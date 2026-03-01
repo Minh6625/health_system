@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../models/user_model.dart';
+import '../services/auth_service.dart';
+import '../widgets/custom_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -11,7 +14,32 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  bool isPasswordHidden = true;
+  final AuthService authService = AuthService();
+
+  bool isLoading = false;
+
+  void handleLogin() async {
+    setState(() => isLoading = true);
+
+    UserModel user = UserModel(
+      email: emailController.text.trim(),
+      password: passwordController.text.trim(),
+    );
+
+    bool success = await authService.login(user);
+
+    setState(() => isLoading = false);
+
+    if (success) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Login thành công")));
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Sai email hoặc mật khẩu")));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,48 +89,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 30),
 
                   // Email
-                  TextField(
+                  CustomTextField(
+                    label: "Email",
+                    icon: Icons.email,
                     controller: emailController,
-                    decoration: InputDecoration(
-                      labelText: "Email",
-                      prefixIcon: const Icon(Icons.email),
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
                   ),
 
                   const SizedBox(height: 20),
 
                   // Password
-                  TextField(
+                  CustomTextField(
+                    label: "Password",
+                    icon: Icons.lock,
                     controller: passwordController,
-                    obscureText: isPasswordHidden,
-                    decoration: InputDecoration(
-                      labelText: "Password",
-                      prefixIcon: const Icon(Icons.lock),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          isPasswordHidden
-                              ? Icons.visibility_off
-                              : Icons.visibility,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            isPasswordHidden = !isPasswordHidden;
-                          });
-                        },
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                    obscureText: true,
                   ),
 
                   const SizedBox(height: 30),
@@ -118,7 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         padding: EdgeInsets.zero,
                       ),
-                      onPressed: () {},
+                      onPressed: isLoading ? null : handleLogin,
                       child: Ink(
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
@@ -126,15 +126,19 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           borderRadius: BorderRadius.all(Radius.circular(14)),
                         ),
-                        child: const Center(
-                          child: Text(
-                            "LOGIN",
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
-                            ),
-                          ),
+                        child: Center(
+                          child: isLoading
+                              ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                )
+                              : const Text(
+                                  "LOGIN",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
                         ),
                       ),
                     ),
