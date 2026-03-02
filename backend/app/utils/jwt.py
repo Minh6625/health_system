@@ -57,6 +57,28 @@ def create_refresh_token(data: dict) -> str:
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
+def create_email_verification_token(data: dict) -> str:
+    """
+    Create JWT email verification token with 24 hours expiry.
+    
+    Args:
+        data: Payload data (user_id, email)
+    
+    Returns:
+        Encoded JWT verification token string
+    """
+    to_encode = data.copy()
+    expire = get_current_time() + timedelta(hours=24)
+    
+    to_encode.update({
+        "exp": expire,
+        "iat": get_current_time(),
+        "iss": "healthguard-mobile",
+        "type": "email_verification"
+    })
+    
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt
 
 def decode_token(token: str) -> dict | None:
     """

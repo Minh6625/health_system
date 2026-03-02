@@ -4,6 +4,7 @@ from typing import Optional
 
 class RegisterRequest(BaseModel):
     email: str = Field(min_length=5, max_length=120)
+    full_name: str = Field(min_length=2, max_length=100)
     password: str = Field(min_length=6, max_length=64)
 
 
@@ -14,6 +15,10 @@ class LoginRequest(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+
+class VerifyEmailRequest(BaseModel):
+    verification_token: str
 
 
 class UserData(BaseModel):
@@ -28,4 +33,4 @@ class AuthResponse(BaseModel):
     message: str
     access_token: Optional[str] = None
     refresh_token: Optional[str] = None
-    user: Optional[UserData] = None
+    verification_token: Optional[str] = None

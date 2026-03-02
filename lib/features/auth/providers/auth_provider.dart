@@ -99,6 +99,39 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> verifyEmail(String verificationToken) async {
+    isLoading = true;
+    message = null;
+    notifyListeners();
+
+    try {
+      final response = await repository.verifyEmail(verificationToken);
+      isLoading = false;
+      message = response.message;
+      notifyListeners();
+      return response.success;
+    } catch (e) {
+      isLoading = false;
+      message = 'Lỗi xác thực: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> resendVerificationToken(String email) async {
+    try {
+      // This would require a new endpoint in the backend
+      // For now, returning false with a message
+      message = 'Chức năng gửi lại token sẽ được cập nhật';
+      notifyListeners();
+      return false;
+    } catch (e) {
+      message = 'Lỗi: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     accessToken = null;
     refreshToken = null;
