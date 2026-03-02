@@ -1,0 +1,3 @@
+class ApiInterceptors {
+  const ApiInterceptors();
+}
