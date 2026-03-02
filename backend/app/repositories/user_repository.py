@@ -23,6 +23,7 @@ class UserRepository:
             full_name=full_name or email.split("@")[0],
             role="patient",
             is_active=True,
+            is_verified=False,
         )
         db.add(user)
         db.commit()
@@ -50,3 +51,14 @@ class UserRepository:
         if user:
             user.last_login_at = get_current_time()
             db.commit()
+
+    @staticmethod
+    def verify_email(db: Session, user_id: int) -> bool:
+        """Mark user's email as verified."""
+        user = UserRepository.get_by_id(db, user_id)
+        if user:
+            user.is_verified = True
+            user.updated_at = get_current_time()
+            db.commit()
+            return True
+        return False

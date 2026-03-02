@@ -3,6 +3,7 @@ class AuthResponse {
   final String message;
   final String? accessToken;
   final String? refreshToken;
+  final String? verificationToken;
   final UserData? user;
 
   AuthResponse({
@@ -10,6 +11,7 @@ class AuthResponse {
     required this.message,
     this.accessToken,
     this.refreshToken,
+    this.verificationToken,
     this.user,
   });
 
@@ -19,6 +21,7 @@ class AuthResponse {
       message: json['message'] as String,
       accessToken: json['access_token'] as String?,
       refreshToken: json['refresh_token'] as String?,
+      verificationToken: json['verification_token'] as String?,
       user: json['user'] != null ? UserData.fromJson(json['user']) : null,
     );
   }

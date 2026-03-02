@@ -7,6 +7,7 @@ from app.schemas.auth import (
     LoginRequest,
     RefreshTokenRequest,
     RegisterRequest,
+    VerifyEmailRequest,
     UserData,
 )
 from app.services.auth_service import AuthService
@@ -36,9 +37,37 @@ def register(
     ip_address = get_client_ip(request)
     user_agent = get_user_agent(request)
 
-    success, message, _ = AuthService.register(
-        db, payload.email.strip(), payload.password, ip_address, user_agent
+    success, message, token_data = AuthService.register(
+        db,
+        payload.email.strip(),
+        payload.full_name,
+        payload.password,
+        ip_address,
+        user_agent,
     )
+    
+    if success and token_data:
+        return AuthResponse(
+            success=True,
+            message=message,
+            verification_token=token_data.get("verification_token")
+        )
+    else:
+        return AuthResponse(success=False, message=message)
+
+
+@router.post("/verify-email", response_model=AuthResponse)
+def verify_email(
+    payload: VerifyEmailRequest, request: Request, db: Session = Depends(get_db)
+) -> AuthResponse:
+    """Verify user email using verification token."""
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+
+    success, message = AuthService.verify_email(
+        db, payload.verification_token, ip_address, user_agent
+    )
+    
     return AuthResponse(success=success, message=message)
 
 
