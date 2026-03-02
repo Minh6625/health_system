@@ -6,7 +6,13 @@ from sqlalchemy.orm import Session
 from app.models.user_model import User
 from app.repositories.audit_log_repository import AuditLogRepository
 from app.repositories.user_repository import UserRepository
-from app.utils.jwt import create_access_token, create_refresh_token, decode_token
+from app.utils.jwt import (
+    create_access_token,
+    create_refresh_token,
+    create_email_verification_token,
+    decode_token,
+)
+from app.utils.email_service import EmailService
 
 
 class AuthService:
@@ -17,6 +23,7 @@ class AuthService:
         cls,
         db: Session,
         email: str,
+        full_name: str,
         password: str,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
@@ -25,7 +32,8 @@ class AuthService:
         Register new user.
         
         Returns:
-            (success, message, None)
+            (success, message, token_data)
+            where token_data = {"verification_token": str} or None on failure
         """
         email = email.strip()
         if not cls.email_pattern.match(email):
@@ -63,7 +71,16 @@ class AuthService:
             return False, "Email đã tồn tại", None
 
         try:
-            user = UserRepository.create_user(db, email, password, full_name=email.split("@")[0])
+            user = UserRepository.create_user(db, email, password, full_name=full_name.strip())
+            
+            # Generate email verification token
+            verification_token = create_email_verification_token(
+                data={"user_id": user.id, "email": user.email}
+            )
+            
+            # Send verification email
+            email_sent = EmailService.send_verification_email(email, verification_token)
+            
             AuditLogRepository.log_action(
                 db,
                 action="user.register",
@@ -73,9 +90,12 @@ class AuthService:
                 resource_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"email": email},
+                details={"email": email, "email_sent": email_sent},
             )
-            return True, "Đăng ký thành công", None
+            
+            return True, "Đăng ký thành công. Vui lòng xác thực email.", {
+                "verification_token": verification_token
+            }
         except Exception as e:
             AuditLogRepository.log_action(
                 db,
@@ -278,3 +298,100 @@ class AuthService:
         }
         
         return True, "Token đã được làm mới", token_data
+    @classmethod
+    def verify_email(
+        cls,
+        db: Session,
+        verification_token: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> tuple[bool, str]:
+        """
+        Verify user email using verification token.
+        
+        Returns:
+            (success, message)
+        """
+        payload = decode_token(verification_token)
+        
+        if not payload or payload.get("type") != "email_verification":
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Invalid verification token"},
+            )
+            return False, "Token xác thực không hợp lệ"
+        
+        user_id = payload.get("user_id")
+        email = payload.get("email")
+        
+        user = UserRepository.get_by_id(db, user_id)
+        
+        if not user:
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "User not found", "user_id": user_id},
+            )
+            return False, "User không tồn tại"
+        
+        if user.email != email:
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="failure",
+                user_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Email mismatch"},
+            )
+            return False, "Email không khớp"
+        
+        if user.is_verified:
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="success",
+                user_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "note": "Already verified"},
+            )
+            return True, "Email đã được xác thực"
+        
+        try:
+            verified = UserRepository.verify_email(db, user_id)
+            
+            if verified:
+                AuditLogRepository.log_action(
+                    db,
+                    action="user.email_verify",
+                    status="success",
+                    user_id=user_id,
+                    resource_type="user",
+                    resource_id=user_id,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"email": email},
+                )
+                return True, "Xác thực email thành công"
+            else:
+                return False, "Lỗi khi xác thực email"
+                
+        except Exception as e:
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="error",
+                user_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "error": str(e)},
+            )
+            return False, f"Lỗi server: {str(e)}"

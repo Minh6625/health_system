@@ -4,6 +4,7 @@ import 'package:health_system/core/constants/app_sizes.dart';
 import 'package:health_system/core/utils/validators.dart';
 import 'package:health_system/features/auth/models/user_model.dart';
 import 'package:health_system/features/auth/providers/auth_provider.dart';
+import 'package:health_system/features/auth/screens/email_verification_screen.dart';
 import 'package:health_system/features/auth/widgets/auth_text_field.dart';
 import 'package:provider/provider.dart';
 
@@ -15,32 +16,28 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController emailController = TextEditingController();
+  final TextEditingController fullNameController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController =
       TextEditingController();
 
   Future<void> handleRegister() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
     final authProvider = context.read<AuthProvider>();
     final email = emailController.text.trim();
+    final fullName = fullNameController.text.trim();
     final password = passwordController.text.trim();
-    final confirmPassword = confirmPasswordController.text.trim();
 
-    if (!Validators.isValidEmail(email)) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Email không hợp lệ')));
-      return;
-    }
-
-    if (password != confirmPassword) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mật khẩu xác nhận không khớp')),
-      );
-      return;
-    }
-
-    final user = UserModel(email: email, password: password);
+    final user = UserModel(
+      email: email,
+      fullName: fullName,
+      password: password,
+    );
     final success = await authProvider.register(user);
 
     if (!mounted) {
@@ -54,13 +51,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (success) {
       authProvider.clearMessage();
-      Navigator.pop(context, email);
+      // Navigate to email verification screen
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EmailVerificationScreen(email: email),
+        ),
+      );
     }
   }
 
   @override
   void dispose() {
     emailController.dispose();
+    fullNameController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
     super.dispose();
@@ -74,43 +78,102 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(title: const Text('Đăng ký')),
       body: Padding(
         padding: const EdgeInsets.all(AppSizes.screenPadding),
-        child: Column(
-          children: [
-            AuthTextField(
-              label: 'Email',
-              icon: Icons.email,
-              controller: emailController,
-            ),
-            const SizedBox(height: 16),
-            AuthTextField(
-              label: 'Mật khẩu',
-              icon: Icons.lock,
-              controller: passwordController,
-              obscureText: true,
-            ),
-            const SizedBox(height: 16),
-            AuthTextField(
-              label: 'Xác nhận mật khẩu',
-              icon: Icons.lock_outline,
-              controller: confirmPasswordController,
-              obscureText: true,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: AppSizes.buttonHeight,
-              child: ElevatedButton(
-                onPressed: authProvider.isLoading ? null : handleRegister,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                AuthTextField(
+                  label: 'Email',
+                  icon: Icons.email,
+                  controller: emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    final input = value?.trim() ?? '';
+                    if (input.isEmpty) return 'Vui lòng nhập email';
+                    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                    if (!emailRegex.hasMatch(input)) {
+                      return 'Email không hợp lệ';
+                    }
+                    return null;
+                  },
                 ),
-                child: authProvider.isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('ĐĂNG KÝ'),
-              ),
+                const SizedBox(height: 16),
+                AuthTextField(
+                  label: 'Họ tên',
+                  icon: Icons.person,
+                  controller: fullNameController,
+                  keyboardType: TextInputType.name,
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    final input = value?.trim() ?? '';
+                    if (input.isEmpty) return 'Vui lòng nhập họ tên';
+                    if (input.length < 2) {
+                      return 'Họ tên phải có ít nhất 2 ký tự';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                AuthTextField(
+                  label: 'Mật khẩu',
+                  icon: Icons.lock,
+                  controller: passwordController,
+                  obscureText: true,
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Vui lòng nhập mật khẩu';
+                    }
+                    if (value.length < 6) {
+                      return 'Mật khẩu phải có ít nhất 6 ký tự';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                AuthTextField(
+                  label: 'Xác nhận mật khẩu',
+                  icon: Icons.lock_outline,
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return 'Vui lòng xác nhận mật khẩu';
+                    }
+                    if (value != passwordController.text) {
+                      return 'Mật khẩu xác nhận không khớp';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: AppSizes.buttonHeight,
+                  child: ElevatedButton(
+                    onPressed: authProvider.isLoading ? null : handleRegister,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: authProvider.isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text('ĐĂNG KÝ'),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
