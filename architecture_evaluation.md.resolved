@@ -1,0 +1,216 @@
+# 🏗️ Kiến trúc tối ưu — HealthGuard Mobile App
+
+## Phạm vi
+
+- **Platform**: Flutter Mobile App (Android)
+- **Roles**: 2 (Patient/Elderly + Caregiver)
+- **Backend**: FastAPI (Mobile Backend) — kết nối qua REST API + MQTT
+- **Mục tiêu**: Kiến trúc **vừa đủ chuẩn**, dễ đọc, dễ mở rộng, không over-engineering
+
+---
+
+## Kiến trúc được chọn: Feature-first
+
+### Vì sao chọn Feature-first?
+
+| Lý do | Giải thích |
+|-------|-----------|
+| **Phù hợp quy mô SRS** | 6 feature modules rõ ràng → mỗi feature = 1 thư mục độc lập |
+| **Dễ chia task** | Mỗi feature map trực tiếp với Trello cards → assign cho từng dev |
+| **Không quá phức tạp** | Không cần tầng `domain/` như Clean Architecture full → ít boilerplate |
+| **2 roles, không 10** | Patient và Caregiver dùng chung nhiều screen → `shared/` chứa phần chung |
+| **Dễ onboard** | Thành viên mới chỉ cần mở folder feature mình phụ trách → hiểu ngay context |
+| **Chuẩn industry** | Đây là pattern phổ biến nhất trong Flutter community 2025-2026 |
+
+### Vì sao KHÔNG chọn các kiến trúc khác?
+
+| Kiến trúc | Lý do loại |
+|-----------|-----------|
+| **Layer-first** (models/, screens/, services/) | Khi có 15+ screens, folder `screens/` sẽ bùng nổ, khó tìm file liên quan |
+| **Clean Architecture strict** | Quá nhiều abstraction (interface → impl cho mỗi repository), team đồ án sẽ bị overwhelm |
+| **MVC/MVVM classic** | Không tận dụng được reactive state management của Flutter |
+
+---
+
+## Cấu trúc thư mục đề xuất
+
+```
+lib/
+│
+├── main.dart                           ← Chỉ chứa runApp()
+├── app.dart                            ← MaterialApp, theme, router
+│
+├── core/                               ← Nền tảng dùng chung toàn app
+│   ├── constants/
+│   │   ├── app_colors.dart             ← Bảng màu tập trung
+│   │   ├── app_strings.dart            ← Text constants (VN/EN)
+│   │   ├── app_sizes.dart              ← Spacing, padding, font sizes
+│   │   └── api_endpoints.dart          ← Base URL, endpoints
+│   │
+│   ├── theme/
+│   │   └── app_theme.dart              ← ThemeData light/dark
+│   │
+│   ├── routes/
+│   │   └── app_router.dart             ← Định nghĩa tất cả routes
+│   │
+│   ├── network/
+│   │   ├── api_client.dart             ← HTTP client (Dio wrapper)
+│   │   ├── api_interceptors.dart       ← JWT token, logging
+│   │   └── api_response.dart           ← Generic response model
+│   │
+│   ├── error/
+│   │   └── failures.dart               ← Các class lỗi thống nhất
+│   │
+│   └── utils/
+│       ├── validators.dart             ← Email, password validation
+│       └── date_formatter.dart         ← Format ngày giờ VN
+│
+├── features/                           ← Mỗi feature = 1 module độc lập
+│   │
+│   ├── auth/                           ← Đăng nhập, đăng ký, quên MK
+│   │   ├── models/
+│   │   │   └── user_model.dart
+│   │   ├── repositories/
+│   │   │   └── auth_repository.dart    ← Gọi API, xử lý response
+│   │   ├── providers/
+│   │   │   └── auth_provider.dart      ← State management cho auth
+│   │   ├── screens/
+│   │   │   ├── login_screen.dart
+│   │   │   ├── register_screen.dart
+│   │   │   └── forgot_password_screen.dart
+│   │   └── widgets/
+│   │       └── auth_text_field.dart
+│   │
+│   ├── health_monitoring/              ← Dashboard chỉ số sinh tồn
+│   │   ├── models/
+│   │   │   ├── vital_sign_model.dart   ← HR, SpO2, BP, Temp
+│   │   │   └── health_history_model.dart
+│   │   ├── repositories/
+│   │   │   └── health_repository.dart
+│   │   ├── providers/
+│   │   │   └── health_provider.dart
+│   │   ├── screens/
+│   │   │   ├── dashboard_screen.dart   ← Realtime vitals
+│   │   │   └── health_history_screen.dart
+│   │   └── widgets/
+│   │       ├── vital_card.dart         ← Card hiển thị 1 chỉ số
+│   │       └── health_chart.dart       ← Line chart lịch sử
+│   │
+│   ├── emergency/                      ← SOS, cảnh báo té ngã
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   ├── providers/
+│   │   ├── screens/
+│   │   │   └── sos_screen.dart         ← Nút SOS + countdown
+│   │   └── widgets/
+│   │
+│   ├── sleep_analysis/                 ← Phân tích giấc ngủ
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   ├── providers/
+│   │   ├── screens/
+│   │   └── widgets/
+│   │
+│   ├── profile/                        ← Thông tin cá nhân, settings
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   ├── providers/
+│   │   ├── screens/
+│   │   └── widgets/
+│   │
+│   └── device/                         ← Kết nối & quản lý thiết bị IoT
+│       ├── models/
+│       ├── repositories/
+│       ├── providers/
+│       ├── screens/
+│       └── widgets/
+│
+└── shared/                             ← Dùng chung giữa các features
+    ├── widgets/
+    │   ├── custom_text_field.dart
+    │   ├── loading_indicator.dart
+    │   ├── error_dialog.dart
+    │   └── bottom_nav_bar.dart         ← Navigation chung
+    └── models/
+        └── pagination_model.dart
+```
+
+---
+
+## Giải thích từng layer
+
+### `core/` — Nền tảng hạ tầng
+
+> Chứa những thứ **không thuộc về bất kỳ feature nào** nhưng toàn bộ app đều cần.
+
+- **`constants/`**: Tập trung tất cả giá trị hardcoded → thay đổi 1 chỗ, áp dụng toàn app
+- **`theme/`**: Định nghĩa `ThemeData` → không còn hardcode `Color(0xFF1565C0)` rải rác
+- **`routes/`**: 1 file quản lý routing → biết ngay app có bao nhiêu screen
+- **`network/`**: API client + interceptors → mọi feature gọi API qua đây, tự động gắn JWT token
+- **`error/`**: Thống nhất cách xử lý lỗi → không mỗi screen xử lý lỗi 1 kiểu
+
+### `features/` — Business logic theo từng chức năng
+
+Mỗi feature folder chứa **4 sub-folders cố định**:
+
+| Sub-folder | Vai trò | Ví dụ |
+|------------|---------|-------|
+| `models/` | Data classes (JSON ↔ Dart object) | `VitalSignModel.fromJson()` |
+| `repositories/` | Gọi API, xử lý data, trả kết quả | `HealthRepository.getLatestVitals()` |
+| `providers/` | State management (giữ data cho UI) | `HealthProvider.vitals` → UI lắng nghe |
+| `screens/` | UI screens | `DashboardScreen` |
+| `widgets/` | UI components riêng của feature | `VitalCard`, `HealthChart` |
+
+**Luồng data trong mỗi feature:**
+```
+Screen → Provider → Repository → API Client (core/network)
+  UI        State       Data            HTTP
+```
+
+### `shared/` — Components dùng chung
+
+> Widget hoặc model mà **≥2 features** cùng sử dụng.
+
+Quy tắc: Nếu widget chỉ dùng trong 1 feature → để trong `features/x/widgets/`. Khi feature thứ 2 cần → di chuyển lên `shared/`.
+
+---
+
+## Mapping Features ↔ SRS Requirements
+
+| Feature folder | SRS Functions | Roles sử dụng |
+|---------------|--------------|----------------|
+| `auth/` | HG-FUNC: Đăng nhập, Đăng ký, Quên MK, Đổi MK | Patient, Caregiver |
+| `health_monitoring/` | HG-FUNC-01, 02, 03, 08, 09 | Patient (xem), Caregiver (giám sát) |
+| `emergency/` | HG-FUNC-04, 05, 06, 07 | Patient (trigger), Caregiver (nhận alert) |
+| `sleep_analysis/` | Sleep Analysis Service (SRS §2.1) | Patient |
+| `profile/` | User profile management | Patient, Caregiver |
+| `device/` | Device Management Service (SRS §2.1) | Patient |
+
+---
+
+## Công nghệ đề xuất kèm theo
+
+| Thành phần | Package | Lý do |
+|-----------|---------|-------|
+| State Management | `provider` | ✅ **Đã chọn** — đơn giản, Flutter official, đủ cho 2-role app |
+| Routing | `go_router` | Declarative routing, hỗ trợ deep link, guard auth |
+| HTTP Client | `dio` | Interceptors, retry, cancel request |
+| Local Storage | `shared_preferences` + `flutter_secure_storage` | Token lưu an toàn |
+| Realtime | `mqtt_client` | Nhận data streaming từ device |
+| Charts | `fl_chart` | Line chart cho vital signs |
+| Push Notification | `firebase_messaging` | FCM theo SRS §3.3 |
+
+---
+
+## 📋 Decision Log
+
+| # | Quyết định | Lựa chọn thay thế | Lý do chọn |
+|---|-----------|-------------------|------------|
+| 1 | **Feature-first** architecture | Layer-first, Clean Architecture strict | Phù hợp quy mô 6 features, dễ chia task cho team, không quá phức tạp |
+| 2 | **Provider** cho state management | Riverpod, BLoC | Đơn giản nhất, Flutter team official recommend, đủ cho app 2-role |
+| 3 | Mobile app chỉ có **2 roles** | — | Patient + Caregiver (Admin dùng Web riêng) |
+| 4 | `providers/` thay vì `blocs/` | `blocs/`, `cubits/` | Tương ứng với Provider package đã chọn |
+| 5 | Không dùng `domain/` layer riêng | Clean Architecture domain layer | Giảm boilerplate, repository đã đủ tách logic cho đồ án |
+
+> [!NOTE]
+> Tất cả quyết định trên đã được user xác nhận. Kiến trúc sẵn sàng cho implementation.
