@@ -31,4 +31,19 @@ class AuthRepository {
       );
     }
   }
+
+  Future<AuthResponse> verifyEmail(String verificationToken) async {
+    try {
+      final result = await _apiClient.post(
+        '/auth/verify-email',
+        body: {'verification_token': verificationToken},
+      );
+      return AuthResponse.fromJson(result);
+    } catch (e) {
+      return AuthResponse(
+        success: false,
+        message: 'Lỗi kết nối: ${e.toString()}',
+      );
+    }
+  }
 }
