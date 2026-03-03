@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:health_system/core/constants/app_colors.dart';
-import 'package:health_system/core/routes/app_router.dart';
+import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/core/routes/app_router.dart';
 
 class StartScreen extends StatelessWidget {
   const StartScreen({super.key});
@@ -11,9 +11,7 @@ class StartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
 
     return Scaffold(
       body: Stack(

@@ -7,7 +7,7 @@
 
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:health_system/app.dart';
+import 'package:healthguard/app.dart';
 
 void main() {
   testWidgets('App shows start screen then navigates to login', (

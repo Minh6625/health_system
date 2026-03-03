@@ -1,6 +1,6 @@
-import 'package:health_system/core/network/api_client.dart';
-import 'package:health_system/features/auth/models/auth_response_model.dart';
-import 'package:health_system/features/auth/models/user_model.dart';
+import 'package:healthguard/core/network/api_client.dart';
+import 'package:healthguard/features/auth/models/auth_response_model.dart';
+import 'package:healthguard/features/auth/models/user_model.dart';
 
 class AuthRepository {
   final ApiClient _apiClient = ApiClient();
