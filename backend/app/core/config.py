@@ -6,7 +6,7 @@ load_dotenv()
 
 
 class Settings:
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:123456@localhost:5433/health_system")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:88888888@0.tcp.ngrok.io:18304/hg_db")
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
     ALGORITHM: str = os.getenv("ALGORITHM", "HS256")
     # Access token expiry in days (30 days = 43200 minutes)

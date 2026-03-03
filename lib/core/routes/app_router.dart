@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:health_system/features/auth/screens/login_screen.dart';
 import 'package:health_system/features/auth/screens/register_screen.dart';
+import 'package:health_system/features/auth/screens/start_screen.dart';
 import 'package:health_system/features/home/screens/dashboard_screen.dart';
 
 class AppRouter {
+  static const String start = '/start';
   static const String login = '/login';
   static const String register = '/register';
   static const String dashboard = '/dashboard';
@@ -14,6 +16,8 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const DashboardScreen());
       case register:
         return MaterialPageRoute(builder: (_) => const RegisterScreen());
+      case start:
+        return MaterialPageRoute(builder: (_) => const StartScreen());
       case login:
       default:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
