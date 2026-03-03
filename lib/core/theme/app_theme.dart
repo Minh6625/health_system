@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:health_system/core/constants/app_colors.dart';
+import 'package:healthguard/core/constants/app_colors.dart';
 
 class AppTheme {
   static ThemeData get lightTheme {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:health_system/app.dart';
+import 'package:healthguard/app.dart';
 
 void main() {
   runApp(const HealthSystemApp());
