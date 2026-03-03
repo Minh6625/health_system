@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:health_system/core/routes/app_router.dart';
-import 'package:health_system/features/auth/providers/auth_provider.dart';
+import 'package:healthguard/core/routes/app_router.dart';
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 
 class DashboardScreen extends StatelessWidget {

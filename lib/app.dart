@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:health_system/core/constants/app_strings.dart';
-import 'package:health_system/core/routes/app_router.dart';
-import 'package:health_system/core/theme/app_theme.dart';
-import 'package:health_system/features/auth/providers/auth_provider.dart';
-import 'package:health_system/features/auth/repositories/auth_repository.dart';
+import 'package:healthguard/core/constants/app_strings.dart';
+import 'package:healthguard/core/routes/app_router.dart';
+import 'package:healthguard/core/theme/app_theme.dart';
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
+import 'package:healthguard/features/auth/repositories/auth_repository.dart';
 import 'package:provider/provider.dart';
 
 class HealthSystemApp extends StatelessWidget {

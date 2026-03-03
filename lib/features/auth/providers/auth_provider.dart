@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
-import 'package:health_system/core/utils/validators.dart';
-import 'package:health_system/features/auth/models/auth_response_model.dart';
-import 'package:health_system/features/auth/models/user_model.dart';
-import 'package:health_system/features/auth/repositories/auth_repository.dart';
-import 'package:health_system/features/auth/services/token_storage_service.dart';
+import 'package:healthguard/core/utils/validators.dart';
+import 'package:healthguard/features/auth/models/auth_response_model.dart';
+import 'package:healthguard/features/auth/models/user_model.dart';
+import 'package:healthguard/features/auth/repositories/auth_repository.dart';
+import 'package:healthguard/features/auth/services/token_storage_service.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository repository;
