@@ -17,7 +17,7 @@ class HealthSystemApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: AppStrings.appName,
         theme: AppTheme.lightTheme,
-        initialRoute: AppRouter.login,
+        initialRoute: AppRouter.start,
         onGenerateRoute: AppRouter.onGenerateRoute,
       ),
     );
