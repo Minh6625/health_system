@@ -10,8 +10,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:health_system/app.dart';
 
 void main() {
-  testWidgets('App shows login screen', (WidgetTester tester) async {
+  testWidgets('App shows start screen then navigates to login', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const HealthSystemApp());
+
+    expect(find.text('Bắt đầu ngay'), findsOneWidget);
+
+    await tester.tap(find.text('Bắt đầu ngay'));
+    await tester.pumpAndSettle();
 
     expect(find.text('LOGIN'), findsOneWidget);
     expect(find.text('Chưa có tài khoản? '), findsOneWidget);
