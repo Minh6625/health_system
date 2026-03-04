@@ -62,3 +62,14 @@ class UserRepository:
             db.commit()
             return True
         return False
+
+    @staticmethod
+    def update_password(db: Session, user_id: int, new_password: str) -> bool:
+        """Update user's password."""
+        user = UserRepository.get_by_id(db, user_id)
+        if user:
+            user.password_hash = hash_password(new_password)
+            user.updated_at = get_current_time()
+            db.commit()
+            return True
+        return False

@@ -30,7 +30,8 @@ class EmailService:
             True if sent successfully, False otherwise
         """
         try:
-            verification_link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
+            # Use mobile deep link for app
+            verification_link = f"{settings.MOBILE_DEEP_LINK_SCHEME}://verify-email?token={verification_token}"
 
             subject = "Xác thực email - Health Guard"
             body = f"""
@@ -38,12 +39,23 @@ Xin chào,
 
 Cảm ơn bạn đã đăng ký tài khoản Health Guard!
 
-Vui lòng xác thực email của bạn bằng cách nhấp vào link dưới đây:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+XÁC THỰC TÀI KHOẢN
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Vui lòng click vào link dưới đây để xác thực email:
+
 {verification_link}
 
-Link này sẽ hết hạn trong 24 giờ.
+Link này sẽ tự động mở ứng dụng Health Guard và kích hoạt tài khoản của bạn.
 
-Nếu bạn không đăng ký tài khoản này, vui lòng bỏ qua email này.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ Lưu ý:
+- Link có hiệu lực trong 24 giờ
+- Nếu link không hoạt động, vui lòng mở app và sử dụng mã:
+  {verification_token}
+- Không chia sẻ link này với bất kỳ ai
 
 ---
 Health Guard Team
@@ -70,7 +82,8 @@ Health Guard Team
             True if sent successfully, False otherwise
         """
         try:
-            reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+            # Use mobile deep link for app
+            reset_link = f"{settings.MOBILE_DEEP_LINK_SCHEME}://reset-password?token={reset_token}"
 
             subject = "Đặt lại mật khẩu - Health Guard"
             body = f"""
@@ -78,12 +91,24 @@ Xin chào,
 
 Bạn đã yêu cầu đặt lại mật khẩu Health Guard.
 
-Vui lòng nhấp vào link dưới đây để đặt lại mật khẩu:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ĐẶT LẠI MẬT KHẨU
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Vui lòng click vào link dưới đây để đặt lại mật khẩu:
+
 {reset_link}
 
-Link này sẽ hết hạn trong 1 giờ.
+Link này sẽ tự động mở ứng dụng Health Guard để bạn cập nhật mật khẩu mới.
 
-Nếu bạn không yêu cầu điều này, vui lòng bỏ qua email này.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+⚠️ Lưu ý:
+- Link có hiệu lực trong 15 phút
+- Nếu link không hoạt động, vui lòng sử dụng mã:
+  {reset_token}
+- Không chia sẻ link này với bất kỳ ai
+- Nếu bạn không yêu cầu đổi mật khẩu, vui lòng bỏ qua email này
 
 ---
 Health Guard Team
@@ -93,6 +118,36 @@ Health Guard Team
 
         except Exception as e:
             logger.error(f"Error sending password reset email to {to_email}: {str(e)}")
+            return False
+
+    @classmethod
+    def send_password_changed_notification(cls, to_email: str) -> bool:
+        """
+        Send notification email after password change.
+
+        Args:
+            to_email: Recipient email address
+
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        try:
+            subject = "Mật khẩu đã được thay đổi - Health Guard"
+            body = f"""
+Xin chào,
+
+Mật khẩu tài khoản Health Guard của bạn đã được thay đổi thành công.
+
+Nếu bạn không thực hiện thay đổi này, vui lòng liên hệ với chúng tôi ngay lập tức.
+
+---
+Health Guard Team
+            """
+
+            return cls._send_email(to_email, subject, body)
+
+        except Exception as e:
+            logger.error(f"Error sending password changed notification to {to_email}: {str(e)}")
             return False
 
     @classmethod

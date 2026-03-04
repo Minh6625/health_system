@@ -95,3 +95,27 @@ def decode_token(token: str) -> dict | None:
         return payload
     except JWTError:
         return None
+
+
+def create_password_reset_token(data: dict) -> str:
+    """
+    Create JWT password reset token with 15 minutes expiry.
+    
+    Args:
+        data: Payload data (user_id, email)
+    
+    Returns:
+        Encoded JWT reset token string
+    """
+    to_encode = data.copy()
+    expire = get_current_time() + timedelta(minutes=15)
+    
+    to_encode.update({
+        "exp": expire,
+        "iat": get_current_time(),
+        "iss": "healthguard-mobile",
+        "type": "password_reset"
+    })
+    
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return encoded_jwt

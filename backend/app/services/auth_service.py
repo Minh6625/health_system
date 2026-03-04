@@ -10,6 +10,7 @@ from app.utils.jwt import (
     create_access_token,
     create_refresh_token,
     create_email_verification_token,
+    create_password_reset_token,
     decode_token,
 )
 from app.utils.email_service import EmailService
@@ -163,6 +164,21 @@ class AuthService:
                     details={"email": email, "reason": "Account locked/inactive"},
                 )
                 return False, "Tài khoản đã bị khóa", None
+            
+            # Check if email is verified
+            if not user.is_verified:
+                AuditLogRepository.log_action(
+                    db,
+                    action="user.login",
+                    status="failure",
+                    user_id=user.id,
+                    resource_type="user",
+                    resource_id=user.id,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"email": email, "reason": "Email not verified"},
+                )
+                return False, "Vui lòng xác thực email trước khi đăng nhập", None
             
             # Update last login timestamp
             UserRepository.update_last_login(db, user.id)
@@ -393,5 +409,371 @@ class AuthService:
                 ip_address=ip_address,
                 user_agent=user_agent,
                 details={"email": email, "error": str(e)},
+            )
+            return False, f"Lỗi server: {str(e)}"
+
+    @classmethod
+    def resend_verification_email(
+        cls,
+        db: Session,
+        email: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> tuple[bool, str, Optional[dict]]:
+        """
+        Resend email verification token to user.
+        
+        Returns:
+            (success, message, token_data)
+            where token_data = {"verification_token": str} or None
+        """
+        email = email.strip()
+        if not cls.email_pattern.match(email):
+            AuditLogRepository.log_action(
+                db,
+                action="user.resend_verification",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "reason": "Invalid email format"},
+            )
+            return False, "Email không hợp lệ", None
+        
+        user = UserRepository.get_by_email(db, email)
+        
+        if not user:
+            # Return success to prevent email enumeration
+            AuditLogRepository.log_action(
+                db,
+                action="user.resend_verification",
+                status="success",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "note": "User not found but returned success"},
+            )
+            return True, "Nếu email tồn tại và chưa xác thực, bạn sẽ nhận được email xác thực", None
+        
+        # Check if already verified
+        if user.is_verified:
+            AuditLogRepository.log_action(
+                db,
+                action="user.resend_verification",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "reason": "Already verified"},
+            )
+            return False, "Email đã được xác thực. Bạn có thể đăng nhập ngay", None
+        
+        try:
+            # Generate new verification token
+            verification_token = create_email_verification_token(
+                data={"user_id": user.id, "email": user.email}
+            )
+            
+            # Send verification email
+            email_sent = EmailService.send_verification_email(email, verification_token)
+            
+            AuditLogRepository.log_action(
+                db,
+                action="user.resend_verification",
+                status="success",
+                user_id=user.id,
+                resource_type="user",
+                resource_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "email_sent": email_sent},
+            )
+            
+            return True, "Email xác thực đã được gửi lại. Vui lòng kiểm tra hộp thư", {
+                "verification_token": verification_token
+            }
+        except Exception as e:
+            AuditLogRepository.log_action(
+                db,
+                action="user.resend_verification",
+                status="error",
+                user_id=user.id if user else None,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "error": str(e)},
+            )
+            return False, f"Lỗi server: {str(e)}", None
+
+    @classmethod
+    def forgot_password(
+        cls,
+        db: Session,
+        email: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> tuple[bool, str, Optional[dict]]:
+        """
+        Generate password reset token and send email.
+        
+        Returns:
+            (success, message, token_data)
+            where token_data = {"reset_token": str} or None
+        """
+        email = email.strip()
+        if not cls.email_pattern.match(email):
+            AuditLogRepository.log_action(
+                db,
+                action="user.forgot_password",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "reason": "Invalid email format"},
+            )
+            return False, "Email không hợp lệ", None
+        
+        user = UserRepository.get_by_email(db, email)
+        
+        # Always return success message to prevent email enumeration
+        # But only send email if user exists
+        if not user:
+            AuditLogRepository.log_action(
+                db,
+                action="user.forgot_password",
+                status="success",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "note": "User not found but returned success"},
+            )
+            return True, "Nếu email tồn tại, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu", None
+        
+        try:
+            # Generate reset token
+            reset_token = create_password_reset_token(
+                data={"user_id": user.id, "email": user.email}
+            )
+            
+            # Send reset email (email service will create deep link)
+            email_sent = EmailService.send_password_reset_email(email, reset_token)
+            
+            AuditLogRepository.log_action(
+                db,
+                action="user.forgot_password",
+                status="success",
+                user_id=user.id,
+                resource_type="user",
+                resource_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "email_sent": email_sent},
+            )
+            
+            return True, "Nếu email tồn tại, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu", {
+                "reset_token": reset_token
+            }
+        except Exception as e:
+            AuditLogRepository.log_action(
+                db,
+                action="user.forgot_password",
+                status="error",
+                user_id=user.id if user else None,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "error": str(e)},
+            )
+            return False, f"Lỗi server: {str(e)}", None
+
+    @classmethod
+    def reset_password(
+        cls,
+        db: Session,
+        reset_token: str,
+        new_password: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> tuple[bool, str]:
+        """
+        Reset password using reset token (one-time use).
+        
+        Returns:
+            (success, message)
+        """
+        if len(new_password) < 6:
+            return False, "Mật khẩu phải có ít nhất 6 ký tự"
+        
+        payload = decode_token(reset_token)
+        
+        if not payload or payload.get("type") != "password_reset":
+            AuditLogRepository.log_action(
+                db,
+                action="user.reset_password",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Invalid reset token"},
+            )
+            return False, "Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"
+        
+        user_id = payload.get("user_id")
+        email = payload.get("email")
+        
+        user = UserRepository.get_by_id(db, user_id)
+        
+        if not user:
+            AuditLogRepository.log_action(
+                db,
+                action="user.reset_password",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "User not found", "user_id": user_id},
+            )
+            return False, "User không tồn tại"
+        
+        if user.email != email:
+            AuditLogRepository.log_action(
+                db,
+                action="user.reset_password",
+                status="failure",
+                user_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Email mismatch"},
+            )
+            return False, "Token không hợp lệ"
+        
+        # Check if password was already changed after token was issued (one-time use)
+        token_issued_at = payload.get("iat")
+        if user.updated_at and token_issued_at:
+            # Convert token_issued_at (timestamp) to datetime for comparison
+            from datetime import datetime, timezone
+            token_time = datetime.fromtimestamp(token_issued_at, tz=timezone.utc)
+            
+            # Ensure user.updated_at is timezone-aware for comparison
+            user_updated_at = user.updated_at
+            if user_updated_at.tzinfo is None:
+                user_updated_at = user_updated_at.replace(tzinfo=timezone.utc)
+            
+            if user_updated_at > token_time:
+                AuditLogRepository.log_action(
+                    db,
+                    action="user.reset_password",
+                    status="failure",
+                    user_id=user_id,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"reason": "Token already used"},
+                )
+                return False, "Token đã được sử dụng. Vui lòng yêu cầu đặt lại mật khẩu mới"
+        
+        try:
+            # Update password
+            UserRepository.update_password(db, user_id, new_password)
+            
+            # Send notification email
+            EmailService.send_password_changed_notification(user.email)
+            
+            AuditLogRepository.log_action(
+                db,
+                action="user.reset_password",
+                status="success",
+                user_id=user_id,
+                resource_type="user",
+                resource_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email},
+            )
+            
+            return True, "Mật khẩu đã được đặt lại thành công"
+            
+        except Exception as e:
+            AuditLogRepository.log_action(
+                db,
+                action="user.reset_password",
+                status="error",
+                user_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "error": str(e)},
+            )
+            return False, f"Lỗi server: {str(e)}"
+
+    @classmethod
+    def change_password(
+        cls,
+        db: Session,
+        user_id: int,
+        current_password: str,
+        new_password: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> tuple[bool, str]:
+        """
+        Change password for authenticated user (requires current password).
+        
+        Returns:
+            (success, message)
+        """
+        if len(new_password) < 6:
+            return False, "Mật khẩu mới phải có ít nhất 6 ký tự"
+        
+        user = UserRepository.get_by_id(db, user_id)
+        
+        if not user:
+            AuditLogRepository.log_action(
+                db,
+                action="user.change_password",
+                status="failure",
+                user_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "User not found"},
+            )
+            return False, "User không tồn tại"
+        
+        # Verify current password
+        from app.utils.password import verify_password
+        if not verify_password(current_password, user.password_hash):
+            AuditLogRepository.log_action(
+                db,
+                action="user.change_password",
+                status="failure",
+                user_id=user_id,
+                resource_type="user",
+                resource_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Wrong current password"},
+            )
+            return False, "Mật khẩu hiện tại không đúng"
+        
+        try:
+            # Update password
+            UserRepository.update_password(db, user_id, new_password)
+            
+            # Send notification email
+            EmailService.send_password_changed_notification(user.email)
+            
+            AuditLogRepository.log_action(
+                db,
+                action="user.change_password",
+                status="success",
+                user_id=user_id,
+                resource_type="user",
+                resource_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": user.email},
+            )
+            
+            return True, "Mật khẩu đã được thay đổi thành công"
+            
+        except Exception as e:
+            AuditLogRepository.log_action(
+                db,
+                action="user.change_password",
+                status="error",
+                user_id=user_id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"error": str(e)},
             )
             return False, f"Lỗi server: {str(e)}"

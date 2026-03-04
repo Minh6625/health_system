@@ -59,5 +59,8 @@ class RateLimiter:
             del self._attempts[identifier]
 
 
-# Global rate limiter instance
+# Global rate limiter instances
 login_rate_limiter = RateLimiter(max_attempts=5, window_minutes=15)
+forgot_password_rate_limiter = RateLimiter(max_attempts=3, window_minutes=15)
+change_password_rate_limiter = RateLimiter(max_attempts=5, window_minutes=15)
+resend_verification_rate_limiter = RateLimiter(max_attempts=3, window_minutes=15)

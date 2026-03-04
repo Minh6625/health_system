@@ -2,16 +2,27 @@ from fastapi import APIRouter, Depends, Request, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
+from app.models.user_model import User
 from app.schemas.auth import (
     AuthResponse,
     LoginRequest,
     RefreshTokenRequest,
     RegisterRequest,
     VerifyEmailRequest,
+    ResendVerificationRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
+    ChangePasswordRequest,
     UserData,
 )
 from app.services.auth_service import AuthService
-from app.utils.rate_limiter import login_rate_limiter
+from app.utils.rate_limiter import (
+    login_rate_limiter,
+    forgot_password_rate_limiter,
+    change_password_rate_limiter,
+    resend_verification_rate_limiter,
+)
+from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -69,6 +80,39 @@ def verify_email(
     )
     
     return AuthResponse(success=success, message=message)
+
+
+@router.post("/resend-verification", response_model=AuthResponse)
+def resend_verification(
+    payload: ResendVerificationRequest, request: Request, db: Session = Depends(get_db)
+) -> AuthResponse:
+    """Resend email verification token to user."""
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+
+    # Check rate limiting (3 attempts per 15 minutes)
+    identifier = f"resend_{payload.email.strip()}"
+    if resend_verification_rate_limiter.is_rate_limited(identifier):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.",
+        )
+
+    success, message, token_data = AuthService.resend_verification_email(
+        db, payload.email.strip(), ip_address, user_agent
+    )
+
+    # Always record attempt for rate limiting
+    resend_verification_rate_limiter.record_attempt(identifier)
+
+    if success:
+        return AuthResponse(
+            success=True,
+            message=message,
+            verification_token=token_data.get("verification_token") if token_data else None
+        )
+    else:
+        return AuthResponse(success=False, message=message)
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -131,3 +175,86 @@ def refresh_token(
         )
     else:
         return AuthResponse(success=False, message=message)
+
+
+@router.post("/forgot-password", response_model=AuthResponse)
+def forgot_password(
+    payload: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)
+) -> AuthResponse:
+    """Request password reset token."""
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+
+    # Check rate limiting (3 attempts per 15 minutes)
+    if forgot_password_rate_limiter.is_rate_limited(ip_address):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.",
+        )
+
+    success, message, token_data = AuthService.forgot_password(
+        db, payload.email.strip(), ip_address, user_agent
+    )
+
+    # Always record attempt for rate limiting
+    forgot_password_rate_limiter.record_attempt(ip_address)
+
+    # Return success response even if email doesn't exist (prevent enumeration)
+    if success:
+        return AuthResponse(
+            success=True,
+            message=message,
+        )
+    else:
+        return AuthResponse(success=False, message=message)
+
+
+@router.post("/reset-password", response_model=AuthResponse)
+def reset_password(
+    payload: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)
+) -> AuthResponse:
+    """Reset password using reset token."""
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+
+    success, message = AuthService.reset_password(
+        db, payload.reset_token, payload.new_password, ip_address, user_agent
+    )
+
+    return AuthResponse(success=success, message=message)
+
+
+@router.post("/change-password", response_model=AuthResponse)
+def change_password(
+    payload: ChangePasswordRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> AuthResponse:
+    """Change password for authenticated user."""
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+
+    # Check rate limiting (5 attempts per 15 minutes)
+    identifier = f"change_pwd_{current_user.id}"
+    if change_password_rate_limiter.is_rate_limited(identifier):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Quá nhiều yêu cầu. Vui lòng thử lại sau 15 phút.",
+        )
+
+    success, message = AuthService.change_password(
+        db,
+        current_user.id,
+        payload.current_password,
+        payload.new_password,
+        ip_address,
+        user_agent,
+    )
+
+    if not success:
+        change_password_rate_limiter.record_attempt(identifier)
+    else:
+        change_password_rate_limiter.reset(identifier)
+
+    return AuthResponse(success=success, message=message)
