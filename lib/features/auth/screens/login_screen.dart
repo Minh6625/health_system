@@ -54,9 +54,34 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+    // Check if login failed due to unverified email
+    if (!success && message.toLowerCase().contains('xác thực email')) {
+      // Show error message with option to go to verification screen
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Vui lòng xác thực email'),
+          duration: const Duration(seconds: 5),
+          action: SnackBarAction(
+            label: 'Xác thực',
+            textColor: Colors.white,
+            onPressed: () {
+              // Resend verification email first
+              _resendVerification(emailController.text.trim());
+              // Then navigate to verification waiting screen
+              Navigator.pushNamed(
+                context,
+                AppRouter.verifyEmail,
+                arguments: {'email': emailController.text.trim()},
+              );
+            },
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
 
     if (success) {
       authProvider.clearMessage();
@@ -64,6 +89,30 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
         AppRouter.dashboard,
         (route) => false,
+      );
+    }
+  }
+
+  Future<void> _resendVerification(String email) async {
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Vui lòng nhập email')));
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final success = await authProvider.resendVerificationToken(email);
+
+    if (!mounted) return;
+
+    final message = authProvider.message;
+    if (message != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: success ? Colors.green : null,
+        ),
       );
     }
   }
@@ -127,11 +176,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       validator: (value) {
-                        final input = value?.trim() ?? '';
-                        if (input.isEmpty) return 'Vui lòng nhập email';
-                        final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                        if (!emailRegex.hasMatch(input)) {
-                          return 'Email không hợp lệ';
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Vui lòng nhập email';
                         }
                         return null;
                       },
@@ -150,7 +196,26 @@ class _LoginScreenState extends State<LoginScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRouter.forgotPassword,
+                          );
+                        },
+                        child: const Text(
+                          'Quên mật khẩu?',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       height: AppSizes.buttonHeight,

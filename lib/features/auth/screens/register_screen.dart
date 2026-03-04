@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/core/constants/app_colors.dart';
 import 'package:healthguard/core/constants/app_sizes.dart';
+import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/models/user_model.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
-import 'package:healthguard/features/auth/screens/email_verification_screen.dart';
 import 'package:healthguard/features/auth/widgets/auth_text_field.dart';
 import 'package:provider/provider.dart';
 
@@ -44,19 +44,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     final message = authProvider.message ?? 'Đăng ký thất bại';
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
 
     if (success) {
       authProvider.clearMessage();
-      // Navigate to email verification screen
-      Navigator.pushReplacement(
+      // Navigate to verification waiting screen
+      Navigator.pushReplacementNamed(
         context,
-        MaterialPageRoute(
-          builder: (context) => EmailVerificationScreen(email: email),
-        ),
+        AppRouter.verifyEmail,
+        arguments: {'email': email},
       );
+    } else {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
