@@ -119,14 +119,25 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> resendVerificationToken(String email) async {
-    try {
-      // This would require a new endpoint in the backend
-      // For now, returning false with a message
-      message = 'Chức năng gửi lại token sẽ được cập nhật';
+    if (!Validators.isValidEmail(email)) {
+      message = 'Email không hợp lệ';
       notifyListeners();
       return false;
+    }
+
+    isLoading = true;
+    message = null;
+    notifyListeners();
+
+    try {
+      final response = await repository.resendVerification(email);
+      isLoading = false;
+      message = response.message;
+      notifyListeners();
+      return response.success;
     } catch (e) {
-      message = 'Lỗi: ${e.toString()}';
+      isLoading = false;
+      message = 'Lỗi kết nối: ${e.toString()}';
       notifyListeners();
       return false;
     }
