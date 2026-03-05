@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/features/auth/screens/auth_pages_screen.dart';
 import 'package:healthguard/features/auth/screens/change_password_screen.dart';
 import 'package:healthguard/features/auth/screens/forgot_password_screen.dart';
 import 'package:healthguard/features/auth/screens/login_screen.dart';
@@ -45,7 +46,7 @@ class AppRouter {
       case changePassword:
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
       case start:
-        return MaterialPageRoute(builder: (_) => const StartScreen());
+        return MaterialPageRoute(builder: (_) => const AuthPagesScreen());
       case login:
       default:
         return MaterialPageRoute(builder: (_) => const LoginScreen());
