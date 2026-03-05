@@ -3,7 +3,9 @@ import 'package:healthguard/core/constants/app_colors.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 
 class StartScreen extends StatelessWidget {
-  const StartScreen({super.key});
+  final bool isInPageView;
+
+  const StartScreen({super.key, this.isInPageView = false});
 
   void _openLogin(BuildContext context) {
     Navigator.pushReplacementNamed(context, AppRouter.login);
@@ -11,175 +13,239 @@ class StartScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-
     return Scaffold(
-      body: Stack(
-        children: [
-          // White background
-          Container(color: Colors.white),
-
-          // Top image (logo.png) - 55% of screen with shadow
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: screenHeight * 0.55,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Container(
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.13),
-                        blurRadius: 32,
-                        offset: const Offset(0, 16),
-                      ),
-                    ],
-                  ),
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [AppColors.primaryLight, Colors.white],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-
-          // Bottom blue section - overlaps image by ~25%
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: screenHeight * 0.36,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary.withValues(alpha: 0),
-                    AppColors.primary.withValues(alpha: 0.3),
-                    AppColors.primary.withValues(alpha: 0.75),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Logo Icon
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.favorite,
+                        color: AppColors.primary,
+                        size: 28,
+                      ),
+                    ),
+                    // Language Button
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.language,
+                        color: Colors.grey,
+                        size: 20,
+                      ),
+                    ),
                   ],
-                  stops: const [0.0, 0.4, 1.0],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
                 ),
-                borderRadius: BorderRadius.zero,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  // Text section
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Chăm sóc sức khỏe gia đình bạn',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppColors.primary.withValues(alpha: 0.85),
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'HealthGuard',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 50,
-                              height: 1.1,
-                              letterSpacing: -0.5,
-                            ),
-                      ),
-                      const SizedBox(height: 10),
-                      Column(
-                        children: [
-                          Text(
-                            'Theo dõi chỉ số từ smartwatch',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.7,
-                                  ),
-                                  fontWeight: FontWeight.w400,
-                                  fontSize: 15,
-                                  height: 1.4,
-                                ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Cảnh báo sớm đột quỵ & té ngã',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.7,
-                                  ),
-                                  fontWeight: FontWeight.w400,
-                                  fontSize: 15,
-                                  height: 1.4,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
 
-                  // Button section
-                  Container(
-                    width: double.infinity,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primaryLight,
-                          Colors.blue[700] ?? AppColors.primary,
-                        ],
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.25),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
+              // Main Content
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 20),
+
+                        // Hero Section - Logo Only
+                        Container(
+                          height: 320,
+                          padding: const EdgeInsets.all(20),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
+
+                        const SizedBox(height: 48),
+
+                        // Title Section
+                        Text(
+                          'HealthGuard',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.displaySmall
+                              ?.copyWith(
+                                color: const Color(0xFF1E293B),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 40,
+                                letterSpacing: -0.5,
+                              ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Chăm sóc sức khỏe gia đình bạn',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 20,
+                              ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Theo dõi chỉ số từ smartwatch.\nCảnh báo sớm đột quỵ & té ngã.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(
+                                color: Colors.grey[600],
+                                fontSize: 16,
+                                height: 1.5,
+                              ),
+                        ),
+                        const SizedBox(height: 40),
                       ],
                     ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => _openLogin(context),
-                        borderRadius: BorderRadius.circular(24),
-                        child: Center(
-                          child: Text(
-                            'Bắt đầu ngay',
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
-                                  letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+
+              // Footer - Only show when not in PageView
+              if (!isInPageView)
+                Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Primary Button
+                      SizedBox(
+                        width: double.infinity,
+                        height: 60,
+                        child: ElevatedButton(
+                          onPressed: () => _openLogin(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 8,
+                            shadowColor: AppColors.primary.withOpacity(0.25),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Bắt đầu ngay',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
                                 ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.arrow_forward,
+                                size: 24,
+                                color: Colors.white,
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
+
+                      const SizedBox(height: 24),
+
+                      // Trust Divider
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.grey[300])),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: Text(
+                              'TIN CẬY & BẢO MẬT',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[400],
+                                letterSpacing: 1.5,
+                              ),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Colors.grey[300])),
+                        ],
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Trust Indicators
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.verified_user,
+                                color: AppColors.primary,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Mã hóa đầu cuối',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 24),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.notifications_active,
+                                color: AppColors.primary,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Hỗ trợ 24/7',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
