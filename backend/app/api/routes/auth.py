@@ -18,6 +18,7 @@ from app.schemas.auth import (
 from app.services.auth_service import AuthService
 from app.utils.rate_limiter import (
     login_rate_limiter,
+    register_rate_limiter,
     forgot_password_rate_limiter,
     change_password_rate_limiter,
     resend_verification_rate_limiter,
@@ -44,24 +45,46 @@ def get_user_agent(request: Request) -> str:
 def register(
     payload: RegisterRequest, request: Request, db: Session = Depends(get_db)
 ) -> AuthResponse:
-    """Register a new user account."""
+    """Register a new user account with role support."""
     ip_address = get_client_ip(request)
     user_agent = get_user_agent(request)
+
+    # Check rate limiting (5 attempts per hour per IP)
+    if register_rate_limiter.is_rate_limited(ip_address):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Quá nhiều yêu cầu đăng ký. Vui lòng thử lại sau 1 giờ.",
+        )
 
     success, message, token_data = AuthService.register(
         db,
         payload.email.strip(),
         payload.full_name,
         payload.password,
-        ip_address,
-        user_agent,
+        role=payload.role,
+        date_of_birth=payload.date_of_birth,
+        phone=payload.phone,
+        ip_address=ip_address,
+        user_agent=user_agent,
     )
     
+    # Record attempt for rate limiting
+    register_rate_limiter.record_attempt(ip_address)
+    
     if success and token_data:
+        user_obj = token_data.get("user")
+        user_data = UserData(
+            user_id=user_obj.id,
+            email=user_obj.email,
+            full_name=user_obj.full_name,
+            role=user_obj.role,
+        ) if user_obj else None
+        
         return AuthResponse(
             success=True,
             message=message,
-            verification_token=token_data.get("verification_token")
+            verification_token=token_data.get("verification_token"),
+            user=user_data,
         )
     else:
         return AuthResponse(success=False, message=message)

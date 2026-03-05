@@ -75,10 +75,73 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    if (!Validators.isStrongPassword(user.password)) {
-      message = 'Mật khẩu phải có ít nhất 6 ký tự';
+    // Validate full_name: only letters, Vietnamese diacritics, and spaces
+    if (user.fullName.trim().isEmpty) {
+      message = 'Vui lòng nhập họ tên';
       notifyListeners();
       return false;
+    }
+
+    if (user.fullName.trim().length < 2) {
+      message = 'Họ tên phải có ít nhất 2 ký tự';
+      notifyListeners();
+      return false;
+    }
+
+    if (user.fullName.trim().length > 100) {
+      message = 'Họ tên không thể vượt quá 100 ký tự';
+      notifyListeners();
+      return false;
+    }
+
+    // Only letters, Vietnamese diacritics (À-ỿ), and spaces allowed
+    final namePattern = RegExp(r'^[a-zA-ZÀ-ỿ\s]+$');
+    if (!namePattern.hasMatch(user.fullName.trim())) {
+      message = 'Họ tên chỉ được chứa chữ cái. Không được phép dùng số hoặc ký tự đặc biệt';
+      notifyListeners();
+      return false;
+    }
+
+    if (user.password.isEmpty || user.password.length < 8) {
+      message = 'Mật khẩu phải có ít nhất 8 ký tự';
+      notifyListeners();
+      return false;
+    }
+
+    // Validate date of birth if provided
+    if (user.dateOfBirth != null) {
+      final age = DateTime.now().year - user.dateOfBirth!.year -
+          (DateTime.now().month < user.dateOfBirth!.month ||
+                  (DateTime.now().month == user.dateOfBirth!.month &&
+                      DateTime.now().day < user.dateOfBirth!.day)
+              ? 1
+              : 0);
+
+      if (age < 18) {
+        message = 'Bạn phải đủ 18 tuổi để đăng ký';
+        notifyListeners();
+        return false;
+      }
+
+      if (age > 150) {
+        message = 'Ngày sinh không hợp lệ';
+        notifyListeners();
+        return false;
+      }
+    } else {
+      message = 'Vui lòng chọn ngày sinh';
+      notifyListeners();
+      return false;
+    }
+
+    // Validate phone if provided
+    if (user.phone != null && user.phone!.isNotEmpty) {
+      final phone = user.phone!.replaceAll(RegExp(r'[^\d]'), '');
+      if (phone.length < 10 || phone.length > 15) {
+        message = 'Số điện thoại phải có từ 10 đến 15 chữ số';
+        notifyListeners();
+        return false;
+      }
     }
 
     isLoading = true;
