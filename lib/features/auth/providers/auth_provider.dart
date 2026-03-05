@@ -76,19 +76,19 @@ class AuthProvider extends ChangeNotifier {
     }
 
     // Validate full_name: only letters, Vietnamese diacritics, and spaces
-    if (user.fullName.trim().isEmpty) {
+    if (user.fullName?.trim().isEmpty ?? true) {
       message = 'Vui lòng nhập họ tên';
       notifyListeners();
       return false;
     }
 
-    if (user.fullName.trim().length < 2) {
+    if ((user.fullName?.trim().length ?? 0) < 2) {
       message = 'Họ tên phải có ít nhất 2 ký tự';
       notifyListeners();
       return false;
     }
 
-    if (user.fullName.trim().length > 100) {
+    if ((user.fullName?.trim().length ?? 0) > 100) {
       message = 'Họ tên không thể vượt quá 100 ký tự';
       notifyListeners();
       return false;
@@ -96,8 +96,9 @@ class AuthProvider extends ChangeNotifier {
 
     // Only letters, Vietnamese diacritics (À-ỿ), and spaces allowed
     final namePattern = RegExp(r'^[a-zA-ZÀ-ỿ\s]+$');
-    if (!namePattern.hasMatch(user.fullName.trim())) {
-      message = 'Họ tên chỉ được chứa chữ cái. Không được phép dùng số hoặc ký tự đặc biệt';
+    if (!namePattern.hasMatch(user.fullName?.trim() ?? '')) {
+      message =
+          'Họ tên chỉ được chứa chữ cái. Không được phép dùng số hoặc ký tự đặc biệt';
       notifyListeners();
       return false;
     }
@@ -110,7 +111,9 @@ class AuthProvider extends ChangeNotifier {
 
     // Validate date of birth if provided
     if (user.dateOfBirth != null) {
-      final age = DateTime.now().year - user.dateOfBirth!.year -
+      final age =
+          DateTime.now().year -
+          user.dateOfBirth!.year -
           (DateTime.now().month < user.dateOfBirth!.month ||
                   (DateTime.now().month == user.dateOfBirth!.month &&
                       DateTime.now().day < user.dateOfBirth!.day)
