@@ -1,4 +1,6 @@
 from sqlalchemy.orm import Session
+from datetime import date
+from typing import Optional
 
 from app.models.user_model import User
 from app.utils.datetime_helper import get_current_time
@@ -15,13 +17,23 @@ class UserRepository:
         return db.query(User).filter(User.id == user_id).first()
 
     @staticmethod
-    def create_user(db: Session, email: str, password: str, full_name: str) -> User:
+    def create_user(
+        db: Session,
+        email: str,
+        password: str,
+        full_name: str,
+        role: str = "patient",
+        date_of_birth: Optional[date] = None,
+        phone: Optional[str] = None,
+    ) -> User:
         hashed_password = hash_password(password)
         user = User(
             email=email,
             password_hash=hashed_password,
             full_name=full_name or email.split("@")[0],
-            role="patient",
+            role=role.lower() if role in ["patient", "caregiver"] else "patient",
+            date_of_birth=date_of_birth,
+            phone=phone,
             is_active=True,
             is_verified=False,
         )

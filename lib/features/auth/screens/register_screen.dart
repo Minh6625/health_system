@@ -21,6 +21,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmPasswordController =
       TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  
+  String selectedRole = 'patient';  // patient | caregiver
+  DateTime? selectedDate;  // ngày sinh
+  late final DateTime _minDateOfBirth = DateTime.now().subtract(const Duration(days: 365 * 18)); // At least 18 years old
 
   Future<void> handleRegister() async {
     if (!_formKey.currentState!.validate()) {
@@ -31,11 +36,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final email = emailController.text.trim();
     final fullName = fullNameController.text.trim();
     final password = passwordController.text.trim();
+    final phone = phoneController.text.trim();
 
     final user = UserModel(
       email: email,
       fullName: fullName,
       password: password,
+      role: selectedRole,
+      dateOfBirth: selectedDate,
+      phone: phone.isEmpty ? null : phone,
     );
     final success = await authProvider.register(user);
 
@@ -66,7 +75,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
     fullNameController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
+    phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDate(BuildContext context, String role) async {
+    // Patient: past to now | Caregiver: must be >= 18 years old
+    final DateTime lastDate = role == 'caregiver'
+        ? DateTime.now().subtract(const Duration(days: 365 * 18))
+        : DateTime.now();
+    
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDate ?? (role == 'caregiver' ? _minDateOfBirth : DateTime.now().subtract(const Duration(days: 365 * 20))),
+      firstDate: DateTime(1900),
+      lastDate: lastDate,
+      helpText: 'Chọn ngày sinh',
+      cancelText: 'Hủy',
+      confirmText: 'Xác nhận',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).primaryColor,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null && picked != selectedDate) {
+      setState(() => selectedDate = picked);
+    }
   }
 
   @override
@@ -111,8 +151,118 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (input.length < 2) {
                       return 'Họ tên phải có ít nhất 2 ký tự';
                     }
+                    if (input.length > 100) {
+                      return 'Họ tên không thể vượt quá 100 ký tự';
+                    }
+                    // Validate: only letters, Vietnamese diacritics, and spaces
+                    final nameRegex = RegExp(r'^[a-zA-ZÀ-ỿ\s]+$');
+                    if (!nameRegex.hasMatch(input)) {
+                      return 'Họ tên chỉ được chứa chữ cái. Không được phép dùng số hoặc ký tự đặc biệt';
+                    }
                     return null;
                   },
+                ),
+                const SizedBox(height: 16),
+                // Date of Birth Picker
+                GestureDetector(
+                  onTap: () => _selectDate(context, selectedRole),
+                  child: FormField(
+                    validator: (value) {
+                      if (selectedDate == null) {
+                        return 'Vui lòng chọn ngày sinh';
+                      }
+                      // Only check age requirement for caregiver role
+                      if (selectedRole == 'caregiver') {
+                        final age = DateTime.now().difference(selectedDate!).inDays ~/ 365;
+                        if (age < 18) {
+                          return 'Người chăm sóc phải đủ 18 tuổi để đăng ký';
+                        }
+                      }
+                      return null;
+                    },
+                    builder: (FormFieldState state) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          InputDecorator(
+                            decoration: InputDecoration(
+                              labelText: 'Ngày sinh',
+                              prefixIcon: const Icon(Icons.calendar_today),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              errorText: state.errorText,
+                            ),
+                            child: Text(
+                              selectedDate != null
+                                  ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
+                                  : 'Chọn ngày sinh',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: selectedDate != null
+                                    ? Colors.black87
+                                    : Colors.grey,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Phone Number Input
+                AuthTextField(
+                  label: 'Số điện thoại',
+                  icon: Icons.phone,
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  textInputAction: TextInputAction.next,
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return null;  // Optional field
+                    }
+                    final phone = value.replaceAll(RegExp(r'[^\d]'), '');
+                    if (phone.length < 10 || phone.length > 15) {
+                      return 'Số điện thoại phải có từ 10 đến 15 chữ số';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: 'Vai trò',
+                    prefixIcon: const Icon(Icons.security),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: 'patient',
+                      child: const Text('Bệnh nhân'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'caregiver',
+                      child: const Text('Người chăm sóc'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      selectedRole = value ?? 'patient';
+                      // If switching to caregiver, reset date if person is younger than 18
+                      if (selectedRole == 'caregiver' && selectedDate != null) {
+                        final age = DateTime.now().difference(selectedDate!).inDays ~/ 365;
+                        if (age < 18) {
+                          selectedDate = _minDateOfBirth; // Reset to 18-year-old date
+                        }
+                      }
+                    });
+                  },
+                  menuMaxHeight: 150,
                 ),
                 const SizedBox(height: 16),
                 AuthTextField(
@@ -125,8 +275,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
                     }
-                    if (value.length < 6) {
-                      return 'Mật khẩu phải có ít nhất 6 ký tự';
+                    if (value.length < 8) {
+                      return 'Mật khẩu phải có ít nhất 8 ký tự';
+                    }
+                    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+                      return 'Mật khẩu phải chứa ít nhất 1 ký tự in hoa';
+                    }
+                    if (!RegExp(r'[a-z]').hasMatch(value)) {
+                      return 'Mật khẩu phải chứa ít nhất 1 ký tự in thường';
+                    }
+                    if (!RegExp(r'\d').hasMatch(value)) {
+                      return 'Mật khẩu phải chứa ít nhất 1 chữ số';
+                    }
+                    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(value)) {
+                      return 'Mật khẩu phải chứa ít nhất 1 ký tự đặc biệt';
                     }
                     return null;
                   },

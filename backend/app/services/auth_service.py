@@ -1,5 +1,7 @@
 import re
 from typing import Optional
+import logging
+from datetime import date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -14,10 +16,45 @@ from app.utils.jwt import (
     decode_token,
 )
 from app.utils.email_service import EmailService
+from app.utils.password import validate_password_strength
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
     email_pattern = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+    
+    @staticmethod
+    def validate_age(date_of_birth: Optional[date]) -> tuple[bool, str]:
+        """
+        Validate age from date of birth.
+        
+        Requirements:
+        - Age >= 18 (must be adult)
+        - Age <= 150 (reasonable upper limit)
+        
+        Returns:
+            (is_valid, message) tuple
+        """
+        if date_of_birth is None:
+            return True, "OK"  # Optional field
+        
+        today = date.today()
+        age = today.year - date_of_birth.year - (
+            (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
+        )
+        
+        # Check if age is in valid range
+        if age < 0:
+            return False, "Ngày sinh không hợp lệ (trong tương lai)"
+        
+        if age < 18:
+            return False, "Bạn phải đủ 18 tuổi để đăng ký"
+        
+        if age > 150:
+            return False, "Ngày sinh không hợp lệ (tuổi quá cao)"
+        
+        return True, "OK"
 
     @classmethod
     def register(
@@ -26,17 +63,34 @@ class AuthService:
         email: str,
         full_name: str,
         password: str,
+        role: str = "patient",
+        date_of_birth: Optional[date] = None,
+        phone: Optional[str] = None,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> tuple[bool, str, Optional[dict]]:
         """
-        Register new user.
+        Register new user with role support and strong password validation.
+        
+        Args:
+            db: Database session
+            email: User email
+            full_name: User full name
+            password: User password (must meet strength requirements)
+            role: User role (patient or caregiver, default: patient)
+            date_of_birth: User date of birth (YYYY-MM-DD), optional
+            phone: User phone number (10-15 digits), optional
+            ip_address: Client IP address
+            user_agent: Client user agent
         
         Returns:
-            (success, message, token_data)
-            where token_data = {"verification_token": str} or None on failure
+            (success, message, token_data) tuple
+            where token_data = {"verification_token": str, "user": User} or None on failure
         """
         email = email.strip()
+        full_name = full_name.strip()
+        
+        # Validate email format
         if not cls.email_pattern.match(email):
             AuditLogRepository.log_action(
                 db,
@@ -48,17 +102,50 @@ class AuthService:
             )
             return False, "Email không hợp lệ", None
 
-        if len(password) < 6:
+        # Validate full_name format (only letters, Vietnamese diacritics, and spaces)
+        full_name_pattern = re.compile(r"^[a-zA-ZÀ-ỿ\s]+$")
+        if not full_name_pattern.match(full_name):
             AuditLogRepository.log_action(
                 db,
                 action="user.register",
                 status="failure",
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"email": email, "reason": "Password too short"},
+                details={"email": email, "reason": "Invalid full_name format (contains numbers or special characters)"},
             )
-            return False, "Mật khẩu phải có ít nhất 6 ký tự", None
+            return False, "Họ tên chỉ được chứa chữ cái và khoảng trắng. Không được phép dùng số hoặc ký tự đặc biệt", None
 
+        # Validate password strength
+        is_strong, strength_message = validate_password_strength(password)
+        if not is_strong:
+            AuditLogRepository.log_action(
+                db,
+                action="user.register",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "reason": f"Password validation failed: {strength_message}"},
+            )
+            return False, strength_message, None
+
+        # Validate date of birth and age
+        is_valid_age, age_message = cls.validate_age(date_of_birth)
+        if not is_valid_age:
+            AuditLogRepository.log_action(
+                db,
+                action="user.register",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email, "reason": f"Age validation failed: {age_message}"},
+            )
+            return False, age_message, None
+
+        # Validate role
+        if role not in ["patient", "caregiver"]:
+            role = "patient"
+
+        # Check if email already exists
         existing_user = UserRepository.get_by_email(db, email)
         if existing_user:
             AuditLogRepository.log_action(
@@ -72,7 +159,16 @@ class AuthService:
             return False, "Email đã tồn tại", None
 
         try:
-            user = UserRepository.create_user(db, email, password, full_name=full_name.strip())
+            # Create new user
+            user = UserRepository.create_user(
+                db,
+                email,
+                password,
+                full_name=full_name.strip(),
+                role=role,
+                date_of_birth=date_of_birth,
+                phone=phone,
+            )
             
             # Generate email verification token
             verification_token = create_email_verification_token(
@@ -91,22 +187,25 @@ class AuthService:
                 resource_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"email": email, "email_sent": email_sent},
+                details={"email": email, "role": role, "email_sent": email_sent},
             )
             
             return True, "Đăng ký thành công. Vui lòng xác thực email.", {
-                "verification_token": verification_token
+                "verification_token": verification_token,
+                "user": user,
             }
         except Exception as e:
+            logger.error(f"Register error for {email}: {str(e)}")
             AuditLogRepository.log_action(
                 db,
                 action="user.register",
                 status="error",
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"email": email, "error": str(e)},
+                details={"email": email, "error": type(e).__name__},
             )
-            return False, f"Lỗi server: {str(e)}", None
+            # Return generic error message (don't leak details)
+            return False, "Đã xảy ra lỗi. Vui lòng thử lại sau.", None
 
     @classmethod
     def login(
@@ -221,15 +320,17 @@ class AuthService:
             return True, "Đăng nhập thành công", token_data
             
         except Exception as e:
+            logger.error(f"Login error for {email}: {str(e)}")
             AuditLogRepository.log_action(
                 db,
                 action="user.login",
                 status="error",
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"email": email, "error": str(e)},
+                details={"email": email, "error": type(e).__name__},
             )
-            return False, f"Lỗi server: {str(e)}", None
+            # Return generic error message (don't leak details)
+            return False, "Đã xảy ra lỗi. Vui lòng thử lại sau.", None
 
     @classmethod
     def refresh_access_token(
