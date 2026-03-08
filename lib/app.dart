@@ -25,7 +25,10 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
   void initState() {
     super.initState();
     _appLinks = AppLinks();
-    _initDeepLinks();
+    // Defer deep link initialization to avoid blocking UI
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initDeepLinks();
+    });
   }
 
   Future<void> _initDeepLinks() async {
@@ -88,7 +91,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         debugShowCheckedModeBanner: false,
         title: AppStrings.appName,
         theme: AppTheme.lightTheme,
-        initialRoute: AppRouter.start,
+        initialRoute: AppRouter.start, // Restored Start screen
         onGenerateRoute: AppRouter.onGenerateRoute,
       ),
     );

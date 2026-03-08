@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:healthguard/core/constants/app_colors.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 
-class StartScreen extends StatelessWidget {
+class StartScreen extends StatefulWidget {
   final bool isInPageView;
 
   const StartScreen({super.key, this.isInPageView = false});
 
+  @override
+  State<StartScreen> createState() => _StartScreenState();
+}
+
+class _StartScreenState extends State<StartScreen> {
   void _openLogin(BuildContext context) {
     Navigator.pushReplacementNamed(context, AppRouter.login);
   }
@@ -14,6 +19,7 @@ class StartScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -82,6 +88,8 @@ class StartScreen extends StatelessWidget {
                             child: Image.asset(
                               'assets/images/logo.png',
                               fit: BoxFit.cover,
+                              cacheWidth: 300,
+                              cacheHeight: 262,
                             ),
                           ),
                         ),
@@ -130,7 +138,7 @@ class StartScreen extends StatelessWidget {
               ),
 
               // Footer - Only show when not in PageView
-              if (!isInPageView)
+              if (!widget.isInPageView)
                 Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(

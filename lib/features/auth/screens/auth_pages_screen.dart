@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/core/constants/app_colors.dart';
 import 'package:healthguard/features/auth/screens/start_screen.dart';
 import 'package:healthguard/features/auth/screens/login_screen.dart';
 
@@ -19,23 +20,37 @@ class _AuthPagesScreenState extends State<AuthPagesScreen> {
     super.dispose();
   }
 
+  void _animateToPage(int page) {
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // PageView with Start and Login screens
+          // PageView with Start and Login screens - Enable swipe
           PageView(
             controller: _pageController,
+            physics: const ClampingScrollPhysics(), // Enable smooth swipe
             onPageChanged: (index) {
               setState(() {
                 _currentPage = index;
               });
+              // Close keyboard when swiping from login back to start
+              if (index == 0) {
+                FocusScope.of(context).unfocus();
+              }
             },
             children: const [StartScreen(isInPageView: true), LoginScreen()],
           ),
 
-          // Guide hint - Only show on first page
+          // Button "Bắt đầu ngay" - Show on Start page
           if (_currentPage == 0)
             Positioned(
               bottom: 120,
@@ -44,88 +59,87 @@ class _AuthPagesScreenState extends State<AuthPagesScreen> {
               child: AnimatedOpacity(
                 opacity: _currentPage == 0 ? 1.0 : 0.0,
                 duration: const Duration(milliseconds: 300),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        _pageController.animateToPage(
-                          1,
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1565C0),
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text(
-                              'Bắt đầu ngay',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.arrow_forward,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => _animateToPage(1),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Bắt đầu ngay',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
                               color: Colors.white,
-                              size: 22,
+                              letterSpacing: 0.5,
                             ),
-                          ],
-                        ),
+                          ),
+                          SizedBox(width: 12),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
 
-          // Page Indicator
+          // Page Indicator với 2 dấu chấm
           Positioned(
-            bottom: 50,
+            bottom: 40,
             left: 0,
             right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  2,
-                  (index) => AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: _currentPage == index ? 32 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _currentPage == index
-                          ? Colors.white
-                          : Colors.white.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+            child: SafeArea(
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(
+                      2,
+                      (index) => GestureDetector(
+                        onTap: () => _animateToPage(index),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOutCubic,
+                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                          width: _currentPage == index ? 28 : 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            color: _currentPage == index
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(5),
+                          ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ),

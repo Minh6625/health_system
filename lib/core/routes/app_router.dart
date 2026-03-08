@@ -11,6 +11,7 @@ import 'package:healthguard/features/home/screens/dashboard_screen.dart';
 
 class AppRouter {
   static const String start = '/start';
+  static const String authPages = '/auth-pages';
   static const String login = '/login';
   static const String register = '/register';
   static const String dashboard = '/dashboard';
@@ -45,11 +46,20 @@ class AppRouter {
         );
       case changePassword:
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
+      case authPages:
+        return MaterialPageRoute(
+          builder: (_) => const AuthPagesScreen(),
+        ); // PageView with Start + Login
       case start:
-        return MaterialPageRoute(builder: (_) => const AuthPagesScreen());
+        return MaterialPageRoute(
+          builder: (_) => const AuthPagesScreen(),
+        ); // Use PageView as default start
       case login:
+        return MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ); // Standalone login (for deep links, etc.)
       default:
-        return MaterialPageRoute(builder: (_) => const LoginScreen());
+        return MaterialPageRoute(builder: (_) => const AuthPagesScreen());
     }
   }
 
