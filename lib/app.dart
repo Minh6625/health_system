@@ -7,6 +7,8 @@ import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/core/theme/app_theme.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
+import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
+import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
 import 'package:provider/provider.dart';
 
 class HealthSystemApp extends StatefulWidget {
@@ -81,8 +83,14 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthProvider(AuthRepository()),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider(AuthRepository())),
+        ChangeNotifierProvider(
+          create: (_) =>
+              EmergencyCaregiverProvider(EmergencyCaregiverRepository()),
+        ),
+      ],
       child: MaterialApp(
         navigatorKey: _navigatorKey,
         debugShowCheckedModeBanner: false,

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/screens/device_screen.dart';
-import 'package:healthguard/features/emergency/screens/warning_screen.dart';
+import 'package:healthguard/features/emergency/screens/emergency_sos_received_list_screen.dart';
 import 'package:healthguard/features/health_monitoring/screens/health_monitoring_screen.dart';
 import 'package:healthguard/features/profile/screens/profile_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_screen.dart';
@@ -18,7 +18,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const HealthMonitoringScreen(),
     const SleepScreen(),
-    const WarningScreen(),
+    const EmergencySOSReceivedListScreen(),
     const DeviceScreen(),
     const ProfileScreen(),
   ];
@@ -51,7 +51,7 @@ class _MainScreenState extends State<MainScreen> {
             children: [
               _buildNavItem(Icons.favorite, 'Sức khỏe', 0),
               _buildNavItem(Icons.bedtime, 'Giấc ngủ', 1),
-              _buildNavItem(Icons.warning_amber_rounded, 'Cảnh báo', 2),
+              _buildNavItem(Icons.warning_amber_rounded, 'Khẩn cấp', 2),
               _buildNavItem(Icons.watch, 'Thiết bị', 3),
               _buildNavItem(Icons.person, 'Cá nhân', 4),
             ],

@@ -1,11 +1,13 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class ApiClient {
   // Use 10.0.2.2 for Android emulator to access host machine's localhost
   static const String baseUrl = 'http://10.0.2.2:8080/api/v1';
 
   static final ApiClient _instance = ApiClient._internal();
+  final _storage = const FlutterSecureStorage();
 
   factory ApiClient() {
     return _instance;
@@ -13,18 +15,28 @@ class ApiClient {
 
   ApiClient._internal();
 
+  /// Build headers with Authorization token if available
+  Future<Map<String, String>> _buildHeaders() async {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+
+    // Get access token from secure storage
+    final token = await _storage.read(key: 'access_token');
+    if (token != null && token.isNotEmpty) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    return headers;
+  }
+
   Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
   }) async {
     try {
       final url = Uri.parse('$baseUrl$path');
+      final headers = await _buildHeaders();
       final response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode(body ?? {}),
-          )
+          .post(url, headers: headers, body: jsonEncode(body ?? {}))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -55,8 +67,9 @@ class ApiClient {
   Future<Map<String, dynamic>> get(String path) async {
     try {
       final url = Uri.parse('$baseUrl$path');
+      final headers = await _buildHeaders();
       final response = await http
-          .get(url, headers: {'Content-Type': 'application/json'})
+          .get(url, headers: headers)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
