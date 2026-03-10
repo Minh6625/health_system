@@ -7,7 +7,7 @@ import 'package:healthguard/features/auth/screens/register_screen.dart';
 import 'package:healthguard/features/auth/screens/reset_password_screen.dart';
 import 'package:healthguard/features/auth/screens/start_screen.dart';
 import 'package:healthguard/features/auth/screens/verify_email_screen.dart';
-import 'package:healthguard/features/home/screens/dashboard_screen.dart';
+import 'package:healthguard/features/home/screens/main_screen.dart';
 
 class AppRouter {
   static const String start = '/start';
@@ -22,7 +22,7 @@ class AppRouter {
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
       case dashboard:
-        return MaterialPageRoute(builder: (_) => const DashboardScreen());
+        return MaterialPageRoute(builder: (_) => const MainScreen());
       case register:
         return MaterialPageRoute(builder: (_) => const RegisterScreen());
       case verifyEmail:
