@@ -29,9 +29,13 @@ def get_current_user(
     Raises:
         HTTPException: If token is invalid or user not found
     """
+    print(f"[AUTH] get_current_user called")
+    
     token = credentials.credentials
+    print(f"[AUTH] Token received (first 20 chars): {token[:20]}...")
     
     payload = decode_token(token)
+    print(f"[AUTH] Decoded payload: {payload}")
     
     if not payload:
         raise HTTPException(
@@ -65,6 +69,9 @@ def get_current_user(
             detail="User không tồn tại",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Debug logging
+    print(f"[AUTH DEBUG] User authenticated - ID: {user.id}, Email: {user.email}, Role: {user.role}")
     
     if not user.is_active:
         raise HTTPException(
