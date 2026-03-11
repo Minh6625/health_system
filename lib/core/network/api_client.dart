@@ -37,7 +37,7 @@ class ApiClient {
       final headers = await _buildHeaders();
       final response = await http
           .post(url, headers: headers, body: jsonEncode(body ?? {}))
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);
@@ -70,7 +70,7 @@ class ApiClient {
       final headers = await _buildHeaders();
       final response = await http
           .get(url, headers: headers)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body);

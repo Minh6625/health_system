@@ -17,19 +17,23 @@ class EmergencySOSDetailScreen extends StatefulWidget {
 }
 
 class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
+  late EmergencyCaregiverProvider _provider;
+  bool _isInitialized = false;
+
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<EmergencyCaregiverProvider>();
-      provider.fetchSOSDetail(widget.sosId);
-      provider.subscribeToSOSUpdates(widget.sosId);
-    });
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      _isInitialized = true;
+      _provider = context.read<EmergencyCaregiverProvider>();
+      _provider.fetchSOSDetail(widget.sosId);
+      _provider.subscribeToSOSUpdates(widget.sosId);
+    }
   }
 
   @override
   void dispose() {
-    context.read<EmergencyCaregiverProvider>().unsubscribeFromSOSUpdates();
+    _provider.unsubscribeFromSOSUpdates();
     super.dispose();
   }
 
@@ -371,7 +375,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
               child: OutlinedButton.icon(
                 onPressed: () => _confirmSafety(provider, sos.id),
                 icon: const Icon(Icons.check_circle),
-                label: const Text('Xác nhận an toàn'),
+                label: const Text('Xác nhận'),
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 56)),
               ),
             ),
@@ -430,9 +434,9 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Xác nhận an toàn'),
+        title: const Text('Xác nhận xử lý'),
         content: const Text(
-          'Bạn có chắc chắn muốn xác nhận bệnh nhân đã an toàn?',
+          'Bạn có chắc chắn muốn xác nhận đã xử lý sự kiện này?',
         ),
         actions: [
           TextButton(
@@ -451,13 +455,13 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
       final success = await provider.resolveSOSByCaregiver(
         sosId: sosId,
         resolutionStatus: 'safe',
-        notes: 'Người chăm sóc xác nhận bệnh nhân an toàn',
+        notes: 'Người chăm sóc xác nhận đã xử lý',
       );
 
       if (success && mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Đã xác nhận an toàn')));
+        ).showSnackBar(const SnackBar(content: Text('Đã xác nhận xử lý')));
       }
     }
   }
