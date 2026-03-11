@@ -2,88 +2,51 @@
 
 ## 📋 Available Workflows
 
-### 1. Backend CI/CD
+### Backend CI
 
 **File:** `backend-ci.yml`  
-**Badge:** ![Backend CI/CD](https://github.com/YOUR_USERNAME/health_system/workflows/Backend%20CI/CD/badge.svg)
+**Badge:** ![Backend CI](https://github.com/YOUR_USERNAME/health_system/workflows/Backend%20CI/badge.svg)
 
 **Triggers:**
 
-- Push to `deploy` or `main` branches
+- Push to any branch with changes in `backend/`
 - Pull requests to `deploy` or `main`
 
 **Jobs:**
 
 - Run tests with PostgreSQL
-- Check code quality
-- Deploy to Heroku (only on `deploy` branch)
-- Health check after deployment
+- Check code style with flake8
+- Generate test summary
 
----
-
-### 2. Backend Tests
-
-**File:** `backend-test.yml`  
-**Badge:** ![Backend Tests](https://github.com/YOUR_USERNAME/health_system/workflows/Backend%20Tests/badge.svg)
-
-**Triggers:**
-
-- Push to any branch with changes in `backend/`
-- Pull requests with changes in `backend/`
-
-**Jobs:**
-
-- Run pytest with coverage
-- Upload coverage to Codecov
-
----
-
-### 3. Backend Linting
-
-**File:** `backend-lint.yml`  
-**Badge:** ![Backend Linting](https://github.com/YOUR_USERNAME/health_system/workflows/Backend%20Linting/badge.svg)
-
-**Triggers:**
-
-- Push to any branch with changes in `backend/`
-- Pull requests with changes in `backend/`
-
-**Jobs:**
-
-- Black: Code formatting
-- isort: Import sorting
-- flake8: Code linting
-- mypy: Type checking
+**Note:** This workflow only runs CI (Continuous Integration). Deploy to Heroku manually using the script or Heroku CLI.
 
 ---
 
 ## 🚀 Usage
 
-### Automatic Deployment
+### Automatic Testing
 
-Push to `deploy` branch to trigger automatic deployment:
+Tests run automatically when you push code:
 
 ```bash
-git checkout deploy
-git merge feat/your-feature
-git push origin deploy
+git add .
+git commit -m "feat: add new feature"
+git push origin your-branch
 ```
 
-### Manual Workflow Trigger
+### Manual Deployment
 
-You can also trigger workflows manually from GitHub Actions tab.
+Deploy to Heroku manually:
 
----
+```bash
+# Option 1: Use script
+cd scripts
+deploy_heroku.bat
 
-## 🔐 Required Secrets
-
-Add these secrets in GitHub repository settings:
-
-| Secret            | Description                             |
-| ----------------- | --------------------------------------- |
-| `HEROKU_API_KEY`  | Heroku API key from `heroku auth:token` |
-| `HEROKU_APP_NAME` | Your Heroku app name                    |
-| `HEROKU_EMAIL`    | Your Heroku account email               |
+# Option 2: Manual
+cd backend
+git push heroku deploy:main
+```
 
 ---
 
@@ -99,15 +62,14 @@ Check workflow status at:
 If workflows fail:
 
 1. Check logs in GitHub Actions tab
-2. Verify secrets are set correctly
-3. Ensure Heroku app exists
-4. Check database connection
+2. Run tests locally: `pytest tests/ -v`
+3. Check code style: `flake8 app/`
 
 ---
 
 ## 📝 Notes
 
 - Tests run on every push/PR
-- Deployment only happens on `deploy` branch
-- All checks must pass before deployment
-- Health check verifies deployment success
+- Code style checks are non-blocking
+- Deploy to Heroku manually when ready
+- All checks must pass before merging PR

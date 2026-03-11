@@ -1,4 +1,256 @@
-# 🔄 CI/CD Setup - GitHub Actions + Heroku
+# 🔄 CI Setup - GitHub Actions
+
+## 📌 Tổng quan
+
+CI pipeline tự động chạy tests khi push code. Deploy lên Heroku thực hiện manual.
+
+---
+
+## 🛠️ Workflow đã tạo
+
+### Backend CI (`backend-ci.yml`)
+
+**Trigger:** Push/PR vào bất kỳ nhánh nào có thay đổi trong `backend/`
+
+**Jobs:**
+
+- **Test:** Chạy pytest với PostgreSQL
+- **Code Style:** Kiểm tra với flake8 (non-blocking)
+
+---
+
+## 🚀 Cách sử dụng
+
+### CI tự động chạy khi push
+
+```bash
+git add .
+git commit -m "feat: add new feature"
+git push origin your-branch
+```
+
+GitHub Actions sẽ tự động chạy tests.
+
+### Deploy manual lên Heroku
+
+```bash
+# Cách 1: Dùng script
+cd scripts
+deploy_heroku.bat
+
+# Cách 2: Manual
+cd backend
+git push heroku deploy:main
+```
+
+---
+
+## 📊 Workflow Flow
+
+```
+┌─────────────────┐
+│  Push code      │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Run Tests      │
+│  - pytest       │
+│  - PostgreSQL   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Code Style     │
+│  - flake8       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  ✅ Done        │
+└─────────────────┘
+```
+
+---
+
+## 🧪 Test CI locally
+
+### Chạy tests như CI
+
+```bash
+cd backend
+
+# Setup test database
+docker run -d \
+  --name test-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=test_db \
+  -p 5432:5432 \
+  postgres:17
+
+# Run tests
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5432/test_db
+export SECRET_KEY=test-secret-key
+pytest tests/ -v
+
+# Cleanup
+docker stop test-postgres
+docker rm test-postgres
+```
+
+### Chạy code style check
+
+```bash
+cd backend
+pip install flake8
+flake8 app/ --max-line-length=100 --ignore=E203,W503
+```
+
+---
+
+## 🔧 Cấu hình Files
+
+### `.github/workflows/backend-ci.yml`
+
+CI workflow - chạy tests và code style checks
+
+### `backend/pyproject.toml`
+
+Cấu hình cho pytest
+
+### `backend/.flake8`
+
+Cấu hình cho flake8 linter
+
+---
+
+## 📝 Best Practices
+
+### 1. Branch Strategy
+
+```
+main (production)
+  ↑
+deploy (staging)
+  ↑
+feat/* (features)
+fix/* (bugfixes)
+```
+
+**Workflow:**
+
+1. Tạo feature branch: `git checkout -b feat/new-feature`
+2. Commit và push: `git push origin feat/new-feature`
+3. Tạo PR vào `deploy` → CI chạy tests
+4. Merge vào `deploy` sau khi tests pass
+5. Deploy manual lên Heroku: `cd scripts && deploy_heroku.bat`
+6. Test trên Heroku staging
+7. Merge `deploy` vào `main` khi stable
+
+### 2. Commit Messages
+
+Dùng conventional commits:
+
+```
+feat: add new feature
+fix: fix bug
+docs: update documentation
+test: add tests
+refactor: refactor code
+chore: update dependencies
+```
+
+### 3. Pull Requests
+
+- Luôn tạo PR thay vì push trực tiếp
+- Đợi CI pass trước khi merge
+- Review code trước khi merge
+
+---
+
+## 🐛 Troubleshooting
+
+### CI fails với "Database connection error"
+
+**Nguyên nhân:** PostgreSQL service chưa ready
+
+**Giải pháp:** Workflow đã có health check, nếu vẫn lỗi tăng retries trong workflow
+
+### Tests fail locally nhưng pass trên CI
+
+**Nguyên nhân:** Environment khác nhau
+
+**Giải pháp:**
+
+- Kiểm tra DATABASE_URL
+- Kiểm tra Python version (phải 3.11)
+- Chạy trong virtual environment
+
+### Code style checks fail
+
+**Giải pháp:**
+
+```bash
+# Check issues
+flake8 app/ --show-source
+
+# Fix automatically (nếu có)
+autopep8 --in-place --aggressive app/**/*.py
+```
+
+---
+
+## 📊 Monitoring
+
+### GitHub Actions Dashboard
+
+Xem tại: `https://github.com/your-username/health_system/actions`
+
+### Logs
+
+```bash
+# GitHub Actions logs
+# Xem trên web UI
+
+# Local test logs
+pytest tests/ -v --tb=long
+```
+
+---
+
+## 🎯 Checklist Setup CI
+
+- [ ] Push code lên GitHub
+- [ ] Kiểm tra GitHub Actions chạy thành công
+- [ ] Verify tests pass
+- [ ] Deploy manual lên Heroku khi cần
+- [ ] Test API endpoints
+- [ ] Setup branch protection rules (optional)
+
+---
+
+## 🔒 Security Notes
+
+1. **Không commit secrets vào code**
+   - File `.env` trong `.gitignore`
+
+2. **Protect branches**
+   - Settings → Branches → Add rule
+   - Require PR reviews
+   - Require status checks to pass
+
+---
+
+## 📚 Resources
+
+- GitHub Actions: https://docs.github.com/en/actions
+- pytest: https://docs.pytest.org/
+- flake8: https://flake8.pycqa.org/
+
+---
+
+**CI đã sẵn sàng! Push code và tests sẽ chạy tự động! ✨**
 
 ## 📌 Tổng quan
 

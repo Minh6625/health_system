@@ -1,15 +1,14 @@
 # health_system
 
-![Backend CI/CD](https://github.com/YOUR_USERNAME/health_system/workflows/Backend%20CI/CD/badge.svg)
-![Backend Tests](https://github.com/YOUR_USERNAME/health_system/workflows/Backend%20Tests/badge.svg)
+![Backend CI](https://github.com/YOUR_USERNAME/health_system/workflows/Backend%20CI/badge.svg)
 
 Health System gồm Frontend (Flutter) + Backend (FastAPI) kết nối PostgreSQL.
 
 ## 🚀 Deploy Status
 
-- **Backend:** Deployed on Heroku
+- **Backend:** Deploy manually to Heroku
 - **Frontend:** Build APK for Android
-- **CI/CD:** GitHub Actions
+- **CI:** GitHub Actions (automated testing)
 
 ## Cấu trúc chính
 
