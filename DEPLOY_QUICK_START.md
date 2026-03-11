@@ -41,32 +41,53 @@ flutter run
 
 ## 🚀 PRODUCTION (Deploy thật)
 
-### Backend → Deploy lên Server
+### Backend → Deploy lên Heroku
+
+**Cách 1: Tự động (khuyến nghị)**
 
 ```bash
-# 1. SSH vào server
-ssh user@your-server-ip
-
-# 2. Clone code
-git clone https://github.com/your-repo/health_system.git
-cd health_system/backend
-
-# 3. Setup
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt gunicorn
-
-# 4. Tạo .env với DATABASE_URL và SECRET_KEY
-
-# 5. Chạy với systemd (xem DEPLOY.md)
+cd scripts
+deploy_heroku.bat
+# Script sẽ tự động setup và deploy
 ```
+
+**Cách 2: Manual**
+
+```bash
+cd backend
+
+# 1. Login Heroku
+heroku login
+
+# 2. Tạo app
+heroku create your-app-name
+
+# 3. Add PostgreSQL
+heroku addons:create heroku-postgresql:mini
+
+# 4. Set environment variables
+heroku config:set SECRET_KEY=your-secret-key
+heroku config:set ALGORITHM=HS256
+
+# 5. Deploy
+git init
+git add .
+git commit -m "Deploy to Heroku"
+git push heroku main
+
+# 6. Chạy SQL scripts
+heroku pg:psql < "../SQL SCRIPTS/02_create_tables_user_management.sql"
+# ... chạy các file SQL khác
+```
+
+**Xem hướng dẫn chi tiết:** `DEPLOY_HEROKU.md`
 
 ### Frontend → Build App
 
 ```bash
 # 1. Đổi API endpoint trong api_client.dart
 # Từ: http://10.0.2.2:8080/api/v1
-# Sang: https://your-domain.com/api/v1
+# Sang: https://your-app-name.herokuapp.com/api/v1
 
 # 2. Build APK
 flutter build apk --release
@@ -75,6 +96,13 @@ flutter build apk --release
 
 # 4. Copy APK vào điện thoại và cài đặt
 ```
+
+---
+
+## 📚 Tài liệu chi tiết
+
+- **DEPLOY_HEROKU.md** - Hướng dẫn deploy backend lên Heroku (khuyến nghị)
+- **DEPLOY.md** - Hướng dẫn deploy lên VPS/Server khác
 
 ---
 

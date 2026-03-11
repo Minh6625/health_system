@@ -35,7 +35,8 @@ Build thành file APK (Android) hoặc IPA (iOS) để cài trên điện thoạ
 ## 📚 Tài liệu
 
 - **DEPLOY_QUICK_START.md** - Hướng dẫn nhanh (5 phút)
-- **DEPLOY.md** - Hướng dẫn chi tiết đầy đủ
+- **DEPLOY_HEROKU.md** - Deploy backend lên Heroku (khuyến nghị)
+- **DEPLOY.md** - Deploy backend lên VPS/Server
 - **DEPLOY_CHECKLIST.md** - Checklist kiểm tra trước khi deploy
 
 ## 🛠️ Scripts tự động
