@@ -1,57 +1,33 @@
-# ⚡ Quick Start - Deploy Branch
+# ⚡ Quick Start - Deploy với Heroku
 
 ## 🎯 Mục đích
 
-Nhánh `deploy` chứa phiên bản ổn định với các tính năng cơ bản đã hoạt động.
+Nhánh `deploy` chứa phiên bản ổn định để deploy backend lên Heroku và build app Flutter.
 
-## 📌 Lưu ý quan trọng
+## 📌 Quy trình
 
-**Backend** → Deploy lên server (VPS, Cloud)  
-**Frontend** → Build thành APK/IPA để cài trên điện thoại
-
----
-
-## 🖥️ DEVELOPMENT (Test local)
-
-### 1️⃣ Setup Database (1 lần duy nhất)
-
-```bash
-psql -U postgres -c "CREATE DATABASE hg_db;"
-cd "SQL SCRIPTS"
-# Chạy các file SQL từ 01 đến 09
-```
-
-### 2️⃣ Chạy Backend
-
-```bash
-cd backend
-venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
-```
-
-### 3️⃣ Test Frontend
-
-```bash
-flutter pub get
-flutter run
-```
+**Backend** → Deploy lên Heroku (miễn phí hoặc $5/tháng)  
+**Frontend** → Build thành APK để cài trên điện thoại
 
 ---
 
-## 🚀 PRODUCTION (Deploy thật)
+## 🚀 Deploy Backend lên Heroku
 
-### Backend → Deploy lên Heroku
-
-**Cách 1: Tự động (khuyến nghị)**
+### Cách 1: Tự động (Khuyến nghị)
 
 ```bash
 cd scripts
 deploy_heroku.bat
-# Script sẽ tự động setup và deploy
 ```
 
-**Cách 2: Manual**
+Script sẽ tự động:
+
+- ✅ Tạo Heroku app
+- ✅ Add PostgreSQL database
+- ✅ Set environment variables
+- ✅ Deploy code
+
+### Cách 2: Manual
 
 ```bash
 cd backend
@@ -66,7 +42,8 @@ heroku create your-app-name
 heroku addons:create heroku-postgresql:mini
 
 # 4. Set environment variables
-heroku config:set SECRET_KEY=your-secret-key
+python -c "import secrets; print(secrets.token_hex(32))"
+heroku config:set SECRET_KEY=your-generated-key
 heroku config:set ALGORITHM=HS256
 
 # 5. Deploy
@@ -77,32 +54,53 @@ git push heroku main
 
 # 6. Chạy SQL scripts
 heroku pg:psql < "../SQL SCRIPTS/02_create_tables_user_management.sql"
-# ... chạy các file SQL khác
+heroku pg:psql < "../SQL SCRIPTS/03_create_tables_devices.sql"
+# ... chạy các file SQL khác (02-09)
 ```
 
-**Xem hướng dẫn chi tiết:** `DEPLOY_HEROKU.md`
-
-### Frontend → Build App
+### Kiểm tra
 
 ```bash
-# 1. Đổi API endpoint trong api_client.dart
-# Từ: http://10.0.2.2:8080/api/v1
-# Sang: https://your-app-name.herokuapp.com/api/v1
+# Xem logs
+heroku logs --tail
 
-# 2. Build APK
-flutter build apk --release
+# Test API
+curl https://your-app-name.herokuapp.com/api/v1/health
 
-# 3. File APK ở: build/app/outputs/flutter-apk/app-release.apk
-
-# 4. Copy APK vào điện thoại và cài đặt
+# Mở API docs
+heroku open /docs
 ```
 
 ---
 
-## 📚 Tài liệu chi tiết
+## 📱 Build Frontend App
 
-- **DEPLOY_HEROKU.md** - Hướng dẫn deploy backend lên Heroku (khuyến nghị)
-- **DEPLOY.md** - Hướng dẫn deploy lên VPS/Server khác
+### 1. Cập nhật API endpoint
+
+Mở file `lib/core/network/api_client.dart`:
+
+```dart
+class ApiClient {
+  // Đổi từ localhost sang Heroku URL
+  static const String baseUrl = 'https://your-app-name.herokuapp.com/api/v1';
+
+  // ... rest of code
+}
+```
+
+### 2. Build APK
+
+```bash
+flutter clean
+flutter pub get
+flutter build apk --release
+```
+
+### 3. Cài đặt
+
+File APK ở: `build/app/outputs/flutter-apk/app-release.apk`
+
+Copy vào điện thoại và cài đặt.
 
 ---
 
@@ -114,16 +112,43 @@ flutter build apk --release
 - ✅ POST `/api/v1/auth/login` - Đăng nhập
 - ✅ GET `/api/v1/health` - Health check
 
-### Frontend Screens
+### Frontend App
 
 - ✅ Login Screen
 - ✅ Register Screen
 - ✅ Home Screen
 - ✅ Emergency (SOS) Screen
 - ✅ Profile Screen
+- ✅ Health Monitoring
+
+---
+
+## 🐛 Troubleshooting
+
+### Backend không start
+
+```bash
+heroku logs --tail
+heroku restart
+```
+
+### App không kết nối backend
+
+- Kiểm tra API endpoint trong `api_client.dart` đúng chưa
+- Test API: `curl https://your-app-name.herokuapp.com/api/v1/health`
 
 ---
 
 ## 📖 Hướng dẫn chi tiết
 
-Xem file `DEPLOY.md` để biết hướng dẫn đầy đủ về deploy backend lên server.
+Xem file **DEPLOY_HEROKU.md** để biết hướng dẫn đầy đủ về:
+
+- Setup Heroku CLI
+- Cấu hình environment variables
+- Chạy SQL scripts
+- Monitoring và troubleshooting
+- Chi phí và scaling
+
+---
+
+**Deploy xong thì test ngay bằng app Flutter nhé! 🎉**
