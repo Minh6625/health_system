@@ -1,0 +1,43 @@
+# ── Virtual environments ──
+venv/
+.venv/
+env/
+
+# ── Tests & QA ──
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+.flake8
+pyproject.toml
+
+# ── Python cache ──
+__pycache__/
+*.pyc
+*.pyo
+
+# ── Environment & secrets ──
+.env
+.env.*
+
+# ── Git & CI ──
+.git/
+.github/
+.gitignore
+
+# ── Documentation ──
+*.md
+LICENSE
+
+# ── Build artifacts ──
+dist/
+build/
+*.egg-info/
+
+# ── IDE ──
+.vscode/
+.idea/
+
+# ── Heroku (not needed inside Docker) ──
+Procfile
+runtime.txt
