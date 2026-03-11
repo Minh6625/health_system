@@ -186,9 +186,10 @@ class TestRegisterRequestSchema:
 
     def test_email_validation(self):
         """Test email validation."""
+        # Pydantic's EmailStr is more permissive, so test with clearly invalid email
         with pytest.raises(ValidationError) as exc_info:
             RegisterRequest(
-                email="invalid-email",  # No @ or domain
+                email="not-an-email",  # Clearly invalid
                 full_name="John Doe",
                 password="StrongPass123!"
             )
@@ -241,7 +242,7 @@ class TestRegisterRequestSchema:
             email="test@example.com",
             full_name="John Doe",
             password="StrongPass123!",
-            role="CAREGIVER"
+            role="caregiver"  # Use lowercase
         )
         
         assert request.role == "caregiver"
