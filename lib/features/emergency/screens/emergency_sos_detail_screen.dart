@@ -16,9 +16,49 @@ class EmergencySOSDetailScreen extends StatefulWidget {
       _EmergencySOSDetailScreenState();
 }
 
-class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
+class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
+    with TickerProviderStateMixin {
   late EmergencyCaregiverProvider _provider;
   bool _isInitialized = false;
+  final ScrollController _scrollController = ScrollController();
+  double _shadowOpacity = 1.0;
+  late AnimationController _arrowAnimationController;
+  late AnimationController _warningAnimationController;
+  late Animation<double> _arrowAnimation;
+  late Animation<double> _warningAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listener in initState
+    _scrollController.addListener(_onScroll);
+    
+    // Setup arrow animation
+    _arrowAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _arrowAnimation = Tween<double>(begin: 0.0, end: 8.0).animate(
+      CurvedAnimation(
+        parent: _arrowAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    
+    // Setup warning icon shake animation (rotate)
+    _warningAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 100),
+      vsync: this,
+    )..repeat(reverse: true);
+    
+    _warningAnimation = Tween<double>(begin: -0.1, end: 0.1).animate(
+      CurvedAnimation(
+        parent: _warningAnimationController,
+        curve: Curves.linear,
+      ),
+    );
+  }
 
   @override
   void didChangeDependencies() {
@@ -31,8 +71,30 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
     }
   }
 
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final currentScroll = _scrollController.position.pixels;
+      
+      // Calculate how close to bottom (0 = at top, 1 = at bottom)
+      final scrollProgress = maxScroll > 0 ? (currentScroll / maxScroll).clamp(0.0, 1.0) : 0.0;
+      
+      // Fade out shadow as we scroll down (inverse of progress)
+      final newOpacity = (1.0 - scrollProgress).clamp(0.0, 1.0);
+      
+      if ((newOpacity - _shadowOpacity).abs() > 0.01) {
+        setState(() {
+          _shadowOpacity = newOpacity;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
+    _scrollController.dispose();
+    _arrowAnimationController.dispose();
+    _warningAnimationController.dispose();
     _provider.unsubscribeFromSOSUpdates();
     super.dispose();
   }
@@ -40,7 +102,11 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Chi tiết SOS')),
+      backgroundColor: const Color(0xFFEBEBEB),
+      appBar: AppBar(
+        title: const Text('Chi tiết SOS'),
+        elevation: 0,
+      ),
       body: Consumer<EmergencyCaregiverProvider>(
         builder: (context, provider, child) {
           // Loading state
@@ -70,99 +136,236 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
     return Column(
       children: [
         // Patient Header
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: sos.isActive ? const Color(0xFFD32F2F) : Colors.grey[200],
-          ),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 40,
-                backgroundImage: sos.patient.photoUrl != null
-                    ? CachedNetworkImageProvider(sos.patient.photoUrl!)
-                    : null,
-                backgroundColor: Colors.grey[400],
-                child: sos.patient.photoUrl == null
-                    ? const Icon(Icons.person, size: 40, color: Colors.white)
-                    : null,
+        Stack(
+          children: [
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: sos.isActive ? const Color(0xFFFFABAF) : Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: sos.isActive
+                        ? const Color(0xFFE53935).withOpacity(0.25)
+                        : Colors.black.withOpacity(0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      sos.patient.name,
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: sos.isActive ? Colors.white : Colors.black87,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 32,
+                        backgroundImage: sos.patient.photoUrl != null
+                            ? CachedNetworkImageProvider(sos.patient.photoUrl!)
+                            : null,
+                        backgroundColor: Colors.grey[400],
+                        child: sos.patient.photoUrl == null
+                            ? const Icon(Icons.person, size: 32, color: Colors.white)
+                            : null,
                       ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          sos.patient.name,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: sos.isActive ? const Color(0xFF1A1A1A) : Colors.black87,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 48), // Space for warning icon
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    const SizedBox(height: 8),
-                    StatusBadge(status: sos.status),
-                  ],
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _getTriggerIcon(sos.triggerType),
+                          size: 18,
+                          color: Colors.grey[800],
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _getTriggerLabel(sos.triggerType),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Animated warning icon for active SOS
+            if (sos.isActive)
+              Positioned(
+                top: 28,    // Thay đổi số này để điều chỉnh khoảng cách từ trên xuống
+                right: 28,  // Thay đổi số này để điều chỉnh khoảng cách từ phải sang trái
+                child: RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _warningAnimation,
+                    builder: (context, child) {
+                      return Transform.rotate(
+                        angle: _warningAnimation.value,
+                        child: child,
+                      );
+                    },
+                    child: const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFE53935),
+                      size: 40,
+                    ),
+                  ),
                 ),
               ),
-              if (sos.isActive)
-                const Icon(Icons.emergency, size: 32, color: Colors.white),
-            ],
-          ),
+          ],
         ),
 
         // Map Placeholder
         Container(
-          height: 250,
-          width: double.infinity,
-          color: Colors.grey[300],
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.map, size: 64, color: Colors.grey[600]),
-              const SizedBox(height: 8),
-              Text(
-                'Map view',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+          height: 220,
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
-              if (sos.location.latitude != null)
-                Text(
-                  'Lat: ${sos.location.latitude!.toStringAsFixed(6)}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-              if (sos.location.longitude != null)
-                Text(
-                  'Lng: ${sos.location.longitude!.toStringAsFixed(6)}',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              color: Colors.grey[300],
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.map, size: 64, color: Colors.grey[600]),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Map view',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                  if (sos.location.latitude != null)
+                    Text(
+                      'Lat: ${sos.location.latitude!.toStringAsFixed(6)}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  if (sos.location.longitude != null)
+                    Text(
+                      'Lng: ${sos.location.longitude!.toStringAsFixed(6)}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
 
         // Details Section
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildLocationInfo(sos),
-                const SizedBox(height: 24),
-                _buildTimeInfo(sos),
-                const SizedBox(height: 24),
-                _buildTriggerInfo(sos),
-                if (sos.fallDetectionXAI != null) ...[
-                  const SizedBox(height: 24),
-                  _buildXAITimeline(sos.fallDetectionXAI!),
-                ],
-                if (sos.resolution != null) ...[
-                  const SizedBox(height: 24),
-                  _buildResolutionInfo(sos.resolution!),
-                ],
-                const SizedBox(height: 80), // Space for action buttons
-              ],
-            ),
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                controller: _scrollController,
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildLocationInfo(sos),
+                    const SizedBox(height: 16),
+                    _buildTimeInfo(sos),
+                    if (sos.fallDetectionXAI != null) ...[
+                      const SizedBox(height: 16),
+                      _buildXAITimeline(sos.fallDetectionXAI!),
+                    ],
+                    if (sos.resolution != null) ...[
+                      const SizedBox(height: 16),
+                      _buildResolutionInfo(sos.resolution!),
+                    ],
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+              // Gradient shadow at bottom to indicate more content below
+              Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _shadowOpacity,
+                    duration: const Duration(milliseconds: 150),
+                    child: RepaintBoundary(
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.15),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Animated arrow icon
+              Positioned(
+                bottom: 20,
+                left: 0,
+                right: 0,
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _shadowOpacity,
+                    duration: const Duration(milliseconds: 150),
+                    child: RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: _arrowAnimation,
+                        builder: (context, child) {
+                          return Transform.translate(
+                            offset: Offset(0, _arrowAnimation.value),
+                            child: child,
+                          );
+                        },
+                        child: Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 32,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
 
@@ -173,105 +376,205 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
   }
 
   Widget _buildLocationInfo(sos) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Vị trí',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'GPS: ${sos.location.latitude.toStringAsFixed(6)}, '
-          '${sos.location.longitude.toStringAsFixed(6)}',
-        ),
-        Text('Độ chính xác: ${sos.location.accuracy.toStringAsFixed(1)} mét'),
-        Text(
-          'Cập nhật: ${DateFormat('HH:mm:ss - dd/MM/yyyy').format(sos.location.lastUpdated)}',
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.location_on, size: 20, color: Colors.blue[700]),
+              const SizedBox(width: 8),
+              const Text(
+                'Vị trí',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'GPS: ${sos.location.latitude.toStringAsFixed(6)}, '
+            '${sos.location.longitude.toStringAsFixed(6)}',
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Độ chính xác: ${sos.location.accuracy.toStringAsFixed(1)} mét',
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Cập nhật: ${DateFormat('HH:mm:ss - dd/MM/yyyy').format(sos.location.lastUpdated)}',
+            style: TextStyle(color: Colors.grey[600], fontSize: 13),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTimeInfo(sos) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Thời gian',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Kích hoạt: ${DateFormat('HH:mm:ss - dd/MM/yyyy').format(sos.triggerTime)}',
-        ),
-        Text('Đã trôi qua: ${_formatElapsedTime(sos.elapsedTime)}'),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 20, color: Colors.blue[700]),
+              const SizedBox(width: 8),
+              const Text(
+                'Thời gian',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Kích hoạt: ${DateFormat('HH:mm:ss - dd/MM/yyyy').format(sos.triggerTime)}',
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Đã trôi qua: ${_formatElapsedTime(sos.elapsedTime)}',
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildTriggerInfo(sos) {
-    IconData icon;
-    String label;
-
-    switch (sos.triggerType) {
-      case 'fall_detected':
-        icon = Icons.arrow_downward;
-        label = 'Phát hiện té ngã';
-        break;
-      case 'manual':
-        icon = Icons.touch_app;
-        label = 'Kích hoạt thủ công';
-        break;
-      case 'vital_critical':
-        icon = Icons.error;
-        label = 'Chỉ số sinh tồn tới hạn';
-        break;
-      default:
-        icon = Icons.emergency;
-        label = 'SOS khẩn cấp';
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Nguyên nhân',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Icon(icon, size: 20),
-            const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontSize: 16)),
-          ],
-        ),
-      ],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.info_outline, size: 20, color: Colors.blue[700]),
+              const SizedBox(width: 8),
+              const Text(
+                'Nguyên nhân',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(_getTriggerIcon(sos.triggerType), size: 20, color: Colors.grey[700]),
+              const SizedBox(width: 8),
+              Text(
+                _getTriggerLabel(sos.triggerType),
+                style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
+  }
+
+  IconData _getTriggerIcon(String triggerType) {
+    switch (triggerType) {
+      case 'fall_detected':
+        return Icons.arrow_downward;
+      case 'manual':
+        return Icons.touch_app;
+      case 'vital_critical':
+        return Icons.error;
+      default:
+        return Icons.emergency;
+    }
+  }
+
+  String _getTriggerLabel(String triggerType) {
+    switch (triggerType) {
+      case 'fall_detected':
+        return 'Phát hiện té ngã';
+      case 'manual':
+        return 'Kích hoạt thủ công';
+      case 'vital_critical':
+        return 'Chỉ số sinh tồn tới hạn';
+      default:
+        return 'SOS khẩn cấp';
+    }
   }
 
   Widget _buildXAITimeline(xai) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.amber[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.amber[300]!),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.amber[300]!, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Chi tiết phát hiện té ngã',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              Icon(Icons.analytics, size: 20, color: Colors.amber[700]),
+              const SizedBox(width: 8),
+              const Text(
+                'Chi tiết phát hiện té ngã',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text('Độ tin cậy: ${xai.confidence.toStringAsFixed(1)}%'),
           const SizedBox(height: 12),
-          const Text(
+          Text(
+            'Độ tin cậy: ${xai.confidence.toStringAsFixed(1)}%',
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+          const SizedBox(height: 12),
+          Text(
             'Timeline:',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[800],
+            ),
           ),
           const SizedBox(height: 8),
           ...xai.timeline.map(
@@ -280,8 +583,16 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('• ', style: TextStyle(fontSize: 16)),
-                  Expanded(child: Text('${event.time} - ${event.description}')),
+                  Text(
+                    '• ',
+                    style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${event.time} - ${event.description}',
+                      style: TextStyle(color: Colors.grey[700]),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -295,25 +606,46 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.green[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green[300]!),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green[300]!, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Thông tin xử lý',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              Icon(Icons.check_circle, size: 20, color: Colors.green[700]),
+              const SizedBox(width: 8),
+              const Text(
+                'Thông tin xử lý',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          Text('Đã xử lý bởi: ${resolution.resolvedBy}'),
+          const SizedBox(height: 12),
+          Text(
+            'Đã xử lý bởi: ${resolution.resolvedBy}',
+            style: TextStyle(color: Colors.grey[700]),
+          ),
+          const SizedBox(height: 4),
           Text(
             'Thời gian: ${DateFormat('HH:mm:ss - dd/MM/yyyy').format(resolution.resolvedTime)}',
+            style: TextStyle(color: Colors.grey[700]),
           ),
           if (resolution.notes != null) ...[
             const SizedBox(height: 8),
-            Text('Ghi chú: ${resolution.notes}'),
+            Text(
+              'Ghi chú: ${resolution.notes}',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
           ],
         ],
       ),
@@ -339,30 +671,52 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen> {
           Row(
             children: [
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => provider.makePhoneCall(sos.patient.phone),
-                  icon: const Icon(Icons.phone),
-                  label: const Text('Gọi điện'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(0, 56),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF66BB6A), Color(0xFF43A047)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: ElevatedButton.icon(
+                    onPressed: () => provider.makePhoneCall(sos.patient.phone),
+                    icon: const Icon(Icons.phone),
+                    label: const Text('Gọi điện'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shadowColor: Colors.transparent,
+                      minimumSize: const Size(0, 56),
+                    ),
                   ),
                 ),
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => provider.openMapNavigation(
-                    sos.location.latitude,
-                    sos.location.longitude,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF42A5F5), Color(0xFF1976D2)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  icon: const Icon(Icons.map),
-                  label: const Text('Chỉ đường'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2196F3),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(0, 56),
+                  child: ElevatedButton.icon(
+                    onPressed: () => provider.openMapNavigation(
+                      sos.location.latitude,
+                      sos.location.longitude,
+                    ),
+                    icon: const Icon(Icons.map),
+                    label: const Text('Chỉ đường'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.white,
+                      shadowColor: Colors.transparent,
+                      minimumSize: const Size(0, 56),
+                    ),
                   ),
                 ),
               ),
