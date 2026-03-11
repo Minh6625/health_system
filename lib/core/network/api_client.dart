@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:healthguard/features/auth/services/token_storage_service.dart';
 
 class ApiClient {
   // Use 10.0.2.2 for Android emulator to access host machine's localhost
@@ -13,16 +14,31 @@ class ApiClient {
 
   ApiClient._internal();
 
+  final TokenStorageService _tokenStorageService = TokenStorageService();
+
+  Future<Map<String, String>> _buildHeaders({bool requiresAuth = true}) async {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+    if (requiresAuth) {
+      final token = await _tokenStorageService.readAccessToken();
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+    }
+    return headers;
+  }
+
   Future<Map<String, dynamic>> post(
     String path, {
     Map<String, dynamic>? body,
+    bool requiresAuth = true,
   }) async {
     try {
       final url = Uri.parse('$baseUrl$path');
+      final headers = await _buildHeaders(requiresAuth: requiresAuth);
       final response = await http
           .post(
             url,
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: jsonEncode(body ?? {}),
           )
           .timeout(const Duration(seconds: 10));
@@ -52,11 +68,12 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> get(String path) async {
+  Future<Map<String, dynamic>> get(String path, {bool requiresAuth = true}) async {
     try {
       final url = Uri.parse('$baseUrl$path');
+      final headers = await _buildHeaders(requiresAuth: requiresAuth);
       final response = await http
-          .get(url, headers: {'Content-Type': 'application/json'})
+          .get(url, headers: headers)
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -75,6 +92,112 @@ class ApiClient {
         }
         throw Exception(errorMessage);
       }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> patch(
+    String path, {
+    Map<String, dynamic>? body,
+    bool requiresAuth = true,
+  }) async {
+    try {
+      final url = Uri.parse('$baseUrl$path');
+      final headers = await _buildHeaders(requiresAuth: requiresAuth);
+      final response = await http
+          .patch(
+            url,
+            headers: headers,
+            body: jsonEncode(body ?? {}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      String errorMessage = 'Request failed';
+      try {
+        final errorBody = jsonDecode(response.body);
+        errorMessage =
+            errorBody['message'] as String? ??
+            errorBody['detail'] as String? ??
+            'Request failed';
+      } catch (e) {
+        errorMessage = _getErrorMessage(response.statusCode);
+      }
+      throw Exception(errorMessage);
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> put(
+    String path, {
+    Map<String, dynamic>? body,
+    bool requiresAuth = true,
+  }) async {
+    try {
+      final url = Uri.parse('$baseUrl$path');
+      final headers = await _buildHeaders(requiresAuth: requiresAuth);
+      final response = await http
+          .put(
+            url,
+            headers: headers,
+            body: jsonEncode(body ?? {}),
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+
+      String errorMessage = 'Request failed';
+      try {
+        final errorBody = jsonDecode(response.body);
+        errorMessage =
+            errorBody['message'] as String? ??
+            errorBody['detail'] as String? ??
+            'Request failed';
+      } catch (e) {
+        errorMessage = _getErrorMessage(response.statusCode);
+      }
+      throw Exception(errorMessage);
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> delete(
+    String path, {
+    bool requiresAuth = true,
+  }) async {
+    try {
+      final url = Uri.parse('$baseUrl$path');
+      final headers = await _buildHeaders(requiresAuth: requiresAuth);
+      final response = await http
+          .delete(url, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        if (response.body.isEmpty) {
+          return <String, dynamic>{};
+        }
+        return jsonDecode(response.body);
+      }
+
+      String errorMessage = 'Request failed';
+      try {
+        final errorBody = jsonDecode(response.body);
+        errorMessage =
+            errorBody['message'] as String? ??
+            errorBody['detail'] as String? ??
+            'Request failed';
+      } catch (e) {
+        errorMessage = _getErrorMessage(response.statusCode);
+      }
+      throw Exception(errorMessage);
     } catch (e) {
       throw Exception('Network error: $e');
     }

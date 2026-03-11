@@ -7,6 +7,10 @@ import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/core/theme/app_theme.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
+import 'package:healthguard/features/device/providers/device_provider.dart';
+import 'package:healthguard/features/health_monitoring/providers/vital_signs_provider.dart';
+import 'package:healthguard/features/profile/providers/profile_provider.dart';
+import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:provider/provider.dart';
 
 class HealthSystemApp extends StatefulWidget {
@@ -81,8 +85,24 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthProvider(AuthRepository()),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(AuthRepository()),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => VitalSignsProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SleepProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => DeviceProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => ProfileProvider(),
+        ),
+      ],
       child: MaterialApp(
         navigatorKey: _navigatorKey,
         debugShowCheckedModeBanner: false,

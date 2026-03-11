@@ -94,6 +94,28 @@ COMMENT ON COLUMN motion_data.magnitude IS 'Độ lớn vector gia tốc (pre-co
 COMMENT ON COLUMN motion_data.sampling_rate IS 'Tần số lấy mẫu (Hz), thường 50-100';
 
 -- ============================================================================
+-- Table: sleep_sessions
+-- Purpose: Lưu phiên ngủ của người dùng từ thiết bị đeo
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS sleep_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    device_id INT REFERENCES devices(id) ON DELETE SET NULL,
+    start_time TIMESTAMPTZ NOT NULL,
+    end_time TIMESTAMPTZ NOT NULL,
+    sleep_score SMALLINT CHECK (sleep_score >= 0 AND sleep_score <= 100),
+    phases JSONB,  -- {"awake": 30, "light": 180, "deep": 90, "rem": 60}
+    wake_count SMALLINT DEFAULT 0 CHECK (wake_count >= 0),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT sleep_session_time_valid CHECK (end_time > start_time)
+);
+
+COMMENT ON TABLE sleep_sessions IS 'Phiên ngủ của người dùng, gồm thời gian ngủ, sleep score và phân bố các phase';
+COMMENT ON COLUMN sleep_sessions.phases IS 'Thời lượng từng phase ngủ theo phút (awake, light, deep, rem)';
+COMMENT ON COLUMN sleep_sessions.sleep_score IS 'Điểm chất lượng giấc ngủ (0-100)';
+
+-- ============================================================================
 -- Create Continuous Aggregates (auto-downsampling)
 -- Purpose: Pre-compute aggregates để query nhanh hơn
 -- ============================================================================
@@ -158,6 +180,7 @@ DO $$
 BEGIN
     RAISE NOTICE '✓ Created hypertable: vitals (7-day chunks)';
     RAISE NOTICE '✓ Created hypertable: motion_data (1-day chunks)';
+    RAISE NOTICE '✓ Created table: sleep_sessions';
     RAISE NOTICE '✓ Created continuous aggregate: vitals_5min';
     RAISE NOTICE '✓ Created continuous aggregate: vitals_hourly';
     RAISE NOTICE '✓ Created continuous aggregate: vitals_daily';

@@ -7,7 +7,11 @@ class AuthRepository {
 
   Future<AuthResponse> login(UserModel user) async {
     try {
-      final result = await _apiClient.post('/auth/login', body: user.toJson());
+      final result = await _apiClient.post(
+        '/auth/login',
+        body: user.toJson(),
+        requiresAuth: false,
+      );
       return AuthResponse.fromJson(result);
     } catch (e) {
       return AuthResponse(
@@ -22,6 +26,7 @@ class AuthRepository {
       final result = await _apiClient.post(
         '/auth/register',
         body: user.toJson(),
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
@@ -37,6 +42,7 @@ class AuthRepository {
       final result = await _apiClient.post(
         '/auth/verify-email',
         body: {'verification_token': verificationToken},
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
@@ -52,6 +58,7 @@ class AuthRepository {
       final result = await _apiClient.post(
         '/auth/resend-verification',
         body: {'email': email},
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
@@ -67,6 +74,7 @@ class AuthRepository {
       final result = await _apiClient.post(
         '/auth/forgot-password',
         body: {'email': email},
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
@@ -85,6 +93,7 @@ class AuthRepository {
       final result = await _apiClient.post(
         '/auth/reset-password',
         body: {'reset_token': resetToken, 'new_password': newPassword},
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
