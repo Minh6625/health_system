@@ -13,16 +13,35 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: isActive ? const Color(0xFFD32F2F) : const Color(0xFF388E3C),
-        borderRadius: BorderRadius.circular(16),
+        gradient: isActive
+            ? const LinearGradient(
+                colors: [Color(0xFFE53935), Color(0xFFD32F2F)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: isActive ? null : const Color(0xFF388E3C),
+        borderRadius: BorderRadius.circular(6),
       ),
-      child: Text(
-        isActive ? 'Đang hoạt động' : 'Đã xử lý',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isActive)
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.white,
+              size: 14,
+            ),
+          if (isActive) const SizedBox(width: 4),
+          Text(
+            isActive ? 'Khẩn cấp' : 'Đã xử lý',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
