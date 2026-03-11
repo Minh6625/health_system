@@ -51,10 +51,10 @@ jobs:
       - name: Run tests
         working-directory: ./backend
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-          SECRET_KEY: test-secret-key-for-ci
-          ALGORITHM: HS256
-          ACCESS_TOKEN_EXPIRE_MINUTES: 30
+          DATABASE_URL: ${{ secrets.CI_DATABASE_URL }}
+          SECRET_KEY: ${{ secrets.CI_SECRET_KEY }}
+          ALGORITHM: ${{ secrets.CI_ALGORITHM }}
+          ACCESS_TOKEN_EXPIRE_MINUTES: ${{ secrets.CI_ACCESS_TOKEN_EXPIRE_MINUTES }}
         run: |
           pytest tests/ -v --tb=short
 
