@@ -87,8 +87,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify Heroku credentials
+        run: |
+          echo "🔑 Verifying Heroku API key..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://api.heroku.com/apps/$HEROKU_APP_NAME \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            -H "Authorization: Bearer $HEROKU_API_KEY")
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "❌ Heroku API key invalid or app '$HEROKU_APP_NAME' not found (HTTP $HTTP_CODE)"
+            echo "   → Check HEROKU_API_KEY in GitHub Secrets (Account Settings → API Key → Reveal)"
+            echo "   → Check HEROKU_APP_NAME matches exactly"
+            exit 1
+          fi
+          echo "✅ Heroku credentials valid"
+
       - name: Login to Heroku Container Registry
-        run: echo "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
+        run: |
+          echo "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
+          echo "✅ Docker login successful"
 
       - name: Build Docker image
         run: docker build -t registry.heroku.com/$HEROKU_APP_NAME/web ./backend

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.api.router import api_router
 from app.db.database import Base, engine
@@ -22,3 +23,10 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+
+
+@app.get("/", include_in_schema=False)
+def root_redirect():
+    """Redirect root URL to Swagger docs"""
+    return RedirectResponse(url="/docs")
+
