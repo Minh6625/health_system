@@ -220,8 +220,8 @@ class ResolutionInfoModel {
 
   factory ResolutionInfoModel.fromJson(Map<String, dynamic> json) {
     return ResolutionInfoModel(
-      resolvedBy: json['resolved_by'] as String,
-      resolvedTime: DateTime.parse(json['resolved_time'] as String),
+      resolvedBy: json['resolved_by_name'] as String,
+      resolvedTime: DateTime.parse(json['resolved_at'] as String),
       notes: json['notes'] as String?,
     );
   }

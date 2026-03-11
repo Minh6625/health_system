@@ -37,11 +37,10 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
 
     try {
       sosList = await repository.getSOSAlerts(status: status);
-      isLoadingList = false;
-      notifyListeners();
     } catch (e) {
-      isLoadingList = false;
       listErrorMessage = _getErrorMessage(e);
+    } finally {
+      isLoadingList = false;
       notifyListeners();
     }
   }
@@ -54,11 +53,10 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
 
     try {
       sosList = await repository.getSOSAlerts(status: status);
-      isRefreshing = false;
-      notifyListeners();
     } catch (e) {
-      isRefreshing = false;
       listErrorMessage = _getErrorMessage(e);
+    } finally {
+      isRefreshing = false;
       notifyListeners();
     }
   }
@@ -71,11 +69,10 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
 
     try {
       sosDetail = await repository.getSOSDetail(sosId: sosId);
-      isLoadingDetail = false;
-      notifyListeners();
     } catch (e) {
-      isLoadingDetail = false;
       detailErrorMessage = _getErrorMessage(e);
+    } finally {
+      isLoadingDetail = false;
       notifyListeners();
     }
   }

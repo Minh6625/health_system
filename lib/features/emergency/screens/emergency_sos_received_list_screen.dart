@@ -14,74 +14,171 @@ class EmergencySOSReceivedListScreen extends StatefulWidget {
 }
 
 class _EmergencySOSReceivedListScreenState
-    extends State<EmergencySOSReceivedListScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+    extends State<EmergencySOSReceivedListScreen> {
+  bool _isInitialized = false;
+  String _selectedStatus = 'all';
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(_onTabChanged);
-
-    // Fetch initial data
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
+    _searchController.addListener(() {
+      setState(() {
+        _searchQuery = _searchController.text.toLowerCase();
+      });
     });
   }
 
-  void _onTabChanged() {
-    if (!_tabController.indexIsChanging) {
-      final status = _getStatusFromTabIndex(_tabController.index);
-      context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(status);
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isInitialized) {
+      _isInitialized = true;
+      // Fetch initial data immediately
+      context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
     }
   }
 
-  String _getStatusFromTabIndex(int index) {
-    switch (index) {
-      case 0:
-        return 'all';
-      case 1:
-        return 'active';
-      case 2:
-        return 'resolved';
-      default:
-        return 'all';
-    }
+  void _onStatusChanged(String status) {
+    setState(() {
+      _selectedStatus = status;
+    });
+    context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(status);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFEBEBEB),
       appBar: AppBar(
         title: const Text('Danh sách SOS nhận được'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Tất cả'),
-            Tab(text: 'Đang hoạt động'),
-            Tab(text: 'Đã xử lý'),
-          ],
-        ),
+        elevation: 0,
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _buildSOSList(status: 'all'),
-          _buildSOSList(status: 'active'),
-          _buildSOSList(status: 'resolved'),
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Tìm kiếm theo tên bệnh nhân...',
+                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+                  prefixIcon: Icon(
+                    Icons.search,
+                    color: Colors.grey[600],
+                    size: 22,
+                  ),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(
+                            Icons.cancel,
+                            size: 20,
+                            color: Colors.grey[500],
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                          },
+                        )
+                      : null,
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Filter Chips
+          Padding(
+            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip('all', 'Tất cả', Icons.medication),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('active', 'Khẩn cấp', Icons.warning_rounded),
+                  const SizedBox(width: 8),
+                  _buildFilterChip('resolved', 'Đã xử lý', Icons.check_circle),
+                ],
+              ),
+            ),
+          ),
+
+          // SOS List
+          Expanded(child: _buildSOSList()),
         ],
       ),
     );
   }
 
-  Widget _buildSOSList({required String status}) {
+  Widget _buildFilterChip(String value, String label, IconData icon) {
+    final bool isSelected = _selectedStatus == value;
+
+    Color getChipColor() {
+      if (!isSelected) return Colors.white;
+      switch (value) {
+        case 'active':
+          return const Color(0xFFE53935); // Red for active
+        case 'resolved':
+          return const Color(0xFF43A047); // Green for resolved
+        default:
+          return const Color(0xFF1976D2); // Blue for all
+      }
+    }
+
+    return FilterChip(
+      selected: isSelected,
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: isSelected ? Colors.white : Colors.grey[700],
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? Colors.white : Colors.grey[700],
+            ),
+          ),
+        ],
+      ),
+      onSelected: (selected) => _onStatusChanged(value),
+      backgroundColor: Colors.white,
+      selectedColor: getChipColor(),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? getChipColor() : Colors.grey.shade300,
+          width: isSelected ? 0 : 1,
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      showCheckmark: false,
+    );
+  }
+
+  Widget _buildSOSList() {
     return Consumer<EmergencyCaregiverProvider>(
       builder: (context, provider, child) {
         // Loading state
@@ -94,8 +191,12 @@ class _EmergencySOSReceivedListScreenState
           return _buildErrorState(provider.listErrorMessage!);
         }
 
-        // Filter list based on current tab
-        final filteredList = _filterList(provider.sosList, status);
+        // Filter list based on status and search query
+        final filteredList = _filterList(
+          provider.sosList,
+          _selectedStatus,
+          _searchQuery,
+        );
 
         // Empty state
         if (filteredList.isEmpty) {
@@ -104,10 +205,10 @@ class _EmergencySOSReceivedListScreenState
 
         // Success state
         return RefreshIndicator(
-          onRefresh: () => provider.refreshSOSAlerts(status),
+          onRefresh: () => provider.refreshSOSAlerts(_selectedStatus),
           child: ListView.builder(
             itemCount: filteredList.length,
-            padding: const EdgeInsets.only(top: 8, bottom: 16),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             itemBuilder: (context, index) {
               final sos = filteredList[index];
               return SOSCard(
@@ -132,9 +233,35 @@ class _EmergencySOSReceivedListScreenState
     );
   }
 
-  List _filterList(List sosList, String status) {
-    if (status == 'all') return sosList;
-    return sosList.where((sos) => sos.status == status).toList();
+  List _filterList(List sosList, String status, String searchQuery) {
+    // Filter by status
+    List filtered;
+    if (status == 'all') {
+      filtered = sosList;
+    } else {
+      filtered = sosList.where((sos) => sos.status == status).toList();
+    }
+
+    // Filter by search query
+    if (searchQuery.isNotEmpty) {
+      filtered = filtered.where((sos) {
+        final patientName = sos.patient.name.toLowerCase();
+        final address = (sos.location.address ?? '').toLowerCase();
+        return patientName.contains(searchQuery) ||
+            address.contains(searchQuery);
+      }).toList();
+    }
+
+    // Sort: Active SOS first, then by trigger time (newest first)
+    filtered.sort((a, b) {
+      // Priority 1: Active status first
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      // Priority 2: Newest first
+      return b.triggerTime.compareTo(a.triggerTime);
+    });
+
+    return filtered;
   }
 
   Widget _buildEmptyState() {
@@ -168,8 +295,9 @@ class _EmergencySOSReceivedListScreenState
           const SizedBox(height: 16),
           ElevatedButton.icon(
             onPressed: () {
-              final status = _getStatusFromTabIndex(_tabController.index);
-              context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(status);
+              context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(
+                _selectedStatus,
+              );
             },
             icon: const Icon(Icons.refresh),
             label: const Text('Thử lại'),
