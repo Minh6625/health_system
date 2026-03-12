@@ -1,11 +1,11 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, EmailStr
 from typing import Optional
 from datetime import date
 import re
 
 
 class RegisterRequest(BaseModel):
-    email: str = Field(min_length=5, max_length=120)
+    email: EmailStr = Field(min_length=5, max_length=120)
     full_name: str = Field(min_length=2, max_length=100)
     password: str = Field(min_length=8, max_length=64)  # Updated to 8 chars for strength
     role: str = Field(default="patient")  # patient | caregiver
@@ -32,9 +32,10 @@ class RegisterRequest(BaseModel):
     @field_validator("role")
     @classmethod
     def validate_role(cls, v: str) -> str:
-        if v not in ["patient", "caregiver"]:
+        v_lower = v.lower()
+        if v_lower not in ["patient", "caregiver"]:
             raise ValueError("Role must be 'patient' or 'caregiver'")
-        return v.lower()
+        return v_lower
     
     @field_validator("phone")
     @classmethod
