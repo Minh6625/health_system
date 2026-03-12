@@ -12,6 +12,20 @@ class RegisterRequest(BaseModel):
     date_of_birth: Optional[date] = None  # YYYY-MM-DD
     phone: Optional[str] = Field(None, min_length=10, max_length=15)  # 10-15 digits
     
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        """Validate email format."""
+        if not v or not v.strip():
+            raise ValueError("Email không được để trống")
+        
+        # Simple email pattern validation
+        email_pattern = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+        if not email_pattern.match(v.strip()):
+            raise ValueError("Email không hợp lệ")
+        
+        return v.strip().lower()
+    
     @field_validator("full_name")
     @classmethod
     def validate_full_name(cls, v: str) -> str:
@@ -32,9 +46,10 @@ class RegisterRequest(BaseModel):
     @field_validator("role")
     @classmethod
     def validate_role(cls, v: str) -> str:
-        if v not in ["patient", "caregiver"]:
+        v_lower = v.lower()
+        if v_lower not in ["patient", "caregiver"]:
             raise ValueError("Role must be 'patient' or 'caregiver'")
-        return v.lower()
+        return v_lower
     
     @field_validator("phone")
     @classmethod

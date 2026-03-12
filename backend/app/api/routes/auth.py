@@ -25,7 +25,7 @@ from app.utils.rate_limiter import (
 )
 from app.core.dependencies import get_current_user
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 def get_client_ip(request: Request) -> str:

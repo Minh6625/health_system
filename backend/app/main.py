@@ -11,7 +11,14 @@ from app.models.sos_event_model import FallEvent, SOSEvent  # noqa: F401 - neede
 # Create tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Health System Backend", version="0.1.0")
+app = FastAPI(
+    title="Health Guard - Mobile Backend",
+    version="0.1.0",
+    root_path="/api/v1",
+    servers=[
+        {"url": "/api/v1", "description": "API v1"},
+    ]
+)
 
 app.add_middleware(
     CORSMiddleware,

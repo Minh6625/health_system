@@ -1,0 +1,196 @@
+name: CD — Deploy Mobile Backend to Heroku
+
+on:
+  push:
+    branches: [deploy]
+  pull_request:
+    branches: [deploy]
+    types: [closed]
+  workflow_dispatch:
+
+env:
+  HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME }}
+  HEROKU_API_KEY:  ${{ secrets.HEROKU_API_KEY }}
+  HEROKU_APP_URL:  ${{ secrets.HEROKU_APP_URL }}
+
+# ─────────────────────────────────────────────────────────────
+jobs:
+
+  # ── Job 1: Run tests before deploying ─────────────────────
+  test:
+    name: 🧪 Test Backend
+    runs-on: ubuntu-latest
+    # Skip if PR was closed WITHOUT merging
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          SECRET_KEY: test-secret-key-for-ci
+          ALGORITHM: HS256
+          ACCESS_TOKEN_EXPIRE_DAYS: "30"
+        run: |
+          echo "🧪 Running tests..."
+          pytest tests/ -v --tb=short
+          echo "✅ All tests passed!"
+
+      - name: Test summary
+        if: always()
+        run: |
+          echo "### 🧪 Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+
+  # ── Job 2: Build Docker image & deploy to Heroku ──────────
+  deploy:
+    name: 🚀 Build & Deploy
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify Heroku credentials
+        run: |
+          echo "🔑 Verifying Heroku API key..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            https://api.heroku.com/apps/$HEROKU_APP_NAME \
+            -H "Accept: application/vnd.heroku+json; version=3" \
+            -H "Authorization: Bearer $HEROKU_API_KEY")
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo "❌ Heroku API key invalid or app '$HEROKU_APP_NAME' not found (HTTP $HTTP_CODE)"
+            echo "   → Check HEROKU_API_KEY in GitHub Secrets (Account Settings → API Key → Reveal)"
+            echo "   → Check HEROKU_APP_NAME matches exactly"
+            exit 1
+          fi
+          echo "✅ Heroku credentials valid"
+
+      - name: Login to Heroku Container Registry
+        run: |
+          echo "$HEROKU_API_KEY" | docker login --username=_ --password-stdin registry.heroku.com
+          echo "✅ Docker login successful"
+
+      - name: Build Docker image
+        run: docker build -t registry.heroku.com/$HEROKU_APP_NAME/web ./backend
+
+      - name: Push Docker image
+        run: docker push registry.heroku.com/$HEROKU_APP_NAME/web
+
+      - name: Release container on Heroku
+        run: |
+          # Get Docker image ID
+          IMAGE_ID=$(docker inspect registry.heroku.com/$HEROKU_APP_NAME/web --format='{{.Id}}')
+
+          # Use Heroku Platform API to release (no CLI needed)
+          HTTP_STATUS=$(curl -s -X PATCH \
+            https://api.heroku.com/apps/$HEROKU_APP_NAME/formation \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/vnd.heroku+json; version=3.docker-releases" \
+            -H "Authorization: Bearer $HEROKU_API_KEY" \
+            -d "{\"updates\": [{\"type\": \"web\", \"docker_image\": \"$IMAGE_ID\"}]}" \
+            -o release_response.json -w "%{http_code}")
+
+          echo "HTTP Status: $HTTP_STATUS"
+          cat release_response.json
+
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            echo "✅ Release successful"
+          else
+            echo "❌ Release failed (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
+
+  # ── Job 3: Smoke test the deployed API ────────────────────
+  smoke-test:
+    name: 🔥 Smoke Tests
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Wait for Heroku to boot
+        run: |
+          echo "⏳ Waiting 30s for Heroku dyno to boot..."
+          sleep 30
+
+      - name: "Test: GET /api/v1/mobile/health"
+        run: |
+          echo "🏥 Testing /api/v1/mobile/health..."
+          RESPONSE=$(curl -sf "$HEROKU_APP_URL/api/v1/mobile/health" || echo "FAIL")
+          echo "Response: $RESPONSE"
+          if echo "$RESPONSE" | grep -q '"status":"ok"'; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed"
+            exit 1
+          fi
+
+      - name: "Test: API responds (no 5xx)"
+        run: |
+          echo "🔌 Testing /api/v1/mobile/..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEROKU_APP_URL/api/v1/mobile/")
+          echo "HTTP Status: $HTTP_CODE"
+          if [ "$HTTP_CODE" -lt 500 ]; then
+            echo "✅ API is responding (HTTP $HTTP_CODE)"
+          else
+            echo "❌ API returned server error (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+
+      - name: "Test: Swagger docs load"
+        run: |
+          echo "📖 Testing /docs..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEROKU_APP_URL/docs")
+          echo "HTTP Status: $HTTP_CODE"
+          if [ "$HTTP_CODE" -lt 400 ]; then
+            echo "✅ Swagger docs accessible"
+          else
+            echo "⚠️ Swagger docs not accessible (HTTP $HTTP_CODE) — non-blocking"
+          fi
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "### 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| App | \`$HEROKU_APP_NAME\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| URL | $HEROKU_APP_URL |" >> $GITHUB_STEP_SUMMARY
+          echo "| Status | ${{ job.status }} |" >> $GITHUB_STEP_SUMMARY
