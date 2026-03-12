@@ -1,16 +1,30 @@
-from pydantic import BaseModel, Field, field_validator, EmailStr
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import date
 import re
 
 
 class RegisterRequest(BaseModel):
-    email: EmailStr = Field(min_length=5, max_length=120)
+    email: str = Field(min_length=5, max_length=120)
     full_name: str = Field(min_length=2, max_length=100)
     password: str = Field(min_length=8, max_length=64)  # Updated to 8 chars for strength
     role: str = Field(default="patient")  # patient | caregiver
     date_of_birth: Optional[date] = None  # YYYY-MM-DD
     phone: Optional[str] = Field(None, min_length=10, max_length=15)  # 10-15 digits
+    
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        """Validate email format."""
+        if not v or not v.strip():
+            raise ValueError("Email không được để trống")
+        
+        # Simple email pattern validation
+        email_pattern = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+        if not email_pattern.match(v.strip()):
+            raise ValueError("Email không hợp lệ")
+        
+        return v.strip().lower()
     
     @field_validator("full_name")
     @classmethod
