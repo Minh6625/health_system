@@ -15,7 +15,7 @@ class TestAgeValidation:
         """Test valid adult age (25 years old)."""
         dob = date.today() - timedelta(days=25*365)
         is_valid, message = AuthService.validate_age(dob)
-        assert is_valid is True
+        assert is_valid is False  # ← Cố tình sai để test CI fail
         assert "OK" in message
 
     def test_valid_minimum_age(self):
