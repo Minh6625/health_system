@@ -172,15 +172,17 @@ class ApiClient {
   Future<Map<String, dynamic>> delete(
     String path, {
     bool requiresAuth = true,
+    Map<String, dynamic>? body,
   }) async {
     try {
       final url = Uri.parse('$baseUrl$path');
       final headers = await _buildHeaders(requiresAuth: requiresAuth);
       final response = await http
-          .delete(url, headers: headers)
+          .delete(url, headers: headers,
+              body: body != null ? jsonEncode(body) : null)
           .timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
         if (response.body.isEmpty) {
           return <String, dynamic>{};
         }

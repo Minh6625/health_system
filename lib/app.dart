@@ -2,6 +2,7 @@
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:healthguard/core/constants/app_strings.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/core/theme/app_theme.dart';
@@ -32,6 +33,10 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     super.initState();
     _appLinks = AppLinks();
     _initDeepLinks();
+    // Remove splash screen after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FlutterNativeSplash.remove();
+    });
   }
 
   Future<void> _initDeepLinks() async {

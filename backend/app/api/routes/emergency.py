@@ -18,7 +18,7 @@ router = APIRouter(prefix="/mobile", tags=["emergency"])
 
 @router.get("/caregiver/sos-alerts", response_model=SOSAlertsResponse)
 def get_sos_alerts(
-    status: str = Query("all", pattern="^(all|active|resolved)$"),
+    status_filter: str = Query("all", alias="status", pattern="^(all|active|resolved)$"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> SOSAlertsResponse:
@@ -42,7 +42,7 @@ def get_sos_alerts(
         )
     
     return EmergencyService.get_sos_alerts_for_caregiver(
-        db, current_user.id, status
+        db, current_user.id, status_filter
     )
 
 

@@ -359,12 +359,16 @@ class _DeviceScreenState extends State<DeviceScreen> {
       onSelected: (_) {
         context.read<DeviceProvider>().setStatusFilter(value);
       },
-      selectedColor: const Color(0xFFD1FAE5),
+      selectedColor: const Color(0xFF0F766E),
       labelStyle: TextStyle(
-        color: selected ? const Color(0xFF065F46) : const Color(0xFFE2F7F2),
+        color: selected ? Colors.white : const Color(0xFF0F766E),
         fontWeight: FontWeight.w600,
       ),
-      backgroundColor: const Color(0x1FFFFFFF),
+      backgroundColor: Colors.white,
+      side: BorderSide(
+        color: selected ? const Color(0xFF0F766E) : Colors.grey.shade300,
+      ),
+      checkmarkColor: Colors.white,
     );
   }
 

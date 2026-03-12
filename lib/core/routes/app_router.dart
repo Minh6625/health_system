@@ -8,6 +8,7 @@ import 'package:healthguard/features/auth/screens/reset_password_screen.dart';
 import 'package:healthguard/features/auth/screens/start_screen.dart';
 import 'package:healthguard/features/auth/screens/verify_email_screen.dart';
 import 'package:healthguard/features/home/screens/main_screen.dart';
+import 'package:healthguard/features/profile/screens/edit_profile_screen.dart';
 
 class AppRouter {
   static const String start = '/start';
@@ -18,6 +19,7 @@ class AppRouter {
   static const String forgotPassword = '/forgot-password';
   static const String resetPassword = '/reset-password';
   static const String changePassword = '/change-password';
+  static const String editProfile = '/edit-profile';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -45,6 +47,8 @@ class AppRouter {
         );
       case changePassword:
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
+      case editProfile:
+        return MaterialPageRoute(builder: (_) => const EditProfileScreen());
       case start:
         return MaterialPageRoute(builder: (_) => const AuthPagesScreen());
       case login:

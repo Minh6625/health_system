@@ -8,6 +8,14 @@ class UserProfileModel {
   final bool isActive;
   final bool isVerified;
   final String? avatarUrl;
+  // Medical fields
+  final String? gender;
+  final String? bloodType;
+  final double? heightCm;
+  final double? weightKg;
+  final List<String> medications;
+  final List<String> allergies;
+  final List<String> medicalConditions;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -21,6 +29,13 @@ class UserProfileModel {
     required this.isActive,
     required this.isVerified,
     this.avatarUrl,
+    this.gender,
+    this.bloodType,
+    this.heightCm,
+    this.weightKg,
+    this.medications = const [],
+    this.allergies = const [],
+    this.medicalConditions = const [],
     required this.createdAt,
     required this.updatedAt,
   });
@@ -38,6 +53,13 @@ class UserProfileModel {
       isActive: json['is_active'] as bool? ?? false,
       isVerified: json['is_verified'] as bool? ?? false,
       avatarUrl: json['avatar_url'] as String?,
+      gender: json['gender'] as String?,
+      bloodType: json['blood_type'] as String?,
+      heightCm: (json['height_cm'] as num?)?.toDouble(),
+      weightKg: (json['weight_kg'] as num?)?.toDouble(),
+      medications: ((json['medications'] as List<dynamic>?) ?? []).map((e) => e.toString()).toList(),
+      allergies: ((json['allergies'] as List<dynamic>?) ?? []).map((e) => e.toString()).toList(),
+      medicalConditions: ((json['medical_conditions'] as List<dynamic>?) ?? []).map((e) => e.toString()).toList(),
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
       updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
     );

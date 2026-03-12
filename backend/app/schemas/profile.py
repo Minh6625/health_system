@@ -3,6 +3,9 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
+VALID_BLOOD_TYPES = {'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'}
+VALID_GENDERS = {'Nam', 'Nữ', 'Khác'}
+
 
 class ProfileResponse(BaseModel):
     user_id: int
@@ -14,6 +17,14 @@ class ProfileResponse(BaseModel):
     is_active: bool
     is_verified: bool
     avatar_url: str | None = None
+    # Medical fields
+    gender: str | None = None
+    blood_type: str | None = None
+    height_cm: float | None = None
+    weight_kg: float | None = None
+    medications: list[str] = []
+    allergies: list[str] = []
+    medical_conditions: list[str] = []
     created_at: datetime
     updated_at: datetime
 
@@ -23,6 +34,14 @@ class ProfileUpdateRequest(BaseModel):
     phone: str | None = Field(default=None, max_length=15)
     date_of_birth: date | None = None
     avatar_url: str | None = None
+    # Medical fields
+    gender: str | None = None
+    blood_type: str | None = None
+    height_cm: float | None = Field(default=None, ge=50, le=250)
+    weight_kg: float | None = Field(default=None, ge=2, le=500)
+    medications: list[str] | None = None
+    allergies: list[str] | None = None
+    medical_conditions: list[str] | None = None
 
     @field_validator('full_name')
     @classmethod
@@ -41,6 +60,32 @@ class ProfileUpdateRequest(BaseModel):
         cleaned = value.replace(' ', '').replace('-', '').strip()
         if not cleaned:
             return None
-        if not cleaned.isdigit() or len(cleaned) < 10 or len(cleaned) > 15:
-            raise ValueError('Số điện thoại phải có từ 10 đến 15 chữ số')
+        if not cleaned.isdigit():
+            raise ValueError('Số điện thoại chỉ được chứa chữ số')
+        if len(cleaned) < 10 or len(cleaned) > 11:
+            raise ValueError('Số điện thoại phải có 10-11 chữ số')
+        if not cleaned.startswith('0'):
+            raise ValueError('Số điện thoại Việt Nam phải bắt đầu bằng 0')
         return cleaned
+
+    @field_validator('blood_type')
+    @classmethod
+    def validate_blood_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value not in VALID_BLOOD_TYPES:
+            raise ValueError(f'Nhóm máu không hợp lệ. Các giá trị hợp lệ: {", ".join(sorted(VALID_BLOOD_TYPES))}')
+        return value
+
+    @field_validator('gender')
+    @classmethod
+    def validate_gender(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if value not in VALID_GENDERS:
+            raise ValueError(f'Giới tính không hợp lệ. Các giá trị hợp lệ: {", ".join(VALID_GENDERS)}')
+        return value
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1)

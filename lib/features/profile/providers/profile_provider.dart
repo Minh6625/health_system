@@ -9,11 +9,13 @@ class ProfileProvider extends ChangeNotifier {
   UserProfileModel? _profile;
   bool _isLoading = false;
   bool _isSaving = false;
+  bool _isDeleting = false;
   String? _errorMessage;
 
   UserProfileModel? get profile => _profile;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
+  bool get isDeleting => _isDeleting;
   String? get errorMessage => _errorMessage;
 
   Future<void> fetchProfile() async {
@@ -37,6 +39,13 @@ class ProfileProvider extends ChangeNotifier {
     String? phone,
     DateTime? dateOfBirth,
     String? avatarUrl,
+    String? gender,
+    String? bloodType,
+    double? heightCm,
+    double? weightKg,
+    List<dynamic>? medications,
+    List<dynamic>? allergies,
+    List<String>? medicalConditions,
   }) async {
     _isSaving = true;
     _errorMessage = null;
@@ -48,6 +57,13 @@ class ProfileProvider extends ChangeNotifier {
         'phone': phone,
         'date_of_birth': dateOfBirth?.toIso8601String().split('T').first,
         'avatar_url': avatarUrl,
+        'gender': gender,
+        'blood_type': bloodType,
+        'height_cm': heightCm,
+        'weight_kg': weightKg,
+        'medications': medications,
+        'allergies': allergies,
+        'medical_conditions': medicalConditions,
       };
 
       final response = await _apiClient.put(ApiEndpoints.profile, body: body);
@@ -58,6 +74,27 @@ class ProfileProvider extends ChangeNotifier {
       return false;
     } finally {
       _isSaving = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> deleteAccount({required String password}) async {
+    _isDeleting = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiClient.delete(
+        ApiEndpoints.profile,
+        body: {'password': password},
+      );
+      _profile = null;
+      return true;
+    } catch (e) {
+      _errorMessage = 'Không thể xóa tài khoản: ${e.toString()}';
+      return false;
+    } finally {
+      _isDeleting = false;
       notifyListeners();
     }
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
+import 'package:healthguard/features/profile/models/user_profile_model.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -12,15 +13,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _dobController = TextEditingController();
-  final TextEditingController _avatarController = TextEditingController();
-
-  DateTime? _selectedDate;
-  String? _lastSyncedProfileKey;
-
   @override
   void initState() {
     super.initState();
@@ -30,85 +22,136 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  @override
-  void dispose() {
-    _fullNameController.dispose();
-    _phoneController.dispose();
-    _dobController.dispose();
-    _avatarController.dispose();
-    super.dispose();
-  }
-
-  void _syncFormFromProfile(ProfileProvider profileProvider) {
-    final profile = profileProvider.profile;
-    if (profile == null) return;
-
-    final currentKey =
-        '${profile.userId}-${profile.updatedAt.toIso8601String()}';
-    if (_lastSyncedProfileKey == currentKey) return;
-
-    _fullNameController.text = profile.fullName;
-    _phoneController.text = profile.phone ?? '';
-    _avatarController.text = profile.avatarUrl ?? '';
-    _selectedDate = profile.dateOfBirth;
-    _dobController.text = _formatDate(profile.dateOfBirth);
-    _lastSyncedProfileKey = currentKey;
+  int? _calculateAge(DateTime? dob) {
+    if (dob == null) return null;
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    if (now.month < dob.month ||
+        (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    return age;
   }
 
   String _formatDate(DateTime? value) {
-    if (value == null) return '';
+    if (value == null) return 'Chưa cập nhật';
     final day = value.day.toString().padLeft(2, '0');
     final month = value.month.toString().padLeft(2, '0');
     return '$day/$month/${value.year}';
   }
 
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final initialDate =
-        _selectedDate ?? DateTime(now.year - 20, now.month, now.day);
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: DateTime(1900),
-      lastDate: now,
-      helpText: 'Chon ngay sinh',
-      cancelText: 'Huy',
-      confirmText: 'Chon',
-    );
+  String _formatDateTime(DateTime value) {
+    final day = value.day.toString().padLeft(2, '0');
+    final month = value.month.toString().padLeft(2, '0');
+    return '$day/$month/${value.year}';
+  }
 
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-        _dobController.text = _formatDate(picked);
-      });
+  String _roleLabel(String role) {
+    switch (role) {
+      case 'patient':
+        return 'Bệnh nhân';
+      case 'caregiver':
+        return 'Người chăm sóc';
+      case 'admin':
+        return 'Quản trị viên';
+      default:
+        return role;
     }
   }
 
-  Future<void> _handleSave(ProfileProvider profileProvider) async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _confirmDeleteAccount() async {
+    final passwordController = TextEditingController();
+    bool obscure = true;
 
-    final success = await profileProvider.updateProfile(
-      fullName: _fullNameController.text.trim(),
-      phone: _phoneController.text.trim().isEmpty
-          ? null
-          : _phoneController.text.trim(),
-      dateOfBirth: _selectedDate,
-      avatarUrl: _avatarController.text.trim().isEmpty
-          ? null
-          : _avatarController.text.trim(),
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.warning_rounded, color: Colors.red.shade700),
+                  const SizedBox(width: 8),
+                  const Text('Xóa tài khoản'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: Text(
+                      'Tài khoản và toàn bộ dữ liệu của bạn sẽ bị xóa sau 30 ngày. Hành động này không thể hoàn tác.',
+                      style: TextStyle(color: Colors.red.shade800, fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscure,
+                    decoration: InputDecoration(
+                      labelText: 'Nhập mật khẩu xác nhận',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setDialogState(() => obscure = !obscure),
+                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Hủy'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(true),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
+                  child: const Text('Xóa tài khoản', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
 
+    if (confirmed != true || !mounted) return;
+
+    final password = passwordController.text.trim();
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Vui lòng nhập mật khẩu'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    final provider = context.read<ProfileProvider>();
+    final success = await provider.deleteAccount(password: password);
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Cap nhat thong tin thanh cong'
-              : (profileProvider.errorMessage ?? 'Cap nhat that bai'),
+    if (success) {
+      await context.read<AuthProvider>().logout();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, AppRouter.login, (route) => false);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.errorMessage ?? 'Xóa tài khoản thất bại'),
+          backgroundColor: Colors.red.shade700,
         ),
-      ),
-    );
+      );
+    }
+    passwordController.dispose();
   }
 
   Future<void> _confirmLogout() async {
@@ -116,17 +159,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) {
         return AlertDialog(
-          title: const Text('Xac nhan dang xuat'),
-          content: const Text('Ban co chac chan muon dang xuat khong?'),
+          title: const Text('Xác nhận đăng xuất'),
+          content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Huy'),
+              child: const Text('Hủy'),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(true),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              child: const Text('Dang xuat'),
+              child: const Text(
+                'Đăng xuất',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ],
         );
@@ -148,18 +194,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return Consumer<ProfileProvider>(
       builder: (context, profileProvider, _) {
-        _syncFormFromProfile(profileProvider);
-
         return Scaffold(
+          backgroundColor: const Color(0xFFF4F7FB),
           appBar: AppBar(
-            title: const Text('Thong tin ca nhan'),
-            backgroundColor: Colors.blue.shade700,
+            title: const Text('Thông tin cá nhân'),
+            backgroundColor: const Color(0xFF0F766E),
+            foregroundColor: Colors.white,
             actions: [
               IconButton(
                 onPressed: profileProvider.isLoading
                     ? null
                     : () => context.read<ProfileProvider>().fetchProfile(),
                 icon: const Icon(Icons.refresh),
+                tooltip: 'Làm mới',
               ),
             ],
           ),
@@ -174,141 +221,213 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _InfoCard(profileProvider: profileProvider),
-            const SizedBox(height: 16),
-            const Text(
-              'Cai dat tai khoan',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _fullNameController,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Ho va ten',
-                border: OutlineInputBorder(),
+    if (profileProvider.errorMessage != null && profileProvider.profile == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.person_off_outlined, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                profileProvider.errorMessage!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600),
               ),
-              validator: (value) {
-                final text = value?.trim() ?? '';
-                if (text.length < 2) return 'Ho ten phai tu 2 ky tu';
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'So dien thoai',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => context.read<ProfileProvider>().fetchProfile(),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Thử lại'),
               ),
-              validator: (value) {
-                final text =
-                    value?.replaceAll(RegExp(r'\s|-'), '').trim() ?? '';
-                if (text.isEmpty) return null;
-                if (text.length < 10 ||
-                    text.length > 15 ||
-                    RegExp(r'\D').hasMatch(text)) {
-                  return 'So dien thoai phai tu 10 den 15 chu so';
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _dobController,
-              readOnly: true,
-              onTap: _pickDate,
-              decoration: const InputDecoration(
-                labelText: 'Ngay sinh',
-                border: OutlineInputBorder(),
-                suffixIcon: Icon(Icons.calendar_today),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _avatarController,
-              textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Avatar URL',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            if (profileProvider.errorMessage != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Text(
-                  profileProvider.errorMessage!,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: profileProvider.isSaving
-                    ? null
-                    : () => _handleSave(profileProvider),
-                icon: profileProvider.isSaving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save),
-                label: Text(
-                  profileProvider.isSaving
-                      ? 'Dang cap nhat...'
-                      : 'Luu thay doi',
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _confirmLogout,
-                icon: const Icon(Icons.logout, color: Colors.red),
-                label: const Text(
-                  'Dang xuat',
-                  style: TextStyle(color: Colors.red),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
-  }
-}
+      );
+    }
 
-class _InfoCard extends StatelessWidget {
-  final ProfileProvider profileProvider;
-
-  const _InfoCard({required this.profileProvider});
-
-  @override
-  Widget build(BuildContext context) {
     final profile = profileProvider.profile;
     if (profile == null) return const SizedBox.shrink();
 
+    final age = _calculateAge(profile.dateOfBirth);
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildHeaderCard(profile),
+          const SizedBox(height: 20),
+          _buildSectionTitle('Thông tin cá nhân'),
+          const SizedBox(height: 10),
+          _buildInfoCard([
+            _InfoRow(
+              icon: Icons.person_outline,
+              label: 'Họ và tên',
+              value: profile.fullName,
+            ),
+            _InfoRow(
+              icon: Icons.cake_outlined,
+              label: 'Ngày sinh',
+              value: _formatDate(profile.dateOfBirth),
+            ),
+            _InfoRow(
+              icon: Icons.numbers_outlined,
+              label: 'Tuổi',
+              value: age != null ? '$age tuổi' : 'Chưa cập nhật',
+            ),
+            _InfoRow(
+              icon: Icons.phone_outlined,
+              label: 'Số điện thoại',
+              value: profile.phone ?? 'Chưa cập nhật',
+            ),
+            _InfoRow(
+              icon: Icons.wc_outlined,
+              label: 'Giới tính',
+              value: profile.gender ?? 'Chưa cập nhật',
+            ),
+            _InfoRow(
+              icon: Icons.bloodtype_outlined,
+              label: 'Nhóm máu',
+              value: profile.bloodType ?? 'Chưa cập nhật',
+            ),
+          ]),
+          const SizedBox(height: 20),
+          _buildSectionTitle('Thông tin y tế'),
+          const SizedBox(height: 10),
+          _buildInfoCard([
+            _InfoRow(
+              icon: Icons.height_outlined,
+              label: 'Chiều cao',
+              value: profile.heightCm != null ? '${profile.heightCm!.toStringAsFixed(1)} cm' : 'Chưa cập nhật',
+            ),
+            _InfoRow(
+              icon: Icons.monitor_weight_outlined,
+              label: 'Cân nặng',
+              value: profile.weightKg != null ? '${profile.weightKg!.toStringAsFixed(1)} kg' : 'Chưa cập nhật',
+            ),
+            _InfoRow(
+              icon: Icons.medication_outlined,
+              label: 'Thuốc đang dùng',
+              value: profile.medications.isNotEmpty
+                  ? profile.medications.join(', ')
+                  : 'Không có',
+            ),
+            _InfoRow(
+              icon: Icons.warning_amber_outlined,
+              label: 'Dị ứng',
+              value: profile.allergies.isNotEmpty
+                  ? profile.allergies.join(', ')
+                  : 'Không có',
+            ),
+            _InfoRow(
+              icon: Icons.history_edu_outlined,
+              label: 'Tiền sử bệnh',
+              value: profile.medicalConditions.isEmpty ? 'Chưa cập nhật' : profile.medicalConditions.join(', '),
+            ),
+          ]),
+          const SizedBox(height: 20),
+          _buildSectionTitle('Thông tin tài khoản'),
+          const SizedBox(height: 10),
+          _buildInfoCard([
+            _InfoRow(
+              icon: Icons.email_outlined,
+              label: 'Email',
+              value: profile.email,
+            ),
+            _InfoRow(
+              icon: Icons.badge_outlined,
+              label: 'Vai trò',
+              value: _roleLabel(profile.role),
+            ),
+            _InfoRow(
+              icon: Icons.verified_user_outlined,
+              label: 'Xác minh email',
+              value: profile.isVerified ? 'Đã xác minh' : 'Chưa xác minh',
+              valueColor: profile.isVerified ? Colors.green.shade700 : Colors.orange.shade700,
+            ),
+            _InfoRow(
+              icon: Icons.toggle_on_outlined,
+              label: 'Trạng thái',
+              value: profile.isActive ? 'Đang hoạt động' : 'Bị khóa',
+              valueColor: profile.isActive ? Colors.green.shade700 : Colors.red.shade700,
+            ),
+            _InfoRow(
+              icon: Icons.calendar_today_outlined,
+              label: 'Ngày tạo tài khoản',
+              value: _formatDateTime(profile.createdAt),
+            ),
+            _InfoRow(
+              icon: Icons.update_outlined,
+              label: 'Cập nhật lần cuối',
+              value: _formatDateTime(profile.updatedAt),
+            ),
+          ]),
+          const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () async {
+                await Navigator.pushNamed(context, '/edit-profile');
+                if (mounted) {
+                  context.read<ProfileProvider>().fetchProfile();
+                }
+              },
+              icon: const Icon(Icons.settings_outlined),
+              label: const Text(
+                'Cài đặt thông tin',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0F766E),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirmLogout,
+              icon: const Icon(Icons.logout, color: Colors.red),
+              label: const Text(
+                'Đăng xuất',
+                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _confirmDeleteAccount,
+              icon: Icon(Icons.delete_forever_outlined, color: Colors.red.shade800),
+              label: Text(
+                'Xóa tài khoản',
+                style: TextStyle(color: Colors.red.shade800, fontWeight: FontWeight.w600),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.red.shade800),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderCard(UserProfileModel profile) {
     final avatar = profile.avatarUrl;
     final trimmedName = profile.fullName.trim();
     final initial = trimmedName.isNotEmpty
@@ -317,19 +436,26 @@ class _InfoCard extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.blue.shade700, Colors.blue.shade500],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F766E).withValues(alpha: 0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
         children: [
           CircleAvatar(
-            radius: 30,
+            radius: 42,
             backgroundColor: Colors.white,
             backgroundImage: avatar != null && avatar.isNotEmpty
                 ? NetworkImage(avatar)
@@ -337,91 +463,160 @@ class _InfoCard extends StatelessWidget {
             child: avatar == null || avatar.isEmpty
                 ? Text(
                     initial,
-                    style: TextStyle(
-                      color: Colors.blue.shade700,
+                    style: const TextStyle(
+                      color: Color(0xFF0F766E),
                       fontWeight: FontWeight.bold,
-                      fontSize: 24,
+                      fontSize: 32,
                     ),
                   )
                 : null,
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  profile.fullName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  profile.email,
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.95)),
-                ),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  children: [
-                    _StatusChip(
-                      label: profile.role.toUpperCase(),
-                      color: Colors.indigo.shade100,
-                      textColor: Colors.indigo.shade900,
-                    ),
-                    _StatusChip(
-                      label: profile.isVerified
-                          ? 'Da xac minh'
-                          : 'Chua xac minh',
-                      color: profile.isVerified
-                          ? Colors.green.shade100
-                          : Colors.orange.shade100,
-                      textColor: profile.isVerified
-                          ? Colors.green.shade900
-                          : Colors.orange.shade900,
-                    ),
-                  ],
-                ),
-              ],
+          const SizedBox(height: 12),
+          Text(
+            profile.fullName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
             ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            profile.email,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              _buildBadge(
+                _roleLabel(profile.role),
+                Colors.white.withValues(alpha: 0.2),
+                Colors.white,
+              ),
+              _buildBadge(
+                profile.isVerified ? 'Đã xác minh' : 'Chưa xác minh',
+                profile.isVerified
+                    ? Colors.green.shade400.withValues(alpha: 0.3)
+                    : Colors.orange.shade400.withValues(alpha: 0.3),
+                Colors.white,
+              ),
+              _buildBadge(
+                profile.isActive ? 'Hoạt động' : 'Bị khóa',
+                profile.isActive
+                    ? Colors.green.shade400.withValues(alpha: 0.3)
+                    : Colors.red.shade400.withValues(alpha: 0.3),
+                Colors.white,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
-}
 
-class _StatusChip extends StatelessWidget {
-  final String label;
-  final Color color;
-  final Color textColor;
-
-  const _StatusChip({
-    required this.label,
-    required this.color,
-    required this.textColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildBadge(String label, Color bgColor, Color textColor) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: color,
+        color: bgColor,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
       ),
       child: Text(
         label,
         style: TextStyle(
           color: textColor,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
   }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: Color(0xFF0F766E),
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(List<_InfoRow> rows) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: rows.asMap().entries.map((entry) {
+          final idx = entry.key;
+          final row = entry.value;
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Row(
+                  children: [
+                    Icon(row.icon, size: 20, color: const Color(0xFF0F766E)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: Text(
+                        row.label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        row.value,
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: row.valueColor ?? Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (idx < rows.length - 1)
+                Divider(height: 1, indent: 48, color: Colors.grey.shade100),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+class _InfoRow {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 }
