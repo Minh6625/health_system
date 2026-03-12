@@ -16,6 +16,9 @@ app = FastAPI(
     title="Health Guard - Mobile Backend",
     version="0.1.0",
     root_path="/api/v1",
+    docs_url="/mobile-docs",
+    redoc_url="/mobile-redoc",
+    openapi_url="/mobile-openapi.json",
     servers=[
         {"url": "/api/v1", "description": "API v1"},
     ]
@@ -35,5 +38,5 @@ app.include_router(api_router)
 @app.get("/", include_in_schema=False)
 def root_redirect():
     """Redirect root URL to Swagger docs"""
-    return RedirectResponse(url="/docs")
+    return RedirectResponse(url="/mobile-docs")
 
