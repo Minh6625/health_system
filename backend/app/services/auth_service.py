@@ -45,17 +45,16 @@ class AuthService:
         if date_of_birth > today:
             return False, "Ngày sinh không hợp lệ (trong tương lai)"
         
-        # Calculate age correctly
-        age = today.year - date_of_birth.year - (
-            (today.month, today.day) < (date_of_birth.month, date_of_birth.day)
-        )
+        # Calculate age in days for more accurate boundary checking
+        days_old = (today - date_of_birth).days
         
-        # Check minimum age (must be at least 18)
-        if age < 18:
+        # Less than or equal to 18*365 days = under 18 years old
+        # More than 150*365 days = over 150 years old
+        
+        if days_old <= 18 * 365:
             return False, "Bạn phải đủ 18 tuổi để đăng ký"
         
-        # Check maximum age (must be at most 150)
-        if age > 150:
+        if days_old > 150 * 365:
             return False, "Ngày sinh không hợp lệ (tuổi quá cao)"
         
         return True, "OK"
