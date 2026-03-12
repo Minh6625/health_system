@@ -71,13 +71,13 @@ class TestAgeValidation:
         assert is_valid is True
 
     def test_age_boundary_just_turned_18(self):
-        """Test age just after turning 18."""
-        dob = date.today() - timedelta(days=18*365 - 1)
+        """Test age just after turning 18 (18 years + 1 day old)."""
+        dob = date.today() - timedelta(days=18*365 + 1)
         is_valid, message = AuthService.validate_age(dob)
         assert is_valid is True
 
     def test_age_boundary_just_before_18(self):
-        """Test age just before turning 18."""
-        dob = date.today() - timedelta(days=18*365 + 1)
+        """Test age just before turning 18 (18 years - 1 day old)."""
+        dob = date.today() - timedelta(days=18*365 - 1)
         is_valid, message = AuthService.validate_age(dob)
         assert is_valid is False

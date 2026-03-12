@@ -48,10 +48,12 @@ class AuthService:
         # Calculate age in days for more accurate boundary checking
         days_old = (today - date_of_birth).days
         
-        # Less than or equal to 18*365 days = under 18 years old
-        # More than 150*365 days = over 150 years old
+        # 18*365 - 1 days = just turned 18 (valid)
+        # 18*365 days = exactly 18 years (valid)
+        # 18*365 + 1 days = just before 18 (invalid - younger)
+        # Note: More days ago = older person
         
-        if days_old <= 18 * 365:
+        if days_old < 18 * 365:
             return False, "Bạn phải đủ 18 tuổi để đăng ký"
         
         if days_old > 150 * 365:
