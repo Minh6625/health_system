@@ -5,6 +5,8 @@ from app.api.router import api_router
 from app.db.database import Base, engine
 from app.models.audit_log_model import AuditLog  # noqa: F401 - needed for table creation
 from app.models.user_model import User  # noqa: F401 - needed for table creation
+from app.models.device_model import Device  # noqa: F401 - needed for table creation
+from app.models.sos_event_model import FallEvent, SOSEvent  # noqa: F401 - needed for table creation
 
 # Create tables
 Base.metadata.create_all(bind=engine)
