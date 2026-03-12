@@ -149,10 +149,10 @@ jobs:
           echo "⏳ Waiting 30s for Heroku dyno to boot..."
           sleep 30
 
-      - name: "Test: GET /api/v1/health"
+      - name: "Test: GET /api/v1/mobile/health"
         run: |
-          echo "🏥 Testing /api/v1/health..."
-          RESPONSE=$(curl -sf "$HEROKU_APP_URL/api/v1/health" || echo "FAIL")
+          echo "🏥 Testing /api/v1/mobile/health..."
+          RESPONSE=$(curl -sf "$HEROKU_APP_URL/api/v1/mobile/health" || echo "FAIL")
           echo "Response: $RESPONSE"
           if echo "$RESPONSE" | grep -q '"status":"ok"'; then
             echo "✅ Health check passed"
@@ -163,8 +163,8 @@ jobs:
 
       - name: "Test: API responds (no 5xx)"
         run: |
-          echo "🔌 Testing /api/v1..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEROKU_APP_URL/api/v1")
+          echo "🔌 Testing /api/v1/mobile/..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEROKU_APP_URL/api/v1/mobile/")
           echo "HTTP Status: $HTTP_CODE"
           if [ "$HTTP_CODE" -lt 500 ]; then
             echo "✅ API is responding (HTTP $HTTP_CODE)"
