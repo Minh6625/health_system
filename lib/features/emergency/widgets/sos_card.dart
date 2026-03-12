@@ -25,7 +25,7 @@ class SOSCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: isUrgent ? const Color(0xFFFFE0E3) : Colors.white,
+        color: isUrgent ? const Color(0xFFFFABAF) : Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: Colors.grey.withOpacity(0.1),
@@ -34,7 +34,7 @@ class SOSCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isUrgent 
-                ? const Color(0xFFE53935).withOpacity(0.15)
+                ? const Color(0xFFE53935).withOpacity(0.25)
                 : Colors.black.withOpacity(0.05),
             blurRadius: 20,
             offset: const Offset(0, 6),
@@ -50,7 +50,7 @@ class SOSCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 // Patient Avatar
                 _buildAvatar(),
@@ -146,8 +146,8 @@ class SOSCard extends StatelessWidget {
   /// Patient avatar
   Widget _buildAvatar() {
     return Container(
-      width: 60,
-      height: 60,
+      width: 70,
+      height: 70,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.grey[200],
@@ -173,7 +173,7 @@ class SOSCard extends StatelessWidget {
   Widget _buildDefaultAvatar() {
     return Container(
       color: const Color(0xFFF5F5F5),
-      child: Icon(Icons.person, size: 30, color: Colors.grey[400]),
+      child: Icon(Icons.person, size: 35, color: Colors.grey[400]),
     );
   }
 

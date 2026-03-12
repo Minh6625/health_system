@@ -27,35 +27,33 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: _screens[_currentIndex],
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-        child: Container(
-          height: 70,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Colors.blue.shade800, Colors.blue.shade600],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      bottomNavigationBar: Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom,
+        ),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade800, Colors.blue.shade600],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.shade900.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, -2),
             ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blue.shade900.withOpacity(0.3),
-                blurRadius: 20,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.favorite, 'Sức khỏe', 0),
-              _buildNavItem(Icons.bedtime, 'Giấc ngủ', 1),
-              _buildNavItem(Icons.warning_amber_rounded, 'Khẩn cấp', 2),
-              _buildNavItem(Icons.watch, 'Thiết bị', 3),
-              _buildNavItem(Icons.person, 'Cá nhân', 4),
-            ],
-          ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _buildNavItem(Icons.favorite, 'Sức khỏe', 0),
+            _buildNavItem(Icons.bedtime, 'Giấc ngủ', 1),
+            _buildNavItem(Icons.warning_amber_rounded, 'Khẩn cấp', 2),
+            _buildNavItem(Icons.watch, 'Thiết bị', 3),
+            _buildNavItem(Icons.person, 'Cá nhân', 4),
+          ],
         ),
       ),
     );

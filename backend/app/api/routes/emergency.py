@@ -13,7 +13,7 @@ from app.schemas.emergency import (
 from app.services.emergency_service import EmergencyService
 
 
-router = APIRouter(prefix="/mobile", tags=["emergency"])
+router = APIRouter(prefix="/emergency", tags=["Emergency"])
 
 
 @router.get("/caregiver/sos-alerts", response_model=SOSAlertsResponse)
@@ -46,7 +46,7 @@ def get_sos_alerts(
     )
 
 
-@router.get("/emergency/sos/{sos_id}", response_model=SOSEventResponse)
+@router.get("/sos/{sos_id}", response_model=SOSEventResponse)
 def get_sos_detail(
     sos_id: int,
     current_user: User = Depends(get_current_user),
@@ -79,7 +79,7 @@ def get_sos_detail(
     return sos_detail
 
 
-@router.post("/emergency/sos/{sos_id}/resolve", response_model=SuccessResponse)
+@router.post("/sos/{sos_id}/resolve", response_model=SuccessResponse)
 def resolve_sos(
     sos_id: int,
     payload: ResolveSOSRequest,
