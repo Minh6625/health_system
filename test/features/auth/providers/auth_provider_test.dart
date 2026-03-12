@@ -26,6 +26,7 @@ void main() {
         fullName: 'Test User',
         password: 'StrongPass123!',
         role: 'patient',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
       
       final response = AuthResponse(
@@ -109,6 +110,7 @@ void main() {
         fullName: 'Nguyễn Văn Anh',
         password: 'StrongPass123!',
         role: 'patient',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
       
       final response = AuthResponse(
@@ -178,6 +180,7 @@ void main() {
         fullName: 'Test User',
         password: 'StrongPass123!',
         role: 'patient',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
       
       final response = AuthResponse(
@@ -203,6 +206,7 @@ void main() {
         fullName: 'Test User',
         password: 'StrongPass123!',
         role: 'patient',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
 
       when(mockRepository.register(user)).thenThrow(Exception('Network error'));
@@ -212,7 +216,7 @@ void main() {
 
       // Assert
       expect(result, false);
-      expect(authProvider.message, contains('lỗi'));
+      expect(authProvider.message, contains('Lỗi'));
       expect(authProvider.isLoading, false);
     });
 
@@ -223,6 +227,7 @@ void main() {
         fullName: 'Test User',
         password: 'StrongPass123!',
         role: 'patient',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
       
       final response = AuthResponse(

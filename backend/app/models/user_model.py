@@ -1,6 +1,7 @@
 from datetime import datetime, date
 
-from sqlalchemy import String, Boolean, DateTime, Date
+from sqlalchemy import String, Boolean, DateTime, Date, Float
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -20,6 +21,14 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     avatar_url: Mapped[str | None] = mapped_column(nullable=True)
+    # Medical information fields
+    gender: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    blood_type: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    height_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    medications: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, server_default="{}")
+    allergies: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, server_default="{}")
+    medical_conditions: Mapped[list[str]] = mapped_column(ARRAY(String), default=list, server_default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_current_time)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_current_time, onupdate=get_current_time)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

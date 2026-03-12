@@ -151,8 +151,8 @@ void main() {
       await tester.pumpAndSettle();
 
       // Assert - Role should be switched (verify by checking dropdown value)
-      final dropdown = tester.widget<DropdownButtonFormField<String>>(
-        find.byType(DropdownButtonFormField<String>),
+      final dropdown = tester.widget<DropdownButton<String>>(
+        find.byType(DropdownButton<String>),
       );
       expect(dropdown.value, 'caregiver');
     });
