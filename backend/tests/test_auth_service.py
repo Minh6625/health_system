@@ -290,11 +290,14 @@ class TestAuthService:
             assert success is True
             assert "thành công" in message.lower()
             assert token_data is not None
-            # Verify create_user was called with correct parameters
+            # Verify create_user was called with caregiver role
             mock_repo.create_user.assert_called_once()
             call_args = mock_repo.create_user.call_args
-            assert call_args[0][1] == "caregiver@example.com"  # email
-            assert call_args[0][2] == "StrongPass123!"  # password
+            assert call_args[0][0] == mock_db
+            assert call_args[0][1] == "caregiver@example.com"
+            assert call_args[0][2] == "StrongPass123!"
+            assert call_args[1]['full_name'] == "Caregiver User"
+            assert call_args[1]['role'] == "caregiver"
 
     def test_register_with_date_of_birth_and_phone(self, mock_db):
         """Test registration with date of birth and phone."""
@@ -367,8 +370,7 @@ class TestAuthService:
             # Make sure email doesn't exist first
             mock_repo.get_by_email.return_value = None
             
-            today = date.today()
-            dob = date(today.year - 151, today.month, today.day)  # 151 years old
+            dob = date.today() - timedelta(days=151*365)  # 151 years old
             
             success, message, token_data = AuthService.register(
                 mock_db,
