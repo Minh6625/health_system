@@ -27,7 +27,7 @@ class TestAuthService:
         user.email = "test@example.com"
         user.password_hash = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/Lt.dbn9/JvY8TJZ6."  # "password123"
         user.full_name = "Test User"
-        user.role = "patient"
+        user.role = "user"
         user.is_active = True
         user.is_verified = True
         user.updated_at = datetime.now()
@@ -304,7 +304,7 @@ class TestAuthService:
             mock_repo.get_by_email.return_value = None  # Email doesn't exist
             mock_user = Mock()
             mock_user.id = 2
-            mock_user.email = "caregiver@example.com"
+            mock_user.email = "admin@example.com"
             mock_user.role = "admin"
             mock_repo.create_user.return_value = mock_user
             mock_token.return_value = "123456"
@@ -312,8 +312,8 @@ class TestAuthService:
             # Execute
             success, message, token_data = AuthService.register(
                 mock_db,
-                email="caregiver@example.com",
-                full_name="Caregiver User",
+                email="admin@example.com",
+                full_name="Admin User",
                 password="StrongPass123!",
                 role="admin",
                 ip_address="127.0.0.1",
@@ -329,9 +329,9 @@ class TestAuthService:
             mock_repo.create_user.assert_called_once()
             call_args = mock_repo.create_user.call_args
             assert call_args[0][0] == mock_db
-            assert call_args[0][1] == "caregiver@example.com"
+            assert call_args[0][1] == "admin@example.com"
             assert call_args[0][2] == "StrongPass123!"
-            assert call_args[1]['full_name'] == "Caregiver User"
+            assert call_args[1]['full_name'] == "Admin User"
             assert call_args[1]['role'] == "admin"
 
     def test_register_with_date_of_birth_and_phone(self, mock_db):

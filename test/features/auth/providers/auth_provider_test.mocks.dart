@@ -61,13 +61,13 @@ class MockAuthRepository extends _i1.Mock implements _i3.AuthRepository {
           as _i4.Future<_i2.AuthResponse>);
 
   @override
-  _i4.Future<_i2.AuthResponse> verifyEmail(String? verificationToken) =>
+  _i4.Future<_i2.AuthResponse> verifyEmail(String? email, String? code) =>
       (super.noSuchMethod(
-            Invocation.method(#verifyEmail, [verificationToken]),
+            Invocation.method(#verifyEmail, [email, code]),
             returnValue: _i4.Future<_i2.AuthResponse>.value(
               _FakeAuthResponse_0(
                 this,
-                Invocation.method(#verifyEmail, [verificationToken]),
+                Invocation.method(#verifyEmail, [email, code]),
               ),
             ),
           )
@@ -101,15 +101,29 @@ class MockAuthRepository extends _i1.Mock implements _i3.AuthRepository {
 
   @override
   _i4.Future<_i2.AuthResponse> resetPassword(
-    String? resetToken,
+    String? email,
+    String? code,
     String? newPassword,
   ) =>
       (super.noSuchMethod(
-            Invocation.method(#resetPassword, [resetToken, newPassword]),
+            Invocation.method(#resetPassword, [email, code, newPassword]),
             returnValue: _i4.Future<_i2.AuthResponse>.value(
               _FakeAuthResponse_0(
                 this,
-                Invocation.method(#resetPassword, [resetToken, newPassword]),
+                Invocation.method(#resetPassword, [email, code, newPassword]),
+              ),
+            ),
+          )
+          as _i4.Future<_i2.AuthResponse>);
+
+  @override
+  _i4.Future<_i2.AuthResponse> verifyResetOtp(String? email, String? code) =>
+      (super.noSuchMethod(
+            Invocation.method(#verifyResetOtp, [email, code]),
+            returnValue: _i4.Future<_i2.AuthResponse>.value(
+              _FakeAuthResponse_0(
+                this,
+                Invocation.method(#verifyResetOtp, [email, code]),
               ),
             ),
           )
