@@ -22,7 +22,7 @@ class UserRepository:
         email: str,
         password: str,
         full_name: str,
-        role: str = "patient",
+        role: str = "user",
         date_of_birth: Optional[date] = None,
         phone: Optional[str] = None,
     ) -> User:
@@ -31,7 +31,7 @@ class UserRepository:
             email=email,
             password_hash=hashed_password,
             full_name=full_name or email.split("@")[0],
-            role=role.lower() if role in ["patient", "caregiver"] else "patient",
+            role=role.lower() if role in ["user", "admin"] else "user",
             date_of_birth=date_of_birth,
             phone=phone,
             is_active=True,

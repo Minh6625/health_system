@@ -38,7 +38,7 @@ class TestAuthService:
         """Test successful user registration with valid credentials."""
         with patch('app.services.auth_service.UserRepository') as mock_repo, \
              patch('app.services.auth_service.AuditLogRepository'), \
-             patch('app.services.auth_service.create_email_verification_token') as mock_token, \
+             patch.object(AuthService, '_generate_pin_code') as mock_token, \
              patch('app.services.auth_service.EmailService'):
             
             # Setup
@@ -47,7 +47,7 @@ class TestAuthService:
             mock_user.id = 1
             mock_user.email = "newuser@example.com"
             mock_repo.create_user.return_value = mock_user
-            mock_token.return_value = "fake_token_123"
+            mock_token.return_value = "123456"
             
             # Execute
             success, message, token_data = AuthService.register(
@@ -63,7 +63,8 @@ class TestAuthService:
             assert success is True
             assert "thành công" in message.lower()
             assert token_data is not None
-            assert "verification_token" in token_data
+            assert "verification_code" in token_data
+            assert token_data["verification_code"] == "123456"
 
     def test_register_invalid_email(self, mock_db):
         """Test registration with invalid email format."""
@@ -201,7 +202,7 @@ class TestAuthService:
         """Test registration with valid Vietnamese full_name containing diacritics."""
         with patch('app.services.auth_service.UserRepository') as mock_repo, \
              patch('app.services.auth_service.AuditLogRepository'), \
-             patch('app.services.auth_service.create_email_verification_token') as mock_token, \
+             patch.object(AuthService, '_generate_pin_code') as mock_token, \
              patch('app.services.auth_service.EmailService'):
             
             # Setup
@@ -210,7 +211,7 @@ class TestAuthService:
             mock_user.id = 4
             mock_user.email = "vietnam@example.com"
             mock_repo.create_user.return_value = mock_user
-            mock_token.return_value = "fake_token_vn"
+            mock_token.return_value = "123456"
             
             # Execute with Vietnamese name containing diacritics
             success, message, token_data = AuthService.register(
@@ -226,7 +227,7 @@ class TestAuthService:
             assert success is True
             assert "thành công" in message.lower()
             assert token_data is not None
-            assert "verification_token" in token_data
+            assert "verification_code" in token_data
 
     def test_register_invalid_full_name_too_short(self, mock_db):
         """Test registration with full_name too short (less than 2 characters)."""
@@ -264,7 +265,7 @@ class TestAuthService:
         """Test registration with valid full_name containing multiple spaces."""
         with patch('app.services.auth_service.UserRepository') as mock_repo, \
              patch('app.services.auth_service.AuditLogRepository'), \
-             patch('app.services.auth_service.create_email_verification_token') as mock_token, \
+             patch.object(AuthService, '_generate_pin_code') as mock_token, \
              patch('app.services.auth_service.EmailService'):
             
             # Setup
@@ -273,7 +274,7 @@ class TestAuthService:
             mock_user.id = 5
             mock_user.email = "space@example.com"
             mock_repo.create_user.return_value = mock_user
-            mock_token.return_value = "fake_token_space"
+            mock_token.return_value = "123456"
             
             # Execute with multiple spaces
             success, message, token_data = AuthService.register(
@@ -289,12 +290,14 @@ class TestAuthService:
             assert success is True
             assert "thành công" in message.lower()
             assert token_data is not None
+            assert "verification_code" in token_data
 
 
-        """Test registration with caregiver role."""
+    def test_register_caregiver_role(self, mock_db):
+        """Test registration with admin role."""
         with patch('app.services.auth_service.UserRepository') as mock_repo, \
              patch('app.services.auth_service.AuditLogRepository'), \
-             patch('app.services.auth_service.create_email_verification_token') as mock_token, \
+             patch.object(AuthService, '_generate_pin_code') as mock_token, \
              patch('app.services.auth_service.EmailService'):
             
             # Setup
@@ -302,9 +305,9 @@ class TestAuthService:
             mock_user = Mock()
             mock_user.id = 2
             mock_user.email = "caregiver@example.com"
-            mock_user.role = "caregiver"
+            mock_user.role = "admin"
             mock_repo.create_user.return_value = mock_user
-            mock_token.return_value = "fake_token_456"
+            mock_token.return_value = "123456"
             
             # Execute
             success, message, token_data = AuthService.register(
@@ -312,7 +315,7 @@ class TestAuthService:
                 email="caregiver@example.com",
                 full_name="Caregiver User",
                 password="StrongPass123!",
-                role="caregiver",
+                role="admin",
                 ip_address="127.0.0.1",
                 user_agent="test"
             )
@@ -321,14 +324,15 @@ class TestAuthService:
             assert success is True
             assert "thành công" in message.lower()
             assert token_data is not None
-            # Verify create_user was called with caregiver role
+            assert "verification_code" in token_data
+            # Verify create_user was called with admin role
             mock_repo.create_user.assert_called_once()
             call_args = mock_repo.create_user.call_args
             assert call_args[0][0] == mock_db
             assert call_args[0][1] == "caregiver@example.com"
             assert call_args[0][2] == "StrongPass123!"
             assert call_args[1]['full_name'] == "Caregiver User"
-            assert call_args[1]['role'] == "caregiver"
+            assert call_args[1]['role'] == "admin"
 
     def test_register_with_date_of_birth_and_phone(self, mock_db):
         """Test registration with date of birth and phone."""
@@ -336,7 +340,7 @@ class TestAuthService:
         
         with patch('app.services.auth_service.UserRepository') as mock_repo, \
              patch('app.services.auth_service.AuditLogRepository'), \
-             patch('app.services.auth_service.create_email_verification_token') as mock_token, \
+             patch.object(AuthService, '_generate_pin_code') as mock_token, \
              patch('app.services.auth_service.EmailService'):
             
             # Setup
@@ -345,7 +349,7 @@ class TestAuthService:
             mock_user.id = 3
             mock_user.email = "patient@example.com"
             mock_repo.create_user.return_value = mock_user
-            mock_token.return_value = "fake_token_789"
+            mock_token.return_value = "123456"
             
             dob = date(2000, 1, 15)  # 24 years old
             
@@ -355,7 +359,7 @@ class TestAuthService:
                 email="patient@example.com",
                 full_name="Patient User",
                 password="StrongPass123!",
-                role="patient",
+                role="user",
                 date_of_birth=dob,
                 phone="0912345678",
                 ip_address="127.0.0.1",
@@ -365,18 +369,19 @@ class TestAuthService:
             # Assert
             assert success is True
             assert token_data is not None
+            assert "verification_code" in token_data
             # Verify create_user was called with date_of_birth and phone
             mock_repo.create_user.assert_called_once()
             call_kwargs = mock_repo.create_user.call_args[1]
             assert call_kwargs['date_of_birth'] == dob
             assert call_kwargs['phone'] == "0912345678"
 
-    def test_register_age_under_18(self, mock_db):
-        """Test registration with age under 18."""
+    def test_register_age_under_16(self, mock_db):
+        """Test registration with age under 16."""
         from datetime import date, timedelta
         
         with patch('app.services.auth_service.AuditLogRepository'):
-            dob = date.today() - timedelta(days=17*365)  # 17 years old
+            dob = date.today() - timedelta(days=15*365)  # 15 years old
             
             success, message, token_data = AuthService.register(
                 mock_db,
@@ -389,7 +394,7 @@ class TestAuthService:
             )
             
             assert success is False
-            assert "18 tuổi" in message
+            assert "16 tuổi" in message
 
     def test_register_age_over_150(self, mock_db):
         """Test registration with age over 150."""
@@ -508,11 +513,11 @@ class TestAuthService:
         """Test forgot password with valid email."""
         with patch('app.services.auth_service.UserRepository') as mock_repo, \
              patch('app.services.auth_service.AuditLogRepository'), \
-             patch('app.services.auth_service.create_password_reset_token') as mock_token, \
+             patch.object(AuthService, '_generate_pin_code') as mock_token, \
              patch('app.services.auth_service.EmailService'):
             
             mock_repo.get_by_email.return_value = mock_user
-            mock_token.return_value = "reset_token_123"
+            mock_token.return_value = "654321"
             
             success, message, token_data = AuthService.forgot_password(
                 mock_db,
@@ -523,7 +528,8 @@ class TestAuthService:
             
             assert success is True
             assert token_data is not None
-            assert "reset_token" in token_data
+            assert "reset_code" in token_data
+            assert token_data["reset_code"] == "654321"
 
     def test_forgot_password_nonexistent_email(self, mock_db):
         """Test forgot password with non-existent email (should return success to prevent enumeration)."""
@@ -610,12 +616,12 @@ class TestAuthService:
         """Test successful resend verification email."""
         with patch('app.services.auth_service.UserRepository') as mock_repo, \
              patch('app.services.auth_service.AuditLogRepository'), \
-             patch('app.services.auth_service.create_email_verification_token') as mock_token, \
+             patch.object(AuthService, '_generate_pin_code') as mock_token, \
              patch('app.services.auth_service.EmailService'):
             
             mock_user.is_verified = False  # Not verified yet
             mock_repo.get_by_email.return_value = mock_user
-            mock_token.return_value = "new_verification_token_123"
+            mock_token.return_value = "111222"
             
             success, message, token_data = AuthService.resend_verification_email(
                 mock_db,
@@ -625,9 +631,10 @@ class TestAuthService:
             )
             
             assert success is True
-            assert "gửi lại" in message.lower()
+            assert "gửi" in message.lower()
             assert token_data is not None
-            assert "verification_token" in token_data
+            assert "verification_code" in token_data
+            assert token_data["verification_code"] == "111222"
 
     def test_resend_verification_nonexistent_email(self, mock_db):
         """Test resend verification with non-existent email (should return success to prevent enumeration)."""
@@ -646,3 +653,90 @@ class TestAuthService:
             # Should return success to prevent email enumeration
             assert success is True
             assert "email tồn tại" in message.lower()
+
+    # --- PIN Validation Tests ---
+
+    def test_verify_email_success(self, mock_db, mock_user):
+        """Test successful email verification with PIN."""
+        from app.utils.datetime_helper import get_current_time
+        with patch('app.services.auth_service.UserRepository') as mock_repo, \
+             patch('app.services.auth_service.AuditLogRepository'):
+            
+            mock_user.is_verified = False
+            mock_user.verification_code = "123456"
+            mock_user.verification_code_expires_at = get_current_time() + timedelta(hours=1)
+            mock_repo.get_by_email.return_value = mock_user
+            
+            success, message = AuthService.verify_email(
+                mock_db,
+                email="test@example.com",
+                code="123456"
+            )
+            
+            assert success is True
+            assert "thành công" in message.lower()
+            assert mock_user.is_verified is True
+            assert mock_user.verification_code is None
+
+    def test_verify_email_wrong_code(self, mock_db, mock_user):
+        """Test email verification with wrong PIN code."""
+        from app.utils.datetime_helper import get_current_time
+        with patch('app.services.auth_service.UserRepository') as mock_repo, \
+             patch('app.services.auth_service.AuditLogRepository'):
+            
+            mock_user.is_verified = False
+            mock_user.verification_code = "123456"
+            mock_user.verification_code_expires_at = get_current_time() + timedelta(hours=1)
+            mock_repo.get_by_email.return_value = mock_user
+            
+            success, message = AuthService.verify_email(
+                mock_db,
+                email="test@example.com",
+                code="654321"
+            )
+            
+            assert success is False
+            assert "không đúng" in message.lower()
+
+    def test_verify_email_expired_code(self, mock_db, mock_user):
+        """Test email verification with expired PIN code."""
+        from app.utils.datetime_helper import get_current_time
+        with patch('app.services.auth_service.UserRepository') as mock_repo, \
+             patch('app.services.auth_service.AuditLogRepository'):
+            
+            mock_user.is_verified = False
+            mock_user.verification_code = "123456"
+            mock_user.verification_code_expires_at = get_current_time() - timedelta(hours=1)
+            mock_repo.get_by_email.return_value = mock_user
+            
+            success, message = AuthService.verify_email(
+                mock_db,
+                email="test@example.com",
+                code="123456"
+            )
+            
+            assert success is False
+            assert "hết hạn" in message.lower()
+
+    def test_reset_password_success(self, mock_db, mock_user):
+        """Test successful password reset with PIN."""
+        from app.utils.datetime_helper import get_current_time
+        with patch('app.services.auth_service.UserRepository') as mock_repo, \
+             patch('app.services.auth_service.AuditLogRepository'), \
+             patch('app.services.auth_service.EmailService'):
+            
+            mock_user.reset_code = "654321"
+            mock_user.reset_code_expires_at = get_current_time() + timedelta(minutes=10)
+            mock_repo.get_by_email.return_value = mock_user
+            
+            success, message = AuthService.reset_password(
+                mock_db,
+                email="test@example.com",
+                code="654321",
+                new_password="NewStrongPass1!"
+            )
+            
+            assert success is True
+            assert "thành công" in message.lower()
+            assert mock_user.reset_code is None
+            mock_repo.update_password.assert_called_once()

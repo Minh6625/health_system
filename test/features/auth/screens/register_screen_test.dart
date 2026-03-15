@@ -5,7 +5,6 @@ import 'package:healthguard/features/auth/repositories/auth_repository.dart';
 import 'package:healthguard/features/auth/screens/register_screen.dart';
 import 'package:healthguard/features/auth/widgets/auth_text_field.dart';
 import 'package:mockito/annotations.dart';
-import 'package:mockito/mockito.dart';
 import 'package:provider/provider.dart';
 
 import 'register_screen_test.mocks.dart';
@@ -39,7 +38,6 @@ void main() {
       expect(find.text('Họ tên'), findsOneWidget);
       expect(find.text('Ngày sinh'), findsOneWidget);
       expect(find.text('Số điện thoại'), findsOneWidget);
-      expect(find.text('Vai trò'), findsOneWidget);
       expect(find.text('Mật khẩu'), findsOneWidget);
       expect(find.text('Xác nhận mật khẩu'), findsOneWidget);
       expect(find.text('Đăng ký'), findsOneWidget);
@@ -51,7 +49,15 @@ void main() {
 
       // Act - Enter invalid email and trigger validation
       await tester.enterText(find.byType(AuthTextField).first, 'invalid-email');
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert - Validation error should appear
@@ -65,7 +71,15 @@ void main() {
       // Act - Find fullName field (second AuthTextField)
       final fullNameFinder = find.byType(AuthTextField).at(1);
       await tester.enterText(fullNameFinder, 'Test123');
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert
@@ -79,7 +93,15 @@ void main() {
       // Act
       final fullNameFinder = find.byType(AuthTextField).at(1);
       await tester.enterText(fullNameFinder, 'Test@User');
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert
@@ -93,7 +115,15 @@ void main() {
       // Act - Enter valid Vietnamese name
       final fullNameFinder = find.byType(AuthTextField).at(1);
       await tester.enterText(fullNameFinder, 'Nguyễn Văn Anh');
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert - Should not show validation error for full name
@@ -120,49 +150,37 @@ void main() {
         }
       }
       
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert
       expect(find.textContaining('Mật khẩu phải có ít nhất 8 ký tự'), findsOneWidget);
     });
 
-    testWidgets('role dropdown has patient and caregiver options', (WidgetTester tester) async {
-      // Arrange
-      await tester.pumpWidget(createTestWidget());
 
-      // Act - Tap dropdown to open
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-
-      // Assert - Both options should be visible
-      expect(find.text('Bệnh nhân'), findsWidgets);
-      expect(find.text('Người chăm sóc'), findsOneWidget);
-    });
-
-    testWidgets('switching to caregiver role shows correct date picker constraints', (WidgetTester tester) async {
-      // Arrange
-      await tester.pumpWidget(createTestWidget());
-
-      // Act - Switch to caregiver role
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Người chăm sóc').last);
-      await tester.pumpAndSettle();
-
-      // Assert - Role should be switched (verify by checking dropdown value)
-      final dropdown = tester.widget<DropdownButton<String>>(
-        find.byType(DropdownButton<String>),
-      );
-      expect(dropdown.value, 'caregiver');
-    });
 
     testWidgets('date of birth field shows validation error when empty', (WidgetTester tester) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
 
       // Act - Try to submit without selecting date
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert
@@ -172,14 +190,17 @@ void main() {
     testWidgets('phone number field accepts optional input', (WidgetTester tester) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
-
-      // Act - Find phone field
-      final phoneField = find.byWidgetPredicate(
-        (widget) => widget is AuthTextField && widget.label == 'Số điện thoại',
-      );
       
       // Phone is optional, so leaving it empty should not show error
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert - Should not show phone validation error when empty
@@ -195,11 +216,19 @@ void main() {
         (widget) => widget is AuthTextField && widget.label == 'Số điện thoại',
       );
       await tester.enterText(phoneField, '123'); // Too short
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert
-      expect(find.textContaining('Số điện thoại phải có từ 10 đến 15 chữ số'), findsOneWidget);
+      expect(find.textContaining('Số điện thoại phải có từ 10 đến 11 chữ số'), findsOneWidget);
     });
 
     testWidgets('password confirmation must match password', (WidgetTester tester) async {
@@ -224,11 +253,19 @@ void main() {
         }
       }
 
-      await tester.tap(find.text('Đăng ký'));
+      final check = find.byType(Checkbox);
+      await tester.ensureVisible(check);
+      await tester.pumpAndSettle();
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      
+      final btn = find.text('ĐĂNG KÝ');
+      await tester.ensureVisible(btn);
+      await tester.tap(btn);
       await tester.pumpAndSettle();
 
       // Assert
-      expect(find.textContaining('Mật khẩu không khớp'), findsOneWidget);
+      expect(find.textContaining('Mật khẩu xác nhận không khớp'), findsOneWidget);
     });
   });
 }

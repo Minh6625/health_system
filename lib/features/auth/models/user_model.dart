@@ -2,15 +2,15 @@ class UserModel {
   final String email;
   final String? fullName;
   final String password;
-  final String role;  // patient | caregiver
+  final String role;  // user | admin
   final DateTime? dateOfBirth;  // YYYY-MM-DD
-  final String? phone;  // 10-15 digits
+  final String? phone;  // 10-11 digits
 
   UserModel({
     required this.email,
     this.fullName,
     required this.password,
-    this.role = 'patient',
+    this.role = 'user',
     this.dateOfBirth,
     this.phone,
   });

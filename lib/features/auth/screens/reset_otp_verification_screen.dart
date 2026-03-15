@@ -3,40 +3,52 @@ import 'package:flutter/material.dart';
 import 'package:healthguard/core/constants/app_colors.dart';
 import 'package:healthguard/core/constants/app_sizes.dart';
 import 'package:healthguard/core/routes/app_router.dart';
-import 'package:healthguard/features/auth/providers/auth_provider.dart';
-import 'package:provider/provider.dart';
+import 'package:healthguard/features/auth/repositories/auth_repository.dart';
 import 'package:pinput/pinput.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-class EmailVerificationScreen extends StatefulWidget {
+/// Screen for verifying the 6-digit OTP sent to the user's email
+/// as part of the password reset flow. On success, navigates to
+/// [ResetPasswordScreen] where the user enters a new password.
+class ResetOtpVerificationScreen extends StatefulWidget {
   final String email;
   final String? code;
 
-  const EmailVerificationScreen({super.key, required this.email, this.code});
+  const ResetOtpVerificationScreen({
+    super.key,
+    required this.email,
+    this.code,
+  });
 
   @override
-  State<EmailVerificationScreen> createState() =>
-      _EmailVerificationScreenState();
+  State<ResetOtpVerificationScreen> createState() =>
+      _ResetOtpVerificationScreenState();
 }
 
-class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
+class _ResetOtpVerificationScreenState
+    extends State<ResetOtpVerificationScreen> {
   final TextEditingController _pinController = TextEditingController();
   final FocusNode _pinFocusNode = FocusNode();
+  final AuthRepository _authRepository = AuthRepository();
 
-  bool _isResendingToken = false;
-  int _resendCountdown = 0;
-  Timer? _countdownTimer;
-
+  bool _isVerifying = false;
   bool _isError = false;
 
   @override
   void initState() {
     super.initState();
+    // Auto-fill pin AFTER the first frame so that Pinput's onCompleted
+    // listener does not fire synchronously during initState (which would
+    // trigger _handleVerifyOtp automatically without user interaction).
     if (widget.code != null && widget.code!.isNotEmpty) {
-      _pinController.text = widget.code!;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _pinController.text = widget.code!;
+        }
+      });
     }
 
-    // Wait for the animation to finish, then focus the OTP field
+    // Focus the OTP field after animation only when no code was pre-filled
     Future.delayed(const Duration(milliseconds: 600), () {
       if (mounted && _pinController.text.length < 6) {
         _pinFocusNode.requestFocus();
@@ -48,92 +60,62 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   void dispose() {
     _pinController.dispose();
     _pinFocusNode.dispose();
-    _countdownTimer?.cancel();
     super.dispose();
   }
 
-  void _startCountdown() {
-    setState(() {
-      _resendCountdown = 60; // 60 seconds countdown
-    });
-    _countdownTimer?.cancel();
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        if (_resendCountdown > 0) {
-          _resendCountdown--;
-        } else {
-          timer.cancel();
-        }
-      });
-    });
-  }
-
-  Future<void> handleVerify() async {
-    final token = _pinController.text.trim();
-    if (token.length < 6) {
+  Future<void> _handleVerifyOtp() async {
+    final otp = _pinController.text.trim();
+    if (otp.length < 6) {
       setState(() => _isError = true);
+      Future.delayed(400.ms, () {
+        if (mounted) setState(() => _isError = false);
+      });
       return;
     }
 
-    setState(() => _isError = false);
-    final authProvider = context.read<AuthProvider>();
+    setState(() {
+      _isVerifying = true;
+      _isError = false;
+    });
 
-    final success = await authProvider.verifyEmail(widget.email, token);
+    try {
+      final response = await _authRepository.verifyResetOtp(widget.email, otp);
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if (success) {
-      authProvider.clearMessage();
-      // Show success briefly before navigating
+      setState(() => _isVerifying = false);
+
+      if (response.success) {
+        // OTP verified — navigate to password reset screen
+        Navigator.pushReplacementNamed(
+          context,
+          AppRouter.resetPassword,
+          arguments: {'email': widget.email, 'code': otp},
+        );
+      } else {
+        setState(() => _isError = true);
+        Future.delayed(400.ms, () {
+          if (mounted) setState(() => _isError = false);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.message),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isVerifying = false;
+        _isError = true;
+      });
+      Future.delayed(400.ms, () {
+        if (mounted) setState(() => _isError = false);
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Xác thực thành công!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        AppRouter.login,
-        (route) => false,
-      );
-    } else {
-      setState(() => _isError = true);
-      final message = authProvider.message ?? 'Mã xác thực không hợp lệ';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
-    }
-  }
-
-  Future<void> handleResendToken() async {
-    if (_resendCountdown > 0) return;
-
-    setState(() => _isResendingToken = true);
-
-    final authProvider = context.read<AuthProvider>();
-    final success = await authProvider.resendVerificationToken(widget.email);
-
-    if (!mounted) return;
-
-    setState(() => _isResendingToken = false);
-
-    if (success) {
-      _startCountdown();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Mã xác thực mới đã được gửi'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Lỗi gửi mã. Vui lòng thử lại.'),
+        SnackBar(
+          content: Text('Lỗi: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -142,8 +124,6 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = context.watch<AuthProvider>();
-
     final defaultPinTheme = PinTheme(
       width: 56,
       height: 60,
@@ -198,7 +178,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Animated Mail Icon
+                      // Animated Lock Icon
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
@@ -206,31 +186,37 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.mark_email_read_rounded,
+                          Icons.lock_reset_rounded,
                           size: 72,
                           color: AppColors.primary,
                         ),
                       )
-                          .animate(onPlay: (controller) => controller.repeat(reverse: true))
-                          .scaleXY(begin: 0.95, end: 1.05, duration: 2.seconds)
+                          .animate(
+                              onPlay: (controller) =>
+                                  controller.repeat(reverse: true))
+                          .scaleXY(
+                              begin: 0.95, end: 1.05, duration: 2.seconds)
                           .fade(duration: 500.ms),
 
                       const SizedBox(height: 32),
 
                       // Title
                       const Text(
-                        'Xác thực Email',
+                        'Xác Nhận OTP',
                         style: TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
                         ),
                         textAlign: TextAlign.center,
-                      ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
+                      )
+                          .animate()
+                          .fadeIn(delay: 200.ms)
+                          .slideY(begin: 0.2, end: 0),
 
                       const SizedBox(height: 16),
 
-                      // Subtitle
+                      // Subtitle with email
                       RichText(
                         textAlign: TextAlign.center,
                         text: TextSpan(
@@ -240,7 +226,9 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                             height: 1.5,
                           ),
                           children: [
-                            const TextSpan(text: 'Vui lòng nhập mã 6 số được gửi đến\n'),
+                            const TextSpan(
+                                text:
+                                    'Mã xác thực 6 số đã được gửi đến\n'),
                             TextSpan(
                               text: widget.email,
                               style: const TextStyle(
@@ -250,7 +238,10 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                             ),
                           ],
                         ),
-                      ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
+                      )
+                          .animate()
+                          .fadeIn(delay: 300.ms)
+                          .slideY(begin: 0.2, end: 0),
 
                       const SizedBox(height: 48),
 
@@ -264,11 +255,12 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                         submittedPinTheme: submittedPinTheme,
                         errorPinTheme: errorPinTheme,
                         forceErrorState: _isError,
-                        pinputAutovalidateMode: PinputAutovalidateMode.onSubmit,
+                        pinputAutovalidateMode:
+                            PinputAutovalidateMode.onSubmit,
                         showCursor: true,
                         onCompleted: (pin) {
                           if (pin.length == 6) {
-                            handleVerify();
+                            _handleVerifyOtp();
                           }
                         },
                         onChanged: (value) {
@@ -280,14 +272,18 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                           .animate()
                           .fadeIn(delay: 400.ms)
                           .slideY(begin: 0.2, end: 0)
-                          .shake(hz: 8, curve: Curves.easeInOutCubic, duration: 400.ms),
-                      
+                          .shake(
+                              hz: 8,
+                              curve: Curves.easeInOutCubic,
+                              duration: 400.ms),
+
                       if (_isError)
                         Padding(
                           padding: const EdgeInsets.only(top: 12.0),
                           child: Text(
                             'Mã xác thực không hợp lệ',
-                            style: TextStyle(color: Colors.red.shade600, fontSize: 13),
+                            style: TextStyle(
+                                color: Colors.red.shade600, fontSize: 13),
                           ).animate().fadeIn(),
                         ),
 
@@ -298,7 +294,8 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                         width: double.infinity,
                         height: 56,
                         child: ElevatedButton(
-                          onPressed: authProvider.isLoading ? null : handleVerify,
+                          onPressed:
+                              _isVerifying ? null : _handleVerifyOtp,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -307,7 +304,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                             ),
                             elevation: 0,
                           ),
-                          child: authProvider.isLoading
+                          child: _isVerifying
                               ? const SizedBox(
                                   width: 24,
                                   height: 24,
@@ -325,57 +322,31 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                                   ),
                                 ),
                         ),
-                      ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2, end: 0),
+                      )
+                          .animate()
+                          .fadeIn(delay: 500.ms)
+                          .slideY(begin: 0.2, end: 0),
 
                       const SizedBox(height: 24),
 
-                      // Resend Token
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'Chưa nhận được mã? ',
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                      // Back to login
+                      Center(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
                           ),
-                          GestureDetector(
-                            onTap: _resendCountdown > 0 || _isResendingToken
-                                ? null
-                                : handleResendToken,
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: _resendCountdown > 0
-                                    ? Colors.grey.shade100
-                                    : AppColors.primary.withAlpha(20),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: _isResendingToken
-                                  ? const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.primary,
-                                      ),
-                                    )
-                                  : Text(
-                                      _resendCountdown > 0
-                                          ? 'Gửi lại ($_resendCountdown s)'
-                                          : 'Gửi lại',
-                                      style: TextStyle(
-                                        color: _resendCountdown > 0
-                                            ? Colors.grey
-                                            : AppColors.primary,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
+                          child: const Text(
+                            'Quay lại đăng nhập',
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                        ],
+                        ),
                       ).animate().fadeIn(delay: 600.ms),
-                      
+
                       const Spacer(),
                     ],
                   ),

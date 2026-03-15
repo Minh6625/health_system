@@ -37,11 +37,11 @@ class AuthRepository {
     }
   }
 
-  Future<AuthResponse> verifyEmail(String verificationToken) async {
+  Future<AuthResponse> verifyEmail(String email, String code) async {
     try {
       final result = await _apiClient.post(
         '/auth/verify-email',
-        body: {'verification_token': verificationToken},
+        body: {'email': email, 'code': code},
         requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
@@ -86,13 +86,30 @@ class AuthRepository {
   }
 
   Future<AuthResponse> resetPassword(
-    String resetToken,
+    String email,
+    String code,
     String newPassword,
   ) async {
     try {
       final result = await _apiClient.post(
         '/auth/reset-password',
-        body: {'reset_token': resetToken, 'new_password': newPassword},
+        body: {'email': email, 'code': code, 'new_password': newPassword},
+        requiresAuth: false,
+      );
+      return AuthResponse.fromJson(result);
+    } catch (e) {
+      return AuthResponse(
+        success: false,
+        message: 'Lỗi kết nối: ${e.toString()}',
+      );
+    }
+  }
+
+  Future<AuthResponse> verifyResetOtp(String email, String code) async {
+    try {
+      final result = await _apiClient.post(
+        '/auth/verify-reset-otp',
+        body: {'email': email, 'code': code},
         requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
