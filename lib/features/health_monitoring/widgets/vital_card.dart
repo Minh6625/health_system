@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/vital_signs.dart';
+import 'animated_vital_value.dart';
 
 class VitalCard extends StatelessWidget {
   final String title;
@@ -87,7 +88,7 @@ class VitalCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: _getIconColor().withOpacity(0.1),
+              color: _getIconColor().withValues(alpha: 0.1),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -110,14 +111,14 @@ class VitalCard extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: _getIconColor().withOpacity(0.15),
+                    color: _getIconColor().withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     _getStatusText(),
                     style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
                       color: _getIconColor(),
                     ),
                   ),
@@ -129,9 +130,9 @@ class VitalCard extends StatelessWidget {
             Text(
               title,
               style: TextStyle(
-                fontSize: 13,
-                color: Colors.grey.shade700,
-                fontWeight: FontWeight.w500,
+                fontSize: 16,
+                color: Colors.grey.shade800,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 4),
@@ -140,14 +141,14 @@ class VitalCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Flexible(
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedVitalValue(
+                      value: value,
                       color: _getIconColor(),
+                      fontSize: 28,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 4),

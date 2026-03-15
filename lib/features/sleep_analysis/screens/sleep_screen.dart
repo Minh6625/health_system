@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
+import 'package:healthguard/features/sleep_analysis/widgets/empty_sleep_view.dart';
+import 'package:healthguard/features/sleep_analysis/widgets/info_tooltip_icon.dart';
+import 'package:healthguard/features/sleep_analysis/widgets/metric_tile.dart';
+import 'package:healthguard/features/sleep_analysis/widgets/phase_composition_chart.dart';
+import 'package:healthguard/features/sleep_analysis/widgets/shimmer_sleep_loading.dart';
+import 'package:healthguard/features/sleep_analysis/widgets/sleep_hero_card.dart';
+import 'package:healthguard/features/sleep_analysis/widgets/sleep_timeline_bar.dart';
+import 'package:healthguard/features/sleep_analysis/widgets/sleep_trend_chart.dart';
 import 'package:provider/provider.dart';
 import '../../family/widgets/profile_switcher.dart';
 
@@ -12,167 +21,59 @@ class SleepScreen extends StatefulWidget {
 }
 
 class _SleepScreenState extends State<SleepScreen> {
-  static const List<String> _weekDays = [
-    'T2',
-    'T3',
-    'T4',
-    'T5',
-    'T6',
-    'T7',
-    'CN',
-  ];
-  static const List<double> _fallbackWave = [
-    0.95,
-    0.15,
-    0.32,
-    0.58,
-    0.14,
-    0.43,
-    0.67,
-    0.27,
-    0.11,
-    0.38,
-    0.74,
-    0.52,
-    0.33,
-    0.28,
-    0.92,
-    0.87,
-    0.31,
-    0.46,
-    0.12,
-    0.18,
-    0.89,
-  ];
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SleepProvider>().fetchLatestSleep();
+      context.read<SleepProvider>().loadAll();
     });
   }
 
+  // ── Full Calendar Date Picker ────────────────────────────────────────────
+
+  Future<void> _onOpenFullCalendar(
+    BuildContext context,
+    SleepProvider provider,
+  ) async {
+    final today = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: provider.selectedDate,
+      firstDate: today.subtract(const Duration(days: 365)),
+      lastDate: today, // no future dates
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.dark(
+            primary: Color(0xFF48D6FF),
+            onPrimary: Color(0xFF07162B),
+            surface: Color(0xFF0D1E38),
+            onSurface: Colors.white,
+          ),
+          dialogTheme: const DialogThemeData(
+            backgroundColor: Color(0xFF0D1E38),
+          ),
+        ),
+        child: child!,
+      ),
+    );
+
+    if (picked != null && context.mounted) {
+      provider.selectDate(picked);
+    }
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final chartHeight = size.height * 0.25;
-
     return Scaffold(
       backgroundColor: const Color(0xFF07162B),
-      appBar: AppBar(
-        title: const Text('Giấc ngủ'),
-        backgroundColor: const Color(0xFF07162B),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: ProfileSwitcher(
-                onProfileChanged: () {
-                  context.read<SleepProvider>().fetchLatestSleep();
-                },
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              context.read<SleepProvider>().fetchLatestSleep();
-            },
-            tooltip: 'Làm mới',
-          ),
-        ],
-      ),
       body: SafeArea(
         child: Consumer<SleepProvider>(
-          builder: (context, provider, child) {
-            if (provider.isLoading && provider.latestSession == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            if (provider.errorMessage != null &&
-                provider.latestSession == null) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.white70,
-                        size: 56,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        provider.errorMessage!,
-                        style: const TextStyle(color: Colors.white70),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: () => provider.fetchLatestSleep(),
-                        child: const Text('Thử lại'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
-
-            final session = provider.latestSession;
-            final wave = session == null
-                ? _fallbackWave
-                : _buildWave(session.phases);
-
-            return RefreshIndicator(
-              onRefresh: () => provider.fetchLatestSleep(),
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(26),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Color(0xFF10233F), Color(0xFF07162B)],
-                    ),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Color(0x2B48D6FF),
-                        blurRadius: 26,
-                        offset: Offset(0, 10),
-                      ),
-                    ],
-                    border: Border.all(
-                      color: const Color(0x332C4367),
-                      width: 1,
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(session),
-                      const SizedBox(height: 14),
-                      _buildWeekSelector(),
-                      const SizedBox(height: 18),
-                      _buildSummary(session),
-                      const SizedBox(height: 18),
-                      Container(
-                        width: double.infinity,
-                        height: 1,
-                        color: const Color(0x334B5E82),
-                      ),
-                      const SizedBox(height: 18),
-                      _buildChartSection(chartHeight, wave, session),
-                    ],
-                  ),
-                ),
-              ),
+          builder: (context, provider, _) {
+            return NestedScrollView(
+              headerSliverBuilder: (ctx, _) => [_buildAppBar(context)],
+              body: _buildBody(context, provider),
             );
           },
         ),
@@ -180,466 +81,363 @@ class _SleepScreenState extends State<SleepScreen> {
     );
   }
 
-  Widget _buildHeader(SleepSession? session) {
-    final start = session?.startTime ?? DateTime.now();
-    final end = session?.endTime ?? DateTime.now();
-    final weekday = _weekdayLabel(end.weekday);
-    final dateLabel = '${start.day}-${end.day} ${_monthLabel(end.month)}';
-
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                weekday,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 34,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                dateLabel,
-                style: TextStyle(
-                  color: Color(0xFF7E9BC2),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+  Widget _buildAppBar(BuildContext context) {
+    return SliverAppBar(
+      backgroundColor: const Color(0xFF07162B),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      pinned: true,
+      floating: false,
+      title: const Text(
+        'Giấc Ngủ',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+      actions: [
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ProfileSwitcher(
+              onProfileChanged: () {
+                context.read<SleepProvider>().fetchLatestSleep();
+              },
+            ),
           ),
         ),
-        Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            color: const Color(0x1A4EDAFF),
-            border: Border.all(color: const Color(0x663DA6D8), width: 1),
-          ),
-          child: const Icon(
-            Icons.calendar_month_rounded,
-            color: Color(0xFF7AC8FF),
-            size: 20,
-          ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: () {
+            context.read<SleepProvider>().fetchLatestSleep();
+          },
+          tooltip: 'Làm mới',
         ),
       ],
     );
   }
 
-  Widget _buildWeekSelector() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(_weekDays.length, (index) {
-        final selected = index == 3;
-        return Container(
-          width: 35,
-          height: 35,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: selected ? const Color(0x2EFFC400) : const Color(0xFF14253D),
-            border: Border.all(
-              color: selected
-                  ? const Color(0xFFFFC400)
-                  : const Color(0xFF3C4D69),
-              width: selected ? 3 : 1,
-            ),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            _weekDays[index],
-            style: TextStyle(
-              color: selected
-                  ? const Color(0xFFFFC400)
-                  : const Color(0xFF93A9C8),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        );
-      }),
-    );
-  }
+  Widget _buildBody(BuildContext context, SleepProvider provider) {
+    // ── Loading ──────────────────────────────────────────────────────────
+    if (provider.isLoading) {
+      return const ShimmerSleepLoading();
+    }
 
-  Widget _buildSummary(SleepSession? session) {
-    final quality = session?.qualityScore ?? 80;
-    final ratio = session?.qualityRatio ?? 0.8;
-    final inBed = session?.inBedText ?? '7h 45m';
-    final wakeCount = session?.wakeCount ?? 0;
+    // ── Error ────────────────────────────────────────────────────────────
+    if (provider.hasError) {
+      return _ErrorView(
+        message: provider.errorMessage ?? 'Đã xảy ra lỗi',
+        onRetry: () => provider.loadAll(),
+      );
+    }
 
-    return Row(
-      children: [
-        SizedBox(
-          width: 130,
-          height: 130,
-          child: CustomPaint(
-            painter: _QualityRingPainter(value: ratio),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '$quality%',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 34,
-                    fontWeight: FontWeight.w800,
+    // ── Empty ────────────────────────────────────────────────────────────
+    if (provider.isEmpty) {
+      return const EmptySleepView();
+    }
+
+    // ── Success ──────────────────────────────────────────────────────────
+    final session = provider.selectedSession;
+    final history = provider.historyList;
+
+    return RefreshIndicator(
+      onRefresh: () => provider.fetchLatestSleep(),
+      color: const Color(0xFF48D6FF),
+      backgroundColor: const Color(0xFF10233F),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // ── Hero Card ─────────────────────────────────────────────
+                if (provider.dateLoading)
+                  _DateLoadingShimmer()
+                else
+                  SleepHeroCard(
+                    session: session,
+                    selectedDate: provider.selectedDate,
+                    onDateSelected: (day) => provider.selectDate(day),
+                    onCalendarTap: () => _onOpenFullCalendar(context, provider),
                   ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Chất lượng',
-                  style: TextStyle(color: Color(0xFF90A6C3), fontSize: 14),
-                ),
-              ],
+                const SizedBox(height: 20),
+
+                // ── ExpansionTile: Detail Analysis ────────────────────────
+                _buildDetailExpansionTile(session, history, provider),
+              ]),
             ),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                inBed,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 38,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.4,
-                ),
-              ),
-              Text(
-                'Trên giường',
-                style: TextStyle(
-                  color: Color(0xFF90A6C3),
-                  fontSize: 20,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              SizedBox(height: 10),
-              Text(
-                'Số lần thức giấc: $wakeCount\nDữ liệu cập nhật từ backend.',
-                style: TextStyle(
-                  color: Color(0xFF6F8AAE),
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildChartSection(
-    double chartHeight,
-    List<double> wave,
+  Widget _buildDetailExpansionTile(
     SleepSession? session,
+    List<SleepSession> history,
+    SleepProvider provider,
   ) {
-    const labels = ['Thức', 'Ngủ', 'Ngủ sâu'];
-    final timeLabels = _buildTimeLabels(session);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: chartHeight,
-          child: Row(
+    return Theme(
+      data: Theme.of(context).copyWith(
+        dividerColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D1E38),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0x264B5E82), width: 1),
+        ),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          expandedCrossAxisAlignment: CrossAxisAlignment.start,
+          iconColor: const Color(0xFF48D6FF),
+          collapsedIconColor: const Color(0xFF5B7FA6),
+          title: Row(
             children: [
-              SizedBox(
-                width: 62,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      labels[0],
-                      style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13),
-                    ),
-                    Text(
-                      labels[1],
-                      style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13),
-                    ),
-                    Text(
-                      labels[2],
-                      style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13),
-                    ),
-                  ],
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: const Color(0x1A48D6FF),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Icon(
+                  Icons.bar_chart_rounded,
+                  color: Color(0xFF48D6FF),
+                  size: 18,
                 ),
               ),
-              Expanded(
-                child: CustomPaint(painter: _SleepChartPainter(points: wave)),
+              const SizedBox(width: 10),
+              const Text(
+                'Xem chi tiết phân tích',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 10),
-        const Divider(color: Color(0x334B5E82), height: 1),
-        const SizedBox(height: 10),
-        const Padding(
-          padding: EdgeInsets.only(left: 64),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Thời gian',
-                style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13),
+          children: [
+            const SizedBox(height: 8),
+
+            // ── Timeline Bar ────────────────────────────────────────────
+            if (session != null) ...[
+              _SectionHeader(
+                title: 'Thời gian phân bổ',
+                tooltip: const InfoTooltipIcon(topic: SleepInfoTopic.phases),
               ),
-              Text(
-                'Ngáy',
-                style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Padding(
-          padding: const EdgeInsets.only(left: 64),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: timeLabels
-                .map(
-                  (label) => Text(
-                    label,
-                    style: const TextStyle(
-                      color: Color(0xFFB8CAE3),
-                      fontWeight: FontWeight.w700,
-                    ),
+              const SizedBox(height: 10),
+              SleepTimelineBar(session: session)
+                  .animate()
+                  .fadeIn(duration: 400.ms, delay: 80.ms)
+                  .slideY(
+                    begin: 0.06,
+                    end: 0,
+                    duration: 400.ms,
+                    curve: Curves.easeOut,
                   ),
-                )
-                .toList(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Padding(
-          padding: EdgeInsets.only(left: 64),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _SnoreDot(active: false),
-              _SnoreDot(active: false),
-              _SnoreDot(active: true),
-              _SnoreDot(active: false),
-              _SnoreDot(active: true),
-              _SnoreDot(active: false),
-              _SnoreDot(active: false),
+              const SizedBox(height: 20),
             ],
-          ),
+
+            // ── Phase Composition (Donut) ───────────────────────────────
+            if (session != null && session.phases != null) ...[
+              _SectionHeader(title: 'Cơ cấu giấc ngủ'),
+              const SizedBox(height: 10),
+              PhaseCompositionChart(session: session)
+                  .animate()
+                  .fadeIn(duration: 500.ms, delay: 140.ms)
+                  .scale(
+                    begin: const Offset(0.96, 0.96),
+                    end: const Offset(1, 1),
+                    duration: 450.ms,
+                    curve: Curves.easeOut,
+                  ),
+              const SizedBox(height: 20),
+            ],
+
+            // ── Metrics ─────────────────────────────────────────────────
+            if (session != null) ...[
+              _SectionHeader(title: 'Chi tiết chỉ số'),
+              const SizedBox(height: 10),
+              _buildMetrics(
+                session,
+              ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
+
+              const SizedBox(height: 20),
+            ],
+
+            // ── Trend Chart ─────────────────────────────────────────────
+            _SectionHeader(
+              title: 'Xu hướng 7 ngày',
+              tooltip: const InfoTooltipIcon(topic: SleepInfoTopic.trend),
+            ),
+            const SizedBox(height: 10),
+            SleepTrendChart(
+              historyList: history.toList(),
+              highlightedDate: session?.endTime,
+              onSessionTapped: provider.selectHistorySession,
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  List<String> _buildTimeLabels(SleepSession? session) {
-    if (session == null) {
-      return ['23', '00', '01', '02', '03', '04', '05', '06'];
-    }
-
-    final labels = <String>[];
-    final start = session.startTime;
-    for (var i = 0; i < 8; i++) {
-      final point = start.add(Duration(hours: i));
-      labels.add(point.hour.toString().padLeft(2, '0'));
-    }
-    return labels;
-  }
-
-  List<double> _buildWave(Map<String, int> phases) {
-    final awake = phases['awake'] ?? 30;
-    final light = phases['light'] ?? 180;
-    final deep = phases['deep'] ?? 90;
-    final rem = phases['rem'] ?? 60;
-    final total = awake + light + deep + rem;
-
-    if (total <= 0) {
-      return _fallbackWave;
-    }
-
-    final awakeRatio = awake / total;
-    final lightRatio = light / total;
-    final deepRatio = deep / total;
-    final remRatio = rem / total;
-
-    return [
-      0.9,
-      0.2,
-      0.45,
-      0.6 * lightRatio + 0.2,
-      0.15,
-      0.4 * deepRatio + 0.35,
-      0.7,
-      0.28,
-      0.16,
-      0.55 * remRatio + 0.35,
-      0.74,
-      0.52,
-      0.33,
-      0.25 + awakeRatio,
-      0.92,
-      0.7,
-      0.31,
-      0.46,
-      0.18,
-      0.2,
-      0.86,
-    ];
-  }
-
-  String _weekdayLabel(int weekday) {
-    const labels = [
-      'Thứ hai',
-      'Thứ ba',
-      'Thứ tư',
-      'Thứ năm',
-      'Thứ sáu',
-      'Thứ bảy',
-      'Chủ nhật',
-    ];
-    return labels[weekday - 1];
-  }
-
-  String _monthLabel(int month) {
-    const labels = [
-      'Thg 1',
-      'Thg 2',
-      'Thg 3',
-      'Thg 4',
-      'Thg 5',
-      'Thg 6',
-      'Thg 7',
-      'Thg 8',
-      'Thg 9',
-      'Thg 10',
-      'Thg 11',
-      'Thg 12',
-    ];
-    return labels[month - 1];
+  Widget _buildMetrics(SleepSession session) {
+    return Column(
+      children: [
+        const Divider(color: Color(0x224B5E82), height: 1),
+        MetricTile(
+          icon: Icons.hotel_rounded,
+          iconColor: const Color(0xFF48A9D6),
+          label: 'Thời gian trên giường',
+          value: session.inBedText,
+        ),
+        const Divider(color: Color(0x224B5E82), height: 1),
+        MetricTile(
+          icon: Icons.nightlight_rounded,
+          iconColor: const Color(0xFF9C6ADE),
+          label: 'Thời gian thức',
+          value: session.awakeText,
+        ),
+        const Divider(color: Color(0x224B5E82), height: 1),
+        MetricTile(
+          icon: Icons.alarm_rounded,
+          iconColor: const Color(0xFFFFC400),
+          label: 'Số lần thức giấc',
+          value: '${session.wakeCount}',
+          unit: 'lần',
+        ),
+        const Divider(color: Color(0x224B5E82), height: 1),
+        MetricTile(
+          icon: Icons.percent_rounded,
+          iconColor: const Color(0xFF4CAF50),
+          label: 'Hiệu quả giấc ngủ',
+          value: '${(session.efficiencyRatio * 100).toStringAsFixed(0)}%',
+        ),
+        const Divider(color: Color(0x224B5E82), height: 1),
+      ],
+    );
   }
 }
 
-class _SnoreDot extends StatelessWidget {
-  final bool active;
+// ── Section Header ────────────────────────────────────────────────────────────
 
-  const _SnoreDot({required this.active});
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final Widget? tooltip;
+
+  const _SectionHeader({required this.title, this.tooltip});
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 450),
-      width: active ? 12 : 8,
-      height: active ? 12 : 8,
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 16,
+          decoration: BoxDecoration(
+            color: const Color(0xFF48D6FF),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        if (tooltip != null) ...[const SizedBox(width: 6), tooltip!],
+      ],
+    );
+  }
+}
+
+// ── Date Loading Shimmer ──────────────────────────────────────────────────────
+
+class _DateLoadingShimmer extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 200,
       decoration: BoxDecoration(
-        color: active ? const Color(0xFF46D8FF) : const Color(0xFF395578),
-        shape: BoxShape.circle,
-        boxShadow: active
-            ? const [
-                BoxShadow(
-                  color: Color(0x6646D8FF),
-                  blurRadius: 12,
-                  spreadRadius: 1,
-                ),
-              ]
-            : null,
+        color: const Color(0xFF0D1E38),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0x332C4367), width: 1),
+      ),
+      child: const Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            color: Color(0xFF48D6FF),
+            strokeWidth: 2.5,
+          ),
+        ),
       ),
     );
   }
 }
 
-class _QualityRingPainter extends CustomPainter {
-  final double value;
+// ── Error View ────────────────────────────────────────────────────────────────
 
-  const _QualityRingPainter({required this.value});
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({required this.message, required this.onRetry});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    const stroke = 12.0;
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width - stroke) / 2;
-
-    final track = Paint()
-      ..color = const Color(0xFF1E3352)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round;
-
-    final progress = Paint()
-      ..shader = const SweepGradient(
-        colors: [Color(0xFFFFEE58), Color(0xFFFFC400)],
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius, track);
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -1.57,
-      6.28318 * value,
-      false,
-      progress,
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.cloud_off_rounded,
+              color: Color(0xFF5B7FA6),
+              size: 64,
+            ),
+            const SizedBox(height: 20),
+            Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xFF90A6C3),
+                fontSize: 16,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Thử lại'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10233F),
+                foregroundColor: const Color(0xFF48D6FF),
+                side: const BorderSide(color: Color(0x6648D6FF)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-  }
-
-  @override
-  bool shouldRepaint(covariant _QualityRingPainter oldDelegate) {
-    return oldDelegate.value != value;
-  }
-}
-
-class _SleepChartPainter extends CustomPainter {
-  final List<double> points;
-
-  const _SleepChartPainter({required this.points});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = const Color(0x263D5E85)
-      ..strokeWidth = 1;
-
-    for (var i = 0; i <= 6; i++) {
-      final x = (size.width / 6) * i;
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), gridPaint);
-    }
-
-    final path = Path();
-    final stepX = size.width / (points.length - 1);
-
-    for (var i = 0; i < points.length; i++) {
-      final x = i * stepX;
-      final y = size.height - (size.height * points[i]);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-
-    final glowPaint = Paint()
-      ..color = const Color(0x5540D8FF)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
-
-    final linePaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFF3ACDFF), Color(0xFF57E2FF)],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height))
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    canvas.drawPath(path, glowPaint);
-    canvas.drawPath(path, linePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SleepChartPainter oldDelegate) {
-    return oldDelegate.points != points;
   }
 }
