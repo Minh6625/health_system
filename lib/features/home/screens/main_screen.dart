@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
-import 'package:healthguard/features/device/screens/device_screen.dart';
 import 'package:healthguard/features/emergency/screens/emergency_sos_received_list_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:healthguard/features/family/screens/family_management_screen.dart';
 import 'package:healthguard/features/health_monitoring/screens/health_monitoring_screen.dart';
 import 'package:healthguard/features/profile/screens/profile_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_screen.dart';
@@ -19,7 +19,7 @@ class _MainScreenState extends State<MainScreen> {
     const HealthMonitoringScreen(),
     const SleepScreen(),
     const EmergencySOSReceivedListScreen(),
-    const DeviceScreen(),
+    const FamilyManagementScreen(),
     const ProfileScreen(),
   ];
 
@@ -28,9 +28,7 @@ class _MainScreenState extends State<MainScreen> {
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom,
-        ),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [Colors.blue.shade800, Colors.blue.shade600],
@@ -51,7 +49,7 @@ class _MainScreenState extends State<MainScreen> {
             _buildNavItem(Icons.favorite, 'Sức khỏe', 0),
             _buildNavItem(Icons.bedtime, 'Giấc ngủ', 1),
             _buildNavItem(Icons.warning_amber_rounded, 'Khẩn cấp', 2),
-            _buildNavItem(Icons.watch, 'Thiết bị', 3),
+            _buildNavItem(Icons.family_restroom, 'Gia đình', 3),
             _buildNavItem(Icons.person, 'Cá nhân', 4),
           ],
         ),

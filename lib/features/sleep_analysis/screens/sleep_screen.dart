@@ -11,6 +11,7 @@ import 'package:healthguard/features/sleep_analysis/widgets/sleep_hero_card.dart
 import 'package:healthguard/features/sleep_analysis/widgets/sleep_timeline_bar.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/sleep_trend_chart.dart';
 import 'package:provider/provider.dart';
+import '../../family/widgets/profile_switcher.dart';
 
 class SleepScreen extends StatefulWidget {
   const SleepScreen({super.key});
@@ -31,7 +32,9 @@ class _SleepScreenState extends State<SleepScreen> {
   // ── Full Calendar Date Picker ────────────────────────────────────────────
 
   Future<void> _onOpenFullCalendar(
-      BuildContext context, SleepProvider provider) async {
+    BuildContext context,
+    SleepProvider provider,
+  ) async {
     final today = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -69,9 +72,7 @@ class _SleepScreenState extends State<SleepScreen> {
         child: Consumer<SleepProvider>(
           builder: (context, provider, _) {
             return NestedScrollView(
-              headerSliverBuilder: (ctx, _) => [
-                _buildAppBar(),
-              ],
+              headerSliverBuilder: (ctx, _) => [_buildAppBar(context)],
               body: _buildBody(context, provider),
             );
           },
@@ -80,18 +81,36 @@ class _SleepScreenState extends State<SleepScreen> {
     );
   }
 
-  Widget _buildAppBar() {
-    return const SliverAppBar(
-      backgroundColor: Color(0xFF07162B),
+  Widget _buildAppBar(BuildContext context) {
+    return SliverAppBar(
+      backgroundColor: const Color(0xFF07162B),
       foregroundColor: Colors.white,
       elevation: 0,
       pinned: true,
       floating: false,
-      title: Text(
+      title: const Text(
         'Giấc Ngủ',
         style: TextStyle(fontWeight: FontWeight.w700),
       ),
-      // DatePicker is now inside SleepHeroCard (WeeklyDatePicker section)
+      actions: [
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ProfileSwitcher(
+              onProfileChanged: () {
+                context.read<SleepProvider>().fetchLatestSleep();
+              },
+            ),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          onPressed: () {
+            context.read<SleepProvider>().fetchLatestSleep();
+          },
+          tooltip: 'Làm mới',
+        ),
+      ],
     );
   }
 
@@ -129,7 +148,6 @@ class _SleepScreenState extends State<SleepScreen> {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-
                 // ── Hero Card ─────────────────────────────────────────────
                 if (provider.dateLoading)
                   _DateLoadingShimmer()
@@ -138,14 +156,12 @@ class _SleepScreenState extends State<SleepScreen> {
                     session: session,
                     selectedDate: provider.selectedDate,
                     onDateSelected: (day) => provider.selectDate(day),
-                    onCalendarTap: () =>
-                        _onOpenFullCalendar(context, provider),
+                    onCalendarTap: () => _onOpenFullCalendar(context, provider),
                   ),
                 const SizedBox(height: 20),
 
                 // ── ExpansionTile: Detail Analysis ────────────────────────
-                _buildDetailExpansionTile(
-                    session, history, provider),
+                _buildDetailExpansionTile(session, history, provider),
               ]),
             ),
           ),
@@ -172,8 +188,7 @@ class _SleepScreenState extends State<SleepScreen> {
           border: Border.all(color: const Color(0x264B5E82), width: 1),
         ),
         child: ExpansionTile(
-          tilePadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
           expandedCrossAxisAlignment: CrossAxisAlignment.start,
           iconColor: const Color(0xFF48D6FF),
@@ -206,7 +221,7 @@ class _SleepScreenState extends State<SleepScreen> {
           children: [
             const SizedBox(height: 8),
 
-                // ── Timeline Bar ────────────────────────────────────────────
+            // ── Timeline Bar ────────────────────────────────────────────
             if (session != null) ...[
               _SectionHeader(
                 title: 'Thời gian phân bổ',
@@ -217,10 +232,11 @@ class _SleepScreenState extends State<SleepScreen> {
                   .animate()
                   .fadeIn(duration: 400.ms, delay: 80.ms)
                   .slideY(
-                      begin: 0.06,
-                      end: 0,
-                      duration: 400.ms,
-                      curve: Curves.easeOut),
+                    begin: 0.06,
+                    end: 0,
+                    duration: 400.ms,
+                    curve: Curves.easeOut,
+                  ),
               const SizedBox(height: 20),
             ],
 
@@ -232,10 +248,11 @@ class _SleepScreenState extends State<SleepScreen> {
                   .animate()
                   .fadeIn(duration: 500.ms, delay: 140.ms)
                   .scale(
-                      begin: const Offset(0.96, 0.96),
-                      end: const Offset(1, 1),
-                      duration: 450.ms,
-                      curve: Curves.easeOut),
+                    begin: const Offset(0.96, 0.96),
+                    end: const Offset(1, 1),
+                    duration: 450.ms,
+                    curve: Curves.easeOut,
+                  ),
               const SizedBox(height: 20),
             ],
 
@@ -243,9 +260,9 @@ class _SleepScreenState extends State<SleepScreen> {
             if (session != null) ...[
               _SectionHeader(title: 'Chi tiết chỉ số'),
               const SizedBox(height: 10),
-              _buildMetrics(session)
-                  .animate()
-                  .fadeIn(duration: 400.ms, delay: 200.ms),
+              _buildMetrics(
+                session,
+              ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
 
               const SizedBox(height: 20),
             ],
@@ -297,8 +314,7 @@ class _SleepScreenState extends State<SleepScreen> {
           icon: Icons.percent_rounded,
           iconColor: const Color(0xFF4CAF50),
           label: 'Hiệu quả giấc ngủ',
-          value:
-              '${(session.efficiencyRatio * 100).toStringAsFixed(0)}%',
+          value: '${(session.efficiencyRatio * 100).toStringAsFixed(0)}%',
         ),
         const Divider(color: Color(0x224B5E82), height: 1),
       ],
@@ -338,10 +354,7 @@ class _SectionHeader extends StatelessWidget {
             ),
           ),
         ),
-        if (tooltip != null) ...[
-          const SizedBox(width: 6),
-          tooltip!,
-        ],
+        if (tooltip != null) ...[const SizedBox(width: 6), tooltip!],
       ],
     );
   }
@@ -389,8 +402,11 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.cloud_off_rounded,
-                color: Color(0xFF5B7FA6), size: 64),
+            const Icon(
+              Icons.cloud_off_rounded,
+              color: Color(0xFF5B7FA6),
+              size: 64,
+            ),
             const SizedBox(height: 20),
             Text(
               message,
@@ -411,7 +427,9 @@ class _ErrorView extends StatelessWidget {
                 foregroundColor: const Color(0xFF48D6FF),
                 side: const BorderSide(color: Color(0x6648D6FF)),
                 padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 12),
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

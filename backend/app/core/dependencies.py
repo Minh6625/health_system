@@ -1,7 +1,8 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.db.database import get_db
 from app.models.user_model import User
@@ -73,3 +74,33 @@ def get_current_user(
         )
     
     return user
+
+
+def get_target_profile_id(
+    x_target_profile_id: Optional[int] = Header(None, alias="X-Target-Profile-Id"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> int:
+    """
+    Dependency to resolve the target profile ID to fetch data for.
+    If X-Target-Profile-Id is not provided, defaults to current_user.id.
+    If provided, it checks if current_user has an accepted relationship allowing vitals viewing.
+    """
+    if not x_target_profile_id or x_target_profile_id == current_user.id:
+        return current_user.id
+        
+    from app.models.relationship_model import UserRelationship
+    relationship = db.query(UserRelationship).filter(
+        UserRelationship.patient_id == x_target_profile_id,
+        UserRelationship.caregiver_id == current_user.id,
+        UserRelationship.status == "accepted",
+        UserRelationship.can_view_vitals == True
+    ).first()
+    
+    if not relationship:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Không có quyền xem dữ liệu của người dùng này"
+        )
+        
+    return x_target_profile_id

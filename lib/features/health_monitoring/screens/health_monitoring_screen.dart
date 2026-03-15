@@ -10,6 +10,7 @@ import '../widgets/blood_pressure_card.dart';
 import '../widgets/health_report_banner.dart';
 import '../screens/vital_detail_screen.dart';
 import '../screens/health_report_screen.dart';
+import '../../family/widgets/profile_switcher.dart';
 
 class HealthMonitoringScreen extends StatefulWidget {
   const HealthMonitoringScreen({super.key});
@@ -28,7 +29,8 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen>
   // Track whether we've run the entrance animation yet
   bool _entrancePlayed = false;
 
-  static const int _animatedItemCount = 4; // badge, grid, BP card, report banner
+  static const int _animatedItemCount =
+      4; // badge, grid, BP card, report banner
 
   @override
   void initState() {
@@ -54,10 +56,12 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen>
       return Tween<Offset>(
         begin: const Offset(0, 0.25),
         end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: _entranceController,
-        curve: Interval(start, end, curve: Curves.easeOutCubic),
-      ));
+      ).animate(
+        CurvedAnimation(
+          parent: _entranceController,
+          curve: Interval(start, end, curve: Curves.easeOutCubic),
+        ),
+      );
     });
 
     // Trigger initial fetch + auto-refresh
@@ -85,10 +89,7 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen>
   Widget _animated(int index, Widget child) {
     return FadeTransition(
       opacity: _itemFades[index],
-      child: SlideTransition(
-        position: _itemSlides[index],
-        child: child,
-      ),
+      child: SlideTransition(position: _itemSlides[index], child: child),
     );
   }
 
@@ -218,75 +219,98 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen>
               await provider.fetchLatestVitals();
             },
             child: CustomScrollView(
-            slivers: [
-              _buildSliverAppBar(provider),
-              SliverPadding(
-                padding: const EdgeInsets.all(16),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // 0 — Timestamp badge
-                    _animated(0, TimestampBadge(vitals: vitals)),
-                    const SizedBox(height: 16),
+              slivers: [
+                _buildSliverAppBar(provider),
+                SliverPadding(
+                  padding: const EdgeInsets.all(16),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      // 0 — Timestamp badge
+                      _animated(0, TimestampBadge(vitals: vitals)),
+                      const SizedBox(height: 16),
 
-                    // 1 — Vital cards grid
-                    _animated(1, _buildVitalGrid(vitals)),
-                    const SizedBox(height: 12),
+                      // 1 — Vital cards grid
+                      _animated(1, _buildVitalGrid(vitals)),
+                      const SizedBox(height: 12),
 
-                    // 2 — Blood pressure card
-                    _animated(
-                      2,
-                      BloodPressureCard(
-                        vitals: vitals,
-                        onTap: () {
-                          final sysStatus = vitals.getBloodPressureSysStatus();
-                          final diaStatus = vitals.getBloodPressureDiaStatus();
-                          final status = sysStatus.index > diaStatus.index ? sysStatus : diaStatus;
-                          final sysStr = vitals.bloodPressureSys?.toStringAsFixed(0) ?? '--';
-                          final diaStr = vitals.bloodPressureDia?.toStringAsFixed(0) ?? '--';
-                          
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => VitalDetailScreen(
-                                title: 'Huyết áp',
-                                value: '$sysStr / $diaStr',
-                                unit: 'mmHg',
-                                status: status,
-                                chartData: const [
-                                  [120, 122, 118, 125, 130, 128, 120, 118], // Sys
-                                  [80, 82, 78, 85, 88, 85, 80, 78], // Dia
-                                ],
-                                chartColors: [Colors.purple.shade400, Colors.teal.shade400],
-                                educationText: 'Huyết áp bình thường của người lớn tuổi nên duy trì dưới 140/90 mmHg. Nếu vượt quá, cần nghỉ ngơi và theo dõi sát.',
-                                onSosTap: () {/* TODO: Auto-trigger SOS */},
+                      // 2 — Blood pressure card
+                      _animated(
+                        2,
+                        BloodPressureCard(
+                          vitals: vitals,
+                          onTap: () {
+                            final sysStatus = vitals
+                                .getBloodPressureSysStatus();
+                            final diaStatus = vitals
+                                .getBloodPressureDiaStatus();
+                            final status = sysStatus.index > diaStatus.index
+                                ? sysStatus
+                                : diaStatus;
+                            final sysStr =
+                                vitals.bloodPressureSys?.toStringAsFixed(0) ??
+                                '--';
+                            final diaStr =
+                                vitals.bloodPressureDia?.toStringAsFixed(0) ??
+                                '--';
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => VitalDetailScreen(
+                                  title: 'Huyết áp',
+                                  value: '$sysStr / $diaStr',
+                                  unit: 'mmHg',
+                                  status: status,
+                                  chartData: const [
+                                    [
+                                      120,
+                                      122,
+                                      118,
+                                      125,
+                                      130,
+                                      128,
+                                      120,
+                                      118,
+                                    ], // Sys
+                                    [80, 82, 78, 85, 88, 85, 80, 78], // Dia
+                                  ],
+                                  chartColors: [
+                                    Colors.purple.shade400,
+                                    Colors.teal.shade400,
+                                  ],
+                                  educationText:
+                                      'Huyết áp bình thường của người lớn tuổi nên duy trì dưới 140/90 mmHg. Nếu vượt quá, cần nghỉ ngơi và theo dõi sát.',
+                                  onSosTap: () {
+                                    /* TODO: Auto-trigger SOS */
+                                  },
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // 3 — Health Report Banner (replaces QuickActionsPanel)
-                    _animated(
-                      3,
-                      HealthReportBanner(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const HealthReportScreen(),
-                            ),
-                          );
-                        },
+                      // 3 — Health Report Banner (replaces QuickActionsPanel)
+                      _animated(
+                        3,
+                        HealthReportBanner(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const HealthReportScreen(),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                  ]),
+                      const SizedBox(height: 24),
+                    ]),
+                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
           );
         },
       ),
@@ -325,6 +349,16 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen>
         ),
       ),
       actions: [
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ProfileSwitcher(
+              onProfileChanged: () {
+                provider.fetchLatestVitals();
+              },
+            ),
+          ),
+        ),
         if (provider.isLoading && provider.currentVitals != null)
           const Padding(
             padding: EdgeInsets.only(right: 8),
@@ -350,7 +384,15 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen>
   // ── Vital Grid ──────────────────────────────────────────────────────────────
 
   Widget _buildVitalGrid(VitalSigns vitals) {
-    void navTo(String title, String val, String unit, VitalStatus st, List<double> chart, Color c, String edu) {
+    void navTo(
+      String title,
+      String val,
+      String unit,
+      VitalStatus st,
+      List<double> chart,
+      Color c,
+      String edu,
+    ) {
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -451,4 +493,3 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen>
     );
   }
 }
-

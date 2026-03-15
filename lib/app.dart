@@ -14,6 +14,7 @@ import 'package:healthguard/features/emergency/repositories/emergency_caregiver_
 import 'package:healthguard/features/health_monitoring/providers/vital_signs_provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
+import 'package:healthguard/features/family/providers/target_profile_provider.dart';
 import 'package:provider/provider.dart';
 
 class HealthSystemApp extends StatefulWidget {
@@ -97,22 +98,35 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     final action = uri.queryParameters['action'];
     final pathStr = uri.path.toLowerCase();
     final hostStr = uri.host.toLowerCase();
-    
-    final isResetPassword = pathStr.contains('reset-password') || hostStr == 'reset-password' || action == 'reset-password';
-    final isVerifyEmail = (pathStr.contains('verify-email') || hostStr == 'verify-email') && !isResetPassword;
+
+    final isResetPassword =
+        pathStr.contains('reset-password') ||
+        hostStr == 'reset-password' ||
+        action == 'reset-password';
+    final isVerifyEmail =
+        (pathStr.contains('verify-email') || hostStr == 'verify-email') &&
+        !isResetPassword;
 
     if (isVerifyEmail) {
       final code = uri.queryParameters['code'] ?? uri.queryParameters['token'];
       final email = uri.queryParameters['email'];
-      
+
       if (code != null) {
-        _routeToDeepLink(AppRouter.verifyEmail, {'code': code, 'email': email, if (action != null) 'action': action});
+        _routeToDeepLink(AppRouter.verifyEmail, {
+          'code': code,
+          'email': email,
+          if (action != null) 'action': action,
+        });
       }
     } else if (isResetPassword) {
       final code = uri.queryParameters['code'] ?? uri.queryParameters['token'];
       final email = uri.queryParameters['email'];
       if (code != null) {
-        _routeToDeepLink(AppRouter.verifyResetOtp, {'code': code, 'email': email, if (action != null) 'action': action});
+        _routeToDeepLink(AppRouter.verifyResetOtp, {
+          'code': code,
+          'email': email,
+          if (action != null) 'action': action,
+        });
       }
     } else {
       debugPrint('[DeepLink] → No matching route found, ignoring.');
@@ -130,21 +144,12 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(
-          create: (_) => AuthProvider(AuthRepository()),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => VitalSignsProvider(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => SleepProvider(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => DeviceProvider(),
-        ),
-        ChangeNotifierProvider(
-          create: (_) => ProfileProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => AuthProvider(AuthRepository())),
+        ChangeNotifierProvider(create: (_) => VitalSignsProvider()),
+        ChangeNotifierProvider(create: (_) => SleepProvider()),
+        ChangeNotifierProvider(create: (_) => DeviceProvider()),
+        ChangeNotifierProvider(create: (_) => ProfileProvider()),
+        ChangeNotifierProvider(create: (_) => TargetProfileProvider()),
         ChangeNotifierProvider(
           create: (_) =>
               EmergencyCaregiverProvider(EmergencyCaregiverRepository()),

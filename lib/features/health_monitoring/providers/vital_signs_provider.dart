@@ -20,7 +20,7 @@ class VitalSignsProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await _apiClient.get('/mobile/vital-signs/latest');
+      final response = await _apiClient.get('/vital-signs/latest');
 
       _currentVitals = VitalSigns.fromJson(response);
 

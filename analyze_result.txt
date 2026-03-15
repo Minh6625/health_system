@@ -1,0 +1,250 @@
+Analyzing health_system...
+
+  error - last_good.dart:1:1 - Expected to find ';'. - expected_token
+  error - last_good.dart:1:1 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:1:5 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:1:7 - Undefined class 'The'. Try changing the name to the name of an existing class, or creating a class with the name 'The'. - undefined_class
+  error - last_good.dart:1:11 - Expected to find ';'. - expected_token
+  error - last_good.dart:1:16 - Undefined class 'simplified'. Try changing the name to the name of an existing class, or creating a class with the name 'simplified'. - undefined_class
+  error - last_good.dart:1:27 - Expected to find ';'. - expected_token
+  error - last_good.dart:1:31 - command isn't a type. Try correcting the name to match an existing type. - not_a_type
+  error - last_good.dart:1:39 - Expected to find ';'. - expected_token
+  error - last_good.dart:1:42 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:1:43 - Expected to find ';'. - expected_token
+  error - last_good.dart:1:43 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:1:46 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:1:47 - Content isn't a type. Try correcting the name to match an existing type. - not_a_type
+  error - last_good.dart:1:55 - Functions must have an explicit list of parameters. Try adding a parameter list. - missing_function_parameters
+  error - last_good.dart:1:61 - A function body must be provided. Try adding a function body. - missing_function_body
+  error - last_good.dart:1:61 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:1:62 - Expected to find ';'. - expected_token
+  error - last_good.dart:1:62 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:1:65 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:1:66 - Expected to find ';'. - expected_token
+  error - last_good.dart:1:66 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:1:72 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:1:72 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:2:1 - Directives must appear before any declarations. Try moving the directive before any declarations. - directive_after_declaration
+  error - last_good.dart:2:1 - Expected to find ';'. - expected_token
+  error - last_good.dart:2:8 - Expected a string literal. - expected_string_literal
+  error - last_good.dart:2:8 - Expected to find ';'. - expected_token
+  error - last_good.dart:2:8 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:4:1 - 'with' can't be used as an identifier because it's a keyword. Try renaming this to be an identifier that isn't a keyword. - expected_identifier_but_got_keyword
+  error - last_good.dart:4:1 - Expected to find ';'. - expected_token
+  error - last_good.dart:4:1 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:4:11 - Expected an identifier. - missing_identifier
+  error - last_good.dart:4:80 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:5:1 - Expected to find ')'. - expected_token
+  error - last_good.dart:5:99 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:115:80 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:116:565 - Illegal character '243'. - illegal_character
+  error - last_good.dart:116:591 - A function body must be provided. Try adding a function body. - missing_function_body
+  error - last_good.dart:116:591 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:116:640 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:117:1 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:117:26 - Expected to find ';'. - expected_token
+  error - last_good.dart:152:1 - The type of 'text' can't be inferred because it depends on itself through the cycle: text. Try adding an explicit type to one or more of the variables in the cycle in order to break the cycle. - top_level_cycle
+  error - last_good.dart:152:1 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:152:15 - Undefined name 'pending_in_pattern'. Try correcting the name to one that is defined, or defining the name. - undefined_identifier
+  error - last_good.dart:152:63 - Expected to find ';'. - expected_token
+  error - last_good.dart:154:1 - 'with' can't be used as an identifier because it's a keyword. Try renaming this to be an identifier that isn't a keyword. - expected_identifier_but_got_keyword
+  error - last_good.dart:154:1 - Expected to find ';'. - expected_token
+  error - last_good.dart:154:1 - The name 'with' is already defined. Try renaming one of the declarations. - duplicate_definition
+           - The first definition of this name at last_good.dart:4:1.
+  error - last_good.dart:154:1 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:154:6 - The name 'open' is already defined. Try renaming one of the declarations. - duplicate_definition
+           - The first definition of this name at last_good.dart:4:6.
+  error - last_good.dart:154:11 - Expected an identifier. - missing_identifier
+  error - last_good.dart:154:80 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:155:1 - A function body must be provided. Try adding a function body. - missing_function_body
+  error - last_good.dart:155:1 - Expected to find ')'. - expected_token
+  error - last_good.dart:155:1 - Functions must have an explicit list of parameters. Try adding a parameter list. - missing_function_parameters
+  error - last_good.dart:155:8 - A function body must be provided. Try adding a function body. - missing_function_body
+  error - last_good.dart:155:8 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:155:9 - Expected to find ';'. - expected_token
+  error - last_good.dart:155:9 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:155:13 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:155:17 - Expected to find ';'. - expected_token
+  error - last_good.dart:155:17 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:155:18 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:155:31 - Expected to find ';'. - expected_token
+  error - last_good.dart:155:31 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:155:34 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:155:35 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:155:36 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:155:97 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:157:7 - Expected an identifier. - missing_identifier
+  error - last_good.dart:158:1 - A function body must be provided. Try adding a function body. - missing_function_body
+  error - last_good.dart:158:1 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:158:1 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:159:1 - Undefined class 'python'. Try changing the name to the name of an existing class, or creating a class with the name 'python'. - undefined_class
+  error - last_good.dart:159:8 - Functions must have an explicit list of parameters. Try adding a parameter list. - missing_function_parameters
+  error - last_good.dart:159:8 - The name 'patch2' is already defined. Try renaming one of the declarations. - duplicate_definition
+           - The first definition of this name at last_good.dart:1:55.
+  error - last_good.dart:159:14 - A function body must be provided. Try adding a function body. - missing_function_body
+  error - last_good.dart:159:14 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:159:15 - Expected to find ';'. - expected_token
+  error - last_good.dart:159:15 - The name 'py' is already defined. Try renaming one of the declarations. - duplicate_definition
+           - The first definition of this name at last_good.dart:1:62.
+  error - last_good.dart:159:15 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:159:17 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:159:18 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:159:20 - Undefined class 'and'. Try changing the name to the name of an existing class, or creating a class with the name 'and'. - undefined_class
+  error - last_good.dart:159:24 - 'this' can't be used as an identifier because it's a keyword. Try renaming this to be an identifier that isn't a keyword. - expected_identifier_but_got_keyword
+  error - last_good.dart:159:24 - Expected to find ';'. - expected_token
+  error - last_good.dart:159:29 - 'is' can't be used as an identifier because it's a keyword. Try renaming this to be an identifier that isn't a keyword. - expected_identifier_but_got_keyword
+  error - last_good.dart:159:29 - Expected to find ';'. - expected_token
+  error - last_good.dart:159:29 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:159:32 - the isn't a type. Try correcting the name to match an existing type. - not_a_type
+  error - last_good.dart:159:36 - Expected to find ';'. - expected_token
+  error - last_good.dart:159:43 - Undefined class 'of'. Try changing the name to the name of an existing class, or creating a class with the name 'of'. - undefined_class
+  error - last_good.dart:159:46 - Expected to find ';'. - expected_token
+  error - last_good.dart:159:54 - Undefined class 'that'. Try changing the name to the name of an existing class, or creating a class with the name 'that'. - undefined_class
+  error - last_good.dart:159:59 - Expected to find ';'. - expected_token
+  error - last_good.dart:159:67 - Expected to find ';'. - expected_token
+  error - last_good.dart:159:67 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:159:74 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:160:1 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:160:3 - Expected to find ';'. - expected_token
+  error - last_good.dart:160:3 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:160:10 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:160:11 - Expected to find ';'. - expected_token
+  error - last_good.dart:160:11 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:160:18 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:160:20 - Undefined class 'A'. Try changing the name to the name of an existing class, or creating a class with the name 'A'. - undefined_class
+  error - last_good.dart:160:22 - Expected to find ';'. - expected_token
+  error - last_good.dart:160:33 - Undefined class 'parameter'. Try changing the name to the name of an existing class, or creating a class with the name 'parameter'. - undefined_class
+  error - last_good.dart:160:43 - Expected to find ';'. - expected_token
+  error - last_good.dart:160:50 - Undefined class 'be'. Try changing the name to the name of an existing class, or creating a class with the name 'be'. - undefined_class
+  error - last_good.dart:160:53 - Expected to find ';'. - expected_token
+  error - last_good.dart:160:59 - Undefined class 'that'. Try changing the name to the name of an existing class, or creating a class with the name 'that'. - undefined_class
+  error - last_good.dart:160:64 - Expected to find ';'. - expected_token
+  error - last_good.dart:160:72 - Expected to find ';'. - expected_token
+  error - last_good.dart:160:72 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:161:1 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+  error - last_good.dart:161:80 - Unterminated string literal. - unterminated_string_literal
+  error - last_good.dart:162:1 - Undefined class 'Command'. Try changing the name to the name of an existing class, or creating a class with the name 'Command'. - undefined_class
+  error - last_good.dart:162:9 - Expected to find ';'. - expected_token
+  error - last_good.dart:162:16 - 'with' can't be used as an identifier because it's a keyword. Try renaming this to be an identifier that isn't a keyword. - expected_identifier_but_got_keyword
+  error - last_good.dart:162:16 - Expected to find ';'. - expected_token
+  error - last_good.dart:162:16 - The name 'with' is already defined. Try renaming one of the declarations. - duplicate_definition
+           - The first definition of this name at last_good.dart:4:1.
+  error - last_good.dart:162:16 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:162:21 - Expected to find ';'. - expected_token
+  error - last_good.dart:162:21 - Variables must be declared using the keywords 'const', 'final', 'var' or a type name. Try adding the name of the type of the variable or the keyword 'var'. - missing_const_final_var_or_type
+  error - last_good.dart:162:26 - Expected a method, getter, setter or operator declaration. This appears to be incomplete code. Try removing it or completing it. - expected_executable
+warning - last_good.dart:155:1 - The declaration '_screen' isn't referenced. Try removing the declaration of '_screen'. - unused_element
+warning - lib\core\network\api_client.dart:4:8 - Unused import: 'package:flutter_secure_storage/flutter_secure_storage.dart'. Try removing the import directive. - unused_import
+warning - lib\core\routes\app_router.dart:1:8 - Unused import: 'package:flutter/foundation.dart'. Try removing the import directive. - unused_import
+warning - lib\core\routes\app_router.dart:10:8 - Unused import: 'package:healthguard/features/auth/screens/start_screen.dart'. Try removing the import directive. - unused_import
+warning - lib\features\emergency\screens\emergency_sos_detail_screen.dart:5:8 - Unused import: 'package:healthguard/features/emergency/widgets/status_badge.dart'. Try removing the import directive. - unused_import
+warning - lib\features\emergency\screens\emergency_sos_detail_screen.dart:468:10 - The declaration '_buildTriggerInfo' isn't referenced. Try removing the declaration of '_buildTriggerInfo'. - unused_element
+warning - lib\features\family\screens\user_detail_screen.dart:507:10 - A value for optional parameter 'valueColor' isn't ever given. Try removing the unused parameter. - unused_element_parameter
+warning - lib\features\profile\screens\profile_screen.dart:2:8 - Unused import: 'package:flutter_animate/flutter_animate.dart'. Try removing the import directive. - unused_import
+   info - last_good.dart:1:1 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:1:1 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:1:1 - The variable name 'Note' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style. - non_constant_identifier_names
+   info - last_good.dart:1:43 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:1:43 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:1:43 - The variable name 'Set' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style. - non_constant_identifier_names
+   info - last_good.dart:1:62 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:1:62 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:1:66 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:1:66 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:1:66 - The variable name 'Value' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style. - non_constant_identifier_names
+   info - last_good.dart:2:8 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:2:8 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:4:1 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:4:1 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:4:6 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:117:1 - The variable name 'pending_in_replacement' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style. - non_constant_identifier_names
+   info - last_good.dart:132:46 - Unnecessary escape in string literal. Remove the '\' escape. - unnecessary_string_escapes
+   info - last_good.dart:132:58 - Unnecessary escape in string literal. Remove the '\' escape. - unnecessary_string_escapes
+   info - last_good.dart:147:46 - Unnecessary escape in string literal. Remove the '\' escape. - unnecessary_string_escapes
+   info - last_good.dart:147:53 - Unnecessary escape in string literal. Remove the '\' escape. - unnecessary_string_escapes
+   info - last_good.dart:154:1 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:154:1 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:154:6 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:155:1 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:155:9 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:155:9 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:155:17 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:155:17 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:155:31 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:155:31 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:157:1 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:159:15 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:159:15 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:159:29 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:159:29 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:159:67 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:159:67 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:160:3 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:160:3 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:160:11 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:160:11 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:160:11 - The variable name 'Content' isn't a lowerCamelCase identifier. Try changing the name to follow the lowerCamelCase style. - non_constant_identifier_names
+   info - last_good.dart:160:72 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:160:72 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:162:16 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:162:16 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - last_good.dart:162:21 - An uninitialized variable should have an explicit type annotation. Try adding a type annotation. - prefer_typing_uninitialized_variables
+   info - last_good.dart:162:21 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - lib\app.dart:5:8 - The imported package 'flutter_native_splash' isn't a dependency of the importing package. Try adding a dependency for 'flutter_native_splash' in the 'pubspec.yaml' file. - depend_on_referenced_packages
+   info - lib\app.dart:118:11 - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?'. - use_null_aware_elements
+   info - lib\app.dart:128:11 - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?'. - use_null_aware_elements
+   info - lib\core\error\failures.dart:8:9 - Parameter 'message' could be a super parameter. Trying converting 'message' to a super parameter. - use_super_parameters
+   info - lib\core\error\failures.dart:13:9 - Parameter 'message' could be a super parameter. Trying converting 'message' to a super parameter. - use_super_parameters
+   info - lib\core\error\failures.dart:18:9 - Parameter 'message' could be a super parameter. Trying converting 'message' to a super parameter. - use_super_parameters
+   info - lib\features\auth\screens\auth_pages_screen.dart:69:51 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\auth\screens\auth_pages_screen.dart:121:42 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\auth\screens\auth_pages_screen.dart:125:47 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\device\screens\device_screen.dart:132:23 - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\device\screens\device_screen.dart:572:22 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\device\screens\device_screen.dart:787:27 - Don't use 'BuildContext's across async gaps. Try rewriting the code to not use the 'BuildContext', or guard the use with a 'mounted' check. - use_build_context_synchronously
+   info - lib\features\emergency\repositories\emergency_caregiver_repository.dart:44:11 - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?'. - use_null_aware_elements
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:151:51 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:152:40 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:193:43 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:253:37 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:331:44 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:378:29 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:386:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:426:25 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:434:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:468:28 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:476:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:537:28 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:546:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:605:31 - Missing type annotation. Try adding a type annotation. - strict_top_level_inference
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:614:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\screens\emergency_sos_detail_screen.dart:662:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\widgets\sos_card.dart:31:30 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\widgets\sos_card.dart:37:43 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\widgets\sos_card.dart:38:32 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\widgets\sos_card.dart:236:46 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\emergency\widgets\sos_card.dart:268:46 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\family\screens\user_detail_screen.dart:123:44 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\family\screens\user_detail_screen.dart:180:35 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\family\screens\user_detail_screen.dart:207:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\family\screens\user_detail_screen.dart:269:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\family\screens\user_detail_screen.dart:282:48 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\family\screens\user_detail_screen.dart:328:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\family\widgets\profile_switcher.dart:8:9 - Parameter 'key' could be a super parameter. Trying converting 'key' to a super parameter. - use_super_parameters
+   info - lib\features\family\widgets\profile_switcher.dart:54:33 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\health_monitoring\models\vital_signs.dart:53:50 - Statements in an if should be enclosed in a block. Try wrapping the statement in a block. - curly_braces_in_flow_control_structures
+   info - lib\features\health_monitoring\screens\health_monitoring_screen.dart:286:32 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\health_monitoring\widgets\vital_card.dart:90:38 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\health_monitoring\widgets\vital_card.dart:113:44 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\home\screens\main_screen.dart:40:43 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\home\screens\main_screen.dart:82:47 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\home\screens\main_screen.dart:94:36 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\home\screens\main_screen.dart:105:36 - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\profile\screens\edit_profile_screen.dart:239:25 - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\profile\screens\edit_profile_screen.dart:257:25 - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre. Try replacing the use of the deprecated member with the replacement. - deprecated_member_use
+   info - lib\features\profile\screens\edit_profile_screen.dart:401:47 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - lib\features\profile\screens\edit_profile_screen.dart:401:51 - Unnecessary use of multiple underscores. Try using '_'. - unnecessary_underscores
+   info - lib\features\profile\screens\profile_screen.dart:441:19 - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext. - use_build_context_synchronously
+   info - lib\main.dart:2:8 - The imported package 'flutter_native_splash' isn't a dependency of the importing package. Try adding a dependency for 'flutter_native_splash' in the 'pubspec.yaml' file. - depend_on_referenced_packages
+
+241 issues found.
