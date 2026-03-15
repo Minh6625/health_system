@@ -13,7 +13,7 @@ from app.schemas.device import (
 )
 from app.services.device_service import DeviceService
 
-router = APIRouter(prefix="/mobile", tags=["mobile-devices"])
+router = APIRouter(tags=["mobile-devices"])
 
 
 @router.get("/devices", response_model=DeviceListResponse)

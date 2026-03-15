@@ -2,13 +2,13 @@ from fastapi import APIRouter
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_target_profile_id
 from app.db.database import get_db
 from app.models.user_model import User
 from app.schemas.monitoring import SleepSessionResponse, VitalSignsResponse
 from app.services.monitoring_service import MonitoringService
 
-router = APIRouter(prefix="/mobile", tags=["mobile-monitoring"])
+router = APIRouter(tags=["mobile-monitoring"])
 
 
 @router.get(
@@ -16,9 +16,9 @@ router = APIRouter(prefix="/mobile", tags=["mobile-monitoring"])
     response_model=VitalSignsResponse,
 )
 def get_latest_vital_signs(
-    current_user: User = Depends(get_current_user),
+    target_profile_id: int = Depends(get_target_profile_id),
 ) -> VitalSignsResponse:
-    return MonitoringService.get_latest_vital_signs(patient_id=current_user.id)
+    return MonitoringService.get_latest_vital_signs(patient_id=target_profile_id)
 
 
 @router.get(
@@ -26,10 +26,10 @@ def get_latest_vital_signs(
     response_model=SleepSessionResponse,
 )
 def get_latest_sleep_session(
-    current_user: User = Depends(get_current_user),
+    target_profile_id: int = Depends(get_target_profile_id),
     db: Session = Depends(get_db),
 ) -> SleepSessionResponse:
     return MonitoringService.get_latest_sleep_session(
-        patient_id=current_user.id,
+        patient_id=target_profile_id,
         db=db,
     )

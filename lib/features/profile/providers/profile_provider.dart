@@ -18,6 +18,12 @@ class ProfileProvider extends ChangeNotifier {
   bool get isDeleting => _isDeleting;
   String? get errorMessage => _errorMessage;
 
+  void clearProfile() {
+    _profile = null;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   Future<void> fetchProfile() async {
     _isLoading = true;
     _errorMessage = null;
@@ -99,3 +105,4 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 }
+

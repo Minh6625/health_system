@@ -7,6 +7,7 @@ from app.models.audit_log_model import AuditLog  # noqa: F401 - needed for table
 from app.models.user_model import User  # noqa: F401 - needed for table creation
 from app.models.device_model import Device  # noqa: F401 - needed for table creation
 from app.models.sos_event_model import FallEvent, SOSEvent  # noqa: F401 - needed for table creation
+from app.models.relationship_model import UserRelationship  # noqa: F401 - needed for table creation
 
 # Create tables
 Base.metadata.create_all(bind=engine)

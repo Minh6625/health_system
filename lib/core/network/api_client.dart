@@ -4,9 +4,9 @@ import 'package:healthguard/features/auth/services/token_storage_service.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-
 class ApiClient {
-  String get baseUrl => dotenv.env['API_URL'] ?? 'http://10.0.2.2:8080/api/v1/mobile';
+  String get baseUrl =>
+      dotenv.env['API_URL'] ?? 'http://10.0.2.2:8080/api/v1/mobile';
 
   static final ApiClient _instance = ApiClient._internal();
 
@@ -18,6 +18,8 @@ class ApiClient {
 
   final TokenStorageService _tokenStorageService = TokenStorageService();
 
+  int? targetProfileId;
+
   Future<Map<String, String>> _buildHeaders({bool requiresAuth = true}) async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (requiresAuth) {
@@ -26,10 +28,13 @@ class ApiClient {
         headers['Authorization'] = 'Bearer $token';
       }
     }
+    if (targetProfileId != null) {
+      headers['X-Target-Profile-Id'] = targetProfileId.toString();
+    }
     return headers;
   }
 
-  Future<Map<String, dynamic>> post(
+  Future<dynamic> post(
     String path, {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
@@ -38,11 +43,7 @@ class ApiClient {
       final url = Uri.parse('$baseUrl$path');
       final headers = await _buildHeaders(requiresAuth: requiresAuth);
       final response = await http
-          .post(
-            url,
-            headers: headers,
-            body: jsonEncode(body ?? {}),
-          )
+          .post(url, headers: headers, body: jsonEncode(body ?? {}))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -70,9 +71,16 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> get(String path, {bool requiresAuth = true}) async {
+  Future<dynamic> get(
+    String path, {
+    bool requiresAuth = true,
+    Map<String, dynamic>? queryParams,
+  }) async {
     try {
-      final url = Uri.parse('$baseUrl$path');
+      Uri url = Uri.parse('$baseUrl$path');
+      if (queryParams != null && queryParams.isNotEmpty) {
+        url = url.replace(queryParameters: queryParams);
+      }
       final headers = await _buildHeaders(requiresAuth: requiresAuth);
       final response = await http
           .get(url, headers: headers)
@@ -99,7 +107,7 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> patch(
+  Future<dynamic> patch(
     String path, {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
@@ -108,11 +116,7 @@ class ApiClient {
       final url = Uri.parse('$baseUrl$path');
       final headers = await _buildHeaders(requiresAuth: requiresAuth);
       final response = await http
-          .patch(
-            url,
-            headers: headers,
-            body: jsonEncode(body ?? {}),
-          )
+          .patch(url, headers: headers, body: jsonEncode(body ?? {}))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -135,7 +139,7 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> put(
+  Future<dynamic> put(
     String path, {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
@@ -144,11 +148,7 @@ class ApiClient {
       final url = Uri.parse('$baseUrl$path');
       final headers = await _buildHeaders(requiresAuth: requiresAuth);
       final response = await http
-          .put(
-            url,
-            headers: headers,
-            body: jsonEncode(body ?? {}),
-          )
+          .put(url, headers: headers, body: jsonEncode(body ?? {}))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -171,7 +171,7 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> delete(
+  Future<dynamic> delete(
     String path, {
     bool requiresAuth = true,
     Map<String, dynamic>? body,
@@ -180,8 +180,11 @@ class ApiClient {
       final url = Uri.parse('$baseUrl$path');
       final headers = await _buildHeaders(requiresAuth: requiresAuth);
       final response = await http
-          .delete(url, headers: headers,
-              body: body != null ? jsonEncode(body) : null)
+          .delete(
+            url,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          )
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 204) {

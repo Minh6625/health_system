@@ -1,9 +1,12 @@
+import 'package:provider/provider.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/material.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/profile/models/user_profile_model.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
-import 'package:provider/provider.dart';
+import 'package:healthguard/features/family/providers/target_profile_provider.dart';
+import 'package:healthguard/features/device/providers/device_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,6 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       context.read<ProfileProvider>().fetchProfile();
+      context.read<DeviceProvider>().fetchDevices();
     });
   }
 
@@ -89,7 +93,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     child: Text(
                       'Tài khoản và toàn bộ dữ liệu của bạn sẽ bị xóa sau 30 ngày. Hành động này không thể hoàn tác.',
-                      style: TextStyle(color: Colors.red.shade800, fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.red.shade800,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -100,10 +107,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       labelText: 'Nhập mật khẩu xác nhận',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setDialogState(() => obscure = !obscure),
+                        icon: Icon(
+                          obscure ? Icons.visibility_off : Icons.visibility,
+                        ),
+                        onPressed: () =>
+                            setDialogState(() => obscure = !obscure),
                       ),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   ),
                 ],
@@ -115,8 +127,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () => Navigator.of(ctx).pop(true),
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade700),
-                  child: const Text('Xóa tài khoản', style: TextStyle(color: Colors.white)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade700,
+                  ),
+                  child: const Text(
+                    'Xóa tài khoản',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ],
             );
@@ -130,7 +147,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final password = passwordController.text.trim();
     if (password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng nhập mật khẩu'), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text('Vui lòng nhập mật khẩu'),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -142,7 +162,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (success) {
       await context.read<AuthProvider>().logout();
       if (!mounted) return;
-      Navigator.pushNamedAndRemoveUntil(context, AppRouter.login, (route) => false);
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRouter.login,
+        (route) => false,
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -180,7 +204,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (confirmed != true || !mounted) return;
-
+    context.read<ProfileProvider>().clearProfile();
+    context.read<TargetProfileProvider>().clearData();
     await context.read<AuthProvider>().logout();
     if (!mounted) return;
     Navigator.pushNamedAndRemoveUntil(
@@ -210,25 +235,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ],
           ),
-          body: _buildBody(profileProvider),
+          body: _buildBody(context, profileProvider),
         );
       },
     );
   }
 
-  Widget _buildBody(ProfileProvider profileProvider) {
+  Widget _buildBody(BuildContext context, ProfileProvider profileProvider) {
+    final deviceProvider = context.watch<DeviceProvider>();
     if (profileProvider.isLoading && profileProvider.profile == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (profileProvider.errorMessage != null && profileProvider.profile == null) {
+    if (profileProvider.errorMessage != null &&
+        profileProvider.profile == null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.person_off_outlined, size: 64, color: Colors.grey.shade400),
+              Icon(
+                Icons.person_off_outlined,
+                size: 64,
+                color: Colors.grey.shade400,
+              ),
               const SizedBox(height: 16),
               Text(
                 profileProvider.errorMessage!,
@@ -258,6 +289,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildHeaderCard(profile),
+          const SizedBox(height: 20),
+          _buildDeviceCard(context, deviceProvider),
           const SizedBox(height: 20),
           _buildSectionTitle('Thông tin cá nhân'),
           const SizedBox(height: 10),
@@ -300,12 +333,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _InfoRow(
               icon: Icons.height_outlined,
               label: 'Chiều cao',
-              value: profile.heightCm != null ? '${profile.heightCm!.toStringAsFixed(1)} cm' : 'Chưa cập nhật',
+              value: profile.heightCm != null
+                  ? '${profile.heightCm!.toStringAsFixed(1)} cm'
+                  : 'Chưa cập nhật',
             ),
             _InfoRow(
               icon: Icons.monitor_weight_outlined,
               label: 'Cân nặng',
-              value: profile.weightKg != null ? '${profile.weightKg!.toStringAsFixed(1)} kg' : 'Chưa cập nhật',
+              value: profile.weightKg != null
+                  ? '${profile.weightKg!.toStringAsFixed(1)} kg'
+                  : 'Chưa cập nhật',
             ),
             _InfoRow(
               icon: Icons.medication_outlined,
@@ -324,7 +361,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _InfoRow(
               icon: Icons.history_edu_outlined,
               label: 'Tiền sử bệnh',
-              value: profile.medicalConditions.isEmpty ? 'Chưa cập nhật' : profile.medicalConditions.join(', '),
+              value: profile.medicalConditions.isEmpty
+                  ? 'Chưa cập nhật'
+                  : profile.medicalConditions.join(', '),
             ),
           ]),
           const SizedBox(height: 20),
@@ -345,13 +384,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: Icons.verified_user_outlined,
               label: 'Xác minh email',
               value: profile.isVerified ? 'Đã xác minh' : 'Chưa xác minh',
-              valueColor: profile.isVerified ? Colors.green.shade700 : Colors.orange.shade700,
+              valueColor: profile.isVerified
+                  ? Colors.green.shade700
+                  : Colors.orange.shade700,
             ),
             _InfoRow(
               icon: Icons.toggle_on_outlined,
               label: 'Trạng thái',
               value: profile.isActive ? 'Đang hoạt động' : 'Bị khóa',
-              valueColor: profile.isActive ? Colors.green.shade700 : Colors.red.shade700,
+              valueColor: profile.isActive
+                  ? Colors.green.shade700
+                  : Colors.red.shade700,
             ),
             _InfoRow(
               icon: Icons.calendar_today_outlined,
@@ -365,6 +408,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ]),
           const SizedBox(height: 28),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pushNamed(context, '/family-management');
+              },
+              icon: const Icon(Icons.family_restroom_outlined),
+              label: const Text(
+                'Quản lý Gia đình',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(
+                  0xFF0369A1,
+                ), // Different shade for variation
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -397,7 +464,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: const Icon(Icons.logout, color: Colors.red),
               label: const Text(
                 'Đăng xuất',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Colors.red),
@@ -410,10 +480,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: _confirmDeleteAccount,
-              icon: Icon(Icons.delete_forever_outlined, color: Colors.red.shade800),
+              icon: Icon(
+                Icons.delete_forever_outlined,
+                color: Colors.red.shade800,
+              ),
               label: Text(
                 'Xóa tài khoản',
-                style: TextStyle(color: Colors.red.shade800, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: Colors.red.shade800,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Colors.red.shade800),
@@ -483,7 +559,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: 4),
           Text(
             profile.email,
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 13),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 13,
+            ),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -567,7 +646,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 child: Row(
                   children: [
                     Icon(row.icon, size: 20, color: const Color(0xFF0F766E)),
@@ -602,6 +684,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildDeviceCard(BuildContext context, DeviceProvider provider) {
+    if (provider.isLoading && provider.devices.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final hasDevice = provider.devices.isNotEmpty;
+    final deviceName = hasDevice
+        ? provider.devices.first.deviceName
+        : 'Chưa có kết nối';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.pushNamed(context, '/device');
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0F766E).withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.watch, color: Color(0xFF0F766E)),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Thiết bị kết nối',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        deviceName ?? 'Chưa có thiết bị',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: hasDevice
+                              ? Colors.green.shade700
+                              : Colors.grey.shade600,
+                          fontWeight: hasDevice
+                              ? FontWeight.w500
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: Colors.grey),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

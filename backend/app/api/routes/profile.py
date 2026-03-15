@@ -7,7 +7,7 @@ from app.models.user_model import User
 from app.schemas.profile import DeleteAccountRequest, ProfileResponse, ProfileUpdateRequest
 from app.services.profile_service import ProfileService
 
-router = APIRouter(prefix='/mobile', tags=['mobile-profile'])
+router = APIRouter(tags=['mobile-profile'])
 
 
 @router.get('/profile', response_model=ProfileResponse)
