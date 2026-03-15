@@ -18,6 +18,15 @@ class VitalSigns {
     required this.timestamp,
     this.isStale = false,
   });
+  static DateTime _parseTimestamp(dynamic ts) {
+    if (ts == null) return DateTime.now();
+    String tsStr = ts.toString();
+    if (!tsStr.endsWith('Z') && !tsStr.contains('T') && tsStr.contains('-') && tsStr.split('-').length == 3) {
+       // if it's just a raw format '2024-03-15 14:30:00', Dart parse treats as local, let's assume UTC from backend
+       tsStr = tsStr.replaceAll(' ', 'T') + 'Z';
+    }
+    return DateTime.parse(tsStr).toLocal();
+  }
 
   factory VitalSigns.fromJson(Map<String, dynamic> json) {
     return VitalSigns(
@@ -27,7 +36,7 @@ class VitalSigns {
       respiratoryRate: json['respiratory_rate']?.toDouble(),
       bloodPressureSys: json['blood_pressure_sys']?.toDouble(),
       bloodPressureDia: json['blood_pressure_dia']?.toDouble(),
-      timestamp: DateTime.parse(json['timestamp']),
+      timestamp: _parseTimestamp(json['timestamp']),
       isStale: json['is_stale'] ?? false,
     );
   }
@@ -50,7 +59,9 @@ class VitalSigns {
     if (heartRate == null) return VitalStatus.unknown;
     if (heartRate! < 50 || heartRate! > 120) return VitalStatus.critical;
     if ((heartRate! >= 50 && heartRate! < 60) ||
-        (heartRate! > 100 && heartRate! <= 120)) return VitalStatus.warning;
+        (heartRate! > 100 && heartRate! <= 120)) {
+      return VitalStatus.warning;
+    }
     return VitalStatus.normal;
   }
 

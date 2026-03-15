@@ -6,6 +6,7 @@ class ApiEndpoints {
   static const String devices = '/mobile/devices';
   static const String latestVitals = '/mobile/vital-signs/latest';
   static const String latestSleep = '/mobile/sleep/latest';
+  static const String sleepHistory = '/mobile/sleep/history';
   static const String profile = '/mobile/profile';
 
   const ApiEndpoints._();

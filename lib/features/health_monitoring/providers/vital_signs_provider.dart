@@ -33,11 +33,11 @@ class VitalSignsProvider extends ChangeNotifier {
     }
   }
 
-  // Auto-refresh every 5 seconds as per UC006 requirement
+  // Auto-refresh every 60 seconds (1 minute) to reduce server load
   void startAutoRefresh({String? patientId}) {
     stopAutoRefresh();
     _autoRefreshTimer = Timer.periodic(
-      const Duration(seconds: 5),
+      const Duration(minutes: 1),
       (_) => fetchLatestVitals(patientId: patientId),
     );
   }
