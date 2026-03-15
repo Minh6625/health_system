@@ -31,13 +31,6 @@ def get_sos_alerts(
     Returns:
         List of SOS alerts with patient info and basic details
     """
-    # Check if user is caregiver
-    if current_user.role not in ["caregiver", "admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Chỉ người chăm sóc mới có thể xem danh sách SOS. Role hiện tại: {current_user.role}"
-        )
-    
     return EmergencyService.get_sos_alerts_for_caregiver(
         db, current_user.id, status_filter
     )

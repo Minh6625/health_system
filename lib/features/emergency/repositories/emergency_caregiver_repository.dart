@@ -8,7 +8,7 @@ class EmergencyCaregiverRepository {
   Future<List<SOSEventModel>> getSOSAlerts({required String status}) async {
     try {
       final result = await _apiClient.get(
-        '/mobile/caregiver/sos-alerts?status=$status',
+        '/emergency/caregiver/sos-alerts?status=$status',
       );
 
       final List<dynamic> sosAlertsJson = result['sos_alerts'] as List;
@@ -23,7 +23,7 @@ class EmergencyCaregiverRepository {
   /// Get detailed information for a specific SOS
   Future<SOSEventModel> getSOSDetail({required String sosId}) async {
     try {
-      final result = await _apiClient.get('/mobile/emergency/sos/$sosId');
+      final result = await _apiClient.get('/emergency/sos/$sosId');
       return SOSEventModel.fromJson(result as Map<String, dynamic>);
     } catch (e) {
       throw Exception('Không thể tải chi tiết SOS: ${e.toString()}');
@@ -38,7 +38,7 @@ class EmergencyCaregiverRepository {
   }) async {
     try {
       await _apiClient.post(
-        '/mobile/emergency/sos/$sosId/resolve',
+        '/emergency/sos/$sosId/resolve',
         body: {
           'resolution_status': resolutionStatus,
           if (notes != null) 'notes': notes,

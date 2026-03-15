@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:provider/provider.dart';
+import '../../family/widgets/profile_switcher.dart';
 
 class SleepScreen extends StatefulWidget {
   const SleepScreen({super.key});
@@ -11,7 +12,15 @@ class SleepScreen extends StatefulWidget {
 }
 
 class _SleepScreenState extends State<SleepScreen> {
-  static const List<String> _weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+  static const List<String> _weekDays = [
+    'T2',
+    'T3',
+    'T4',
+    'T5',
+    'T6',
+    'T7',
+    'CN',
+  ];
   static const List<double> _fallbackWave = [
     0.95,
     0.15,
@@ -56,6 +65,25 @@ class _SleepScreenState extends State<SleepScreen> {
         backgroundColor: const Color(0xFF07162B),
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ProfileSwitcher(
+                onProfileChanged: () {
+                  context.read<SleepProvider>().fetchLatestSleep();
+                },
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () {
+              context.read<SleepProvider>().fetchLatestSleep();
+            },
+            tooltip: 'Làm mới',
+          ),
+        ],
       ),
       body: SafeArea(
         child: Consumer<SleepProvider>(
@@ -64,14 +92,19 @@ class _SleepScreenState extends State<SleepScreen> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            if (provider.errorMessage != null && provider.latestSession == null) {
+            if (provider.errorMessage != null &&
+                provider.latestSession == null) {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline, color: Colors.white70, size: 56),
+                      const Icon(
+                        Icons.error_outline,
+                        color: Colors.white70,
+                        size: 56,
+                      ),
                       const SizedBox(height: 16),
                       Text(
                         provider.errorMessage!,
@@ -90,7 +123,9 @@ class _SleepScreenState extends State<SleepScreen> {
             }
 
             final session = provider.latestSession;
-            final wave = session == null ? _fallbackWave : _buildWave(session.phases);
+            final wave = session == null
+                ? _fallbackWave
+                : _buildWave(session.phases);
 
             return RefreshIndicator(
               onRefresh: () => provider.fetchLatestSleep(),
@@ -112,7 +147,10 @@ class _SleepScreenState extends State<SleepScreen> {
                         offset: Offset(0, 10),
                       ),
                     ],
-                    border: Border.all(color: const Color(0x332C4367), width: 1),
+                    border: Border.all(
+                      color: const Color(0x332C4367),
+                      width: 1,
+                    ),
                   ),
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -205,7 +243,9 @@ class _SleepScreenState extends State<SleepScreen> {
             shape: BoxShape.circle,
             color: selected ? const Color(0x2EFFC400) : const Color(0xFF14253D),
             border: Border.all(
-              color: selected ? const Color(0xFFFFC400) : const Color(0xFF3C4D69),
+              color: selected
+                  ? const Color(0xFFFFC400)
+                  : const Color(0xFF3C4D69),
               width: selected ? 3 : 1,
             ),
           ),
@@ -213,7 +253,9 @@ class _SleepScreenState extends State<SleepScreen> {
           child: Text(
             _weekDays[index],
             style: TextStyle(
-              color: selected ? const Color(0xFFFFC400) : const Color(0xFF93A9C8),
+              color: selected
+                  ? const Color(0xFFFFC400)
+                  : const Color(0xFF93A9C8),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -249,10 +291,7 @@ class _SleepScreenState extends State<SleepScreen> {
                 SizedBox(height: 2),
                 Text(
                   'Chất lượng',
-                  style: TextStyle(
-                    color: Color(0xFF90A6C3),
-                    fontSize: 14,
-                  ),
+                  style: TextStyle(color: Color(0xFF90A6C3), fontSize: 14),
                 ),
               ],
             ),
@@ -291,7 +330,7 @@ class _SleepScreenState extends State<SleepScreen> {
               ),
             ],
           ),
-        )
+        ),
       ],
     );
   }
@@ -333,9 +372,7 @@ class _SleepScreenState extends State<SleepScreen> {
                 ),
               ),
               Expanded(
-                child: CustomPaint(
-                  painter: _SleepChartPainter(points: wave),
-                ),
+                child: CustomPaint(painter: _SleepChartPainter(points: wave)),
               ),
             ],
           ),
@@ -348,8 +385,14 @@ class _SleepScreenState extends State<SleepScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Thời gian', style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13)),
-              Text('Ngáy', style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13)),
+              Text(
+                'Thời gian',
+                style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13),
+              ),
+              Text(
+                'Ngáy',
+                style: TextStyle(color: Color(0xFF95A8C7), fontSize: 13),
+              ),
             ],
           ),
         ),

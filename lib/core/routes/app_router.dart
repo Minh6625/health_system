@@ -11,6 +11,9 @@ import 'package:healthguard/features/auth/screens/start_screen.dart';
 import 'package:healthguard/features/auth/screens/email_verification_screen.dart';
 import 'package:healthguard/features/home/screens/main_screen.dart';
 import 'package:healthguard/features/profile/screens/edit_profile_screen.dart';
+import 'package:healthguard/features/family/screens/family_management_screen.dart';
+import 'package:healthguard/features/family/screens/search_user_screen.dart';
+import 'package:healthguard/features/device/screens/device_screen.dart';
 
 class AppRouter {
   static const String start = '/start';
@@ -23,6 +26,9 @@ class AppRouter {
   static const String resetPassword = '/reset-password';
   static const String changePassword = '/change-password';
   static const String editProfile = '/edit-profile';
+  static const String familyManagement = '/family-management';
+  static const String searchUser = '/search-user';
+  static const String device = '/device';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     String routePath = settings.name ?? login;
@@ -40,9 +46,14 @@ class AppRouter {
         final action = routeArgs['action'];
         final pathStr = routePath.toLowerCase();
         final hostStr = uri.host.toLowerCase();
-        
-        final isResetPassword = pathStr.contains('reset-password') || hostStr == 'reset-password' || action == 'reset-password';
-        final isVerifyEmail = (pathStr.contains('verify-email') || hostStr == 'verify-email') && !isResetPassword;
+
+        final isResetPassword =
+            pathStr.contains('reset-password') ||
+            hostStr == 'reset-password' ||
+            action == 'reset-password';
+        final isVerifyEmail =
+            (pathStr.contains('verify-email') || hostStr == 'verify-email') &&
+            !isResetPassword;
 
         // If the path is empty or just '/', we need to deduce the intent from the query parameters
         if (routePath.isEmpty || routePath == '/') {
@@ -102,6 +113,14 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
       case editProfile:
         return MaterialPageRoute(builder: (_) => const EditProfileScreen());
+      case familyManagement:
+        return MaterialPageRoute(
+          builder: (_) => const FamilyManagementScreen(),
+        );
+      case searchUser:
+        return MaterialPageRoute(builder: (_) => const UserSearchTab());
+      case device:
+        return MaterialPageRoute(builder: (_) => const DeviceScreen());
       case start:
         return MaterialPageRoute(builder: (_) => const AuthPagesScreen());
       case login:

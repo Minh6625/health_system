@@ -3,13 +3,13 @@ import 'package:provider/provider.dart';
 import '../models/vital_signs.dart';
 import '../providers/vital_signs_provider.dart';
 import '../widgets/vital_card.dart';
+import '../../family/widgets/profile_switcher.dart';
 
 class HealthMonitoringScreen extends StatefulWidget {
   const HealthMonitoringScreen({super.key});
 
   @override
-  State<HealthMonitoringScreen> createState() =>
-      _HealthMonitoringScreenState();
+  State<HealthMonitoringScreen> createState() => _HealthMonitoringScreenState();
 }
 
 class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
@@ -36,9 +36,19 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
     return Scaffold(
       backgroundColor: Colors.grey.shade50,
       appBar: AppBar(
-        title: const Text('Giám Sát Sức Khỏe'),
+        title: const Text('Giám Sát'),
         backgroundColor: Colors.blue.shade700,
         actions: [
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ProfileSwitcher(
+                onProfileChanged: () {
+                  context.read<VitalSignsProvider>().fetchLatestVitals();
+                },
+              ),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () {
@@ -51,13 +61,10 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
       body: Consumer<VitalSignsProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading && provider.currentVitals == null) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
-          if (provider.errorMessage != null &&
-              provider.currentVitals == null) {
+          if (provider.errorMessage != null && provider.currentVitals == null) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -70,10 +77,7 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
                   const SizedBox(height: 16),
                   Text(
                     provider.errorMessage!,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey.shade700,
-                    ),
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade700),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
@@ -92,10 +96,7 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
             return Center(
               child: Text(
                 'Không có dữ liệu',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey.shade600,
-                ),
+                style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
               ),
             );
           }
@@ -200,16 +201,16 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
         color: vitals.isStale ? Colors.orange.shade50 : Colors.blue.shade50,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color:
-              vitals.isStale ? Colors.orange.shade200 : Colors.blue.shade200,
+          color: vitals.isStale ? Colors.orange.shade200 : Colors.blue.shade200,
         ),
       ),
       child: Row(
         children: [
           Icon(
             vitals.isStale ? Icons.warning_amber : Icons.check_circle,
-            color:
-                vitals.isStale ? Colors.orange.shade700 : Colors.blue.shade700,
+            color: vitals.isStale
+                ? Colors.orange.shade700
+                : Colors.blue.shade700,
             size: 20,
           ),
           const SizedBox(width: 8),
@@ -228,11 +229,7 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
             ),
           ),
           if (vitals.isStale)
-            Icon(
-              Icons.sync_problem,
-              color: Colors.orange.shade700,
-              size: 20,
-            ),
+            Icon(Icons.sync_problem, color: Colors.orange.shade700, size: 20),
         ],
       ),
     );
@@ -242,8 +239,9 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
     final sysStatus = vitals.getBloodPressureSysStatus();
     final diaStatus = vitals.getBloodPressureDiaStatus();
     // Use worse status
-    final overallStatus =
-        sysStatus.index > diaStatus.index ? sysStatus : diaStatus;
+    final overallStatus = sysStatus.index > diaStatus.index
+        ? sysStatus
+        : diaStatus;
 
     Color backgroundColor;
     Color borderColor;
@@ -293,11 +291,7 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
         ),
         child: Row(
           children: [
-            Icon(
-              Icons.monitor_heart,
-              size: 40,
-              color: iconColor,
-            ),
+            Icon(Icons.monitor_heart, size: 40, color: iconColor),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -359,10 +353,7 @@ class _HealthMonitoringScreenState extends State<HealthMonitoringScreen> {
                   const SizedBox(height: 4),
                   Text(
                     'Tâm thu / Tâm trương',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
                   ),
                 ],
               ),
