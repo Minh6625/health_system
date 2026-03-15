@@ -11,7 +11,7 @@ import 'package:healthguard/features/profile/providers/profile_provider.dart';
 
 class UserSearchTab extends StatefulWidget {
   final VoidCallback? onSwitchTab;
-  const UserSearchTab({Key? key, this.onSwitchTab}) : super(key: key);
+  const UserSearchTab({super.key, this.onSwitchTab});
 
   @override
   State<UserSearchTab> createState() => _UserSearchTabState();
