@@ -17,7 +17,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(100))
     date_of_birth: Mapped[date | None] = mapped_column(Date, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
-    role: Mapped[str] = mapped_column(String(20), default="patient")
+    role: Mapped[str] = mapped_column(String(20), default="user")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     avatar_url: Mapped[str | None] = mapped_column(nullable=True)
@@ -33,3 +33,14 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_current_time, onupdate=get_current_time)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # --- Email verification (6-digit PIN code) ---
+    # Stored as VARCHAR(6) to preserve leading zeros (e.g. '012345'). NULL after verified.
+    verification_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    verification_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # --- Password reset (6-digit PIN code) ---
+    # NULL after reset is used. Expires in 15 minutes.
+    reset_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    reset_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+

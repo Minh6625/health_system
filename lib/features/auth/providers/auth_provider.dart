@@ -94,8 +94,8 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // Only letters, Vietnamese diacritics (À-ỿ), and spaces allowed
-    final namePattern = RegExp(r'^[a-zA-ZÀ-ỿ\s]+$');
+    // Only letters, Unicode characters (for all VN diacritics), and spaces allowed
+    final namePattern = RegExp(r'^[\p{L}\s]+$', unicode: true);
     if (!namePattern.hasMatch(user.fullName?.trim() ?? '')) {
       message =
           'Họ tên chỉ được chứa chữ cái. Không được phép dùng số hoặc ký tự đặc biệt';
@@ -120,8 +120,8 @@ class AuthProvider extends ChangeNotifier {
               ? 1
               : 0);
 
-      if (age < 18) {
-        message = 'Bạn phải đủ 18 tuổi để đăng ký';
+      if (age < 16) {
+        message = 'Bạn phải đủ 16 tuổi để đăng ký';
         notifyListeners();
         return false;
       }
@@ -138,10 +138,15 @@ class AuthProvider extends ChangeNotifier {
     }
 
     // Validate phone if provided
-    if (user.phone != null && user.phone!.isNotEmpty) {
-      final phone = user.phone!.replaceAll(RegExp(r'[^\d]'), '');
-      if (phone.length < 10 || phone.length > 15) {
-        message = 'Số điện thoại phải có từ 10 đến 15 chữ số';
+    if (user.phone != null && user.phone!.trim().isNotEmpty) {
+      final phone = user.phone!.trim();
+      if (!RegExp(r'^\d+$').hasMatch(phone)) {
+        message = 'Số điện thoại chỉ được chứa ký tự số';
+        notifyListeners();
+        return false;
+      }
+      if (phone.length < 10 || phone.length > 11) {
+        message = 'Số điện thoại phải có từ 10 đến 11 chữ số';
         notifyListeners();
         return false;
       }
@@ -165,13 +170,13 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> verifyEmail(String verificationToken) async {
+  Future<bool> verifyEmail(String email, String code) async {
     isLoading = true;
     message = null;
     notifyListeners();
 
     try {
-      final response = await repository.verifyEmail(verificationToken);
+      final response = await repository.verifyEmail(email, code);
       isLoading = false;
       message = response.message;
       notifyListeners();

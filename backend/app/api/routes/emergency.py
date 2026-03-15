@@ -31,9 +31,6 @@ def get_sos_alerts(
     Returns:
         List of SOS alerts with patient info and basic details
     """
-    # Debug logging
-    print(f"[DEBUG] User ID: {current_user.id}, Email: {current_user.email}, Role: {current_user.role}")
-    
     # Check if user is caregiver
     if current_user.role not in ["caregiver", "admin"]:
         raise HTTPException(

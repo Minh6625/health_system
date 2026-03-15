@@ -37,12 +37,14 @@ dependencies:
   provider: ^6.1.5
   http: ^1.1.0
   flutter_secure_storage: ^9.2.2
-  app_links: ^6.3.3
+  app_links: ^7.0.0
   jwt_decode: ^0.3.1
   cached_network_image: ^3.4.1
   intl: ^0.20.2
   url_launcher: ^6.3.2
   flutter_dotenv: ^5.1.0
+  flutter_animate: ^4.5.2
+  pinput: ^6.0.2
 
 dev_dependencies:
   flutter_test:

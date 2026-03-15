@@ -22,6 +22,7 @@ class _AuthPagesScreenState extends State<AuthPagesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           // PageView with Start and Login screens
