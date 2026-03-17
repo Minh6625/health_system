@@ -30,6 +30,27 @@ class EmergencyCaregiverRepository {
     }
   }
 
+  /// Trigger manual SOS event
+  Future<void> triggerSOS({
+    double? latitude,
+    double? longitude,
+    String? address,
+  }) async {
+    try {
+      await _apiClient.post(
+        '/emergency/sos/trigger',
+        body: {
+          'trigger_type': 'manual',
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+          if (address != null) 'address': address,
+        },
+      );
+    } catch (e) {
+      throw Exception('Không thể gửi cảnh báo khẩn cấp: ${e.toString()}');
+    }
+  }
+
   /// Resolve SOS by caregiver
   Future<void> resolveSOSByCaregiver({
     required String sosId,

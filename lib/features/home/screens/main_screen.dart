@@ -1,4 +1,4 @@
-import 'package:healthguard/features/emergency/screens/emergency_sos_received_list_screen.dart';
+import 'package:healthguard/features/emergency/screens/emergency_main_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/family/screens/family_management_screen.dart';
 import 'package:healthguard/features/health_monitoring/screens/health_monitoring_screen.dart';
@@ -13,12 +13,12 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = 2;
 
   final List<Widget> _screens = [
     const HealthMonitoringScreen(),
     const SleepScreen(),
-    const EmergencySOSReceivedListScreen(),
+    const EmergencyMainScreen(),
     const FamilyManagementScreen(),
     const ProfileScreen(),
   ];

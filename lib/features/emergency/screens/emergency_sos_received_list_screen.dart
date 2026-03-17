@@ -35,8 +35,12 @@ class _EmergencySOSReceivedListScreenState
     super.didChangeDependencies();
     if (!_isInitialized) {
       _isInitialized = true;
-      // Fetch initial data immediately
-      context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
+      // Fetch initial data immediately after build
+      Future.microtask(() {
+        if (mounted) {
+          context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
+        }
+      });
     }
   }
 
@@ -57,10 +61,6 @@ class _EmergencySOSReceivedListScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEBEBEB),
-      appBar: AppBar(
-        title: const Text('Danh sách SOS nhận được'),
-        elevation: 0,
-      ),
       body: Column(
         children: [
           // Search Bar

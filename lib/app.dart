@@ -187,6 +187,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
             }
             // Safe to remove splash screen now that routing is resolved
             FlutterNativeSplash.remove();
+            debugPrint("==== SPLASH REMOVED IN BUILDER ====");
           });
           return child!;
         },

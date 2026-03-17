@@ -27,13 +27,10 @@ class SOSCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isUrgent ? const Color(0xFFFFABAF) : Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.1),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
         boxShadow: [
           BoxShadow(
-            color: isUrgent 
+            color: isUrgent
                 ? const Color(0xFFE53935).withOpacity(0.25)
                 : Colors.black.withOpacity(0.05),
             blurRadius: 20,
@@ -120,7 +117,10 @@ class SOSCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               sos.location.address ??
-                                  'Vị trí không xác định',
+                                  (sos.location.latitude != null &&
+                                          sos.location.longitude != null
+                                      ? '${sos.location.latitude!.toStringAsFixed(4)}, ${sos.location.longitude!.toStringAsFixed(4)}'
+                                      : 'Vị trí không xác định'),
                               style: TextStyle(
                                 fontSize: 13,
                                 color: Colors.grey[600],
