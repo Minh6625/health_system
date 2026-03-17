@@ -118,15 +118,13 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
   /// Open map navigation to patient location
   Future<void> openMapNavigation(double latitude, double longitude) async {
     try {
-      final url =
+      final String googleMapsUrl =
           'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude';
-      final uri = Uri.parse(url);
+      final Uri uri = Uri.parse(googleMapsUrl);
 
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        throw Exception('Không thể mở bản đồ');
-      }
+      // On Android simulators, canLaunchUrl for 'https://' sometimes evaluates to false
+      // even if the browser works, so we launch directly and let the OS handle it
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
       listErrorMessage = 'Không thể mở ứng dụng bản đồ';
       notifyListeners();

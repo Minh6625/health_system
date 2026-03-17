@@ -20,6 +20,28 @@ class EmergencyService:
     """Business logic for emergency/SOS operations."""
 
     @staticmethod
+    def trigger_sos(
+        db: Session,
+        user_id: int,
+        trigger_type: str = "manual",
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        address: Optional[str] = None
+    ) -> bool:
+        """Trigger a new SOS event."""
+        
+        EmergencyRepository.create_sos_event(
+            db=db,
+            user_id=user_id,
+            device_id=None,  # Manual SOS is sent from the phone directly, not a wearable
+            trigger_type=trigger_type,
+            latitude=latitude,
+            longitude=longitude,
+            address=address
+        )
+        return True
+
+    @staticmethod
     def get_sos_alerts_for_caregiver(
         db: Session,
         caregiver_user_id: int,
@@ -72,7 +94,7 @@ class EmergencyService:
                     longitude=float(sos.longitude) if sos.longitude else None,
                     address=sos.address,
                     last_updated=sos.triggered_at
-                ) if sos.latitude else None,
+                ) if (sos.latitude or sos.address) else None,
                 time_elapsed_minutes=elapsed_minutes
             ))
         
@@ -148,9 +170,9 @@ class EmergencyService:
                 latitude=float(sos.latitude) if sos.latitude else None,
                 longitude=float(sos.longitude) if sos.longitude else None,
                 address=sos.address,
-                accuracy=50.0,  # Mock accuracy for now
+                accuracy=50.0 if sos.latitude else None,  # Mock accuracy only if coords exist
                 last_updated=sos.triggered_at
-            ) if sos.latitude else None,
+            ) if (sos.latitude or sos.address) else None,
             fall_detection_xai=fall_xai,
             resolution=resolution_info
         )

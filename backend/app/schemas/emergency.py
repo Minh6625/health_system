@@ -114,7 +114,12 @@ class SOSAlertsResponse(BaseModel):
 # ============================================================================
 # Request Models
 # ============================================================================
-
+class TriggerSOSRequest(BaseModel):
+    """Request to trigger a new SOS event."""
+    trigger_type: str = "manual"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    address: Optional[str] = None
 class ResolveSOSRequest(BaseModel):
     """Request to resolve SOS event by caregiver."""
     resolution_status: str = Field(..., pattern="^(safe|assisted|cancelled)$")

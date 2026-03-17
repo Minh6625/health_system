@@ -60,7 +60,7 @@ class SOSEvent(Base):
     
     # Source
     fall_event_id: Mapped[Optional[int]] = mapped_column(ForeignKey("fall_events.id", ondelete="SET NULL"), nullable=True)
-    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"))
+    device_id: Mapped[Optional[int]] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), nullable=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     
     # Trigger

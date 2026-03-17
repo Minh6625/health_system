@@ -8,6 +8,7 @@ from app.schemas.emergency import (
     SOSAlertsResponse,
     SOSEventResponse,
     ResolveSOSRequest,
+    TriggerSOSRequest,
     SuccessResponse,
 )
 from app.services.emergency_service import EmergencyService
@@ -15,6 +16,27 @@ from app.services.emergency_service import EmergencyService
 
 router = APIRouter(prefix="/emergency", tags=["Emergency"])
 
+@router.post("/sos/trigger", response_model=SuccessResponse)
+def trigger_sos(
+    payload: TriggerSOSRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+) -> SuccessResponse:
+    """
+    Triggers a manual or automatic SOS event for the current user.
+    """
+    EmergencyService.trigger_sos(
+        db, 
+        current_user.id, 
+        payload.trigger_type,
+        payload.latitude,
+        payload.longitude,
+        payload.address
+    )
+    return SuccessResponse(
+        success=True,
+        message="Đã gửi tín hiệu khẩn cấp thành công"
+    )
 
 @router.get("/caregiver/sos-alerts", response_model=SOSAlertsResponse)
 def get_sos_alerts(
@@ -59,8 +81,10 @@ def get_sos_detail(
             detail="Không tìm thấy sự kiện SOS"
         )
     
-    # Check authorization (caregiver/admin only)
-    if current_user.role not in ["caregiver", "admin"]:
+    from app.repositories.emergency_repository import EmergencyRepository
+    # Check authorization (must be owner or linked profile)
+    has_access = EmergencyRepository.check_user_has_access(db, current_user.id, sos_detail.patient.user_id)
+    if not has_access and current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bạn không có quyền xem chi tiết SOS này"
@@ -89,11 +113,20 @@ def resolve_sos(
     Returns:
         Success response
     """
-    # Check if user is caregiver
-    if current_user.role not in ["caregiver", "admin"]:
+    sos_detail = EmergencyService.get_sos_detail(db, sos_id)
+    if not sos_detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy sự kiện SOS"
+        )
+        
+    from app.repositories.emergency_repository import EmergencyRepository
+    # Check authorization
+    has_access = EmergencyRepository.check_user_has_access(db, current_user.id, sos_detail.patient.user_id)
+    if not has_access and current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Chỉ người chăm sóc mới có thể xác nhận xử lý SOS"
+            detail="Bạn không có quyền xác nhận xử lý SOS này"
         )
     
     success = EmergencyService.resolve_sos_by_caregiver(

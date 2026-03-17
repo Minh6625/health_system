@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS sos_events (
     
     -- Source
     fall_event_id INT REFERENCES fall_events(id) ON DELETE SET NULL,  -- NULL if manual SOS
-    device_id INT NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
+    device_id INT REFERENCES devices(id) ON DELETE CASCADE, -- NULL if triggered from mobile app
     user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     
     -- Trigger

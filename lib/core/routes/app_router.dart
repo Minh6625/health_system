@@ -32,6 +32,8 @@ class AppRouter {
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     String routePath = settings.name ?? login;
+    debugPrint("======== [AppRouter] onGenerateRoute: $routePath ========");
+
     Map<String, dynamic> routeArgs = {};
     if (settings.arguments != null) {
       routeArgs = Map<String, dynamic>.from(settings.arguments as Map);
