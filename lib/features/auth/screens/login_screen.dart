@@ -161,17 +161,14 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
           child: SafeArea(
-            child: LayoutBuilder(
-            builder: (context, constraints) {
-              return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.screenPadding,
-                ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    minHeight: constraints.maxHeight,
-                  ),
-                  child: IntrinsicHeight(
+            child: CustomScrollView(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.screenPadding,
+                    ),
                     child: Form(
                       key: _formKey,
                       child: Column(
@@ -182,8 +179,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           // Logo Section
                           Center(
                             child: Container(
-                              width: 280,
-                              height: 240,
+                              width: 200,
+                              height: 160,
                               decoration: BoxDecoration(
                                 color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(32),
@@ -197,8 +194,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           )
-                              .animate(onPlay: (controller) => controller.repeat(reverse: true))
-                              .scaleXY(begin: 0.98, end: 1.02, duration: 3.seconds)
+                              .animate()
+                              .scaleXY(begin: 0.98, end: 1.0, duration: 1.seconds, curve: Curves.easeOutBack)
                               .fade(duration: 500.ms),
                               
                           const SizedBox(height: 24),
@@ -354,9 +351,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-              );
-            },
-          ),
+              ],
+            ),
         ),
         ),
       ),

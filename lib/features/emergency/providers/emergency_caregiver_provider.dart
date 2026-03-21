@@ -139,9 +139,9 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
     _sosUpdateSubscription?.cancel();
 
     // TODO: Implement WebSocket connection here
-    // For MVP, we'll use polling every 10 seconds
+    // For MVP, we'll use polling every 30 seconds
     _sosUpdateSubscription =
-        Stream.periodic(const Duration(seconds: 10), (_) => sosId)
+        Stream.periodic(const Duration(seconds: 30), (_) => sosId)
             .asyncMap((id) async {
               try {
                 return await repository.getSOSDetail(sosId: id);

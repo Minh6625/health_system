@@ -26,13 +26,13 @@ class MetricTile extends StatelessWidget {
         children: [
           // Icon container – touch target ≥ 48dp via Row expansion
           Container(
-            width: 38,
-            height: 38,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: iconColor.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 18),
+            child: Icon(icon, color: iconColor, size: 24),
           ),
           const SizedBox(width: 12),
           // Label
@@ -41,7 +41,7 @@ class MetricTile extends StatelessWidget {
               label,
               style: const TextStyle(
                 color: Color(0xFF90A6C3),
-                fontSize: 16, // ≥ 16sp per accessibility guideline
+                fontSize: 18, // ≥ 18sp for better accessibility
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -56,7 +56,7 @@ class MetricTile extends StatelessWidget {
                 value,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 17,
+                  fontSize: 22,
                   fontWeight: FontWeight.w700,
                 ),
               ),

@@ -16,9 +16,9 @@ class PhaseCompositionChart extends StatefulWidget {
 class _PhaseCompositionChartState extends State<PhaseCompositionChart> {
   int _touchedIndex = -1;
 
-  static const _lightColor = Color(0xFF48A9D6);
-  static const _deepColor = Color(0xFF3A5FCD);
-  static const _remColor = Color(0xFF9C6ADE);
+  static const _lightColor = Color(0xFF6AAED6);
+  static const _deepColor = Color(0xFF5A75CD);
+  static const _remColor = Color(0xFFA685DE);
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +114,7 @@ class _PhaseCompositionChartState extends State<PhaseCompositionChart> {
         title: '$pct%',
         titleStyle: TextStyle(
           color: Colors.white,
-          fontSize: isTouched ? 14 : 12,
+          fontSize: isTouched ? 16 : 14,
           fontWeight: FontWeight.w700,
         ),
         badgeWidget: null,
@@ -154,13 +154,13 @@ class _LegendItem extends StatelessWidget {
           children: [
             Text(
               label,
-              style: const TextStyle(color: Color(0xFF90A6C3), fontSize: 12),
+              style: const TextStyle(color: Color(0xFF90A6C3), fontSize: 14),
             ),
             Text(
               timeStr,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: 15,
                 fontWeight: FontWeight.w600,
               ),
             ),

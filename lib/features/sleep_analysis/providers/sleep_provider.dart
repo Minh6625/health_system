@@ -4,7 +4,7 @@ import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
 import 'package:healthguard/features/sleep_analysis/repositories/mock_sleep_repository.dart';
 import 'package:healthguard/features/sleep_analysis/repositories/sleep_repository.dart';
 
-enum SleepLoadState { initial, loading, success, empty, error }
+enum SleepLoadState { initial, loading, success, empty, error, noDataYet }
 
 class SleepProvider extends ChangeNotifier {
   /// 🔧 ĐỔI THÀNH false khi backend API đã sẵn sàng
@@ -48,6 +48,7 @@ class SleepProvider extends ChangeNotifier {
   bool get isEmpty => _loadState == SleepLoadState.empty;
   bool get hasError => _loadState == SleepLoadState.error;
   bool get isSuccess => _loadState == SleepLoadState.success;
+  bool get isNoDataYet => _loadState == SleepLoadState.noDataYet;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -108,14 +109,26 @@ class SleepProvider extends ChangeNotifier {
   Future<void> selectDate(DateTime date) async {
     final day = DateTime(date.year, date.month, date.day);
     _selectedDate = day;
+    
+    final now = DateTime.now();
+    // Rule: Nếu là ngày hiện tại && trước 6:00 sáng -> noDataYet
+    if (day.year == now.year && day.month == now.month && day.day == now.day && now.hour < 6) {
+      _loadState = SleepLoadState.noDataYet;
+      _selectedSession = null;
+      notifyListeners();
+      return;
+    }
+
     _dateLoading = true;
     notifyListeners();
 
     try {
       final session = await _repository.getSessionByDate(day, patientId: _patientId);
       _selectedSession = session;
+      _loadState = session == null ? SleepLoadState.empty : SleepLoadState.success;
     } catch (_) {
       // keep previous selectedSession on error
+      _loadState = SleepLoadState.error;
     } finally {
       _dateLoading = false;
       notifyListeners();

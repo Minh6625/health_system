@@ -41,8 +41,11 @@ class EmergencyCaregiverRepository {
         '/emergency/sos/trigger',
         body: {
           'trigger_type': 'manual',
+          // ignore: use_null_aware_elements
           if (latitude != null) 'latitude': latitude,
+          // ignore: use_null_aware_elements
           if (longitude != null) 'longitude': longitude,
+          // ignore: use_null_aware_elements
           if (address != null) 'address': address,
         },
       );
@@ -62,6 +65,7 @@ class EmergencyCaregiverRepository {
         '/emergency/sos/$sosId/resolve',
         body: {
           'resolution_status': resolutionStatus,
+          // ignore: use_null_aware_elements
           if (notes != null) 'notes': notes,
         },
       );

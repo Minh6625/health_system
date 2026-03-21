@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/core/constants/api_endpoints.dart';
 import 'package:healthguard/core/network/api_client.dart';
+import 'package:healthguard/features/device/mock/device_mock_data.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
 
 class DeviceProvider extends ChangeNotifier {
@@ -20,6 +21,18 @@ class DeviceProvider extends ChangeNotifier {
   String get statusFilter => _statusFilter;
   String? get typeFilter => _typeFilter;
   int get total => _total;
+
+  /// Find devices that require user attention (offline, low battery, no sync)
+  List<DeviceModel> get needsAttentionDevices =>
+      _devices.where((d) => _deviceNeedsAttention(d)).toList();
+
+  bool _deviceNeedsAttention(DeviceModel device) {
+    if (!device.isOnline) return true;
+    if (device.batteryLevel != null && device.batteryLevel! <= 20) return true;
+    if (device.lastSyncAt == null) return true;
+    if (DateTime.now().difference(device.lastSyncAt!).inHours >= 24) return true;
+    return false;
+  }
 
   Future<void> setStatusFilter(String value) async {
     _statusFilter = value;
@@ -115,11 +128,75 @@ class DeviceProvider extends ChangeNotifier {
     }
   }
 
+  void _sortDevices(List<DeviceModel> list) {
+    list.sort((a, b) {
+      final aNeedsAtt = _deviceNeedsAttention(a);
+      final bNeedsAtt = _deviceNeedsAttention(b);
+      if (aNeedsAtt && !bNeedsAtt) return -1;
+      if (!aNeedsAtt && bNeedsAtt) return 1;
+      if (a.isOnline && !b.isOnline) return -1;
+      if (!a.isOnline && b.isOnline) return 1;
+      return a.id.compareTo(b.id);
+    });
+  }
+
   Future<void> fetchDevices() async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
+    if (DeviceMockConfig.useMockData) {
+      // ── Mock mode ──────────────────────────────────────────────────────
+      await Future.delayed(
+        Duration(milliseconds: DeviceMockConfig.fakeApiDelayMs),
+      );
+      
+      var mockList = <DeviceModel>[];
+      switch (DeviceMockConfig.listScenario) {
+        case MockListScenario.empty:
+          mockList = [];
+          break;
+        case MockListScenario.error:
+          _errorMessage = 'Mock lỗi API: Không thể tải danh sách thiết bị.';
+          _isLoading = false;
+          notifyListeners();
+          return;
+        case MockListScenario.allOffline:
+          mockList = DeviceMockSnapshots.all.map((d) => DeviceModel(
+            id: d.id, uuid: d.uuid, deviceName: d.deviceName, deviceType: d.deviceType,
+            model: d.model, firmwareVersion: d.firmwareVersion, macAddress: d.macAddress,
+            serialNumber: d.serialNumber, mqttClientId: d.mqttClientId,
+            isActive: d.isActive, isOnline: false, batteryLevel: d.batteryLevel,
+            signalStrength: d.signalStrength, lastSeenAt: d.lastSeenAt,
+            lastSyncAt: d.lastSyncAt, registeredAt: d.registeredAt,
+          )).toList();
+          break;
+        case MockListScenario.normal:
+          mockList = List<DeviceModel>.from(DeviceMockSnapshots.all);
+          break;
+      }
+
+      // Apply status filter
+      if (_statusFilter == 'online') {
+        mockList = mockList.where((d) => d.isOnline).toList();
+      } else if (_statusFilter == 'offline') {
+        mockList = mockList.where((d) => !d.isOnline).toList();
+      }
+
+      // Apply type filter
+      if (_typeFilter != null && _typeFilter!.isNotEmpty) {
+        mockList = mockList.where((d) => d.deviceType == _typeFilter).toList();
+      }
+
+      _sortDevices(mockList);
+      _devices = mockList;
+      _total = _devices.length;
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
+    // ── Live mode ────────────────────────────────────────────────────────
     try {
       final query = <String, String>{
         'status': _statusFilter,
@@ -137,10 +214,14 @@ class DeviceProvider extends ChangeNotifier {
       final response = await _apiClient.get('${ApiEndpoints.devices}?$queryString');
       final rawDevices = response['devices'] as List<dynamic>? ?? [];
       _total = (response['total'] as num?)?.toInt() ?? rawDevices.length;
-      _devices = rawDevices
+      
+      var liveList = rawDevices
           .whereType<Map<String, dynamic>>()
           .map(DeviceModel.fromJson)
           .toList();
+          
+      _sortDevices(liveList);
+      _devices = liveList;
     } catch (e) {
       _errorMessage = 'Khong the tai danh sach thiet bi: ${e.toString()}';
     } finally {

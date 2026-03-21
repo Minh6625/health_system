@@ -8,11 +8,13 @@ class ShimmerSleepLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return SingleChildScrollView(
+      physics: const NeverScrollableScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // Hero card placeholder
           _ShimmerBox(height: 140, radius: 22)
               .animate(onPlay: (c) => c.repeat())
@@ -103,6 +105,7 @@ class ShimmerSleepLoading extends StatelessWidget {
                 color: const Color(0x33FFFFFF),
               ),
         ],
+        ),
       ),
     );
   }

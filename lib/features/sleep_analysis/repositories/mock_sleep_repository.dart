@@ -74,6 +74,12 @@ class MockSleepRepository implements SleepRepository {
   Future<SleepSession?> getSessionByDate(DateTime date,
       {String? patientId}) async {
     await Future.delayed(const Duration(milliseconds: 500));
+    
+    // Giả lập trạng thái "Empty" cho các ngày chia hết cho 5
+    if (date.day % 5 == 0) {
+      return null;
+    }
+
     // Return a mock session with a slightly different score for the selected date
     final score = 55 + (date.day % 40); // varies by day
     final label = score >= 70 ? 'GOOD' : (score >= 50 ? 'AVERAGE' : 'POOR');

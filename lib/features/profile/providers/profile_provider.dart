@@ -24,7 +24,19 @@ class ProfileProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchProfile() async {
+  // ── Cache ────────────────────────────────────────────────────────────────
+  DateTime? _lastFetched;
+  static const _cacheTtl = Duration(minutes: 5);
+
+  bool get hasValidCache =>
+      _profile != null &&
+      _lastFetched != null &&
+      DateTime.now().difference(_lastFetched!) < _cacheTtl;
+
+  Future<void> fetchProfile({bool force = false}) async {
+    // Return immediately if cache is still valid (unless forced by pull-to-refresh)
+    if (!force && hasValidCache) return;
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -32,6 +44,7 @@ class ProfileProvider extends ChangeNotifier {
     try {
       final response = await _apiClient.get(ApiEndpoints.profile);
       _profile = UserProfileModel.fromJson(response);
+      _lastFetched = DateTime.now();
     } catch (e) {
       _errorMessage = 'Không thể tải hồ sơ: ${e.toString()}';
     } finally {

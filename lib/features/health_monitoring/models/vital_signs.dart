@@ -23,7 +23,7 @@ class VitalSigns {
     String tsStr = ts.toString();
     if (!tsStr.endsWith('Z') && !tsStr.contains('T') && tsStr.contains('-') && tsStr.split('-').length == 3) {
        // if it's just a raw format '2024-03-15 14:30:00', Dart parse treats as local, let's assume UTC from backend
-       tsStr = tsStr.replaceAll(' ', 'T') + 'Z';
+       tsStr = '${tsStr.replaceAll(' ', 'T')}Z';
     }
     return DateTime.parse(tsStr).toLocal();
   }

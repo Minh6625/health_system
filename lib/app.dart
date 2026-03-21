@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
+// ignore: depend_on_referenced_packages
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:healthguard/core/constants/app_strings.dart';
 import 'package:healthguard/core/routes/app_router.dart';
@@ -10,11 +11,11 @@ import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
+// ignore: unused_import — giữ để dễ switch sang real backend
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
-import 'package:healthguard/features/health_monitoring/providers/vital_signs_provider.dart';
+import 'package:healthguard/features/emergency/repositories/emergency_caregiver_mock_repository.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
-import 'package:healthguard/features/family/providers/target_profile_provider.dart';
 import 'package:provider/provider.dart';
 
 class HealthSystemApp extends StatefulWidget {
@@ -41,6 +42,26 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     super.initState();
     _appLinks = AppLinks();
     _initDeepLinks();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_deepLinkDispatched && _pendingDeepLinkRoute != null) {
+        _deepLinkDispatched = true;
+        final route = _pendingDeepLinkRoute!;
+        final args = _pendingDeepLinkArgs;
+        _pendingDeepLinkRoute = null;
+        _pendingDeepLinkArgs = null;
+        if (route == AppRouter.verifyResetOtp) {
+          _navigatorKey.currentState?.pushNamedAndRemoveUntil(
+            route,
+            (r) => r.settings.name == AppRouter.start,
+            arguments: args,
+          );
+        } else {
+          _navigatorKey.currentState?.pushNamed(route, arguments: args);
+        }
+      }
+      FlutterNativeSplash.remove();
+      debugPrint("==== SPLASH REMOVED IN INITSTATE ====");
+    });
   }
 
   Future<void> _initDeepLinks() async {
@@ -115,6 +136,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         _routeToDeepLink(AppRouter.verifyEmail, {
           'code': code,
           'email': email,
+          // ignore: use_null_aware_elements
           if (action != null) 'action': action,
         });
       }
@@ -125,6 +147,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         _routeToDeepLink(AppRouter.verifyResetOtp, {
           'code': code,
           'email': email,
+          // ignore: use_null_aware_elements
           if (action != null) 'action': action,
         });
       }
@@ -145,14 +168,16 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(AuthRepository())),
-        ChangeNotifierProvider(create: (_) => VitalSignsProvider()),
         ChangeNotifierProvider(create: (_) => SleepProvider()),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
-        ChangeNotifierProvider(create: (_) => TargetProfileProvider()),
         ChangeNotifierProvider(
-          create: (_) =>
-              EmergencyCaregiverProvider(EmergencyCaregiverRepository()),
+          create: (_) => EmergencyCaregiverProvider(
+            // ⚡ DEV: dùng mock repository — comment dòng dưới & uncomment dòng
+            // trên khi có backend thật
+            EmergencyCaregiverMockRepository(),
+            // EmergencyCaregiverRepository(),
+          ),
         ),
       ],
       child: MaterialApp(
@@ -162,35 +187,6 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         theme: AppTheme.lightTheme,
         initialRoute: AppRouter.start,
         onGenerateRoute: AppRouter.onGenerateRoute,
-        builder: (context, child) {
-          // addPostFrameCallback in builder fires on every rebuild.
-          // We guard with _deepLinkDispatched so the pending link is only pushed once.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_deepLinkDispatched && _pendingDeepLinkRoute != null) {
-              _deepLinkDispatched = true;
-              final route = _pendingDeepLinkRoute!;
-              final args = _pendingDeepLinkArgs;
-              _pendingDeepLinkRoute = null;
-              _pendingDeepLinkArgs = null;
-              // Use the same strategy as _routeToDeepLink: clear the auth
-              // stack back to /start for reset-password so the user cannot
-              // press Back and land on an intermediate auth screen.
-              if (route == AppRouter.verifyResetOtp) {
-                _navigatorKey.currentState?.pushNamedAndRemoveUntil(
-                  route,
-                  (r) => r.settings.name == AppRouter.start,
-                  arguments: args,
-                );
-              } else {
-                _navigatorKey.currentState?.pushNamed(route, arguments: args);
-              }
-            }
-            // Safe to remove splash screen now that routing is resolved
-            FlutterNativeSplash.remove();
-            debugPrint("==== SPLASH REMOVED IN BUILDER ====");
-          });
-          return child!;
-        },
       ),
     );
   }

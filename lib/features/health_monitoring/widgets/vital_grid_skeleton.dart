@@ -20,14 +20,20 @@ class _VitalGridSkeletonState extends State<VitalGridSkeleton>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
-    )..repeat();
+    );
     _shimmer = Tween<double>(begin: -1.5, end: 2.5).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
     );
+    // Defer repeat() to post-frame to prevent mouse_tracker assertion when
+    // the skeleton is swapped out during the same frame it starts animating.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _controller.repeat();
+    });
   }
 
   @override
   void dispose() {
+    _controller.stop();
     _controller.dispose();
     super.dispose();
   }
@@ -70,15 +76,21 @@ class _VitalGridSkeletonState extends State<VitalGridSkeleton>
         // TimestampBadge skeleton
         _skeletonBox(height: 44, radius: 12),
         const SizedBox(height: 16),
-        // 2×2 card grid
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 12,
-          crossAxisSpacing: 12,
-          childAspectRatio: 1.0,
-          children: List.generate(4, (_) => _skeletonBox()),
+        // 2×2 card grid — use explicit Row+Column to avoid shrinkWrap sliver assertion
+        Row(
+          children: [
+            Expanded(child: _skeletonBox(height: 140)),
+            const SizedBox(width: 12),
+            Expanded(child: _skeletonBox(height: 140)),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(child: _skeletonBox(height: 140)),
+            const SizedBox(width: 12),
+            Expanded(child: _skeletonBox(height: 140)),
+          ],
         ),
         const SizedBox(height: 12),
         // Blood pressure card (wide)

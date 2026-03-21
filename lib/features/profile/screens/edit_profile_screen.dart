@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:provider/provider.dart';
 
+// Thông tin y tế và tiền sử bệnh lý đã được tách sang MedicalInfoScreen.
+// EditProfileScreen chỉ quản lý thông tin cá nhân cơ bản.
+
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -15,26 +18,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _avatarController = TextEditingController();
-  final TextEditingController _heightController = TextEditingController();
-  final TextEditingController _weightController = TextEditingController();
-  final TextEditingController _medicationsController = TextEditingController();
-  final TextEditingController _allergiesController = TextEditingController();
 
   DateTime? _selectedDate;
   String? _selectedGender;
-  String? _selectedBloodType;
-  final Set<String> _selectedConditions = {};
   bool _initialized = false;
 
   static const _genders = ['Nam', 'Nữ', 'Khác'];
-  static const _bloodTypes = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-  static const _medicalHistoryLabels = {
-    'hypertension': 'Cao huyết áp',
-    'heart_disease': 'Tim mạch',
-    'diabetes': 'Tiểu đường',
-    'stroke': 'Đột quỵ',
-    'other': 'Khác',
-  };
 
   @override
   void didChangeDependencies() {
@@ -48,17 +37,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _selectedDate = profile.dateOfBirth;
         _dobController.text = _formatDate(profile.dateOfBirth);
         _selectedGender = profile.gender;
-        _selectedBloodType = profile.bloodType;
-        if (profile.heightCm != null) {
-          _heightController.text = profile.heightCm!.toStringAsFixed(1);
-        }
-        if (profile.weightKg != null) {
-          _weightController.text = profile.weightKg!.toStringAsFixed(1);
-        }
-        _medicationsController.text = profile.medications.join(', ');
-        _allergiesController.text = profile.allergies.join(', ');
-        // Restore medical conditions checkboxes
-        _selectedConditions.addAll(profile.medicalConditions);
       }
       _initialized = true;
     }
@@ -70,10 +48,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _phoneController.dispose();
     _dobController.dispose();
     _avatarController.dispose();
-    _heightController.dispose();
-    _weightController.dispose();
-    _medicationsController.dispose();
-    _allergiesController.dispose();
     super.dispose();
   }
 
@@ -105,14 +79,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  List<dynamic> _parseCommaList(String text) {
-    return text.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-  }
-
   Future<void> _handleSave() async {
     if (!_formKey.currentState!.validate()) return;
 
     final provider = context.read<ProfileProvider>();
+    final existing = provider.profile;
+
     final success = await provider.updateProfile(
       fullName: _fullNameController.text.trim(),
       phone: _phoneController.text.trim().isEmpty
@@ -123,20 +95,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ? null
           : _avatarController.text.trim(),
       gender: _selectedGender,
-      bloodType: _selectedBloodType,
-      heightCm: _heightController.text.trim().isEmpty
-          ? null
-          : double.tryParse(_heightController.text.trim()),
-      weightKg: _weightController.text.trim().isEmpty
-          ? null
-          : double.tryParse(_weightController.text.trim()),
-      medications: _medicationsController.text.trim().isEmpty
-          ? []
-          : _parseCommaList(_medicationsController.text),
-      allergies: _allergiesController.text.trim().isEmpty
-          ? []
-          : _parseCommaList(_allergiesController.text),
-      medicalConditions: _selectedConditions.toList(),
+      // Giữ nguyên thông tin y tế hiện có – không thay đổi từ màn này
+      bloodType: existing?.bloodType,
+      heightCm: existing?.heightCm,
+      weightKg: existing?.weightKg,
+      medications: existing?.medications ?? [],
+      allergies: existing?.allergies ?? [],
+      medicalConditions: existing?.medicalConditions ?? [],
     );
 
     if (!mounted) return;
@@ -146,6 +111,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         const SnackBar(
           content: Text('Cập nhật thông tin thành công'),
           backgroundColor: Color(0xFF0F766E),
+          behavior: SnackBarBehavior.floating,
         ),
       );
       Navigator.of(context).pop();
@@ -154,6 +120,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         SnackBar(
           content: Text(provider.errorMessage ?? 'Cập nhật thất bại'),
           backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -171,7 +138,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             foregroundColor: Colors.white,
           ),
           body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
             child: Form(
               key: _formKey,
               child: Column(
@@ -186,13 +153,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         controller: _fullNameController,
                         textInputAction: TextInputAction.next,
                         style: const TextStyle(fontSize: 16),
-                        decoration: _inputDecoration('Họ và tên', Icons.person_outline),
+                        decoration:
+                            _inputDecoration('Họ và tên', Icons.person_outline),
                         validator: (v) {
                           final text = v?.trim() ?? '';
                           if (text.isEmpty) return 'Vui lòng nhập họ tên';
                           if (text.length < 2) return 'Họ tên phải từ 2 ký tự';
                           if (!RegExp(r'^[a-zA-ZÀ-ỿ\s]+$').hasMatch(text)) {
-                            return 'Họ tên chỉ được chứa chữ cái và khoảng trắng';
+                            return 'Họ tên chỉ được chứa chữ cái';
                           }
                           return null;
                         },
@@ -207,7 +175,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         decoration: _inputDecoration(
                           'Ngày sinh',
                           Icons.cake_outlined,
-                          suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18),
+                          suffixIcon: const Icon(Icons.calendar_today_outlined,
+                              size: 18),
                         ),
                       ),
                     ),
@@ -217,9 +186,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         keyboardType: TextInputType.phone,
                         textInputAction: TextInputAction.next,
                         style: const TextStyle(fontSize: 16),
-                        decoration: _inputDecoration('Số điện thoại', Icons.phone_outlined),
+                        decoration: _inputDecoration(
+                            'Số điện thoại', Icons.phone_outlined),
                         validator: (v) {
-                          final text = v?.replaceAll(RegExp(r'[\s-]'), '').trim() ?? '';
+                          final text =
+                              v?.replaceAll(RegExp(r'[\s-]'), '').trim() ?? '';
                           if (text.isEmpty) return null;
                           if (!RegExp(r'^\d+$').hasMatch(text)) {
                             return 'Số điện thoại chỉ được chứa chữ số';
@@ -228,140 +199,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             return 'Số điện thoại phải có 10-11 chữ số';
                           }
                           if (!text.startsWith('0')) {
-                            return 'Số điện thoại Việt Nam phải bắt đầu bằng 0';
+                            return 'Số điện thoại VN phải bắt đầu bằng 0';
                           }
                           return null;
                         },
                       ),
                     ),
                     _buildField(
+                      isLast: true,
                       child: DropdownButtonFormField<String>(
-                        value: _selectedGender,
-                        decoration: _inputDecoration('Giới tính', Icons.wc_outlined),
-                        style: const TextStyle(fontSize: 16, color: Colors.black87),
+                        initialValue: _selectedGender,
+                        decoration:
+                            _inputDecoration('Giới tính', Icons.wc_outlined),
+                        style: const TextStyle(
+                            fontSize: 16, color: Colors.black87),
                         items: _genders
-                            .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                            .map((g) =>
+                                DropdownMenuItem(value: g, child: Text(g)))
                             .toList(),
-                        onChanged: (v) => setState(() => _selectedGender = v),
+                        onChanged: (v) =>
+                            setState(() => _selectedGender = v),
                       ),
                     ),
                   ]),
-                  const SizedBox(height: 24),
-
-                  // ── Thông tin y tế ──
-                  _buildSectionTitle('Thông tin y tế'),
-                  const SizedBox(height: 12),
-                  _buildCard([
-                    _buildField(
-                      child: DropdownButtonFormField<String>(
-                        value: _selectedBloodType,
-                        decoration: _inputDecoration('Nhóm máu', Icons.bloodtype_outlined),
-                        style: const TextStyle(fontSize: 16, color: Colors.black87),
-                        items: _bloodTypes
-                            .map((b) => DropdownMenuItem(value: b, child: Text(b)))
-                            .toList(),
-                        onChanged: (v) => setState(() => _selectedBloodType = v),
-                      ),
-                    ),
-                    _buildField(
-                      child: TextFormField(
-                        controller: _heightController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        textInputAction: TextInputAction.next,
-                        style: const TextStyle(fontSize: 16),
-                        decoration: _inputDecoration('Chiều cao (cm)', Icons.height_outlined),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return null;
-                          final val = double.tryParse(v.trim());
-                          if (val == null) return 'Vui lòng nhập số hợp lệ';
-                          if (val < 50 || val > 250) return 'Chiều cao phải từ 50 đến 250 cm';
-                          return null;
-                        },
-                      ),
-                    ),
-                    _buildField(
-                      child: TextFormField(
-                        controller: _weightController,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        textInputAction: TextInputAction.next,
-                        style: const TextStyle(fontSize: 16),
-                        decoration: _inputDecoration('Cân nặng (kg)', Icons.monitor_weight_outlined),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return null;
-                          final val = double.tryParse(v.trim());
-                          if (val == null) return 'Vui lòng nhập số hợp lệ';
-                          if (val < 2 || val > 500) return 'Cân nặng phải từ 2 đến 500 kg';
-                          return null;
-                        },
-                      ),
-                    ),
-                    _buildField(
-                      child: TextFormField(
-                        controller: _medicationsController,
-                        textInputAction: TextInputAction.next,
-                        style: const TextStyle(fontSize: 16),
-                        decoration: _inputDecoration(
-                          'Thuốc đang dùng (cách nhau bởi dấu phẩy)',
-                          Icons.medication_outlined,
-                        ),
-                      ),
-                    ),
-                    _buildField(
-                      child: TextFormField(
-                        controller: _allergiesController,
-                        textInputAction: TextInputAction.done,
-                        style: const TextStyle(fontSize: 16),
-                        decoration: _inputDecoration(
-                          'Dị ứng (cách nhau bởi dấu phẩy)',
-                          Icons.warning_amber_outlined,
-                        ),
-                      ),
-                    ),
-                  ]),
-                  const SizedBox(height: 24),
-
-                  // ── Tiền sử bệnh lý ──
-                  _buildSectionTitle('Tiền sử bệnh lý'),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.amber.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.shade200),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    margin: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.amber.shade700, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Thông tin tiền sử bệnh ảnh hưởng đến điểm đánh giá rủi ro sức khỏe AI.',
-                            style: TextStyle(fontSize: 12, color: Colors.amber.shade800),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _buildCard(
-                    _medicalHistoryLabels.entries.map((entry) {
-                      return CheckboxListTile(
-                        title: Text(entry.value, style: const TextStyle(fontSize: 15)),
-                        value: _selectedConditions.contains(entry.key),
-                        activeColor: const Color(0xFF0F766E),
-                        controlAffinity: ListTileControlAffinity.leading,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                        onChanged: (v) => setState(() {
-                          if (v == true) {
-                            _selectedConditions.add(entry.key);
-                          } else {
-                            _selectedConditions.remove(entry.key);
-                          }
-                        }),
-                      );
-                    }).toList(),
-                  ),
                   const SizedBox(height: 24),
 
                   // ── Ảnh đại diện ──
@@ -374,7 +234,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         keyboardType: TextInputType.url,
                         textInputAction: TextInputAction.done,
                         style: const TextStyle(fontSize: 16),
-                        decoration: _inputDecoration('Đường dẫn ảnh (URL)', Icons.image_outlined),
+                        decoration: _inputDecoration(
+                            'Đường dẫn ảnh (URL)', Icons.image_outlined),
                         onChanged: (_) => setState(() {}),
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) return null;
@@ -382,7 +243,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                           if (uri == null ||
                               !uri.hasScheme ||
                               !['http', 'https'].contains(uri.scheme)) {
-                            return 'URL không hợp lệ (phải bắt đầu bằng http:// hoặc https://)';
+                            return 'URL không hợp lệ (cần bắt đầu bằng http/https)';
                           }
                           return null;
                         },
@@ -398,14 +259,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             height: 100,
                             width: 100,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            errorBuilder: (_, _, _) => Container(
                               height: 100,
                               width: 100,
                               decoration: BoxDecoration(
                                 color: Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: Icon(Icons.broken_image_outlined, color: Colors.grey.shade400),
+                              child: Icon(Icons.broken_image_outlined,
+                                  color: Colors.grey.shade400),
                             ),
                           ),
                         ),
@@ -421,8 +283,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       ),
                     ),
                   const SizedBox(height: 28),
+
+                  // ── CTA Lưu ──
                   SizedBox(
                     width: double.infinity,
+                    height: 52,
                     child: ElevatedButton.icon(
                       onPressed: provider.isSaving ? null : _handleSave,
                       icon: provider.isSaving
@@ -430,20 +295,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
+                                  strokeWidth: 2, color: Colors.white),
                             )
                           : const Icon(Icons.save_outlined),
                       label: Text(
-                        provider.isSaving ? 'Đang lưu...' : 'Lưu thay đổi',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        provider.isSaving ? 'Đang lưu…' : 'Lưu thay đổi',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F766E),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        disabledBackgroundColor:
+                            const Color(0xFF0F766E).withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
                     ),
                   ),
@@ -461,9 +327,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Text(
       title,
       style: const TextStyle(
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: FontWeight.w700,
         color: Color(0xFF0F766E),
+        letterSpacing: 0.3,
       ),
     );
   }
@@ -485,19 +352,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildField({required Widget child}) {
+  Widget _buildField({required Widget child, bool isLast = false}) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(
-        children: [
-          child,
-          const SizedBox(height: 4),
-        ],
-      ),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, isLast ? 16 : 4),
+      child: child,
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon, {Widget? suffixIcon}) {
+  InputDecoration _inputDecoration(String label, IconData icon,
+      {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon, color: const Color(0xFF0F766E), size: 20),
@@ -507,7 +370,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         borderRadius: BorderRadius.circular(10),
         borderSide: const BorderSide(color: Color(0xFF0F766E), width: 2),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
     );
   }
 }

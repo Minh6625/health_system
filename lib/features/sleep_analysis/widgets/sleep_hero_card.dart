@@ -36,9 +36,9 @@ class SleepHeroCard extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0E2244), Color(0xFF091529)],
+          colors: [Color(0xFF101C2F), Color(0xFF071220)],
         ),
-        border: Border.all(color: const Color(0x332C4367), width: 1),
+        border: Border.all(color: const Color(0x1F4B5E82), width: 1),
         boxShadow: const [
           BoxShadow(
             color: Color(0x3048D6FF),
@@ -125,12 +125,12 @@ class _WeeklyDatePicker extends StatelessWidget {
                   onTap: () => onDateSelected?.call(day),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    width: 36,
-                    height: 52,
+                    width: 40,
+                    height: 58,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12),
                       color: isSelected
-                          ? const Color(0xFF153358)
+                          ? const Color(0xFF1A3B66)
                           : Colors.transparent,
                       border: Border.all(
                         color: isSelected
@@ -149,22 +149,22 @@ class _WeeklyDatePicker extends StatelessWidget {
                           style: TextStyle(
                             color: isSelected
                                 ? const Color(0xFF48D6FF)
-                                : const Color(0xFF5B7FA6),
-                            fontSize: 10,
+                                : const Color(0xFF7A96B8),
+                            fontSize: 12,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.2,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 2),
                         Text(
                           '${day.day}',
                           style: TextStyle(
                             color: isSelected
                                 ? Colors.white
                                 : isToday
-                                    ? const Color(0xFF90A6C3)
-                                    : const Color(0xFF4C6589),
-                            fontSize: 14,
+                                    ? const Color(0xFFA6BACF)
+                                    : const Color(0xFF5B7FA6),
+                            fontSize: 16,
                             fontWeight: isSelected
                                 ? FontWeight.w800
                                 : FontWeight.w500,
@@ -193,8 +193,8 @@ class _WeeklyDatePicker extends StatelessWidget {
           GestureDetector(
             onTap: onCalendarTap,
             child: Container(
-              width: 36,
-              height: 52,
+              width: 40,
+              height: 58,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(12),
                 color: const Color(0x0F48D6FF),
@@ -204,7 +204,7 @@ class _WeeklyDatePicker extends StatelessWidget {
               child: const Icon(
                 Icons.calendar_month_rounded,
                 color: Color(0xFF48D6FF),
-                size: 18,
+                size: 22,
               ),
             ),
           ),
@@ -280,24 +280,24 @@ class _ScoreAndDurationRow extends StatelessWidget {
         // Right column: sleep duration + info rows (bigger & clearer)
         Expanded(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 4),
+              const SizedBox(height: 6),
               // Sleep duration – main figure
               FittedBox(
                 fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
+                alignment: Alignment.center,
                 child: Text(
                   session.sleepText,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 36,
+                    fontSize: 38,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
                     height: 1.1,
                   ),
                 ),
               ),
+              const SizedBox(height: 4),
               const Text(
                 'Thời gian ngủ thực tế',
                 style: TextStyle(
@@ -305,26 +305,27 @@ class _ScoreAndDurationRow extends StatelessWidget {
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
+                textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 18),
               // Info rows – larger font
               _InfoRow(
                 icon: Icons.hotel_rounded,
-                iconColor: const Color(0xFF48A9D6),
+                iconColor: const Color(0xFF6AAED6),
                 label: 'Trên giường',
                 value: session.inBedText,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _InfoRow(
                 icon: Icons.nightlight_round,
-                iconColor: const Color(0xFFFFC400),
+                iconColor: const Color(0xFFE5C05C),
                 label: 'Thức giấc',
                 value: '${session.wakeCount} lần',
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _InfoRow(
                 icon: Icons.percent_rounded,
-                iconColor: const Color(0xFF4CAF50),
+                iconColor: const Color(0xFF81C784),
                 label: 'Hiệu quả',
                 value:
                     '${(session.efficiencyRatio * 100).toStringAsFixed(0)}%',
@@ -368,8 +369,8 @@ class _InfoRow extends StatelessWidget {
           child: Text(
             label,
             style: const TextStyle(
-              color: Color(0xFF7A96B8),
-              fontSize: 13,
+              color: Color(0xFF90A6C3),
+              fontSize: 15,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -378,7 +379,7 @@ class _InfoRow extends StatelessWidget {
           value,
           style: const TextStyle(
             color: Color(0xFFCCDEF5),
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -427,12 +428,12 @@ class _AIAssessmentBubble extends StatelessWidget {
           Column(
             children: [
               Container(
-                width: 64,
-                height: 64,
+                width: 86,
+                height: 86,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFF152B4A),
-                  border: Border.all(color: const Color(0x3348D6FF), width: 1),
+                  color: const Color(0xFF1A2B42),
+                  border: Border.all(color: const Color(0x2648D6FF), width: 1.5),
                 ),
                 child: ClipOval(
                   child: Image.asset(
@@ -451,7 +452,7 @@ class _AIAssessmentBubble extends StatelessWidget {
                 'AI Bác sĩ',
                 style: TextStyle(
                   color: Color(0xFF48D6FF),
-                  fontSize: 9,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -467,15 +468,15 @@ class _AIAssessmentBubble extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF152B4A),
+                    color: const Color(0xFF1A2B42),
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(16),
-                      topRight: Radius.circular(16),
-                      bottomRight: Radius.circular(16),
-                      bottomLeft: Radius.circular(4),
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                      bottomRight: Radius.circular(20),
+                      bottomLeft: Radius.circular(6),
                     ),
                     border: Border.all(
-                        color: const Color(0x3348D6FF), width: 1),
+                        color: const Color(0x2648D6FF), width: 1),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,7 +490,7 @@ class _AIAssessmentBubble extends StatelessWidget {
                             'Phân tích ngày $dateStr',
                             style: const TextStyle(
                               color: Color(0xFF48D6FF),
-                              fontSize: 11,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -499,9 +500,9 @@ class _AIAssessmentBubble extends StatelessWidget {
                       Text(
                         message,
                         style: const TextStyle(
-                          color: Color(0xFFB8CAE3),
-                          fontSize: 13,
-                          height: 1.5,
+                          color: Color(0xFFCCDEF5),
+                          fontSize: 16,
+                          height: 1.6,
                         ),
                       ),
                     ],
@@ -535,7 +536,7 @@ class _QualityRingPainter extends CustomPainter {
       center,
       radius,
       Paint()
-        ..color = const Color(0xFF1E3352)
+        ..color = const Color(0xFF152640)
         ..style = PaintingStyle.stroke
         ..strokeWidth = stroke,
     );

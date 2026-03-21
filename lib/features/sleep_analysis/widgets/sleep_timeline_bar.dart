@@ -10,10 +10,10 @@ class SleepTimelineBar extends StatelessWidget {
 
   const SleepTimelineBar({super.key, required this.session});
 
-  static const _awakeColor = Color(0xFFFFC400);
-  static const _lightColor = Color(0xFF48A9D6);
-  static const _deepColor = Color(0xFF3A5FCD);
-  static const _remColor = Color(0xFF9C6ADE);
+  static const _awakeColor = Color(0xFFE5C05C);
+  static const _lightColor = Color(0xFF6AAED6);
+  static const _deepColor = Color(0xFF5A75CD);
+  static const _remColor = Color(0xFFA685DE);
   static const _noDataColor = Color(0xFF2A3D5F);
 
   @override
@@ -113,8 +113,8 @@ class SleepTimelineBar extends StatelessWidget {
   Widget _timeLabel(String t) => Text(
         t,
         style: const TextStyle(
-          color: Color(0xFF5B7FA6),
-          fontSize: 11,
+          color: Color(0xFF7A96B8),
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       );
@@ -167,7 +167,7 @@ class _LegendDot extends StatelessWidget {
           label,
           style: const TextStyle(
             color: Color(0xFF90A6C3),
-            fontSize: 12,
+            fontSize: 15,
           ),
         ),
       ],

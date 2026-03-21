@@ -27,12 +27,12 @@ class SOSCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: isUrgent ? const Color(0xFFFFABAF) : Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.withOpacity(0.1), width: 1),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1), width: 1),
         boxShadow: [
           BoxShadow(
             color: isUrgent
-                ? const Color(0xFFE53935).withOpacity(0.25)
-                : Colors.black.withOpacity(0.05),
+                ? const Color(0xFFE53935).withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 6),
             spreadRadius: -2,
@@ -233,7 +233,7 @@ class SOSCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(5),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFE53935).withOpacity(0.4),
+              color: const Color(0xFFE53935).withValues(alpha: 0.4),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -265,7 +265,7 @@ class SOSCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(5),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF43A047).withOpacity(0.35),
+              color: const Color(0xFF43A047).withValues(alpha: 0.35),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
