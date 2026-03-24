@@ -5,13 +5,17 @@ class LinkedContactModel {
   final String displayName;
   final String email;
   final String avatarUrl;
+
   /// Nhãn hiển thị chính (có thể do user tự đặt hoặc fallback từ tag đầu tiên)
   final String primaryRelationshipLabel;
+
   /// Custom tags — thay thế enum role cứng là source of truth chính
   final List<ContactTag> tags;
+
   /// Giữ role enum làm fallback / suggestion — không dùng làm grouping chính
   final ContactRole role;
   final ContactStatus status;
+
   /// Permissions: 'can_view_vitals', 'can_receive_alerts', 'can_view_location'
   final List<String> permissions;
   final bool isIncomingRequest;
@@ -27,9 +31,10 @@ class LinkedContactModel {
     this.status = ContactStatus.accepted,
     this.permissions = const [],
     this.isIncomingRequest = false,
-  })  : tags = tags ?? const [],
-        primaryRelationshipLabel = primaryRelationshipLabel ??
-            (tags != null && tags.isNotEmpty ? tags.first.name : role.label);
+  }) : tags = tags ?? const [],
+       primaryRelationshipLabel =
+           primaryRelationshipLabel ??
+           (tags != null && tags.isNotEmpty ? tags.first.name : role.label);
 
   LinkedContactModel copyWith({
     String? id,
@@ -48,7 +53,8 @@ class LinkedContactModel {
       displayName: displayName ?? this.displayName,
       email: email ?? this.email,
       avatarUrl: avatarUrl ?? this.avatarUrl,
-      primaryRelationshipLabel: primaryRelationshipLabel ?? this.primaryRelationshipLabel,
+      primaryRelationshipLabel:
+          primaryRelationshipLabel ?? this.primaryRelationshipLabel,
       tags: tags ?? this.tags,
       role: role ?? this.role,
       status: status ?? this.status,
@@ -58,11 +64,7 @@ class LinkedContactModel {
   }
 }
 
-enum ContactStatus {
-  pending,
-  accepted,
-  rejected,
-}
+enum ContactStatus { pending, accepted, rejected }
 
 /// Enum role giữ lại làm suggestion defaults, không phải source of truth chính
 enum ContactRole {

@@ -69,14 +69,16 @@ class RelationshipService:
 
     @staticmethod
     def request_relationship(db: Session, current_user: User, payload: RelationshipRequestCreate) -> UserRelationship:
-        if not payload.email and not payload.phone:
+        if not payload.email and not payload.phone and not payload.target_user_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Must provide email or phone number to find user"
+                detail="Must provide email, phone number, or target_user_id to find user"
             )
             
         target_user = None
-        if payload.email:
+        if payload.target_user_id:
+            target_user = UserRepository.get_by_id(db, payload.target_user_id)
+        elif payload.email:
             target_user = UserRepository.get_by_email(db, payload.email)
         elif payload.phone:
             # Assumes we have a get_by_phone method, fallback to query
@@ -112,6 +114,8 @@ class RelationshipService:
             caregiver_id=current_user.id,     # The one sending the request (wants to view)
             relationship_type=payload.relationship_type,
             status="pending",
+            primary_relationship_label=payload.primary_relationship_label,
+            tags=payload.tags if payload.tags else [],
             can_view_vitals=False,
             can_receive_alerts=False,
             can_view_location=False
@@ -132,8 +136,28 @@ class RelationshipService:
         rel.status = "accepted"
         rel.can_view_vitals = True
         rel.can_receive_alerts = True
+        RelationshipRepository.update(db, rel)
         
-        return RelationshipRepository.update(db, rel)
+        # Check if inverse relationship already exists
+        existing_inverse_rel = db.query(UserRelationship).filter(
+            UserRelationship.patient_id == rel.caregiver_id,
+            UserRelationship.caregiver_id == rel.patient_id
+        ).first()
+
+        # If it doesn't exist, create it (Patient views Caregiver)
+        if not existing_inverse_rel:
+            inverse_rel = UserRelationship(
+                patient_id=rel.caregiver_id,
+                caregiver_id=rel.patient_id,
+                relationship_type=rel.relationship_type,
+                status="accepted",
+                can_view_vitals=True,
+                can_receive_alerts=True,
+                can_view_location=False
+            )
+            RelationshipRepository.create(db, inverse_rel)
+            
+        return rel
 
     @staticmethod
     def delete_relationship(db: Session, current_user: User, relationship_id: int) -> None:
@@ -143,29 +167,95 @@ class RelationshipService:
             
         if rel.patient_id != current_user.id and rel.caregiver_id != current_user.id:
             raise HTTPException(status_code=403, detail="Không có quyền xóa liên kết này")
-            
+
+        inverse_rel = db.query(UserRelationship).filter(
+            UserRelationship.patient_id == rel.caregiver_id,
+            UserRelationship.caregiver_id == rel.patient_id
+        ).first()
+
         RelationshipRepository.delete(db, rel)
+        if inverse_rel:
+            RelationshipRepository.delete(db, inverse_rel)
+
+    @staticmethod
+    def update_relationship(db: Session, current_user: User, relationship_id: int, payload: Any) -> UserRelationship:
+        rel = RelationshipRepository.get_by_id(db, relationship_id)
+        if not rel:
+            raise HTTPException(status_code=404, detail="Không tìm thấy liên kết")
+            
+        if rel.patient_id != current_user.id and rel.caregiver_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Không có quyền cập nhật liên kết này")
+            
+        update_data = payload.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(rel, key, value)
+
+        return RelationshipRepository.update(db, rel)
 
     @staticmethod
     def format_relationships(db: Session, user_id: int) -> List[Dict[str, Any]]:
-        rels = RelationshipRepository.get_user_relationships(db, user_id)
-        result = []
+        rels = db.query(UserRelationship).filter(
+            (UserRelationship.patient_id == user_id) | 
+            (UserRelationship.caregiver_id == user_id)
+        ).all()
+        
+        # Group by partner_id
+        grouped = {}
         for r in rels:
-            patient = UserRepository.get_by_id(db, r.patient_id)
-            caregiver = UserRepository.get_by_id(db, r.caregiver_id)
+            partner_id = r.caregiver_id if r.patient_id == user_id else r.patient_id
+            if partner_id not in grouped:
+                grouped[partner_id] = []
+            grouped[partner_id].append(r)
+            
+        result = []
+        for partner_id, partner_rels in grouped.items():
+            primary_rel = None
+            if len(partner_rels) > 1:
+                # 2 rows means accepted
+                for r in partner_rels:
+                    if r.patient_id == user_id:
+                        primary_rel = r
+                        break
+                if not primary_rel:
+                    primary_rel = partner_rels[0]
+            else:
+                primary_rel = partner_rels[0]
+                
+            patient = UserRepository.get_by_id(db, primary_rel.patient_id)
+            caregiver = UserRepository.get_by_id(db, primary_rel.caregiver_id)
             if not patient or not caregiver:
                 continue
-            result.append({
-                "id": r.id,
-                "patient_id": r.patient_id,
+                
+            inverse_rel = next((r for r in partner_rels if r.caregiver_id == user_id), None)
+            
+            res_dict = {
+                "id": primary_rel.id,
+                "patient_id": primary_rel.patient_id,
                 "patient_name": patient.full_name,
                 "patient_email": patient.email,
-                "caregiver_id": r.caregiver_id,
+                "caregiver_id": primary_rel.caregiver_id,
                 "caregiver_name": caregiver.full_name,
                 "caregiver_email": caregiver.email,
-                "relationship_type": r.relationship_type,
-                "status": r.status,
-                "created_at": r.created_at
-            })
+                "relationship_type": primary_rel.relationship_type,
+                "status": primary_rel.status,
+                "primary_relationship_label": primary_rel.primary_relationship_label,
+                "tags": primary_rel.tags if primary_rel.tags else [],
+                "can_view_vitals": primary_rel.can_view_vitals,
+                "can_receive_alerts": primary_rel.can_receive_alerts,
+                "can_view_location": primary_rel.can_view_location,
+                "created_at": primary_rel.created_at
+            }
+            
+            if inverse_rel:
+                res_dict["has_view_vitals_permission"] = inverse_rel.can_view_vitals
+                res_dict["has_receive_alerts_permission"] = inverse_rel.can_receive_alerts
+                res_dict["has_view_location_permission"] = inverse_rel.can_view_location
+            else:
+                res_dict["has_view_vitals_permission"] = False
+                res_dict["has_receive_alerts_permission"] = False
+                res_dict["has_view_location_permission"] = False
+                
+            result.append(res_dict)
+            
         return result
-
+            

@@ -9,6 +9,7 @@ from app.schemas.relationship import (
     AccessProfileResponse,
     RelationshipRequestCreate,
     RelationshipAcceptRequest,
+    RelationshipUpdate,
     RelationshipResponse,
     UserSearchResponse
 )
@@ -91,6 +92,24 @@ def accept_relationship(
             return r
     raise HTTPException(status_code=404, detail="Error formatting response")
 
+@router.put(
+    "/relationships/{relationship_id}",
+    response_model=RelationshipResponse,
+    summary="Update relationship permissions and tags"
+)
+def update_relationship(
+    relationship_id: int,
+    payload: RelationshipUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update permissions like can_view_vitals, or tags/relationship_type"""
+    rel = RelationshipService.update_relationship(db, current_user, relationship_id, payload)
+    rels = RelationshipService.format_relationships(db, current_user.id)
+    for r in rels:
+        if r["id"] == rel.id:
+            return r
+    raise HTTPException(status_code=404, detail="Error formatting response")
 
 @router.delete(
     "/relationships/{relationship_id}",

@@ -12,10 +12,7 @@ import 'package:provider/provider.dart';
 class LinkedContactDetailScreen extends StatelessWidget {
   final String contactId;
 
-  const LinkedContactDetailScreen({
-    super.key,
-    required this.contactId,
-  });
+  const LinkedContactDetailScreen({super.key, required this.contactId});
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +26,10 @@ class LinkedContactDetailScreen extends StatelessWidget {
 class _LinkedContactDetailContent extends StatelessWidget {
   const _LinkedContactDetailContent();
 
-  void _showTagPicker(BuildContext context, LinkedContactDetailMockProvider provider) {
+  void _showTagPicker(
+    BuildContext context,
+    LinkedContactDetailMockProvider provider,
+  ) {
     final contact = provider.contact;
     if (contact == null) return;
 
@@ -57,11 +57,16 @@ class _LinkedContactDetailContent extends StatelessWidget {
     );
   }
 
-  void _showLabelEditor(BuildContext context, LinkedContactDetailMockProvider provider) {
+  void _showLabelEditor(
+    BuildContext context,
+    LinkedContactDetailMockProvider provider,
+  ) {
     final contact = provider.contact;
     if (contact == null) return;
 
-    final controller = TextEditingController(text: contact.primaryRelationshipLabel);
+    final controller = TextEditingController(
+      text: contact.primaryRelationshipLabel,
+    );
 
     showDialog(
       context: context,
@@ -92,7 +97,10 @@ class _LinkedContactDetailContent extends StatelessWidget {
     );
   }
 
-  void _handleUnlink(BuildContext context, LinkedContactDetailMockProvider provider) {
+  void _handleUnlink(
+    BuildContext context,
+    LinkedContactDetailMockProvider provider,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) => UnlinkConfirmDialog(
@@ -113,7 +121,13 @@ class _LinkedContactDetailContent extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
       appBar: AppBar(
-        title: const Text('Quyền chia sẻ', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF12304A))),
+        title: const Text(
+          'Quyền chia sẻ',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF12304A),
+          ),
+        ),
         backgroundColor: const Color(0xFFF4F7FB),
         elevation: 0,
         centerTitle: true,
@@ -123,10 +137,15 @@ class _LinkedContactDetailContent extends StatelessWidget {
     );
   }
 
-  Widget _buildBody(BuildContext context, LinkedContactDetailMockProvider provider) {
+  Widget _buildBody(
+    BuildContext context,
+    LinkedContactDetailMockProvider provider,
+  ) {
     if (provider.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2F80ED))),
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2F80ED)),
+        ),
       );
     }
 
@@ -139,7 +158,11 @@ class _LinkedContactDetailContent extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Có lỗi xảy ra',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF12304A)),
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF12304A),
+              ),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
@@ -161,37 +184,43 @@ class _LinkedContactDetailContent extends StatelessWidget {
         LinkedContactHeroCard(contact: contact),
         SharingContextInfoBanner(contact: contact),
         const SizedBox(height: 24),
-        
+
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
           child: const Text(
             'Quyền hạn của bạn trao',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF5B7288)),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF5B7288),
+            ),
           ),
         ),
         const SizedBox(height: 8),
         PermissionToggleCard(
           title: 'Cho phép xem chỉ số sức khoẻ của tôi',
-          description: 'Người này sẽ xem được nhịp tim, SpO₂, huyết áp và các chỉ số liên quan của bạn.',
+          description:
+              'Người này sẽ xem được nhịp tim, SpO₂, huyết áp và các chỉ số liên quan của bạn.',
           value: contact.permissions.contains('can_view_vitals'),
-          isSaving: provider.isSavingPermission('can_view_vitals'),
           onChanged: (val) => provider.togglePermission('can_view_vitals', val),
         ),
         PermissionToggleCard(
           title: 'Cho phép nhận cảnh báo SOS của tôi',
-          description: 'Người này sẽ nhận thông báo khi bạn phát tín hiệu khẩn cấp SOS.',
+          description:
+              'Người này sẽ nhận thông báo khi bạn phát tín hiệu khẩn cấp SOS.',
           value: contact.permissions.contains('can_receive_alerts'),
-          isSaving: provider.isSavingPermission('can_receive_alerts'),
-          onChanged: (val) => provider.togglePermission('can_receive_alerts', val),
+          onChanged: (val) =>
+              provider.togglePermission('can_receive_alerts', val),
         ),
         PermissionToggleCard(
           title: 'Cho phép xem vị trí của tôi khi SOS',
-          description: 'Chỉ chia sẻ vị trí trong tình huống khẩn cấp để hỗ trợ tìm kiếm nhanh hơn.',
+          description:
+              'Chỉ chia sẻ vị trí trong tình huống khẩn cấp để hỗ trợ tìm kiếm nhanh hơn.',
           value: contact.permissions.contains('can_view_location'),
-          isSaving: provider.isSavingPermission('can_view_location'),
-          onChanged: (val) => provider.togglePermission('can_view_location', val),
+          onChanged: (val) =>
+              provider.togglePermission('can_view_location', val),
         ),
-        
+
         const SizedBox(height: 16),
         LabelManagementCard(
           title: 'Nhãn chính hiển thị',
@@ -202,7 +231,9 @@ class _LinkedContactDetailContent extends StatelessWidget {
         const SizedBox(height: 8),
         LabelManagementCard(
           title: 'Tags phân nhóm',
-          currentLabel: contact.tags.isEmpty ? 'Chưa gắn tag' : contact.tags.map((t) => t.name).join(', '),
+          currentLabel: contact.tags.isEmpty
+              ? 'Chưa gắn tag'
+              : contact.tags.map((t) => t.name).join(', '),
           isUpdating: provider.isUpdatingLabel,
           onTapChange: () => _showTagPicker(context, provider),
         ),
@@ -248,13 +279,21 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 40, height: 4,
+            width: 40,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 24),
-            decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
           const Text(
             'Phân nhóm liên hệ',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF12304A)),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF12304A),
+            ),
           ),
           const SizedBox(height: 8),
           const Text(
@@ -289,7 +328,9 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
-                  side: BorderSide(color: isSelected ? tag.color : Colors.grey.shade300),
+                  side: BorderSide(
+                    color: isSelected ? tag.color : Colors.grey.shade300,
+                  ),
                 ),
               );
             }).toList(),
@@ -308,10 +349,15 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                 backgroundColor: const Color(0xFF2F80ED),
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 elevation: 0,
               ),
-              child: const Text('Lưu thay đổi', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Lưu thay đổi',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ),
           ),
         ],

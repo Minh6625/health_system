@@ -38,10 +38,7 @@ class LinkedContactsEmptyState extends StatelessWidget {
           const Text(
             'Dùng tính năng chia sẻ kết nối để theo dõi sức khoẻ người thân hoặc chia sẻ cho bác sĩ.',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF5B7288),
-            ),
+            style: TextStyle(fontSize: 16, color: Color(0xFF5B7288)),
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(

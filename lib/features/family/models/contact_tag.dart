@@ -19,8 +19,8 @@ class ContactTag {
 class ContactTagsConfig {
   static const List<ContactTag> defaultTags = [
     ContactTag(id: 'family', name: 'Gia đình', color: Color(0xFF2F80ED)),
-    ContactTag(id: 'doctor', name: 'Bác sĩ',  color: Color(0xFF2E9B6F)),
-    ContactTag(id: 'friend', name: 'Bạn bè',  color: Color(0xFFF2A93B)),
+    ContactTag(id: 'doctor', name: 'Bác sĩ', color: Color(0xFF2E9B6F)),
+    ContactTag(id: 'friend', name: 'Bạn bè', color: Color(0xFFF2A93B)),
   ];
 
   static ContactTag? findById(String id) {

@@ -23,7 +23,8 @@ class FamilyDashboardMockProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  List<FamilyProfileSnapshot> get _profiles => SharedFamilyMockProvider().generateDashboardSnapshots();
+  List<FamilyProfileSnapshot> get _profiles =>
+      SharedFamilyMockProvider().generateDashboardSnapshots();
 
   List<FamilyProfileSnapshot> get profiles => _profiles;
   bool get isLoading => _isLoading;
@@ -37,9 +38,23 @@ class FamilyDashboardMockProvider extends ChangeNotifier {
     }
   }
 
-  int get totalTracked => _profiles.isNotEmpty ? _profiles.where((p) => p.hasViewVitalsPermission).length : 0;
-  int get stableCount => _profiles.where((p) => p.riskLevel == 'low' && !p.isSosActive && p.hasViewVitalsPermission).length;
-  int get attentionCount => _profiles.where((p) => (p.riskLevel == 'medium' || p.riskLevel == 'high') && !p.isSosActive && p.hasViewVitalsPermission).length;
+  int get totalTracked => _profiles.isNotEmpty
+      ? _profiles.where((p) => p.hasViewVitalsPermission).length
+      : 0;
+  int get stableCount => _profiles
+      .where(
+        (p) =>
+            p.riskLevel == 'low' && !p.isSosActive && p.hasViewVitalsPermission,
+      )
+      .length;
+  int get attentionCount => _profiles
+      .where(
+        (p) =>
+            (p.riskLevel == 'medium' || p.riskLevel == 'high') &&
+            !p.isSosActive &&
+            p.hasViewVitalsPermission,
+      )
+      .length;
   int get sosCount => _profiles.where((p) => p.isSosActive).length;
 
   List<FamilyProfileSnapshot> get displayList {
@@ -55,13 +70,16 @@ class FamilyDashboardMockProvider extends ChangeNotifier {
         if (r == 'medium') return 2;
         return 1;
       }
+
       return riskWeight(b.riskLevel).compareTo(riskWeight(a.riskLevel));
     });
 
     if (_currentFilter == FamilyFilter.sos) {
       list = list.where((p) => p.isSosActive).toList();
     } else if (_currentFilter == FamilyFilter.attention) {
-      list = list.where((p) => p.riskLevel == 'medium' || p.riskLevel == 'high').toList();
+      list = list
+          .where((p) => p.riskLevel == 'medium' || p.riskLevel == 'high')
+          .toList();
     } else if (_currentFilter == FamilyFilter.priority) {
       list = list.where((p) => p.isPinned).toList();
     }
@@ -69,13 +87,13 @@ class FamilyDashboardMockProvider extends ChangeNotifier {
     return list;
   }
 
-  void loadDashboard() async {
+  void loadDashboard(int currentUserId) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     // Trigger global load if not already loaded
-    await SharedFamilyMockProvider().loadInitialData();
+    await SharedFamilyMockProvider().loadInitialData(currentUserId);
 
     _isLoading = false;
     notifyListeners();

@@ -1,13 +1,18 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:healthguard/features/family/models/contact_tag.dart';
 import 'package:healthguard/features/family/models/linked_contact_model.dart';
 import 'package:healthguard/features/family/models/family_profile_snapshot.dart';
 
+import 'package:healthguard/features/family/repositories/family_repository.dart';
+
 class SharedFamilyMockProvider extends ChangeNotifier {
   // Singleton instance
-  static final SharedFamilyMockProvider _instance = SharedFamilyMockProvider._internal();
+  static final SharedFamilyMockProvider _instance =
+      SharedFamilyMockProvider._internal();
   factory SharedFamilyMockProvider() => _instance;
   SharedFamilyMockProvider._internal();
+
+  final FamilyRepository _repository = FamilyRepository();
 
   bool _isLoading = false;
   String? _error;
@@ -18,62 +23,90 @@ class SharedFamilyMockProvider extends ChangeNotifier {
   String? get error => _error;
   List<LinkedContactModel> get contacts => _contacts;
 
-  List<LinkedContactModel> get pendingRequests => 
+  List<LinkedContactModel> get pendingRequests =>
       _contacts.where((c) => c.status == ContactStatus.pending).toList();
-      
-  List<LinkedContactModel> get acceptedContacts => 
+
+  List<LinkedContactModel> get acceptedContacts =>
       _contacts.where((c) => c.status == ContactStatus.accepted).toList();
 
-  Future<void> loadInitialData() async {
-    if (_contacts.isNotEmpty) return; // Already loaded
-
+  Future<void> loadInitialData(int currentUserId) async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final relationships = await _repository.getRelationships();
 
-    _contacts = [
-      LinkedContactModel(
-        id: '1',
-        displayName: 'Bố - Nguyễn Văn A',
-        email: 'nguyen.a@example.com',
-        role: ContactRole.family,
-        tags: [ContactTagsConfig.defaultTags[0]], // Gia đình
-        primaryRelationshipLabel: 'Gia đình',
-        status: ContactStatus.accepted,
-        permissions: ['can_view_vitals', 'can_receive_alerts'],
-      ),
-      LinkedContactModel(
-        id: '2',
-        displayName: 'Mẹ - Trần Thị B',
-        email: 'tran.b@example.com',
-        role: ContactRole.family,
-        tags: [ContactTagsConfig.defaultTags[0]], // Gia đình
-        primaryRelationshipLabel: 'Gia đình',
-        status: ContactStatus.accepted,
-        permissions: ['can_view_vitals', 'can_receive_alerts', 'can_view_location'],
-      ),
-      LinkedContactModel(
-        id: '3',
-        displayName: 'Bác sĩ - Phạm Văn D',
-        email: 'doctor.pham@example.com',
-        role: ContactRole.doctor,
-        tags: [ContactTagsConfig.defaultTags[1]], // Bác sĩ
-        primaryRelationshipLabel: 'Bác sĩ',
-        status: ContactStatus.accepted,
-        permissions: ['can_view_vitals'],
-      ),
-      LinkedContactModel(
-        id: 'req_1',
-        displayName: 'Cô - Lê Thị C',
-        email: 'le.c@example.com',
-        role: ContactRole.unclassified,
-        tags: const [], // chưa gắn tag
-        primaryRelationshipLabel: 'Chưa phân loại',
-        status: ContactStatus.pending,
-        isIncomingRequest: true,
-      ),
-    ];
+      _contacts = relationships.map((rel) {
+        bool isIncoming = rel['patient_id'] == currentUserId;
+        String displayName = isIncoming
+            ? rel['caregiver_name']
+            : rel['patient_name'];
+        String email = isIncoming
+            ? rel['caregiver_email']
+            : rel['patient_email'];
+        String? relationshipType = rel['relationship_type'];
+
+        ContactRole role = ContactRole.unclassified;
+        if (relationshipType == 'family') role = ContactRole.family;
+        if (relationshipType == 'doctor') role = ContactRole.doctor;
+
+        List<String> perms = [];
+        if (rel['can_view_vitals'] == true) perms.add('can_view_vitals');
+        if (rel['can_receive_alerts'] == true) perms.add('can_receive_alerts');
+        if (rel['can_view_location'] == true) perms.add('can_view_location');
+        if (rel['has_view_vitals_permission'] == true)
+          perms.add('has_view_vitals_permission');
+
+        // Parse tags from API
+        List<ContactTag> parsedTags = [];
+        if (rel['tags'] != null && rel['tags'] is List) {
+          for (var tagMap in rel['tags']) {
+            if (tagMap is Map<String, dynamic> && tagMap.containsKey('id')) {
+              final matchedTag = ContactTagsConfig.findById(
+                tagMap['id'].toString(),
+              );
+              if (matchedTag != null) {
+                parsedTags.add(matchedTag);
+              } else {
+                parsedTags.add(
+                  ContactTag(
+                    id: tagMap['id'].toString(),
+                    name: tagMap['name']?.toString() ?? 'Unknown',
+                    color: const Color(0xFF9E9E9E),
+                  ),
+                );
+              }
+            }
+          }
+        }
+
+        // Fallback for mock/empty data
+        if (parsedTags.isEmpty && role == ContactRole.family) {
+          parsedTags = [ContactTagsConfig.defaultTags[0]];
+        }
+
+        String primaryLabel =
+            rel['primary_relationship_label'] ??
+            (relationshipType == 'family' ? 'Gia đình' : 'Chưa phân loại');
+
+        return LinkedContactModel(
+          id: rel['id'].toString(),
+          displayName: displayName,
+          email: email,
+          role: role,
+          tags: parsedTags,
+          primaryRelationshipLabel: primaryLabel,
+          status: rel['status'] == 'pending'
+              ? ContactStatus.pending
+              : ContactStatus.accepted,
+          isIncomingRequest: isIncoming,
+          permissions: perms,
+        );
+      }).toList();
+    } catch (e) {
+      _error = e.toString().replaceAll('Exception: ', '').trim();
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -84,16 +117,20 @@ class SharedFamilyMockProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 400));
-    
-    final index = _contacts.indexWhere((c) => c.id == contactId);
-    if (index != -1) {
-      _contacts[index] = _contacts[index].copyWith(
-        status: ContactStatus.accepted,
-        permissions: permissions,
-      );
+    try {
+      await _repository.acceptRelationship(int.parse(contactId));
+
+      final index = _contacts.indexWhere((c) => c.id == contactId);
+      if (index != -1) {
+        _contacts[index] = _contacts[index].copyWith(
+          status: ContactStatus.accepted,
+          permissions: permissions,
+        );
+      }
+    } catch (e) {
+      debugPrint('Error accepting request: $e');
     }
-    
+
     _isLoading = false;
     notifyListeners();
   }
@@ -102,11 +139,16 @@ class SharedFamilyMockProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 400));
-    _contacts.removeWhere((c) => c.id == contactId);
-    
-    _isLoading = false;
-    notifyListeners();
+    try {
+      await _repository.removeRelationshipById(int.parse(contactId));
+      _contacts.removeWhere((c) => c.id == contactId);
+    } catch (e) {
+      debugPrint('Error rejecting request: $e');
+      _error = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   // Phase 4: Add Contact — nhận tags thay vì role cứng
@@ -114,51 +156,119 @@ class SharedFamilyMockProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final tagsData = tags.map((t) => {'id': t.id, 'name': t.name}).toList();
+      final primaryLabel = tags.isNotEmpty ? tags.first.name : 'Chưa phân loại';
 
-    final primaryLabel = tags.isNotEmpty ? tags.first.name : 'Chưa phân loại';
+      await _repository.sendConnectionRequest(
+        email: email,
+        tags: tagsData,
+        primaryLabel: primaryLabel,
+      );
 
-    _contacts.add(LinkedContactModel(
-      id: 'req_${DateTime.now().millisecondsSinceEpoch}',
-      displayName: email.split('@').first,
-      email: email,
-      tags: tags,
-      primaryRelationshipLabel: primaryLabel,
-      role: ContactRole.unclassified,
-      status: ContactStatus.pending,
-      isIncomingRequest: false, // Outgoing
-    ));
+      // Cần load lại danh sách từ server thay vì add tay để có ID thật
+      // tạm fake lại một đối tượng để UI phản hồi nhanh
+      _contacts.add(
+        LinkedContactModel(
+          id: 'req_${DateTime.now().millisecondsSinceEpoch}',
+          displayName: email.split('@').first,
+          email: email,
+          tags: tags,
+          primaryRelationshipLabel: primaryLabel,
+          role: ContactRole.unclassified,
+          status: ContactStatus.pending,
+          isIncomingRequest: false, // Outgoing
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error sending request: $e');
+      _error = e.toString();
+    }
 
     _isLoading = false;
     notifyListeners();
   }
 
   // Phase 5: Detail updates
-  Future<void> updateContactPermissions(String contactId, List<String> newPermissions) async {
+  Future<void> updateContactPermissions(
+    String contactId,
+    List<String> newPermissions,
+  ) async {
     final index = _contacts.indexWhere((c) => c.id == contactId);
-    if (index != -1) {
-      _contacts[index] = _contacts[index].copyWith(permissions: newPermissions);
-      notifyListeners();
+    if (index == -1) return;
+
+    // Optimistic Update: prevent race conditions when tapping toggles quickly
+    final oldContact = _contacts[index];
+    _contacts[index] = oldContact.copyWith(permissions: newPermissions);
+    notifyListeners();
+
+    try {
+      await _repository.updateRelationship(int.parse(contactId), {
+        'can_view_vitals': newPermissions.contains('can_view_vitals'),
+        'can_receive_alerts': newPermissions.contains('can_receive_alerts'),
+        'can_view_location': newPermissions.contains('can_view_location'),
+      });
+    } catch (e) {
+      debugPrint('Error updating permissions: $e');
+      // Rollback
+      final rollbackIndex = _contacts.indexWhere((c) => c.id == contactId);
+      if (rollbackIndex != -1) {
+        _contacts[rollbackIndex] = oldContact;
+        notifyListeners();
+      }
+      rethrow;
     }
   }
 
-  Future<void> updateContactTags(String contactId, List<ContactTag> newTags) async {
-    final index = _contacts.indexWhere((c) => c.id == contactId);
-    if (index != -1) {
-      _contacts[index] = _contacts[index].copyWith(
-        tags: newTags,
-        // Cập nhật luôn primary label nếu tags thay đổi và có ít nhất 1 tag
-        primaryRelationshipLabel: newTags.isNotEmpty ? newTags.first.name : null,
-      );
-      notifyListeners();
+  Future<void> updateContactTags(
+    String contactId,
+    List<ContactTag> newTags,
+  ) async {
+    try {
+      final tagsData = newTags
+          .map((t) => {'id': t.id, 'name': t.name})
+          .toList();
+      String? newPrimaryLabel = newTags.isNotEmpty ? newTags.first.name : null;
+
+      await _repository.updateRelationship(int.parse(contactId), {
+        'tags': tagsData,
+        'primary_relationship_label': newPrimaryLabel,
+      });
+
+      final index = _contacts.indexWhere((c) => c.id == contactId);
+      if (index != -1) {
+        _contacts[index] = _contacts[index].copyWith(
+          tags: newTags,
+          // Cập nhật luôn primary label nếu tags thay đổi và có ít nhất 1 tag
+          primaryRelationshipLabel: newPrimaryLabel,
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error updating tags: $e');
+      rethrow;
     }
   }
 
-  Future<void> updateContactPrimaryLabel(String contactId, String newLabel) async {
-    final index = _contacts.indexWhere((c) => c.id == contactId);
-    if (index != -1) {
-      _contacts[index] = _contacts[index].copyWith(primaryRelationshipLabel: newLabel);
-      notifyListeners();
+  Future<void> updateContactPrimaryLabel(
+    String contactId,
+    String newLabel,
+  ) async {
+    try {
+      await _repository.updateRelationship(int.parse(contactId), {
+        'primary_relationship_label': newLabel,
+      });
+
+      final index = _contacts.indexWhere((c) => c.id == contactId);
+      if (index != -1) {
+        _contacts[index] = _contacts[index].copyWith(
+          primaryRelationshipLabel: newLabel,
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error updating primary label: $e');
+      rethrow;
     }
   }
 
@@ -171,8 +281,14 @@ class SharedFamilyMockProvider extends ChangeNotifier {
   }
 
   Future<void> unlinkContact(String contactId) async {
-    _contacts.removeWhere((c) => c.id == contactId);
-    notifyListeners();
+    try {
+      await _repository.removeRelationshipById(int.parse(contactId));
+      _contacts.removeWhere((c) => c.id == contactId);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error unlinking contact: $e');
+      rethrow;
+    }
   }
 
   LinkedContactModel? getContactById(String id) {
@@ -194,9 +310,16 @@ class SharedFamilyMockProvider extends ChangeNotifier {
 
       // Mock BP: Mẹ tăng nhẹ, Bác sĩ cao, còn lại bình thường
       int? sys, dia;
-      if (c.id == '2') { sys = 138; dia = 88; }
-      else if (c.id == '3') { sys = 145; dia = 92; }
-      else { sys = 118; dia = 76; }
+      if (c.id == '2') {
+        sys = 138;
+        dia = 88;
+      } else if (c.id == '3') {
+        sys = 145;
+        dia = 92;
+      } else {
+        sys = 118;
+        dia = 76;
+      }
 
       // Mock Temp: Mẹ sốt nhẹ, còn lại bình thường
       double temp = c.id == '2' ? 37.8 : 36.5 + (c.id.hashCode % 3) * 0.1;
@@ -204,21 +327,37 @@ class SharedFamilyMockProvider extends ChangeNotifier {
       // Mock sleep data
       int sleepMin;
       String sleepQual;
-      if (c.id == '1') { sleepMin = 480; sleepQual = 'Tốt'; }
-      else if (c.id == '2') { sleepMin = 330; sleepQual = 'Kém'; }
-      else { sleepMin = 420; sleepQual = 'Trung bình'; }
+      if (c.id == '1') {
+        sleepMin = 480;
+        sleepQual = 'Tốt';
+      } else if (c.id == '2') {
+        sleepMin = 330;
+        sleepQual = 'Kém';
+      } else {
+        sleepMin = 420;
+        sleepQual = 'Trung bình';
+      }
 
       // Mock health score 7 ngày
       int score;
       String scoreLevel;
-      if (c.id == '1') { score = 72; scoreLevel = 'Trung bình'; }
-      else if (c.id == '2') { score = 48; scoreLevel = 'Thấp'; }
-      else { score = 85; scoreLevel = 'Cao'; }
+      if (c.id == '1') {
+        score = 72;
+        scoreLevel = 'Trung bình';
+      } else if (c.id == '2') {
+        score = 48;
+        scoreLevel = 'Thấp';
+      } else {
+        score = 85;
+        scoreLevel = 'Cao';
+      }
 
       return FamilyProfileSnapshot(
         id: c.id,
         name: c.displayName.split(' - ').last,
-        relation: c.primaryRelationshipLabel.isNotEmpty ? c.primaryRelationshipLabel : c.role.label,
+        relation: c.primaryRelationshipLabel.isNotEmpty
+            ? c.primaryRelationshipLabel
+            : c.role.label,
         heartRate: 70 + (c.id.hashCode % 30),
         spo2: 95 + (c.id.hashCode % 5),
         bloodPressureSystolic: sys,
@@ -228,9 +367,15 @@ class SharedFamilyMockProvider extends ChangeNotifier {
         isSosActive: isSos,
         sosId: isSos ? 'sos-mock-${c.id}-001' : null,
         isPinned: pinned,
-        hasViewVitalsPermission: c.permissions.contains('can_view_vitals'),
-        lastUpdated: DateTime.now().subtract(Duration(minutes: c.hashCode.abs() % 10)),
-        specialNote: isSos ? 'Cần hỗ trợ ngay!' : (risk == 'medium' ? 'Huyết áp cần theo dõi' : ''),
+        hasViewVitalsPermission: c.permissions.contains(
+          'has_view_vitals_permission',
+        ),
+        lastUpdated: DateTime.now().subtract(
+          Duration(minutes: c.hashCode.abs() % 10),
+        ),
+        specialNote: isSos
+            ? 'Cần hỗ trợ ngay!'
+            : (risk == 'medium' ? 'Huyết áp cần theo dõi' : ''),
         sleepDurationMinutes: sleepMin,
         sleepQuality: sleepQual,
         healthScore7Days: score,

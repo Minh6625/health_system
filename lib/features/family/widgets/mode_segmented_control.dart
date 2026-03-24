@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum AddContactMode { scan, myCode }
+enum AddContactMode { scan, myCode, searchPhone }
 
 class ModeSegmentedControl extends StatelessWidget {
   final AddContactMode currentMode;
@@ -38,6 +38,14 @@ class ModeSegmentedControl extends StatelessWidget {
               onTap: () => onModeChanged(AddContactMode.myCode),
             ),
           ),
+          Expanded(
+            child: _buildSegment(
+              title: 'SĐT',
+              icon: Icons.search,
+              isSelected: currentMode == AddContactMode.searchPhone,
+              onTap: () => onModeChanged(AddContactMode.searchPhone),
+            ),
+          ),
         ],
       ),
     );
@@ -64,7 +72,7 @@ class ModeSegmentedControl extends StatelessWidget {
                     color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 4,
                     offset: const Offset(0, 2),
-                  )
+                  ),
                 ]
               : null,
         ),
@@ -74,7 +82,9 @@ class ModeSegmentedControl extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: isSelected ? const Color(0xFF12304A) : const Color(0xFF5B7288),
+              color: isSelected
+                  ? const Color(0xFF12304A)
+                  : const Color(0xFF5B7288),
             ),
             const SizedBox(width: 8),
             Text(
@@ -82,7 +92,9 @@ class ModeSegmentedControl extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? const Color(0xFF12304A) : const Color(0xFF5B7288),
+                color: isSelected
+                    ? const Color(0xFF12304A)
+                    : const Color(0xFF5B7288),
               ),
             ),
           ],

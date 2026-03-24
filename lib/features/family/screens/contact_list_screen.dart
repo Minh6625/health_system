@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import '../widgets/linked_contacts_hero_card.dart';
 import '../widgets/pending_requests_section.dart';
 import '../widgets/grouped_contacts_section.dart';
@@ -18,7 +19,12 @@ class _ContactListScreenState extends State<ContactListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<SharedFamilyMockProvider>().loadInitialData();
+      final auth = context.read<AuthProvider>();
+      if (auth.currentUser != null) {
+        context.read<SharedFamilyMockProvider>().loadInitialData(
+          auth.currentUser!.userId,
+        );
+      }
     });
   }
 
@@ -41,7 +47,12 @@ class _ContactListScreenState extends State<ContactListScreen> {
           }
 
           return RefreshIndicator(
-            onRefresh: () => provider.loadInitialData(),
+            onRefresh: () async {
+              final auth = context.read<AuthProvider>();
+              if (auth.currentUser != null) {
+                await provider.loadInitialData(auth.currentUser!.userId);
+              }
+            },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -80,7 +91,11 @@ class _ContactListScreenState extends State<ContactListScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.contact_mail_outlined, size: 68, color: Colors.teal.shade300),
+            Icon(
+              Icons.contact_mail_outlined,
+              size: 68,
+              color: Colors.teal.shade300,
+            ),
             const SizedBox(height: 16),
             Text(
               provider.error!,
@@ -89,7 +104,12 @@ class _ContactListScreenState extends State<ContactListScreen> {
             ),
             const SizedBox(height: 18),
             ElevatedButton.icon(
-              onPressed: () => provider.loadInitialData(),
+              onPressed: () {
+                final auth = context.read<AuthProvider>();
+                if (auth.currentUser != null) {
+                  provider.loadInitialData(auth.currentUser!.userId);
+                }
+              },
               icon: const Icon(Icons.refresh),
               label: const Text('Thử lại'),
             ),

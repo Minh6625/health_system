@@ -21,7 +21,11 @@ class PendingRequestCard extends StatelessWidget {
           await provider.acceptRequest(request.id, permissions);
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Đã chấp nhận liên kết với ${request.displayName}')),
+              SnackBar(
+                content: Text(
+                  'Đã chấp nhận liên kết với ${request.displayName}',
+                ),
+              ),
             );
           }
         },
@@ -33,9 +37,15 @@ class PendingRequestCard extends StatelessWidget {
     final provider = context.read<SharedFamilyMockProvider>();
     await provider.rejectRequest(request.id);
     if (context.mounted) {
-       ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Đã từ chối liên kết với ${request.displayName}')),
-       );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            request.isIncomingRequest
+                ? 'Đã từ chối liên kết với ${request.displayName}'
+                : 'Đã hủy yêu cầu gửi đến ${request.displayName}',
+          ),
+        ),
+      );
     }
   }
 
@@ -45,7 +55,9 @@ class PendingRequestCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFF6E9), // bg.pending
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFF2A93B).withValues(alpha: 0.3)),
+        border: Border.all(
+          color: const Color(0xFFF2A93B).withValues(alpha: 0.3),
+        ),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -56,7 +68,9 @@ class PendingRequestCard extends StatelessWidget {
                 radius: 24,
                 backgroundColor: const Color(0xFFF2A93B).withValues(alpha: 0.2),
                 child: Text(
-                  request.displayName.isNotEmpty ? request.displayName[0].toUpperCase() : '?',
+                  request.displayName.isNotEmpty
+                      ? request.displayName[0].toUpperCase()
+                      : '?',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -78,9 +92,11 @@ class PendingRequestCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Muốn kết nối với bạn',
-                      style: TextStyle(
+                    Text(
+                      request.isIncomingRequest
+                          ? 'Muốn kết nối với bạn'
+                          : 'Đang chờ xác nhận...',
+                      style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF5B7288),
                       ),
@@ -105,26 +121,39 @@ class PendingRequestCard extends StatelessWidget {
                     ),
                     minimumSize: const Size(0, 48), // Accessbility standard
                   ),
-                  child: const Text('Hủy', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () => _onAccept(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2F80ED), // brand.primary
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  child: Text(
+                    request.isIncomingRequest ? 'Từ chối' : 'Hủy yêu cầu',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                    elevation: 0,
-                    minimumSize: const Size(0, 48),
                   ),
-                  child: const Text('Xác nhận', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
+              if (request.isIncomingRequest) const SizedBox(width: 12),
+              if (request.isIncomingRequest)
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => _onAccept(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2F80ED), // brand.primary
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                      minimumSize: const Size(0, 48),
+                    ),
+                    child: const Text(
+                      'Xác nhận',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ],

@@ -25,12 +25,16 @@ class FamilySOSPriorityBanner extends StatelessWidget {
             color: const Color(0xFFD95C5C).withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.white,
+            size: 28,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

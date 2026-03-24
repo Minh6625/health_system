@@ -18,7 +18,9 @@ class UnlinkActionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFDEEEE),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFC94A4A).withValues(alpha: 0.3)),
+        border: Border.all(
+          color: const Color(0xFFC94A4A).withValues(alpha: 0.3),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,7 +52,9 @@ class UnlinkActionCard extends StatelessWidget {
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFC94A4A)),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFFC94A4A),
+                        ),
                       ),
                     )
                   : const Text(

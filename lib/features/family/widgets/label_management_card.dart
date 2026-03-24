@@ -55,7 +55,9 @@ class LabelManagementCard extends StatelessWidget {
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF5B7288)),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF5B7288),
+                      ),
                     ),
                   )
                 else ...[

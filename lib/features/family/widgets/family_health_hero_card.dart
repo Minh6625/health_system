@@ -33,7 +33,11 @@ class FamilyHealthHeroCard extends StatelessWidget {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.family_restroom, color: Color(0xFF2F80ED), size: 20),
+                child: const Icon(
+                  Icons.family_restroom,
+                  color: Color(0xFF2F80ED),
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
               Expanded(
