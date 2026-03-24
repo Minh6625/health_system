@@ -79,10 +79,9 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
-
-                <key>NSLocationWhenInUseUsageDescription</key>
-                <string>Ứng dụng cần quyền vị trí để gửi tọa độ của bạn khi có trường hợp khẩn cấp (SOS).</string>
-                <key>NSLocationAlwaysUsageDescription</key>
-                <string>Ứng dụng cần quyền truy cập vị trí liên tục để giúp bảo vệ bạn.</string>
-</dict>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Ứng dụng cần quyền vị trí để gửi tọa độ của bạn khi có trường hợp khẩn cấp (SOS).</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>Ứng dụng cần quyền truy cập vị trí liên tục để giúp bảo vệ bạn.</string>
+	</dict>
 </plist>

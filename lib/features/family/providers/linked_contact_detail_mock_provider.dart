@@ -23,11 +23,7 @@ class LinkedContactDetailMockProvider extends ChangeNotifier {
   }
 
   // Track saving state per permission key to show inline loading indicator
-  final Map<String, bool> _savingPermissions = {
-    'can_view_vitals': false,
-    'can_receive_alerts': false,
-    'can_view_location': false,
-  };
+  
 
   bool _isUnlinking = false;
   bool _isUpdatingLabel = false;
@@ -42,8 +38,7 @@ class LinkedContactDetailMockProvider extends ChangeNotifier {
   bool get isUnlinking => _isUnlinking;
   bool get isUpdatingLabel => _isUpdatingLabel;
 
-  bool isSavingPermission(String key) => _savingPermissions[key] ?? false;
-
+  
   void loadContact(String contactId) {
     _contactId = contactId;
     _isLoading = false;
@@ -54,26 +49,26 @@ class LinkedContactDetailMockProvider extends ChangeNotifier {
     final currentContact = contact;
     if (currentContact == null) return false;
 
-    // Set loading state for this specific permission
-    _savingPermissions[key] = true;
-    notifyListeners();
+    try {
+      final newPermissions = List<String>.from(currentContact.permissions);
+      if (value) {
+        if (!newPermissions.contains(key)) newPermissions.add(key);
+      } else {
+        newPermissions.remove(key);
+      }
 
-    // Simulate network request (160ms as per plan)
-    await Future.delayed(const Duration(milliseconds: 160));
+      // No await, background update
+      SharedFamilyMockProvider().updateContactPermissions(
+        currentContact.id,
+        newPermissions,
+      ).catchError((e) {
+        debugPrint('Toggle loi: ');
+      });
 
-    // Update local state
-    final newPermissions = List<String>.from(currentContact.permissions);
-    if (value) {
-      if (!newPermissions.contains(key)) newPermissions.add(key);
-    } else {
-      newPermissions.remove(key);
+      return true;
+    } catch (e) {
+      return false;
     }
-
-    await SharedFamilyMockProvider().updateContactPermissions(currentContact.id, newPermissions);
-    
-    _savingPermissions[key] = false;
-    // SharedFamilyMockProvider already notifies, which bubbles up via _onGlobalChange
-    return true;
   }
 
   Future<bool> updateTags(List<ContactTag> newTags) async {

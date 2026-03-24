@@ -8,15 +8,22 @@ import 'package:healthguard/features/family/widgets/family_sos_full_screen_overl
 import 'package:healthguard/features/family/widgets/locked_profile_card.dart';
 import 'package:provider/provider.dart';
 
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
+
 class FamilyDashboardScreen extends StatelessWidget {
   const FamilyDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) {
+      create: (context) {
+        final auth = context.read<AuthProvider>();
         final provider = FamilyDashboardMockProvider();
-        Future.microtask(() => provider.loadDashboard());
+        if (auth.currentUser != null) {
+          Future.microtask(
+            () => provider.loadDashboard(auth.currentUser!.userId),
+          );
+        }
         return provider;
       },
       child: const _FamilyDashboardContent(),
@@ -28,7 +35,8 @@ class _FamilyDashboardContent extends StatefulWidget {
   const _FamilyDashboardContent();
 
   @override
-  State<_FamilyDashboardContent> createState() => _FamilyDashboardContentState();
+  State<_FamilyDashboardContent> createState() =>
+      _FamilyDashboardContentState();
 }
 
 class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
@@ -40,13 +48,17 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     final provider = context.watch<FamilyDashboardMockProvider>();
     if (!provider.isLoading && !_sosOverlayShown && provider.sosCount > 0) {
       _sosOverlayShown = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showSosOverlay(provider));
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _showSosOverlay(provider),
+      );
     }
   }
 
   void _showSosOverlay(FamilyDashboardMockProvider provider) {
     if (!mounted) return;
-    final sosProfiles = provider.displayList.where((p) => p.isSosActive).toList();
+    final sosProfiles = provider.displayList
+        .where((p) => p.isSosActive)
+        .toList();
     if (sosProfiles.isEmpty) return;
 
     showGeneralDialog(
@@ -69,17 +81,15 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
   }
 
   void _onContactTapped(BuildContext context, String profileId) {
-    Navigator.of(context).pushNamed(
-      AppRouter.personDetail,
-      arguments: {'profileId': profileId},
-    );
+    Navigator.of(
+      context,
+    ).pushNamed(AppRouter.personDetail, arguments: {'profileId': profileId});
   }
 
   void _onManageContactsTapped(BuildContext context) {
-    Navigator.of(context).pushNamed(
-      AppRouter.familyManagement,
-      arguments: {'initialTab': 1},
-    );
+    Navigator.of(
+      context,
+    ).pushNamed(AppRouter.familyManagement, arguments: {'initialTab': 1});
   }
 
   @override
@@ -92,10 +102,15 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     );
   }
 
-  Widget _buildBody(BuildContext context, FamilyDashboardMockProvider provider) {
+  Widget _buildBody(
+    BuildContext context,
+    FamilyDashboardMockProvider provider,
+  ) {
     if (provider.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2F80ED))),
+        child: CircularProgressIndicator(
+          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2F80ED)),
+        ),
       );
     }
 
@@ -108,11 +123,20 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
             const SizedBox(height: 16),
             const Text(
               'Có lỗi xảy ra khi tải dữ liệu',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF12304A)),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF12304A),
+              ),
             ),
             const SizedBox(height: 8),
             ElevatedButton(
-              onPressed: () => provider.loadDashboard(),
+              onPressed: () {
+                final auth = context.read<AuthProvider>();
+                if (auth.currentUser != null) {
+                  provider.loadDashboard(auth.currentUser!.userId);
+                }
+              },
               child: const Text('Thử lại'),
             ),
           ],
@@ -122,7 +146,12 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
 
     if (provider.profiles.isEmpty) {
       return RefreshIndicator(
-        onRefresh: () async => provider.loadDashboard(),
+        onRefresh: () async {
+          final auth = context.read<AuthProvider>();
+          if (auth.currentUser != null) {
+            provider.loadDashboard(auth.currentUser!.userId);
+          }
+        },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
@@ -135,7 +164,12 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     }
 
     return RefreshIndicator(
-      onRefresh: () async => provider.loadDashboard(),
+      onRefresh: () async {
+        final auth = context.read<AuthProvider>();
+        if (auth.currentUser != null) {
+          provider.loadDashboard(auth.currentUser!.userId);
+        }
+      },
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(bottom: 24),
@@ -168,7 +202,10 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
             if (!profile.hasViewVitalsPermission) {
               return LockedProfileCard(
                 profile: profile,
-                onManageRoles: () => Navigator.of(context).pushNamed(AppRouter.linkedContactDetail, arguments: {'contactId': profile.id}),
+                onManageRoles: () => Navigator.of(context).pushNamed(
+                  AppRouter.linkedContactDetail,
+                  arguments: {'contactId': profile.id},
+                ),
               );
             }
             return FamilyProfileHealthCard(
@@ -204,7 +241,10 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     );
   }
 
-  Widget _buildFilterChips(BuildContext context, FamilyDashboardMockProvider provider) {
+  Widget _buildFilterChips(
+    BuildContext context,
+    FamilyDashboardMockProvider provider,
+  ) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -219,7 +259,11 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     );
   }
 
-  Widget _buildChip(FamilyDashboardMockProvider provider, String label, FamilyFilter filter) {
+  Widget _buildChip(
+    FamilyDashboardMockProvider provider,
+    String label,
+    FamilyFilter filter,
+  ) {
     final isSelected = provider.currentFilter == filter;
     return Padding(
       padding: const EdgeInsets.only(right: 8.0),
@@ -240,7 +284,9 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: isSelected ? const Color(0xFFB8CAE0) : const Color(0xFFD8E3EE),
+            color: isSelected
+                ? const Color(0xFFB8CAE0)
+                : const Color(0xFFD8E3EE),
           ),
         ),
       ),

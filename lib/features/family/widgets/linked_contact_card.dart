@@ -11,9 +11,15 @@ class LinkedContactCard extends StatelessWidget {
     if (contact.permissions.isEmpty) return 'Chỉ xem thông tin cơ bản';
 
     final pItems = <String>[];
-    if (contact.permissions.contains('can_receive_alerts')) pItems.add('Nhận cảnh báo (SOS)');
-    if (contact.permissions.contains('can_view_vitals')) pItems.add('Xem chỉ số sức khoẻ');
-    if (contact.permissions.contains('can_view_location')) pItems.add('Xem vị trí');
+    if (contact.permissions.contains('can_receive_alerts')) {
+      pItems.add('Nhận cảnh báo (SOS)');
+    }
+    if (contact.permissions.contains('can_view_vitals')) {
+      pItems.add('Xem chỉ số sức khoẻ');
+    }
+    if (contact.permissions.contains('can_view_location')) {
+      pItems.add('Xem vị trí');
+    }
 
     return pItems.join(' • ');
   }
@@ -38,7 +44,7 @@ class LinkedContactCard extends StatelessWidget {
             color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 10,
             offset: const Offset(0, 4),
-          )
+          ),
         ],
       ),
       child: Material(
@@ -54,7 +60,9 @@ class LinkedContactCard extends StatelessWidget {
                   radius: 26,
                   backgroundColor: const Color(0xFFEEF4FF),
                   child: Text(
-                    contact.displayName.isNotEmpty ? contact.displayName[0].toUpperCase() : 'U',
+                    contact.displayName.isNotEmpty
+                        ? contact.displayName[0].toUpperCase()
+                        : 'U',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -81,17 +89,28 @@ class LinkedContactCard extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 4),
                           child: Wrap(
                             spacing: 4,
-                            children: contact.tags.map((tag) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: tag.color.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                tag.name,
-                                style: TextStyle(fontSize: 10, color: tag.color, fontWeight: FontWeight.bold),
-                              ),
-                            )).toList(),
+                            children: contact.tags
+                                .map(
+                                  (tag) => Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: tag.color.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      tag.name,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: tag.color,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
                           ),
                         ),
                       Text(

@@ -155,7 +155,8 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
                       // Tab Liên hệ với badge pending
                       Tab(
                         child: Selector<SharedFamilyMockProvider, int>(
-                          selector: (context, provider) => provider.pendingRequests.length,
+                          selector: (context, provider) =>
+                              provider.pendingRequests.length,
                           builder: (context, pendingCount, child) {
                             if (pendingCount > 0) {
                               return Row(
@@ -189,7 +190,8 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
                       if (_canReceiveAlerts)
                         Tab(
                           child: Selector<EmergencyCaregiverProvider, int>(
-                            selector: (context, provider) => provider.activeCount,
+                            selector: (context, provider) =>
+                                provider.activeCount,
                             builder: (context, activeCount, child) {
                               if (activeCount > 0) {
                                 return Row(

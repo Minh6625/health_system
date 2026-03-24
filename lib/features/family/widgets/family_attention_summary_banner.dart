@@ -15,7 +15,9 @@ class FamilyAttentionSummaryBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFDF4E5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFF2A93B).withValues(alpha: 0.3)),
+        border: Border.all(
+          color: const Color(0xFFF2A93B).withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: [

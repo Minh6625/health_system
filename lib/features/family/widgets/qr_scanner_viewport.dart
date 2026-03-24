@@ -42,7 +42,7 @@ class QRScannerViewport extends StatelessWidget {
                     color: const Color(0xFF2F80ED).withValues(alpha: 0.8),
                     blurRadius: 8,
                     spreadRadius: 2,
-                  )
+                  ),
                 ],
                 color: const Color(0xFF2F80ED),
               ),
@@ -54,7 +54,7 @@ class QRScannerViewport extends StatelessWidget {
             child: Text(
               'Đưa mã QR vào giữa khung để quét',
               style: TextStyle(
-                color: Colors.white, 
+                color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -70,7 +70,11 @@ class QRScannerViewport extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: IconButton(
-                icon: const Icon(Icons.flash_off, color: Colors.white, size: 24),
+                icon: const Icon(
+                  Icons.flash_off,
+                  color: Colors.white,
+                  size: 24,
+                ),
                 onPressed: () {},
               ),
             ),
@@ -85,7 +89,9 @@ class QRScannerViewport extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade600,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: const Text('Sim: OK'),
                 ),
@@ -95,13 +101,15 @@ class QRScannerViewport extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red.shade600,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                   child: const Text('Sim: Error'),
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );

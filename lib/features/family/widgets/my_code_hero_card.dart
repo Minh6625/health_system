@@ -61,7 +61,11 @@ class MyCodeHeroCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.timer_outlined, size: 16, color: Color(0xFFF2A93B)),
+              const Icon(
+                Icons.timer_outlined,
+                size: 16,
+                color: Color(0xFFF2A93B),
+              ),
               const SizedBox(width: 6),
               Text(
                 'Có hiệu lực đến $expiryText',

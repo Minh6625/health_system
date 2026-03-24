@@ -9,16 +9,23 @@ class PendingRequestsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (requests.isEmpty) return const SizedBox.shrink();
+
+    bool hasIncoming = requests.any((req) => req.isIncomingRequest);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(Icons.info_outline, color: Color(0xFFF2A93B)), // warning color
+            Icon(
+              Icons.info_outline,
+              color: hasIncoming ? const Color(0xFFF2A93B) : Colors.blueGrey,
+            ), // warning color
             const SizedBox(width: 8),
-            const Text(
-              'Cần xử lý ngay',
-              style: TextStyle(
+            Text(
+              hasIncoming ? 'Cần xử lý ngay' : 'Đang chờ xác nhận',
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF12304A),
@@ -28,7 +35,7 @@ class PendingRequestsSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFF2A93B),
+                color: hasIncoming ? const Color(0xFFF2A93B) : Colors.blueGrey,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
@@ -43,10 +50,12 @@ class PendingRequestsSection extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        ...requests.map((request) => Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: PendingRequestCard(request: request),
-        )),
+        ...requests.map(
+          (request) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: PendingRequestCard(request: request),
+          ),
+        ),
       ],
     );
   }

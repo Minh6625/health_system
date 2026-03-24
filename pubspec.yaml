@@ -51,6 +51,7 @@ dependencies:
   latlong2: ^0.9.1
   lottie: ^3.3.2
 
+  flutter_native_splash: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -62,7 +63,6 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.4.0
   mockito: ^5.4.4
   build_runner: ^2.4.9
 

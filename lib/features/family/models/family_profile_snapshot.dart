@@ -11,9 +11,11 @@ class FamilyProfileSnapshot {
   final double? bodyTemperature;
   final String riskLevel; // 'low', 'medium', 'high'
   final bool isSosActive;
+
   /// sosId khi isSosActive = true — dùng để navigate đến EmergencySOSDetailScreen
   final String? sosId;
   final bool hasViewVitalsPermission;
+
   /// Đánh dấu ưu tiên (Pinned) — dùng cho filter "Ưu tiên", không hardcode role
   final bool isPinned;
   final DateTime lastUpdated;
@@ -51,7 +53,9 @@ class FamilyProfileSnapshot {
 
   /// Chuỗi huyết áp dạng "120/80"
   String? get bloodPressureDisplay {
-    if (bloodPressureSystolic == null || bloodPressureDiastolic == null) return null;
+    if (bloodPressureSystolic == null || bloodPressureDiastolic == null) {
+      return null;
+    }
     return '$bloodPressureSystolic/$bloodPressureDiastolic';
   }
 

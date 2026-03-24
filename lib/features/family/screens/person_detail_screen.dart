@@ -62,20 +62,36 @@ class PersonDetailScreen extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 26),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.white,
+            size: 26,
+          ),
           const SizedBox(width: 12),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Đang có yêu cầu SOS!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
-                Text('Vui lòng kiểm tra ngay', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                Text(
+                  'Đang có yêu cầu SOS!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                Text(
+                  'Vui lòng kiểm tra ngay',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
               ],
             ),
           ),
           ElevatedButton(
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chuyển đến màn SOS')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Chuyển đến màn SOS')),
+              );
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
@@ -83,9 +99,14 @@ class PersonDetailScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Xem', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            child: const Text(
+              'Xem',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ),
         ],
       ),
@@ -98,7 +119,9 @@ class PersonDetailScreen extends StatelessWidget {
         : (profile.riskLevel != 'low' ? 'Cần theo dõi' : 'Đang ổn định');
     final statusColor = profile.isSosActive
         ? const Color(0xFFE53935)
-        : (profile.riskLevel != 'low' ? const Color(0xFFF2A93B) : const Color(0xFF2E9B6F));
+        : (profile.riskLevel != 'low'
+              ? const Color(0xFFF2A93B)
+              : const Color(0xFF2E9B6F));
 
     return Container(
       color: Colors.white,
@@ -110,7 +133,11 @@ class PersonDetailScreen extends StatelessWidget {
             backgroundColor: const Color(0xFFEEF4FF),
             child: Text(
               profile.name.isNotEmpty ? profile.name[0].toUpperCase() : 'U',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF2F80ED)),
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2F80ED),
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -123,20 +150,31 @@ class PersonDetailScreen extends StatelessWidget {
                     Flexible(
                       child: Text(
                         profile.name,
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF12304A)),
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF12304A),
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFFEEF4FF),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         profile.relation,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF2F80ED), fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF2F80ED),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ],
@@ -145,20 +183,31 @@ class PersonDetailScreen extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      width: 8, height: 8,
-                      decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       statusLabel,
-                      style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 14),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(width: 8),
                     const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
                     const SizedBox(width: 8),
                     Text(
                       'Cập nhật 2p trước',
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -179,7 +228,11 @@ class PersonDetailScreen extends StatelessWidget {
         children: [
           const Text(
             'Chỉ số gần nhất',
-            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF12304A)),
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF12304A),
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -202,39 +255,70 @@ class PersonDetailScreen extends StatelessWidget {
     );
   }
 
-  List<VitalMetricItem> _buildVitalItems(BuildContext context, FamilyProfileSnapshot profile) {
+  List<VitalMetricItem> _buildVitalItems(
+    BuildContext context,
+    FamilyProfileSnapshot profile,
+  ) {
     // HR visual state
     VitalMetricVisualState hrState;
     String hrStatus;
     final hr = profile.heartRate;
-    if (hr < 50 || hr > 120) { hrState = VitalMetricVisualState.critical; hrStatus = 'Nguy hiểm'; }
-    else if (hr < 60 || hr > 100) { hrState = VitalMetricVisualState.warning; hrStatus = 'Cần chú ý'; }
-    else { hrState = VitalMetricVisualState.normal; hrStatus = 'Bình thường'; }
+    if (hr < 50 || hr > 120) {
+      hrState = VitalMetricVisualState.critical;
+      hrStatus = 'Nguy hiểm';
+    } else if (hr < 60 || hr > 100) {
+      hrState = VitalMetricVisualState.warning;
+      hrStatus = 'Cần chú ý';
+    } else {
+      hrState = VitalMetricVisualState.normal;
+      hrStatus = 'Bình thường';
+    }
 
     // SpO2 visual state
     VitalMetricVisualState spo2State;
     String spo2Status;
     final spo2 = profile.spo2;
-    if (spo2 < 90) { spo2State = VitalMetricVisualState.critical; spo2Status = 'Nguy hiểm'; }
-    else if (spo2 < 95) { spo2State = VitalMetricVisualState.warning; spo2Status = 'Thấp'; }
-    else { spo2State = VitalMetricVisualState.normal; spo2Status = 'Bình thường'; }
+    if (spo2 < 90) {
+      spo2State = VitalMetricVisualState.critical;
+      spo2Status = 'Nguy hiểm';
+    } else if (spo2 < 95) {
+      spo2State = VitalMetricVisualState.warning;
+      spo2Status = 'Thấp';
+    } else {
+      spo2State = VitalMetricVisualState.normal;
+      spo2Status = 'Bình thường';
+    }
 
     // BP visual state
     VitalMetricVisualState bpState;
     String bpStatus;
     final sys = profile.bloodPressureSystolic ?? 0;
     final dia = profile.bloodPressureDiastolic ?? 0;
-    if (sys > 160 || dia > 100) { bpState = VitalMetricVisualState.critical; bpStatus = 'Nguy hiểm'; }
-    else if (sys > 140 || dia > 90) { bpState = VitalMetricVisualState.warning; bpStatus = 'Cao'; }
-    else { bpState = VitalMetricVisualState.normal; bpStatus = 'Bình thường'; }
+    if (sys > 160 || dia > 100) {
+      bpState = VitalMetricVisualState.critical;
+      bpStatus = 'Nguy hiểm';
+    } else if (sys > 140 || dia > 90) {
+      bpState = VitalMetricVisualState.warning;
+      bpStatus = 'Cao';
+    } else {
+      bpState = VitalMetricVisualState.normal;
+      bpStatus = 'Bình thường';
+    }
 
     // Temp visual state
     VitalMetricVisualState tempState;
     String tempStatus;
     final temp = profile.bodyTemperature ?? 36.5;
-    if (temp > 38.5) { tempState = VitalMetricVisualState.critical; tempStatus = 'Sốt cao'; }
-    else if (temp > 37.5) { tempState = VitalMetricVisualState.warning; tempStatus = 'Sốt nhẹ'; }
-    else { tempState = VitalMetricVisualState.normal; tempStatus = 'Bình thường'; }
+    if (temp > 38.5) {
+      tempState = VitalMetricVisualState.critical;
+      tempStatus = 'Sốt cao';
+    } else if (temp > 37.5) {
+      tempState = VitalMetricVisualState.warning;
+      tempStatus = 'Sốt nhẹ';
+    } else {
+      tempState = VitalMetricVisualState.normal;
+      tempStatus = 'Bình thường';
+    }
 
     return [
       VitalMetricItem(
@@ -243,7 +327,11 @@ class PersonDetailScreen extends StatelessWidget {
         value: '$hr bpm',
         statusLabel: hrStatus,
         visualState: hrState,
-        onTap: () => Navigator.pushNamed(context, AppRouter.vitalDetail, arguments: {'profileId': profile.id, 'vitalType': 'hr'}),
+        onTap: () => Navigator.pushNamed(
+          context,
+          AppRouter.vitalDetail,
+          arguments: {'profileId': profile.id, 'vitalType': 'hr'},
+        ),
       ),
       VitalMetricItem(
         type: VitalMetricType.spo2,
@@ -251,7 +339,11 @@ class PersonDetailScreen extends StatelessWidget {
         value: '$spo2%',
         statusLabel: spo2Status,
         visualState: spo2State,
-        onTap: () => Navigator.pushNamed(context, AppRouter.vitalDetail, arguments: {'profileId': profile.id, 'vitalType': 'spo2'}),
+        onTap: () => Navigator.pushNamed(
+          context,
+          AppRouter.vitalDetail,
+          arguments: {'profileId': profile.id, 'vitalType': 'spo2'},
+        ),
       ),
       VitalMetricItem(
         type: VitalMetricType.bloodPressure,
@@ -259,7 +351,11 @@ class PersonDetailScreen extends StatelessWidget {
         value: profile.bloodPressureDisplay ?? '--/--',
         statusLabel: bpStatus,
         visualState: bpState,
-        onTap: () => Navigator.pushNamed(context, AppRouter.vitalDetail, arguments: {'profileId': profile.id, 'vitalType': 'bp'}),
+        onTap: () => Navigator.pushNamed(
+          context,
+          AppRouter.vitalDetail,
+          arguments: {'profileId': profile.id, 'vitalType': 'bp'},
+        ),
       ),
       VitalMetricItem(
         type: VitalMetricType.temperature,
@@ -267,12 +363,19 @@ class PersonDetailScreen extends StatelessWidget {
         value: profile.bodyTemperatureDisplay ?? '--°C',
         statusLabel: tempStatus,
         visualState: tempState,
-        onTap: () => Navigator.pushNamed(context, AppRouter.vitalDetail, arguments: {'profileId': profile.id, 'vitalType': 'temp'}),
+        onTap: () => Navigator.pushNamed(
+          context,
+          AppRouter.vitalDetail,
+          arguments: {'profileId': profile.id, 'vitalType': 'temp'},
+        ),
       ),
     ];
   }
 
-  Widget _buildHealthScoreBanner(BuildContext context, FamilyProfileSnapshot profile) {
+  Widget _buildHealthScoreBanner(
+    BuildContext context,
+    FamilyProfileSnapshot profile,
+  ) {
     // Chỉ hiển thị khi có score hợp lệ
     if (profile.healthScore7Days == 0) return const SizedBox.shrink();
 
@@ -313,7 +416,11 @@ class PersonDetailScreen extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.favorite_rounded, color: Color(0xFF81E6D9), size: 28),
+              child: const Icon(
+                Icons.favorite_rounded,
+                color: Color(0xFF81E6D9),
+                size: 28,
+              ),
             ),
             const SizedBox(width: 16),
             // Điểm số lớn
@@ -333,12 +440,20 @@ class PersonDetailScreen extends StatelessWidget {
                 children: [
                   const Text(
                     'Điểm sức khoẻ',
-                    style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     profile.healthScoreLevel,
-                    style: TextStyle(color: scoreColor, fontSize: 13, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: scoreColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -403,7 +518,11 @@ class PersonDetailScreen extends StatelessWidget {
                       color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.bed_rounded, color: Color(0xFFD8B4FE), size: 28),
+                    child: const Icon(
+                      Icons.bed_rounded,
+                      color: Color(0xFFD8B4FE),
+                      size: 28,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   // Nội dung
@@ -413,7 +532,11 @@ class PersonDetailScreen extends StatelessWidget {
                       children: [
                         const Text(
                           'Giấc ngủ',
-                          style: TextStyle(color: Color(0xFFD8B4FE), fontSize: 13, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                            color: Color(0xFFD8B4FE),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -427,12 +550,20 @@ class PersonDetailScreen extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           'Chất lượng: ${profile.sleepQuality}',
-                          style: TextStyle(color: qualityColor, fontSize: 13, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: qualityColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.white38, size: 22),
+                  const Icon(
+                    Icons.chevron_right,
+                    color: Colors.white38,
+                    size: 22,
+                  ),
                 ],
               ),
             ),
@@ -450,11 +581,23 @@ class PersonDetailScreen extends StatelessWidget {
         children: [
           const Text(
             'Cảnh báo gần đây',
-            style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF12304A)),
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF12304A),
+            ),
           ),
           const SizedBox(height: 12),
-          _buildAlertItem('Nhịp tim cao (112 bpm)', 'Hôm nay, 14:30', const Color(0xFFF2A93B)),
-          _buildAlertItem('Đã nhấn nút SOS', 'Hôm qua, 09:15', const Color(0xFFE53935)),
+          _buildAlertItem(
+            'Nhịp tim cao (112 bpm)',
+            'Hôm nay, 14:30',
+            const Color(0xFFF2A93B),
+          ),
+          _buildAlertItem(
+            'Đã nhấn nút SOS',
+            'Hôm qua, 09:15',
+            const Color(0xFFE53935),
+          ),
           const SizedBox(height: 32),
         ],
       ),
@@ -472,10 +615,26 @@ class PersonDetailScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 12),
-          Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500, color: Color(0xFF12304A), fontSize: 14))),
-          Text(time, style: const TextStyle(fontSize: 12, color: Color(0xFF5B7288))),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF12304A),
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Text(
+            time,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF5B7288)),
+          ),
         ],
       ),
     );

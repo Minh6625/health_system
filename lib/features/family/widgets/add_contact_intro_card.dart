@@ -20,7 +20,10 @@ class AddContactIntroCard extends StatelessWidget {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.qr_code_scanner, color: Color(0xFF2F80ED)), // brand.primary
+            child: const Icon(
+              Icons.qr_code_scanner,
+              color: Color(0xFF2F80ED),
+            ), // brand.primary
           ),
           const SizedBox(width: 16),
           const Expanded(
@@ -37,7 +40,7 @@ class AddContactIntroCard extends StatelessWidget {
                 ),
                 SizedBox(height: 4),
                 Text(
-                  'Thêm liên hệ an toàn bằng cách quét mã QR hoặc nhập chung mã PIN 6 số.',
+                  'Thêm liên hệ an toàn bằng cách quét mã, chia sẻ mã QR hoặc tìm qua số điện thoại.',
                   style: TextStyle(
                     fontSize: 14,
                     color: Color(0xFF5B7288), // text.secondary

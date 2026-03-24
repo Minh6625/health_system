@@ -11,10 +11,12 @@ class PermissionSetupBottomSheet extends StatefulWidget {
   });
 
   @override
-  State<PermissionSetupBottomSheet> createState() => _PermissionSetupBottomSheetState();
+  State<PermissionSetupBottomSheet> createState() =>
+      _PermissionSetupBottomSheetState();
 }
 
-class _PermissionSetupBottomSheetState extends State<PermissionSetupBottomSheet> {
+class _PermissionSetupBottomSheetState
+    extends State<PermissionSetupBottomSheet> {
   bool canViewVitals = false; // Default safe
   bool canReceiveAlerts = true; // Default safe
   bool canViewLocation = true; // Default safe
@@ -45,10 +47,7 @@ class _PermissionSetupBottomSheetState extends State<PermissionSetupBottomSheet>
           const SizedBox(height: 8),
           const Text(
             'Lưu ý: Bạn có thể thay đổi các quyền này bất kỳ lúc nào trong cài đặt liên hệ.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF5B7288),
-            ),
+            style: TextStyle(fontSize: 14, color: Color(0xFF5B7288)),
           ),
           const SizedBox(height: 24),
           _buildToggle(
@@ -60,7 +59,8 @@ class _PermissionSetupBottomSheetState extends State<PermissionSetupBottomSheet>
           const SizedBox(height: 16),
           _buildToggle(
             title: 'Nhận cảnh báo khẩn cấp (SOS)',
-            description: 'Người này sẽ nhận được thông báo khi bạn gặp nguy hiểm.',
+            description:
+                'Người này sẽ nhận được thông báo khi bạn gặp nguy hiểm.',
             value: canReceiveAlerts,
             onChanged: (val) => setState(() => canReceiveAlerts = val),
           ),
@@ -79,15 +79,23 @@ class _PermissionSetupBottomSheetState extends State<PermissionSetupBottomSheet>
                   onPressed: () {
                     // Cài sau: Keep safe defaults
                     Navigator.pop(context);
-                    widget.onConfirm(['can_receive_alerts', 'can_view_location']);
+                    widget.onConfirm([
+                      'can_receive_alerts',
+                      'can_view_location',
+                    ]);
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF5B7288),
                     side: const BorderSide(color: Color(0xFF5B7288)),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  child: const Text('Cài sau', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Cài sau',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -106,10 +114,15 @@ class _PermissionSetupBottomSheetState extends State<PermissionSetupBottomSheet>
                     backgroundColor: const Color(0xFF2F80ED),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     elevation: 0,
                   ),
-                  child: const Text('Xác nhận', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    'Xác nhận',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],

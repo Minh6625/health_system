@@ -5,6 +5,7 @@ import 'package:healthguard/features/family/models/family_profile_snapshot.dart'
 class FamilySOSFullScreenOverlay extends StatelessWidget {
   /// Danh sách profiles đang có SOS (có thể nhiều hơn 1).
   final List<FamilyProfileSnapshot> sosProfiles;
+
   /// Callback khi bấm "Xem ngay" — truyền sosId (KHÔNG phải profileId)
   final void Function(String sosId) onViewDetail;
   final VoidCallback onDismiss;
@@ -36,7 +37,10 @@ class FamilySOSFullScreenOverlay extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFFE53935).withValues(alpha: 0.15),
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFE53935), width: 2),
+                    border: Border.all(
+                      color: const Color(0xFFE53935),
+                      width: 2,
+                    ),
                   ),
                   child: const Icon(
                     Icons.warning_amber_rounded,
@@ -59,10 +63,7 @@ class FamilySOSFullScreenOverlay extends StatelessWidget {
                   sosProfiles.length == 1
                       ? '${primary.name} đang cần hỗ trợ khẩn cấp'
                       : '${sosProfiles.length} người đang cần hỗ trợ khẩn cấp',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.white70,
-                  ),
+                  style: const TextStyle(fontSize: 16, color: Colors.white70),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
@@ -73,10 +74,14 @@ class FamilySOSFullScreenOverlay extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFFE53935).withValues(alpha: 0.5)),
+                    border: Border.all(
+                      color: const Color(0xFFE53935).withValues(alpha: 0.5),
+                    ),
                   ),
                   child: Column(
-                    children: sosProfiles.map((p) => _buildProfileRow(p)).toList(),
+                    children: sosProfiles
+                        .map((p) => _buildProfileRow(p))
+                        .toList(),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -89,12 +94,17 @@ class FamilySOSFullScreenOverlay extends StatelessWidget {
                       backgroundColor: const Color(0xFFE53935),
                       foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       elevation: 0,
                     ),
                     child: const Text(
                       'Xem ngay',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),

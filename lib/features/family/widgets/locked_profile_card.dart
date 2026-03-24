@@ -37,7 +37,11 @@ class LockedProfileCard extends StatelessWidget {
                 backgroundColor: const Color(0xFFE2E8F0),
                 child: Text(
                   profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '?',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5B7288)),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF5B7288),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -64,15 +68,16 @@ class LockedProfileCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.lock_outline, color: Color(0xFF5B7288), size: 18),
+                const Icon(
+                  Icons.lock_outline,
+                  color: Color(0xFF5B7288),
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'Bạn chưa được cấp quyền xem dữ liệu sức khoẻ.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF5B7288),
-                    ),
+                    style: TextStyle(fontSize: 14, color: Color(0xFF5B7288)),
                   ),
                 ),
               ],
@@ -85,7 +90,10 @@ class LockedProfileCard extends StatelessWidget {
               onPressed: onManageRoles,
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF2F80ED),
-                textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                textStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
               ),
               child: const Text('Quản lý quyền'),
             ),

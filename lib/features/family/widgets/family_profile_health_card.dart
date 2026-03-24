@@ -36,7 +36,9 @@ class FamilyProfileHealthCard extends StatelessWidget {
     }
 
     final diff = DateTime.now().difference(profile.lastUpdated).inMinutes;
-    String updatedText = diff < 1 ? 'Vừa cập nhật' : 'Cập nhật $diff phút trước';
+    String updatedText = diff < 1
+        ? 'Vừa cập nhật'
+        : 'Cập nhật $diff phút trước';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -50,7 +52,9 @@ class FamilyProfileHealthCard extends StatelessWidget {
             offset: const Offset(0, 4),
           ),
         ],
-        border: profile.isSosActive ? Border.all(color: const Color(0xFFD95C5C), width: 1.5) : null,
+        border: profile.isSosActive
+            ? Border.all(color: const Color(0xFFD95C5C), width: 1.5)
+            : null,
       ),
       child: Material(
         color: Colors.transparent,
@@ -70,8 +74,14 @@ class FamilyProfileHealthCard extends StatelessWidget {
                       radius: 20,
                       backgroundColor: iconBgColor,
                       child: Text(
-                        profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '?',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: iconColor),
+                        profile.name.isNotEmpty
+                            ? profile.name[0].toUpperCase()
+                            : '?',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: iconColor,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -91,9 +101,14 @@ class FamilyProfileHealthCard extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              if (profile.isSosActive || profile.riskLevel == 'high') ...[
+                              if (profile.isSosActive ||
+                                  profile.riskLevel == 'high') ...[
                                 const SizedBox(width: 6),
-                                const Icon(Icons.warning_amber_rounded, color: Color(0xFFD95C5C), size: 18),
+                                const Icon(
+                                  Icons.warning_amber_rounded,
+                                  color: Color(0xFFD95C5C),
+                                  size: 18,
+                                ),
                               ],
                             ],
                           ),
@@ -104,9 +119,11 @@ class FamilyProfileHealthCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color: profile.isSosActive || profile.riskLevel == 'high' 
-                                  ? const Color(0xFFD95C5C) 
-                                  : const Color(0xFFF2A93B),
+                                color:
+                                    profile.isSosActive ||
+                                        profile.riskLevel == 'high'
+                                    ? const Color(0xFFD95C5C)
+                                    : const Color(0xFFF2A93B),
                               ),
                             ),
                         ],
@@ -118,9 +135,19 @@ class FamilyProfileHealthCard extends StatelessWidget {
                 // Vitals: Row 1 — HR + SpO2
                 Row(
                   children: [
-                    _buildVitalItem(Icons.favorite_rounded, '${profile.heartRate}', 'bpm', const Color(0xFFD95C5C)),
+                    _buildVitalItem(
+                      Icons.favorite_rounded,
+                      '${profile.heartRate}',
+                      'bpm',
+                      const Color(0xFFD95C5C),
+                    ),
                     const SizedBox(width: 16),
-                    _buildVitalItem(Icons.water_drop_rounded, '${profile.spo2}', '%', const Color(0xFF2F80ED)),
+                    _buildVitalItem(
+                      Icons.water_drop_rounded,
+                      '${profile.spo2}',
+                      '%',
+                      const Color(0xFF2F80ED),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -148,13 +175,27 @@ class FamilyProfileHealthCard extends StatelessWidget {
                   children: [
                     Text(
                       updatedText,
-                      style: const TextStyle(fontSize: 13, color: Color(0xFF5B7288)),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF5B7288),
+                      ),
                     ),
                     Row(
                       children: const [
-                        Text('Xem', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2F80ED))),
+                        Text(
+                          'Xem',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2F80ED),
+                          ),
+                        ),
                         SizedBox(width: 4),
-                        Icon(Icons.arrow_forward, size: 16, color: Color(0xFF2F80ED)),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: 16,
+                          color: Color(0xFF2F80ED),
+                        ),
                       ],
                     ),
                   ],
@@ -167,7 +208,12 @@ class FamilyProfileHealthCard extends StatelessWidget {
     );
   }
 
-  Widget _buildVitalItem(IconData icon, String value, String unit, Color iconColor) {
+  Widget _buildVitalItem(
+    IconData icon,
+    String value,
+    String unit,
+    Color iconColor,
+  ) {
     return Expanded(
       child: Row(
         children: [
@@ -176,14 +222,20 @@ class FamilyProfileHealthCard extends StatelessWidget {
           Flexible(
             child: Text(
               '$value ',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Color(0xFF12304A)),
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF12304A),
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          Text(unit, style: const TextStyle(fontSize: 12, color: Color(0xFF5B7288))),
+          Text(
+            unit,
+            style: const TextStyle(fontSize: 12, color: Color(0xFF5B7288)),
+          ),
         ],
       ),
     );
   }
 }
-

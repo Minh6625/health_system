@@ -40,15 +40,16 @@ class GroupedContactsSection extends StatelessWidget {
     for (final tag in ContactTagsConfig.defaultTags) {
       final groupContacts = tagGroups[tag.id] ?? [];
       if (groupContacts.isNotEmpty) {
-        children.add(ContactsGroupHeader(
-          title: tag.name,
-          color: tag.color,
-        ));
+        children.add(ContactsGroupHeader(title: tag.name, color: tag.color));
         children.add(const SizedBox(height: 12));
-        children.addAll(groupContacts.map((c) => Padding(
+        children.addAll(
+          groupContacts.map(
+            (c) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: LinkedContactCard(contact: c),
-            )));
+            ),
+          ),
+        );
         children.add(const SizedBox(height: 8));
       }
     }
@@ -56,15 +57,21 @@ class GroupedContactsSection extends StatelessWidget {
     // Section "Chưa gắn tag"
     final untagged = tagGroups['_untagged'] ?? [];
     if (untagged.isNotEmpty) {
-      children.add(const ContactsGroupHeader(
-        title: 'Chưa gắn tag',
-        color: Color(0xFF9CA3AF),
-      ));
+      children.add(
+        const ContactsGroupHeader(
+          title: 'Chưa gắn tag',
+          color: Color(0xFF9CA3AF),
+        ),
+      );
       children.add(const SizedBox(height: 12));
-      children.addAll(untagged.map((c) => Padding(
+      children.addAll(
+        untagged.map(
+          (c) => Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: LinkedContactCard(contact: c),
-          )));
+          ),
+        ),
+      );
     }
 
     return Column(
