@@ -34,7 +34,7 @@ class DeviceMockConfig {
 
   /// Set to [true] to use local mock instead of real API calls.
   /// In production builds this should be [false].
-  static bool useMockData = true; // ← flip to false for production
+  static bool useMockData = false; // ✅ Using live API data from backend
 
   /// Simulated network delay for mock API calls (ms).
   static const int fakeApiDelayMs = 800;

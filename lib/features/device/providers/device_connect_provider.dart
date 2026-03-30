@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/mock/device_mock_data.dart';
+import 'package:healthguard/features/device/repositories/device_repository.dart';
 
 enum DeviceConnectState {
   intro,              // Method select (QR or Manual)
@@ -14,6 +15,8 @@ enum DeviceConnectState {
 }
 
 class DeviceConnectProvider extends ChangeNotifier {
+  final DeviceRepository _repository = DeviceRepository();
+
   DeviceConnectState _state = DeviceConnectState.intro;
   DeviceConnectState get state => _state;
 
@@ -22,6 +25,9 @@ class DeviceConnectProvider extends ChangeNotifier {
 
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
+  
+  bool _isPairing = false;
+  bool get isPairing => _isPairing;
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -74,12 +80,27 @@ class DeviceConnectProvider extends ChangeNotifier {
     if (_identifiedDevice == null) return;
     
     _state = DeviceConnectState.pairing;
+    _isPairing = true;
+    _errorMessage = null;
     notifyListeners();
 
-    // Simulate pairing/binding delay
-    await Future.delayed(const Duration(milliseconds: DeviceMockConfig.fakePairingDelayMs));
-
-    _state = DeviceConnectState.success;
-    notifyListeners();
+    try {
+      // Call live API to pair device
+      await _repository.pairNewDevice(
+        macAddress: _identifiedDevice!.macAddress,
+        deviceName: _identifiedDevice!.name,
+        deviceType: _identifiedDevice!.deviceType,
+        model: null,  // MockBleDevice doesn't have model
+      );
+      
+      _state = DeviceConnectState.success;
+      _isPairing = false;
+      notifyListeners();
+    } catch (e) {
+      _state = DeviceConnectState.error;
+      _errorMessage = 'Ghép nối thất bại: ${e.toString()}';
+      _isPairing = false;
+      notifyListeners();
+    }
   }
 }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
 import 'package:healthguard/features/device/mock/device_mock_data.dart';
+import 'package:healthguard/features/device/repositories/device_repository.dart';
 
 class DeviceConfigureProvider extends ChangeNotifier {
   final DeviceModel device;
+  final DeviceRepository _repository = DeviceRepository();
   
   // Local state for the form
   late String deviceName;
@@ -21,6 +23,9 @@ class DeviceConfigureProvider extends ChangeNotifier {
 
   bool _isUnpairing = false;
   bool get isUnpairing => _isUnpairing;
+  
+  String? _errorMessage;
+  String? get errorMessage => _errorMessage;
 
   DeviceConfigureProvider(this.device) {
     deviceName = device.displayName;
@@ -72,15 +77,30 @@ class DeviceConfigureProvider extends ChangeNotifier {
 
   Future<bool> saveChanges() async {
     _isSaving = true;
+    _errorMessage = null;
     notifyListeners();
 
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: DeviceMockConfig.fakeApiDelayMs));
+    try {
+      // Call live API to update device settings
+      await _repository.updateDeviceSettings(
+        deviceId: device.id,
+        calibrationData: {
+          'notify_high_hr': vibrationAlert,
+          'notify_low_spo2': sleepTracking,
+          'notify_high_bp': vibrationAlert,
+        },
+      );
 
-    _isSaving = false;
-    _isDirty = false;
-    notifyListeners();
-    return true; // Return true to indicate success
+      _isSaving = false;
+      _isDirty = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isSaving = false;
+      _errorMessage = 'Lỗi: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> unpairDevice() async {

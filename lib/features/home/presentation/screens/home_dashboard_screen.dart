@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/routes/app_router.dart';
 import '../../../../shared/presentation/shell/app_shell_bottom_nav.dart';
 import '../../../../shared/presentation/shell/main_scaffold_shell.dart';
 import '../../../../shared/presentation/emergency/emergency_sticky_bar.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../providers/home_dashboard_provider.dart';
 import '../models/home_dashboard_view_model.dart';
 import '../widgets/dashboard_greeting_header.dart';
 import '../widgets/dashboard_secondary_links.dart';
@@ -14,67 +16,105 @@ import '../widgets/live_vitals_section.dart';
 import '../widgets/risk_insight_card.dart';
 import '../widgets/sleep_insight_card.dart';
 import '../widgets/vital_metric_card.dart';
+import '../../../auth/providers/auth_provider.dart';
 
-class HomeDashboardScreen extends StatelessWidget {
+class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // In a real implementation, this ViewModel would come from a State Management solution
-    // like Bloc (e.g. context.watch<HomeDashboardCubit>().state.toViewModel())
-    // For now, we use a mocked view model to demonstrate the layout.
-    final vm = _getMockViewModel(context);
+  State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
+}
 
-    return MainScaffoldShell(
-      bottomNavigation: AppShellBottomNav(
-        currentTab: AppMainTab.me,
-        familyHasAlertBadge: vm.familyHasAlertBadge,
-        deviceHasAttentionBadge: vm.deviceNeedsAttention,
-        onTabSelected: (tab) {
-          switch (tab) {
-            case AppMainTab.device:
-              Navigator.pushReplacementNamed(context, '/device');
-              break;
-            case AppMainTab.family:
-              Navigator.pushReplacementNamed(context, '/family-management');
-              break;
-            case AppMainTab.profile:
-              Navigator.pushReplacementNamed(context, '/profile');
-              break;
-            case AppMainTab.me:
-              // Already on dashboard
-              break;
-          }
-        },
-      ),
-      stickyBottomBar: EmergencyStickyBar(
-        emphasis: vm.emergencyBarEmphasis,
-        onPressed: () {
-          Navigator.pushNamed(context, AppRouter.manualSos);
-        },
-      ),
-      child: SafeArea(bottom: false, child: _DashboardBody(vm: vm)),
+class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Load dashboard data when screen initializes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<HomeDashboardProvider>().loadDashboardData();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<HomeDashboardProvider>(
+      builder: (context, provider, child) {
+        final vm = _buildViewModel(context, provider);
+
+        return MainScaffoldShell(
+          bottomNavigation: AppShellBottomNav(
+            currentTab: AppMainTab.me,
+            familyHasAlertBadge: vm.familyHasAlertBadge,
+            deviceHasAttentionBadge: vm.deviceNeedsAttention,
+            onTabSelected: (tab) {
+              switch (tab) {
+                case AppMainTab.device:
+                  Navigator.pushReplacementNamed(context, '/device');
+                  break;
+                case AppMainTab.family:
+                  Navigator.pushReplacementNamed(context, '/family-management');
+                  break;
+                case AppMainTab.profile:
+                  Navigator.pushReplacementNamed(context, '/profile');
+                  break;
+                case AppMainTab.me:
+                  // Already on dashboard
+                  break;
+              }
+            },
+          ),
+          stickyBottomBar: EmergencyStickyBar(
+            emphasis: vm.emergencyBarEmphasis,
+            onPressed: () {
+              Navigator.pushNamed(context, AppRouter.manualSos);
+            },
+          ),
+          child: SafeArea(bottom: false, child: _DashboardBody(vm: vm, provider: provider)),
+        );
+      },
     );
   }
 
-  HomeDashboardViewModel _getMockViewModel(BuildContext context) {
+  HomeDashboardViewModel _buildViewModel(BuildContext context, HomeDashboardProvider provider) {
+    // Get current user from AuthProvider
+    final authProvider = context.read<AuthProvider>();
+    final displayName = authProvider.currentUser?.fullName ?? 'Người dùng';
+
+    // Format vital values
+    final heartRateStr = provider.heartRate != null ? '${provider.heartRate!.toStringAsFixed(0)} BPM' : '--';
+    final spo2Str = provider.spo2 != null ? '${provider.spo2!.toStringAsFixed(0)}%' : '--';
+    final bpStr = provider.bloodPressureSys != null && provider.bloodPressureDia != null
+        ? '${provider.bloodPressureSys!.toStringAsFixed(0)}/${provider.bloodPressureDia!.toStringAsFixed(0)}'
+        : '--';
+    final tempStr = provider.temperature != null ? '${provider.temperature!.toStringAsFixed(1)}°C' : '--';
+
+    // Determine BP status
+    VitalMetricVisualState bpState = VitalMetricVisualState.normal;
+    if (provider.bloodPressureSys != null && provider.bloodPressureSys! > 140) {
+      bpState = VitalMetricVisualState.warning;
+    }
+
     return HomeDashboardViewModel(
       onRefresh: () async {
-        await Future.delayed(const Duration(seconds: 1));
+        await provider.refreshDashboard();
       },
-      displayName: 'Minh Thiện',
-      latestUpdatedLabel: 'Cập nhật sức khoẻ mới nhất lúc 08:42',
+      displayName: displayName,
+      latestUpdatedLabel: provider.vitalsTimestamp != null
+          ? 'Cập nhật lúc ${provider.vitalsTimestamp!.hour}:${provider.vitalsTimestamp!.minute.toString().padLeft(2, '0')}'
+          : 'Đang tải dữ liệu...',
       overallStatus: DashboardOverallStatus.normal,
-      heroTitle: 'Ổn định hôm nay',
-      heroSummary: 'Các chỉ số đang ở mức an toàn',
+      heroTitle: provider.riskLevel == 'low' ? 'Ổn định hôm nay' : 'Cần theo dõi',
+      heroSummary: provider.riskLevel != null
+          ? 'Mức rủi ro: ${provider.riskLevel}'
+          : 'Các chỉ số đang được đồng bộ...',
       deviceConnectionState: DeviceConnectionUiState.connected,
       batteryPercent: 82,
       vitalItems: [
         VitalMetricItem(
           type: VitalMetricType.heartRate,
           label: 'Nhịp tim',
-          value: '82 BPM',
-          statusLabel: 'Bình thường',
+          value: heartRateStr,
+          statusLabel: provider.heartRate == null ? 'Đang tải' : (provider.heartRate! < 60 || provider.heartRate! > 100  ? 'Cảnh báo' : 'Bình thường'),
           onTap: () {
             Navigator.pushNamed(context, '/vital-detail', arguments: {'vitalType': 'hr'});
           },
@@ -82,8 +122,8 @@ class HomeDashboardScreen extends StatelessWidget {
         VitalMetricItem(
           type: VitalMetricType.spo2,
           label: 'SpO2',
-          value: '97%',
-          statusLabel: 'Tốt',
+          value: spo2Str,
+          statusLabel: provider.spo2 == null ? 'Đang tải' : (provider.spo2! < 95 ? 'Cảnh báo' : 'Tốt'),
           onTap: () {
             Navigator.pushNamed(context, '/vital-detail', arguments: {'vitalType': 'spo2'});
           },
@@ -91,9 +131,9 @@ class HomeDashboardScreen extends StatelessWidget {
         VitalMetricItem(
           type: VitalMetricType.bloodPressure,
           label: 'Huyết áp',
-          value: '120/80',
-          statusLabel: 'Theo dõi',
-          visualState: VitalMetricVisualState.warning,
+          value: bpStr,
+          statusLabel: provider.bloodPressureSys == null ? 'Đang tải' : 'Theo dõi',
+          visualState: bpState,
           onTap: () {
             Navigator.pushNamed(context, '/vital-detail', arguments: {'vitalType': 'bp'});
           },
@@ -101,31 +141,72 @@ class HomeDashboardScreen extends StatelessWidget {
         VitalMetricItem(
           type: VitalMetricType.temperature,
           label: 'Nhiệt độ',
-          value: '36.5°C',
-          statusLabel: 'Tốt',
+          value: tempStr,
+          statusLabel: provider.temperature == null ? 'Đang tải' : 'Tốt',
           onTap: () {
             Navigator.pushNamed(context, '/vital-detail', arguments: {'vitalType': 'temp'});
           },
         ),
       ],
-      sleepDurationLabel: '7h20',
-      sleepDurationMinutes: 440,
-      sleepInsightSummary: 'Đêm qua bạn ngủ sâu và ổn định',
-      riskScoreLabel: '78',
-      riskLevelLabel: 'Thấp',
-      riskSummary: 'Sức khoẻ của bạn đang ở mức ổn định',
-      riskVisualState: RiskVisualState.low,
+      sleepDurationLabel: provider.sleepData != null
+          ? '${(provider.sleepData!['in_bed_minutes'] as int?) ?? 0 ~/ 60}h'
+          : '-- h',
+      sleepDurationMinutes: (provider.sleepData?['in_bed_minutes'] as int?) ?? 0,
+      sleepInsightSummary: provider.sleepData != null
+          ? 'Quality: ${provider.sleepData!['quality_score']}%'
+          : 'Chưa có dữ liệu giấc ngủ',
+      riskScoreLabel: provider.latestRiskScore?.toStringAsFixed(0) ?? '--',
+      riskLevelLabel: provider.riskLevel ?? 'Không xác định',
+      riskSummary: provider.riskLevel == 'low'
+          ? 'Sức khoẻ của bạn đang ở mức ổn định'
+          : provider.riskLevel == 'high'
+              ? 'Cần theo dõi các chỉ số sức khỏe'
+              : 'Cập nhật dữ liệu...',
+      riskVisualState: _getRiskVisualState(provider.riskLevel),
     );
+  }
+
+  RiskVisualState _getRiskVisualState(String? level) {
+    return switch (level?.toLowerCase()) {
+      'low' => RiskVisualState.low,
+      'medium' => RiskVisualState.moderate,
+      'high' => RiskVisualState.high,
+      'critical' => RiskVisualState.high,
+      _ => RiskVisualState.moderate,
+    };
   }
 }
 
 class _DashboardBody extends StatelessWidget {
-  const _DashboardBody({required this.vm});
+  const _DashboardBody({required this.vm, required this.provider});
 
   final HomeDashboardViewModel vm;
+  final HomeDashboardProvider provider;
 
   @override
   Widget build(BuildContext context) {
+    if (provider.isLoading && provider.heartRate == null) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
+    if (provider.error != null && provider.heartRate == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Lỗi: ${provider.error}'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => provider.loadDashboardData(),
+              child: const Text('Thử lại'),
+            ),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: vm.onRefresh,
       child: CustomScrollView(
