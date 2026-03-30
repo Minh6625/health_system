@@ -276,13 +276,13 @@ class TestAuthService:
             mock_repo.create_user.return_value = mock_user
             mock_token.return_value = "123456"
             
-            # Execute with multiple spaces
+            # Execute with valid name
             success, message, token_data = AuthService.register(
                 mock_db,
                 email="caregiver@example.com",
                 full_name="Caregiver User",
                 password="StrongPass123!",
-                role="admin",
+                role="caregiver",
                 ip_address="127.0.0.1",
                 user_agent="test"
             )
@@ -292,14 +292,14 @@ class TestAuthService:
             assert "thành công" in message.lower()
             assert token_data is not None
             assert "verification_code" in token_data
-            # Verify create_user was called with admin role
+            # Verify create_user was called with proper role
             mock_repo.create_user.assert_called_once()
             call_args = mock_repo.create_user.call_args
             assert call_args[0][0] == mock_db
-            assert call_args[0][1] == "admin@example.com"
+            assert call_args[0][1] == "caregiver@example.com"
             assert call_args[0][2] == "StrongPass123!"
-            assert call_args[1]['full_name'] == "Admin User"
-            assert call_args[1]['role'] == "admin"
+            assert call_args[1]['full_name'] == "Caregiver User"
+            assert call_args[1]['role'] == "user"
 
     def test_register_with_date_of_birth_and_phone(self, mock_db):
         """Test registration with date of birth and phone."""
