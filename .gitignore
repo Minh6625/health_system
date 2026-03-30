@@ -60,3 +60,6 @@ diff.txt
 crash_log.txt
 *.log
 out*.txt
+
+# AI Code Assistant Folders
+.codex_appdata/
