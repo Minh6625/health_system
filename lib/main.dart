@@ -2,11 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:healthguard/app.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-// ignore: depend_on_referenced_packages
-
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  const isProduction = bool.fromEnvironment('dart.vm.product');
-  await dotenv.load(fileName: isProduction ? ".env.prod" : ".env.dev");
-  runApp(const HealthSystemApp());
+  debugPrint("==== MAIN STARTED ====");
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    // TẠM THỜI TẮT GIỮ SPLASH ĐỂ DEBUG XEM CÓ PHẢI NÓ LÀM ĐEN MÀN HÌNH KHÔNG
+    // FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+    debugPrint("==== BINDING INITIALIZED ====");
+
+    try {
+      const isProduction = bool.fromEnvironment('dart.vm.product');
+      await dotenv.load(fileName: isProduction ? ".env.prod" : ".env.dev");
+      debugPrint("==== DOTENV LOADED ====");
+    } catch (e) {
+      debugPrint("==== DOTENV ERROR (IGNORING) ==== $e");
+    }
+
+    runApp(const HealthSystemApp());
+    debugPrint("==== RUNAPP CALLED ====");
+  } catch (e, stack) {
+    debugPrint("==== ERROR IN MAIN ==== $e\n$stack");
+  }
 }

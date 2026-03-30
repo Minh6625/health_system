@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:healthguard/features/emergency/models/sos_event_model.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
-import 'package:healthguard/features/emergency/widgets/status_badge.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 
 /// SOS Detail screen for Caregiver
 class EmergencySOSDetailScreen extends StatefulWidget {
@@ -21,7 +23,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
   late EmergencyCaregiverProvider _provider;
   bool _isInitialized = false;
   final ScrollController _scrollController = ScrollController();
-  double _shadowOpacity = 1.0;
+  final ValueNotifier<double> _shadowOpacity = ValueNotifier<double>(1.0);
   late AnimationController _arrowAnimationController;
   late AnimationController _warningAnimationController;
   late Animation<double> _arrowAnimation;
@@ -32,32 +34,54 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     super.initState();
     // Add listener in initState
     _scrollController.addListener(_onScroll);
-    
+
     // Setup arrow animation
     _arrowAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
-    )..repeat(reverse: true);
-    
+    );
+
     _arrowAnimation = Tween<double>(begin: 0.0, end: 8.0).animate(
       CurvedAnimation(
         parent: _arrowAnimationController,
         curve: Curves.easeInOut,
       ),
     );
-    
+
+    // Bounce arrow 3 times then stop to save battery
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      if (!mounted) return;
+      for (int i = 0; i < 3; i++) {
+        if (!mounted) break;
+        await _arrowAnimationController.forward();
+        if (!mounted) break;
+        await _arrowAnimationController.reverse();
+      }
+    });
+
     // Setup warning icon shake animation (rotate)
     _warningAnimationController = AnimationController(
       duration: const Duration(milliseconds: 100),
       vsync: this,
-    )..repeat(reverse: true);
-    
+    );
+
     _warningAnimation = Tween<double>(begin: -0.1, end: 0.1).animate(
       CurvedAnimation(
         parent: _warningAnimationController,
         curve: Curves.linear,
       ),
     );
+
+    // Shake warning 5 times then stop to save battery
+    Future.delayed(const Duration(milliseconds: 500), () async {
+      if (!mounted) return;
+      for (int i = 0; i < 5; i++) {
+        if (!mounted) break;
+        await _warningAnimationController.forward();
+        if (!mounted) break;
+        await _warningAnimationController.reverse();
+      }
+    });
   }
 
   @override
@@ -75,17 +99,17 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     if (_scrollController.hasClients) {
       final maxScroll = _scrollController.position.maxScrollExtent;
       final currentScroll = _scrollController.position.pixels;
-      
+
       // Calculate how close to bottom (0 = at top, 1 = at bottom)
-      final scrollProgress = maxScroll > 0 ? (currentScroll / maxScroll).clamp(0.0, 1.0) : 0.0;
-      
+      final scrollProgress = maxScroll > 0
+          ? (currentScroll / maxScroll).clamp(0.0, 1.0)
+          : 0.0;
+
       // Fade out shadow as we scroll down (inverse of progress)
       final newOpacity = (1.0 - scrollProgress).clamp(0.0, 1.0);
-      
-      if ((newOpacity - _shadowOpacity).abs() > 0.01) {
-        setState(() {
-          _shadowOpacity = newOpacity;
-        });
+
+      if ((newOpacity - _shadowOpacity.value).abs() > 0.01) {
+        _shadowOpacity.value = newOpacity;
       }
     }
   }
@@ -93,6 +117,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
   @override
   void dispose() {
     _scrollController.dispose();
+    _shadowOpacity.dispose();
     _arrowAnimationController.dispose();
     _warningAnimationController.dispose();
     _provider.unsubscribeFromSOSUpdates();
@@ -103,26 +128,22 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEBEBEB),
-      appBar: AppBar(
-        title: const Text('Chi tiết SOS'),
-        elevation: 0,
-      ),
-      body: Consumer<EmergencyCaregiverProvider>(
-        builder: (context, provider, child) {
-          // Loading state
-          if (provider.isLoadingDetail) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      appBar: AppBar(title: const Text('Chi tiết SOS'), elevation: 0),
+      body: Builder(
+        builder: (context) {
+          final isLoading = context.select<EmergencyCaregiverProvider, bool>(
+            (p) => p.isLoadingDetail,
+          );
+          final error = context.select<EmergencyCaregiverProvider, String?>(
+            (p) => p.detailErrorMessage,
+          );
+          final hasDetail = context.select<EmergencyCaregiverProvider, bool>(
+            (p) => p.sosDetail != null,
+          );
 
-          // Error state
-          if (provider.detailErrorMessage != null) {
-            return _buildErrorState(provider.detailErrorMessage!);
-          }
-
-          // Success state
-          if (provider.sosDetail != null) {
-            return _buildDetailContent(provider);
-          }
+          if (isLoading) return const Center(child: CircularProgressIndicator());
+          if (error != null) return _buildErrorState(error);
+          if (hasDetail) return _buildDetailContent(context);
 
           return const SizedBox.shrink();
         },
@@ -130,16 +151,19 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     );
   }
 
-  Widget _buildDetailContent(EmergencyCaregiverProvider provider) {
-    final sos = provider.sosDetail!;
+  Widget _buildDetailContent(BuildContext context) {
 
     return Column(
       children: [
         // Patient Header
-        Stack(
-          children: [
-            Container(
-              width: double.infinity,
+        Selector<EmergencyCaregiverProvider, SOSEventModel?>(
+          selector: (context, provider) => provider.sosDetail,
+          builder: (context, sos, child) {
+            if (sos == null) return const SizedBox.shrink();
+            return Stack(
+              children: [
+                Container(
+                  width: double.infinity,
               margin: const EdgeInsets.all(16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -148,8 +172,8 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                 boxShadow: [
                   BoxShadow(
                     color: sos.isActive
-                        ? const Color(0xFFE53935).withOpacity(0.25)
-                        : Colors.black.withOpacity(0.08),
+                        ? const Color(0xFFE53935).withValues(alpha: 0.25)
+                        : Colors.black.withValues(alpha: 0.08),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -168,7 +192,11 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                             : null,
                         backgroundColor: Colors.grey[400],
                         child: sos.patient.photoUrl == null
-                            ? const Icon(Icons.person, size: 32, color: Colors.white)
+                            ? const Icon(
+                                Icons.person,
+                                size: 32,
+                                color: Colors.white,
+                              )
                             : null,
                       ),
                       const SizedBox(width: 12),
@@ -178,7 +206,9 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: sos.isActive ? const Color(0xFF1A1A1A) : Colors.black87,
+                            color: sos.isActive
+                                ? const Color(0xFF1A1A1A)
+                                : Colors.black87,
                             height: 1.2,
                           ),
                         ),
@@ -188,9 +218,12 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                   ),
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
@@ -219,8 +252,10 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             // Animated warning icon for active SOS
             if (sos.isActive)
               Positioned(
-                top: 28,    // Thay đổi số này để điều chỉnh khoảng cách từ trên xuống
-                right: 28,  // Thay đổi số này để điều chỉnh khoảng cách từ phải sang trái
+                top:
+                    28, // Thay đổi số này để điều chỉnh khoảng cách từ trên xuống
+                right:
+                    28, // Thay đổi số này để điều chỉnh khoảng cách từ phải sang trái
                 child: RepaintBoundary(
                   child: AnimatedBuilder(
                     animation: _warningAnimation,
@@ -239,10 +274,17 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                 ),
               ),
           ],
+        );
+          },
         ),
 
         // Map Placeholder
-        Container(
+        Selector<EmergencyCaregiverProvider, String>(
+          selector: (context, provider) =>
+              '${provider.sosDetail?.location.latitude},${provider.sosDetail?.location.longitude}',
+          builder: (context, locStr, child) {
+            final sos = context.read<EmergencyCaregiverProvider>().sosDetail!;
+            return Container(
           height: 220,
           margin: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
@@ -250,7 +292,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -260,37 +302,79 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             borderRadius: BorderRadius.circular(12),
             child: Container(
               color: Colors.grey[300],
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.map, size: 64, color: Colors.grey[600]),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Map view',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                  if (sos.location.latitude != null)
-                    Text(
-                      'Lat: ${sos.location.latitude!.toStringAsFixed(6)}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              child:
+                  (sos.location.latitude != null &&
+                      sos.location.longitude != null)
+                  ? FlutterMap(
+                      options: MapOptions(
+                        initialCenter: LatLng(
+                          sos.location.latitude!,
+                          sos.location.longitude!,
+                        ),
+                        initialZoom: 15.0,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate:
+                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.example.healthguard',
+                        ),
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: LatLng(
+                                sos.location.latitude!,
+                                sos.location.longitude!,
+                              ),
+                              width: 40,
+                              height: 40,
+                              child: const Icon(
+                                Icons.location_on,
+                                color: Colors.red,
+                                size: 40,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.map, size: 64, color: Colors.grey[600]),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Map view',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          'Vị trí không xác định',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
                     ),
-                  if (sos.location.longitude != null)
-                    Text(
-                      'Lng: ${sos.location.longitude!.toStringAsFixed(6)}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                    ),
-                ],
-              ),
             ),
           ),
+        );
+          },
         ),
 
         // Details Section
         Expanded(
           child: Stack(
             children: [
-              SingleChildScrollView(
-                controller: _scrollController,
+              Selector<EmergencyCaregiverProvider, SOSEventModel?>(
+                selector: (context, provider) => provider.sosDetail,
+                builder: (context, sos, child) {
+                  if (sos == null) return const SizedBox.shrink();
+                  return SingleChildScrollView(
+                    controller: _scrollController,
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,6 +393,8 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                     const SizedBox(height: 16),
                   ],
                 ),
+              );
+                },
               ),
               // Gradient shadow at bottom to indicate more content below
               Positioned(
@@ -316,24 +402,29 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                 left: 0,
                 right: 0,
                 child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: _shadowOpacity,
-                    duration: const Duration(milliseconds: 150),
-                    child: RepaintBoundary(
-                      child: Container(
-                        height: 100,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withOpacity(0.15),
-                            ],
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: _shadowOpacity,
+                    builder: (context, opacity, child) {
+                      return AnimatedOpacity(
+                        opacity: opacity,
+                        duration: const Duration(milliseconds: 150),
+                        child: RepaintBoundary(
+                          child: Container(
+                            height: 100,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.black.withValues(alpha: 0.15),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -343,25 +434,30 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                 left: 0,
                 right: 0,
                 child: IgnorePointer(
-                  child: AnimatedOpacity(
-                    opacity: _shadowOpacity,
-                    duration: const Duration(milliseconds: 150),
-                    child: RepaintBoundary(
-                      child: AnimatedBuilder(
-                        animation: _arrowAnimation,
-                        builder: (context, child) {
-                          return Transform.translate(
-                            offset: Offset(0, _arrowAnimation.value),
-                            child: child,
-                          );
-                        },
-                        child: Icon(
-                          Icons.keyboard_arrow_down,
-                          size: 32,
-                          color: Colors.grey[700],
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: _shadowOpacity,
+                    builder: (context, opacity, child) {
+                      return AnimatedOpacity(
+                        opacity: opacity,
+                        duration: const Duration(milliseconds: 150),
+                        child: RepaintBoundary(
+                          child: AnimatedBuilder(
+                            animation: _arrowAnimation,
+                            builder: (context, child) {
+                              return Transform.translate(
+                                offset: Offset(0, _arrowAnimation.value),
+                                child: child,
+                              );
+                            },
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              size: 32,
+                              color: Colors.grey[700],
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -370,12 +466,19 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
         ),
 
         // Action Buttons
-        _buildActionButtons(provider, sos),
+        Selector<EmergencyCaregiverProvider, SOSEventModel?>(
+          selector: (context, provider) => provider.sosDetail,
+          builder: (context, sos, child) {
+            if (sos == null) return const SizedBox.shrink();
+            final provider = context.read<EmergencyCaregiverProvider>();
+            return _buildActionButtons(provider, sos);
+          },
+        ),
       ],
     );
   }
 
-  Widget _buildLocationInfo(sos) {
+  Widget _buildLocationInfo(dynamic sos) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -383,7 +486,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -403,27 +506,35 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             ],
           ),
           const SizedBox(height: 12),
-          Text(
-            'GPS: ${sos.location.latitude.toStringAsFixed(6)}, '
-            '${sos.location.longitude.toStringAsFixed(6)}',
-            style: TextStyle(color: Colors.grey[700]),
-          ),
+          if (sos.location?.latitude != null && sos.location?.longitude != null)
+            Text(
+              'GPS: ${sos.location!.latitude!.toStringAsFixed(6)}, '
+              '${sos.location!.longitude!.toStringAsFixed(6)}',
+              style: TextStyle(color: Colors.grey[700]),
+            )
+          else
+            Text(
+              'GPS: Không có dữ liệu',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
           const SizedBox(height: 4),
-          Text(
-            'Độ chính xác: ${sos.location.accuracy.toStringAsFixed(1)} mét',
-            style: TextStyle(color: Colors.grey[700]),
-          ),
+          if (sos.location?.accuracy != null)
+            Text(
+              'Độ chính xác: ${sos.location!.accuracy!.toStringAsFixed(1)} mét',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
           const SizedBox(height: 4),
-          Text(
-            'Cập nhật: ${DateFormat('HH:mm:ss - dd/MM/yyyy').format(sos.location.lastUpdated)}',
-            style: TextStyle(color: Colors.grey[600], fontSize: 13),
-          ),
+          if (sos.location?.lastUpdated != null)
+            Text(
+              'Cập nhật: ${DateFormat('HH:mm:ss - dd/MM/yyyy').format(sos.location!.lastUpdated!)}',
+              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildTimeInfo(sos) {
+  Widget _buildTimeInfo(dynamic sos) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -431,7 +542,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -465,7 +576,8 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     );
   }
 
-  Widget _buildTriggerInfo(sos) {
+  // ignore: unused_element
+  Widget _buildTriggerInfo(dynamic sos) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -473,7 +585,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -495,7 +607,11 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
           const SizedBox(height: 12),
           Row(
             children: [
-              Icon(_getTriggerIcon(sos.triggerType), size: 20, color: Colors.grey[700]),
+              Icon(
+                _getTriggerIcon(sos.triggerType),
+                size: 20,
+                color: Colors.grey[700],
+              ),
               const SizedBox(width: 8),
               Text(
                 _getTriggerLabel(sos.triggerType),
@@ -534,7 +650,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     }
   }
 
-  Widget _buildXAITimeline(xai) {
+  Widget _buildXAITimeline(dynamic xai) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -543,7 +659,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
         border: Border.all(color: Colors.amber[300]!, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -602,7 +718,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     );
   }
 
-  Widget _buildResolutionInfo(resolution) {
+  Widget _buildResolutionInfo(dynamic resolution) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -611,7 +727,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
         border: Border.all(color: Colors.green[300]!, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -652,14 +768,14 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     );
   }
 
-  Widget _buildActionButtons(EmergencyCaregiverProvider provider, sos) {
+  Widget _buildActionButtons(EmergencyCaregiverProvider provider, dynamic sos) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             offset: const Offset(0, -2),
           ),
@@ -705,10 +821,14 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: ElevatedButton.icon(
-                    onPressed: () => provider.openMapNavigation(
-                      sos.location.latitude,
-                      sos.location.longitude,
-                    ),
+                    onPressed:
+                        (sos.location?.latitude == null ||
+                            sos.location?.longitude == null)
+                        ? null
+                        : () => provider.openMapNavigation(
+                            sos.location!.latitude,
+                            sos.location!.longitude,
+                          ),
                     icon: const Icon(Icons.map),
                     label: const Text('Chỉ đường'),
                     style: ElevatedButton.styleFrom(

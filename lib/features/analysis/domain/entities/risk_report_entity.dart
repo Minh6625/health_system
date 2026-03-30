@@ -1,0 +1,40 @@
+enum RiskLevel { low, moderate, high, critical }
+
+class TopFactor {
+  final String key;
+  final String label;
+
+  TopFactor({required this.key, required this.label});
+}
+
+class RiskReportEntity {
+  final String reportId;
+  final String profileId;
+  final int score;
+  final RiskLevel level;
+  final String displayStatus;
+  final String summary;
+  final DateTime analyzedAt;
+  final int previousScore;
+  final List<int> trend7d;
+  final List<TopFactor> topFactors;
+  final List<String> recommendationPreview;
+  final double confidence;
+  final bool isStale;
+
+  RiskReportEntity({
+    required this.reportId,
+    required this.profileId,
+    required this.score,
+    required this.level,
+    required this.displayStatus,
+    required this.summary,
+    required this.analyzedAt,
+    required this.previousScore,
+    required this.trend7d,
+    required this.topFactors,
+    required this.recommendationPreview,
+    required this.confidence,
+    required this.isStale,
+  });
+}

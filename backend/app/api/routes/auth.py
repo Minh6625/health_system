@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Request, HTTPException, status
+from fastapi import APIRouter, Depends, Request, HTTPException, status, BackgroundTasks
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -12,6 +13,7 @@ from app.schemas.auth import (
     ResendVerificationRequest,
     ForgotPasswordRequest,
     ResetPasswordRequest,
+    VerifyResetOtpRequest,
     ChangePasswordRequest,
     UserData,
 )
@@ -43,7 +45,10 @@ def get_user_agent(request: Request) -> str:
 
 @router.post("/register", response_model=AuthResponse)
 def register(
-    payload: RegisterRequest, request: Request, db: Session = Depends(get_db)
+    payload: RegisterRequest, 
+    request: Request, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ) -> AuthResponse:
     """Register a new user account with role support."""
     ip_address = get_client_ip(request)
@@ -66,6 +71,7 @@ def register(
         phone=payload.phone,
         ip_address=ip_address,
         user_agent=user_agent,
+        background_tasks=background_tasks,
     )
     
     # Record attempt for rate limiting
@@ -99,7 +105,7 @@ def verify_email(
     user_agent = get_user_agent(request)
 
     success, message = AuthService.verify_email(
-        db, payload.verification_token, ip_address, user_agent
+        db, payload.email, payload.code, ip_address, user_agent
     )
     
     return AuthResponse(success=success, message=message)
@@ -107,7 +113,10 @@ def verify_email(
 
 @router.post("/resend-verification", response_model=AuthResponse)
 def resend_verification(
-    payload: ResendVerificationRequest, request: Request, db: Session = Depends(get_db)
+    payload: ResendVerificationRequest, 
+    request: Request, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ) -> AuthResponse:
     """Resend email verification token to user."""
     ip_address = get_client_ip(request)
@@ -122,7 +131,7 @@ def resend_verification(
         )
 
     success, message, token_data = AuthService.resend_verification_email(
-        db, payload.email.strip(), ip_address, user_agent
+        db, payload.email.strip(), ip_address, user_agent, background_tasks
     )
 
     # Always record attempt for rate limiting
@@ -202,7 +211,10 @@ def refresh_token(
 
 @router.post("/forgot-password", response_model=AuthResponse)
 def forgot_password(
-    payload: ForgotPasswordRequest, request: Request, db: Session = Depends(get_db)
+    payload: ForgotPasswordRequest, 
+    request: Request, 
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ) -> AuthResponse:
     """Request password reset token."""
     ip_address = get_client_ip(request)
@@ -216,7 +228,7 @@ def forgot_password(
         )
 
     success, message, token_data = AuthService.forgot_password(
-        db, payload.email.strip(), ip_address, user_agent
+        db, payload.email.strip(), ip_address, user_agent, background_tasks
     )
 
     # Always record attempt for rate limiting
@@ -232,6 +244,21 @@ def forgot_password(
         return AuthResponse(success=False, message=message)
 
 
+@router.post("/verify-reset-otp", response_model=AuthResponse)
+def verify_reset_otp(
+    payload: VerifyResetOtpRequest, request: Request, db: Session = Depends(get_db)
+) -> AuthResponse:
+    """Verify password reset OTP code without changing the password."""
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+
+    success, message = AuthService.verify_reset_otp(
+        db, payload.email, payload.code, ip_address, user_agent
+    )
+
+    return AuthResponse(success=success, message=message)
+
+
 @router.post("/reset-password", response_model=AuthResponse)
 def reset_password(
     payload: ResetPasswordRequest, request: Request, db: Session = Depends(get_db)
@@ -241,7 +268,7 @@ def reset_password(
     user_agent = get_user_agent(request)
 
     success, message = AuthService.reset_password(
-        db, payload.reset_token, payload.new_password, ip_address, user_agent
+        db, payload.email, payload.code, payload.new_password, ip_address, user_agent
     )
 
     return AuthResponse(success=success, message=message)
@@ -281,3 +308,59 @@ def change_password(
         change_password_rate_limiter.reset(identifier)
 
     return AuthResponse(success=success, message=message)
+
+
+@router.get("/deep-link-redirect", include_in_schema=False)
+def deep_link_redirect(action: str, code: str, email: str):
+    """
+    Redirect web links (from emails) to the mobile app deep link via HTML/JS.
+    Directly using HTTP 302 redirects to custom schemes is often blocked by Chrome/Android.
+    """
+    from app.core.config import settings
+    from fastapi.responses import HTMLResponse
+    
+    # iOS/Standard custom scheme
+    ios_url = f"{settings.MOBILE_DEEP_LINK_SCHEME}://{action}?code={code}&email={email}"
+    
+    # Android Chrome specific Intent URI (Bypasses security blocks)
+    android_intent_url = f"intent://{action}?code={code}&email={email}#Intent;scheme={settings.MOBILE_DEEP_LINK_SCHEME};package=com.example.health_system;end;"
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>Đang mở Health Guard...</title>
+        <style>
+            body {{ font-family: -apple-system, system-ui, sans-serif; text-align: center; padding: 40px 20px; background-color: #171a21; color: #c6d4df; }}
+            .container {{ max-width: 500px; margin: 0 auto; background-color: #1b2838; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }}
+            h2 {{ color: #ffffff; }}
+            .btn {{ display: inline-block; background: linear-gradient(to right, #47bfff 0%, #1a44c2 100%); color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold; margin-top: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h2>Đang mở ứng dụng Health Guard...</h2>
+            <p>Nếu ứng dụng không tự động mở, vui lòng nhấn vào nút bên dưới:</p>
+            <a href="#" id="open-btn" class="btn">Mở Health Guard</a>
+        </div>
+        <script>
+            // Detect platform to set the correct app launch URL
+            var isAndroid = /Android/i.test(navigator.userAgent);
+            var targetUrl = isAndroid ? "{android_intent_url}" : "{ios_url}";
+            
+            // Set the fallback button link
+            document.getElementById('open-btn').href = targetUrl;
+            
+            // Try to open the app automatically
+            window.onload = function() {{
+                setTimeout(function() {{
+                    window.location.href = targetUrl;
+                }}, 500);
+            }};
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)

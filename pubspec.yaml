@@ -37,13 +37,21 @@ dependencies:
   provider: ^6.1.5
   http: ^1.1.0
   flutter_secure_storage: ^9.2.2
-  app_links: ^6.3.3
-  jwt_decode: ^0.3.1
+  app_links: ^7.0.0
   cached_network_image: ^3.4.1
   intl: ^0.20.2
   url_launcher: ^6.3.2
   flutter_dotenv: ^5.1.0
+  flutter_animate: ^4.5.2
+  pinput: ^6.0.2
+  fl_chart: ^0.70.2
+  slide_to_act: ^2.0.2
+  geolocator: ^14.0.2
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  lottie: ^3.3.2
 
+  flutter_native_splash: any
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -55,7 +63,8 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.4.0
+  mockito: ^5.4.4
+  build_runner: ^2.4.9
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -69,6 +78,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/lottie/
     - .env.dev
     - .env.prod
 

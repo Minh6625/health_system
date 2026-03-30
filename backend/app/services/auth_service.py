@@ -1,8 +1,10 @@
 import re
+import secrets
 from typing import Optional
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 
+from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
 from app.models.user_model import User
@@ -11,10 +13,9 @@ from app.repositories.user_repository import UserRepository
 from app.utils.jwt import (
     create_access_token,
     create_refresh_token,
-    create_email_verification_token,
-    create_password_reset_token,
     decode_token,
 )
+from app.utils.datetime_helper import get_current_time
 from app.utils.email_service import EmailService
 from app.utils.password import validate_password_strength
 
@@ -23,6 +24,11 @@ logger = logging.getLogger(__name__)
 
 class AuthService:
     email_pattern = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
+    
+    @staticmethod
+    def _generate_pin_code() -> str:
+        """Generate cryptographically secure 6-digit PIN (100000-999999)."""
+        return str(secrets.randbelow(900000) + 100000)
     
     @staticmethod
     def validate_age(date_of_birth: Optional[date]) -> tuple[bool, str]:
@@ -53,8 +59,8 @@ class AuthService:
         # 18*365 + 1 days = just before 18 (invalid - younger)
         # Note: More days ago = older person
         
-        if days_old < 18 * 365:
-            return False, "Bạn phải đủ 18 tuổi để đăng ký"
+        if days_old < 16 * 365:
+            return False, "Bạn phải đủ 16 tuổi để đăng ký"
         
         if days_old > 150 * 365:
             return False, "Ngày sinh không hợp lệ (tuổi quá cao)"
@@ -68,11 +74,12 @@ class AuthService:
         email: str,
         full_name: str,
         password: str,
-        role: str = "patient",
+        role: str = "user",
         date_of_birth: Optional[date] = None,
         phone: Optional[str] = None,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
+        background_tasks: Optional[BackgroundTasks] = None,
     ) -> tuple[bool, str, Optional[dict]]:
         """
         Register new user with role support and strong password validation.
@@ -82,7 +89,7 @@ class AuthService:
             email: User email
             full_name: User full name
             password: User password (must meet strength requirements)
-            role: User role (patient or caregiver, default: patient)
+            role: User role (user or admin, default: user)
             date_of_birth: User date of birth (YYYY-MM-DD), optional
             phone: User phone number (10-15 digits), optional
             ip_address: Client IP address
@@ -147,21 +154,66 @@ class AuthService:
             return False, age_message, None
 
         # Validate role
-        if role not in ["patient", "caregiver"]:
-            role = "patient"
+        if role not in ["user", "admin"]:
+            role = "user"
 
         # Check if email already exists
         existing_user = UserRepository.get_by_email(db, email)
         if existing_user:
-            AuditLogRepository.log_action(
-                db,
-                action="user.register",
-                status="failure",
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details={"email": email, "reason": "Email already exists"},
-            )
-            return False, "Email đã tồn tại", None
+            if existing_user.is_verified:
+                AuditLogRepository.log_action(
+                    db,
+                    action="user.register",
+                    status="failure",
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"email": email, "reason": "Email already exists and is verified"},
+                )
+                return False, "Email đã tồn tại", None
+            else:
+                # User exists but is not verified, allow them to re-register
+                # Update their information with the new data
+                try:
+                    from app.utils.password import hash_password
+                    existing_user.hashed_password = hash_password(password)
+                    existing_user.full_name = full_name.strip()
+                    existing_user.role = role
+                    existing_user.date_of_birth = date_of_birth
+                    existing_user.phone = phone
+                    existing_user.updated_at = get_current_time()
+                    
+                    # Generate email verification PIN code
+                    verification_code = cls._generate_pin_code()
+                    existing_user.verification_code = verification_code
+                    existing_user.verification_code_expires_at = get_current_time() + timedelta(hours=24)
+                    db.commit()
+                    
+                    # Send verification email
+                    if background_tasks:
+                        background_tasks.add_task(EmailService.send_verification_email, email, verification_code)
+                        email_sent = True
+                    else:
+                        email_sent = EmailService.send_verification_email(email, verification_code)
+                    
+                    AuditLogRepository.log_action(
+                        db,
+                        action="user.register",
+                        status="success",
+                        user_id=existing_user.id,
+                        resource_type="user",
+                        resource_id=existing_user.id,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        details={"email": email, "role": role, "email_sent": email_sent, "note": "Re-registration of unverified account"},
+                    )
+                    
+                    return True, "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã xác thực.", {
+                        "verification_code": verification_code,  # ONLY FOR DEV/TESTING
+                        "user": existing_user,
+                    }
+                except Exception as e:
+                    logger.error(f"Re-register error for {email}: {str(e)}")
+                    return False, "Đã xảy ra lỗi khi cập nhật tài khoản đăng ký. Vui lòng thử lại.", None
 
         try:
             # Create new user
@@ -175,13 +227,18 @@ class AuthService:
                 phone=phone,
             )
             
-            # Generate email verification token
-            verification_token = create_email_verification_token(
-                data={"user_id": user.id, "email": user.email}
-            )
+            # Generate email verification PIN code
+            verification_code = cls._generate_pin_code()
+            user.verification_code = verification_code
+            user.verification_code_expires_at = get_current_time() + timedelta(hours=24)
+            db.commit()
             
             # Send verification email
-            email_sent = EmailService.send_verification_email(email, verification_token)
+            if background_tasks:
+                background_tasks.add_task(EmailService.send_verification_email, email, verification_code)
+                email_sent = True
+            else:
+                email_sent = EmailService.send_verification_email(email, verification_code)
             
             AuditLogRepository.log_action(
                 db,
@@ -195,8 +252,8 @@ class AuthService:
                 details={"email": email, "role": role, "email_sent": email_sent},
             )
             
-            return True, "Đăng ký thành công. Vui lòng xác thực email.", {
-                "verification_token": verification_token,
+            return True, "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã xác thực.", {
+                "verification_code": verification_code,  # ONLY FOR DEV/TESTING
                 "user": user,
             }
         except Exception as e:
@@ -424,33 +481,19 @@ class AuthService:
     def verify_email(
         cls,
         db: Session,
-        verification_token: str,
+        email: str,
+        code: str,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> tuple[bool, str]:
         """
-        Verify user email using verification token.
+        Verify user email using 6-digit PIN code.
         
         Returns:
             (success, message)
         """
-        payload = decode_token(verification_token)
-        
-        if not payload or payload.get("type") != "email_verification":
-            AuditLogRepository.log_action(
-                db,
-                action="user.email_verify",
-                status="failure",
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details={"reason": "Invalid verification token"},
-            )
-            return False, "Token xác thực không hợp lệ"
-        
-        user_id = payload.get("user_id")
-        email = payload.get("email")
-        
-        user = UserRepository.get_by_id(db, user_id)
+        email = email.strip().lower()
+        user = UserRepository.get_by_email(db, email)
         
         if not user:
             AuditLogRepository.log_action(
@@ -459,59 +502,87 @@ class AuthService:
                 status="failure",
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"reason": "User not found", "user_id": user_id},
+                details={"reason": "User not found", "email": email},
             )
-            return False, "User không tồn tại"
-        
-        if user.email != email:
-            AuditLogRepository.log_action(
-                db,
-                action="user.email_verify",
-                status="failure",
-                user_id=user_id,
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details={"reason": "Email mismatch"},
-            )
-            return False, "Email không khớp"
+            return False, "Email không tồn tại"
         
         if user.is_verified:
             AuditLogRepository.log_action(
                 db,
                 action="user.email_verify",
                 status="success",
-                user_id=user_id,
+                user_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 details={"email": email, "note": "Already verified"},
             )
             return True, "Email đã được xác thực"
+            
+        if not user.verification_code:
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "No verification code set"},
+            )
+            return False, "Không tìm thấy yêu cầu xác thực email. Vui lòng yêu cầu gửi lại mã."
+            
+        # Constant-time comparison to prevent timing attacks
+        if not secrets.compare_digest(user.verification_code, code):
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Invalid code"},
+            )
+            return False, "Mã xác thực không đúng"
+            
+        # Check expiry
+        if not user.verification_code_expires_at or user.verification_code_expires_at < get_current_time():
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Code expired"},
+            )
+            return False, "Mã xác thực đã hết hạn. Vui lòng yêu cầu gửi lại mã."
         
         try:
-            verified = UserRepository.verify_email(db, user_id)
+            # Mark as verified and clear the code
+            user.is_verified = True
+            user.verification_code = None
+            user.verification_code_expires_at = None
+            user.updated_at = get_current_time()
+            db.commit()
             
-            if verified:
-                AuditLogRepository.log_action(
-                    db,
-                    action="user.email_verify",
-                    status="success",
-                    user_id=user_id,
-                    resource_type="user",
-                    resource_id=user_id,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    details={"email": email},
-                )
-                return True, "Xác thực email thành công"
-            else:
-                return False, "Lỗi khi xác thực email"
+            AuditLogRepository.log_action(
+                db,
+                action="user.email_verify",
+                status="success",
+                user_id=user.id,
+                resource_type="user",
+                resource_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"email": email},
+            )
+            return True, "Xác thực email thành công"
                 
         except Exception as e:
             AuditLogRepository.log_action(
                 db,
                 action="user.email_verify",
                 status="error",
-                user_id=user_id,
+                user_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 details={"email": email, "error": str(e)},
@@ -525,6 +596,7 @@ class AuthService:
         email: str,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
+        background_tasks: Optional[BackgroundTasks] = None,
     ) -> tuple[bool, str, Optional[dict]]:
         """
         Resend email verification token to user.
@@ -573,13 +645,18 @@ class AuthService:
             return False, "Email đã được xác thực. Bạn có thể đăng nhập ngay", None
         
         try:
-            # Generate new verification token
-            verification_token = create_email_verification_token(
-                data={"user_id": user.id, "email": user.email}
-            )
+            # Generate new verification PIN code
+            verification_code = cls._generate_pin_code()
+            user.verification_code = verification_code
+            user.verification_code_expires_at = get_current_time() + timedelta(hours=24)
+            db.commit()
             
             # Send verification email
-            email_sent = EmailService.send_verification_email(email, verification_token)
+            if background_tasks:
+                background_tasks.add_task(EmailService.send_verification_email, email, verification_code)
+                email_sent = True
+            else:
+                email_sent = EmailService.send_verification_email(email, verification_code)
             
             AuditLogRepository.log_action(
                 db,
@@ -593,8 +670,8 @@ class AuthService:
                 details={"email": email, "email_sent": email_sent},
             )
             
-            return True, "Email xác thực đã được gửi lại. Vui lòng kiểm tra hộp thư", {
-                "verification_token": verification_token
+            return True, "Mã xác thực mới đã được gửi. Vui lòng kiểm tra hộp thư", {
+                "verification_code": verification_code  # ONLY FOR DEV/TESTING
             }
         except Exception as e:
             AuditLogRepository.log_action(
@@ -615,13 +692,14 @@ class AuthService:
         email: str,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
+        background_tasks: Optional[BackgroundTasks] = None,
     ) -> tuple[bool, str, Optional[dict]]:
         """
-        Generate password reset token and send email.
+        Generate password reset PIN code and send email.
         
         Returns:
             (success, message, token_data)
-            where token_data = {"reset_token": str} or None
+            where token_data = {"reset_code": str} or None
         """
         email = email.strip()
         if not cls.email_pattern.match(email):
@@ -648,16 +726,21 @@ class AuthService:
                 user_agent=user_agent,
                 details={"email": email, "note": "User not found but returned success"},
             )
-            return True, "Nếu email tồn tại, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu", None
+            return True, "Nếu email tồn tại, bạn sẽ nhận được email chứa mã đặt lại mật khẩu", None
         
         try:
-            # Generate reset token
-            reset_token = create_password_reset_token(
-                data={"user_id": user.id, "email": user.email}
-            )
+            # Generate reset PIN code
+            reset_code = cls._generate_pin_code()
+            user.reset_code = reset_code
+            user.reset_code_expires_at = get_current_time() + timedelta(minutes=15)
+            db.commit()
             
-            # Send reset email (email service will create deep link)
-            email_sent = EmailService.send_password_reset_email(email, reset_token)
+            # Send reset email
+            if background_tasks:
+                background_tasks.add_task(EmailService.send_password_reset_email, email, reset_code)
+                email_sent = True
+            else:
+                email_sent = EmailService.send_password_reset_email(email, reset_code)
             
             AuditLogRepository.log_action(
                 db,
@@ -671,8 +754,8 @@ class AuthService:
                 details={"email": email, "email_sent": email_sent},
             )
             
-            return True, "Nếu email tồn tại, bạn sẽ nhận được email hướng dẫn đặt lại mật khẩu", {
-                "reset_token": reset_token
+            return True, "Nếu email tồn tại, bạn sẽ nhận được email chứa mã đặt lại mật khẩu", {
+                "reset_code": reset_code  # ONLY FOR DEV/TESTING
             }
         except Exception as e:
             AuditLogRepository.log_action(
@@ -687,16 +770,99 @@ class AuthService:
             return False, f"Lỗi server: {str(e)}", None
 
     @classmethod
+    def verify_reset_otp(
+        cls,
+        db: Session,
+        email: str,
+        code: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> tuple[bool, str]:
+        """
+        Verify password reset OTP code WITHOUT changing the password.
+        Used by the frontend to validate the OTP before showing the new-password form.
+        The reset_code is intentionally preserved so reset_password() can still use it.
+
+        Returns:
+            (success, message)
+        """
+        email = email.strip().lower()
+        user = UserRepository.get_by_email(db, email)
+
+        if not user:
+            AuditLogRepository.log_action(
+                db,
+                action="user.verify_reset_otp",
+                status="failure",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "User not found", "email": email},
+            )
+            return False, "Email không tồn tại"
+
+        if not user.reset_code:
+            AuditLogRepository.log_action(
+                db,
+                action="user.verify_reset_otp",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "No reset code set"},
+            )
+            return False, "Không tìm thấy yêu cầu đặt lại mật khẩu. Vui lòng yêu cầu lại."
+
+        # Constant-time comparison to prevent timing attacks
+        if not secrets.compare_digest(user.reset_code, code):
+            AuditLogRepository.log_action(
+                db,
+                action="user.verify_reset_otp",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Invalid code"},
+            )
+            return False, "Mã xác thực không đúng"
+
+        # Check expiry
+        if not user.reset_code_expires_at or user.reset_code_expires_at < get_current_time():
+            AuditLogRepository.log_action(
+                db,
+                action="user.verify_reset_otp",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Code expired"},
+            )
+            return False, "Mã xác thực đã hết hạn. Vui lòng yêu cầu lại."
+
+        AuditLogRepository.log_action(
+            db,
+            action="user.verify_reset_otp",
+            status="success",
+            user_id=user.id,
+            resource_type="user",
+            resource_id=user.id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details={"email": email},
+        )
+        return True, "Mã xác thực hợp lệ"
+
+    @classmethod
     def reset_password(
         cls,
         db: Session,
-        reset_token: str,
+        email: str,
+        code: str,
         new_password: str,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> tuple[bool, str]:
         """
-        Reset password using reset token (one-time use).
+        Reset password using 6-digit PIN code.
         
         Returns:
             (success, message)
@@ -704,23 +870,8 @@ class AuthService:
         if len(new_password) < 6:
             return False, "Mật khẩu phải có ít nhất 6 ký tự"
         
-        payload = decode_token(reset_token)
-        
-        if not payload or payload.get("type") != "password_reset":
-            AuditLogRepository.log_action(
-                db,
-                action="user.reset_password",
-                status="failure",
-                ip_address=ip_address,
-                user_agent=user_agent,
-                details={"reason": "Invalid reset token"},
-            )
-            return False, "Token đặt lại mật khẩu không hợp lệ hoặc đã hết hạn"
-        
-        user_id = payload.get("user_id")
-        email = payload.get("email")
-        
-        user = UserRepository.get_by_id(db, user_id)
+        email = email.strip().lower()
+        user = UserRepository.get_by_email(db, email)
         
         if not user:
             AuditLogRepository.log_action(
@@ -729,49 +880,60 @@ class AuthService:
                 status="failure",
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"reason": "User not found", "user_id": user_id},
+                details={"reason": "User not found", "email": email},
             )
-            return False, "User không tồn tại"
-        
-        if user.email != email:
+            return False, "Email không tồn tại"
+            
+        if not user.reset_code:
             AuditLogRepository.log_action(
                 db,
                 action="user.reset_password",
                 status="failure",
-                user_id=user_id,
+                user_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"reason": "Email mismatch"},
+                details={"reason": "No reset code set"},
             )
-            return False, "Token không hợp lệ"
-        
-        # Check if password was already changed after token was issued (one-time use)
-        token_issued_at = payload.get("iat")
-        if user.updated_at and token_issued_at:
-            # Convert token_issued_at (timestamp) to datetime for comparison
-            from datetime import datetime, timezone
-            token_time = datetime.fromtimestamp(token_issued_at, tz=timezone.utc)
+            return False, "Không tìm thấy yêu cầu đặt lại mật khẩu"
             
-            # Ensure user.updated_at is timezone-aware for comparison
-            user_updated_at = user.updated_at
-            if user_updated_at.tzinfo is None:
-                user_updated_at = user_updated_at.replace(tzinfo=timezone.utc)
+        # Constant-time comparison to prevent timing attacks
+        if not secrets.compare_digest(user.reset_code, code):
+            AuditLogRepository.log_action(
+                db,
+                action="user.reset_password",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Invalid code"},
+            )
+            return False, "Mã đặt lại mật khẩu không đúng"
             
-            if user_updated_at > token_time:
-                AuditLogRepository.log_action(
-                    db,
-                    action="user.reset_password",
-                    status="failure",
-                    user_id=user_id,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                    details={"reason": "Token already used"},
-                )
-                return False, "Token đã được sử dụng. Vui lòng yêu cầu đặt lại mật khẩu mới"
+        # Check expiry
+        if not user.reset_code_expires_at or user.reset_code_expires_at < get_current_time():
+            AuditLogRepository.log_action(
+                db,
+                action="user.reset_password",
+                status="failure",
+                user_id=user.id,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "Code expired"},
+            )
+            return False, "Mã đặt lại mật khẩu đã hết hạn. Vui lòng yêu cầu lại."
         
         try:
             # Update password
-            UserRepository.update_password(db, user_id, new_password)
+            UserRepository.update_password(db, user.id, new_password)
+            
+            # Clear the reset code to prevent reuse
+            user.reset_code = None
+            user.reset_code_expires_at = None
+            
+            # Use a slightly complex update flow - ensure we do a db refresh or commit
+            # (update_password does commit, but its best to ensure our manual changes save too)
+            user.updated_at = get_current_time()
+            db.commit()
             
             # Send notification email
             EmailService.send_password_changed_notification(user.email)
@@ -780,9 +942,9 @@ class AuthService:
                 db,
                 action="user.reset_password",
                 status="success",
-                user_id=user_id,
+                user_id=user.id,
                 resource_type="user",
-                resource_id=user_id,
+                resource_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 details={"email": email},
@@ -795,7 +957,7 @@ class AuthService:
                 db,
                 action="user.reset_password",
                 status="error",
-                user_id=user_id,
+                user_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
                 details={"email": email, "error": str(e)},

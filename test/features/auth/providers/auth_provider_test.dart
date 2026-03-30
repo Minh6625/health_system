@@ -25,7 +25,8 @@ void main() {
         email: 'test@example.com',
         fullName: 'Test User',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
       
       final response = AuthResponse(
@@ -52,7 +53,7 @@ void main() {
         email: 'invalid-email',
         fullName: 'Test User',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
       );
 
       // Act
@@ -71,7 +72,7 @@ void main() {
         email: 'test@example.com',
         fullName: 'Test123',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
       );
 
       // Act
@@ -90,7 +91,7 @@ void main() {
         email: 'test@example.com',
         fullName: 'Test@User#',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
       );
 
       // Act
@@ -108,7 +109,8 @@ void main() {
         email: 'test@example.com',
         fullName: 'Nguyễn Văn Anh',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
       
       final response = AuthResponse(
@@ -134,7 +136,7 @@ void main() {
         email: 'test@example.com',
         fullName: '',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
       );
 
       // Act
@@ -152,7 +154,7 @@ void main() {
         email: 'test@example.com',
         fullName: 'Test User',
         password: 'Pass1!',
-        role: 'patient',
+        role: 'user',
       );
       
       final response = AuthResponse(
@@ -177,7 +179,8 @@ void main() {
         email: 'test@example.com',
         fullName: 'Test User',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
       
       final response = AuthResponse(
@@ -202,7 +205,8 @@ void main() {
         email: 'test@example.com',
         fullName: 'Test User',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
 
       when(mockRepository.register(user)).thenThrow(Exception('Network error'));
@@ -212,7 +216,7 @@ void main() {
 
       // Assert
       expect(result, false);
-      expect(authProvider.message, contains('lỗi'));
+      expect(authProvider.message, contains('Lỗi'));
       expect(authProvider.isLoading, false);
     });
 
@@ -222,7 +226,8 @@ void main() {
         email: 'test@example.com',
         fullName: 'Test User',
         password: 'StrongPass123!',
-        role: 'patient',
+        role: 'user',
+        dateOfBirth: DateTime(1990, 1, 1),
       );
       
       final response = AuthResponse(

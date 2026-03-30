@@ -3,6 +3,7 @@
 *.log
 *.pyc
 .venv/
+venv/
 *.swp
 .DS_Store
 .atom/
@@ -51,3 +52,14 @@ app.*.map.json
 /android/app/release
 .env.dev
 .env.prod
+
+# Temporary Logs and Artifacts
+analyze*.txt
+flutter_analyze*.txt
+diff.txt
+crash_log.txt
+*.log
+out*.txt
+
+# AI Code Assistant Folders
+.codex_appdata/

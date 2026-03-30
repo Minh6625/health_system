@@ -30,6 +30,9 @@ class Settings:
     SENDER_EMAIL: str = os.getenv("SENDER_EMAIL", "")
     SENDER_PASSWORD: str = os.getenv("SENDER_PASSWORD", "")
     
+    # Backend URL for deep link redirection API
+    BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8080")
+    
     # Frontend URL for email verification links (web)
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     

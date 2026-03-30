@@ -19,20 +19,20 @@ class TestAgeValidation:
         assert "OK" in message
 
     def test_valid_minimum_age(self):
-        """Test exactly 18 years old (minimum requirement)."""
+        """Test exactly 16 years old (minimum requirement)."""
         # Use exact date calculation for 18 years
         from datetime import date
         today = date.today()
-        dob = date(today.year - 18, today.month, today.day)
+        dob = date(today.year - 16, today.month, today.day)
         is_valid, message = AuthService.validate_age(dob)
         assert is_valid is True
 
-    def test_young_age_17_years(self):
-        """Test age under 18 (17 years old)."""
-        dob = date.today() - timedelta(days=17*365)
+    def test_young_age_15_years(self):
+        """Test age under 16 (15 years old)."""
+        dob = date.today() - timedelta(days=15*365)
         is_valid, message = AuthService.validate_age(dob)
         assert is_valid is False
-        assert "18 tuổi" in message
+        assert "16 tuổi" in message
 
     def test_negative_age_future_date(self):
         """Test negative age (date in future)."""
@@ -70,19 +70,19 @@ class TestAgeValidation:
 
     def test_leap_year_age_calculation(self):
         """Test age calculation on leap year date."""
-        # February 29 of 18 years ago
-        dob = date(2006, 2, 28)  # Using 2006 which has Feb 28
+        # February 29 of 16 years ago
+        dob = date(2008, 2, 29)  # 2008 was a leap year
         is_valid, message = AuthService.validate_age(dob)
         assert is_valid is True
 
-    def test_age_boundary_just_turned_18(self):
-        """Test age just after turning 18 (18 years + 1 day old)."""
-        dob = date.today() - timedelta(days=18*365 + 1)
+    def test_age_boundary_just_turned_16(self):
+        """Test age just after turning 16 (16 years + 1 day old)."""
+        dob = date.today() - timedelta(days=16*365 + 1)
         is_valid, message = AuthService.validate_age(dob)
         assert is_valid is True
 
-    def test_age_boundary_just_before_18(self):
-        """Test age just before turning 18 (18 years - 1 day old)."""
-        dob = date.today() - timedelta(days=18*365 - 1)
+    def test_age_boundary_just_before_16(self):
+        """Test age just before turning 16 (16 years - 1 day old)."""
+        dob = date.today() - timedelta(days=16*365 - 1)
         is_valid, message = AuthService.validate_age(dob)
         assert is_valid is False

@@ -24,7 +24,7 @@ class TestRegisterRequestSchema:
         assert request.email == "test@example.com"
         assert request.full_name == "John Doe"
         assert request.password == "StrongPass123!"
-        assert request.role == "patient"
+        assert request.role == "user"
 
     def test_valid_registration_with_all_fields(self):
         """Test valid registration with all fields."""
@@ -32,7 +32,7 @@ class TestRegisterRequestSchema:
             email="test@example.com",
             full_name="Jane Smith",
             password="SecurePass456!",
-            role="caregiver",
+            role="admin",
             date_of_birth=date(2000, 1, 15),
             phone="0912345678"
         )
@@ -40,7 +40,7 @@ class TestRegisterRequestSchema:
         assert request.email == "test@example.com"
         assert request.full_name == "Jane Smith"
         assert request.password == "SecurePass456!"
-        assert request.role == "caregiver"
+        assert request.role == "admin"
         assert request.date_of_birth == date(2000, 1, 15)
         assert request.phone == "0912345678"
 
@@ -233,7 +233,7 @@ class TestRegisterRequestSchema:
                 email="test@example.com",
                 full_name="John Doe",
                 password="StrongPass123!",
-                role="admin"  # Invalid role
+                role="manager"  # Invalid role
             )
         
         errors = exc_info.value.errors()
@@ -245,10 +245,10 @@ class TestRegisterRequestSchema:
             email="test@example.com",
             full_name="John Doe",
             password="StrongPass123!",
-            role="caregiver"  # Use lowercase
+            role="admin"  # Use lowercase
         )
         
-        assert request.role == "caregiver"
+        assert request.role == "admin"
 
     def test_phone_validation_removes_spaces_and_dashes(self):
         """Test phone validation removes spaces and dashes."""

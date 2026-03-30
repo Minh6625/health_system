@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
         android:label="HealthGuard"
         android:name="${applicationName}"
@@ -31,9 +36,10 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 
-                <!-- Deep link scheme: healthguard://verify-email?token=xxx -->
-                <data android:scheme="healthguard"/>
-                <data android:host="verify-email"/>
+                <!-- Match standard HTTPS links from app.healthguard.com -->
+                <data android:scheme="https" android:host="app.healthguard.com" android:pathPrefix="/verify-email" />
+                <data android:scheme="http" android:host="192.168.1.101" android:pathPrefix="/verify-email" />
+                <data android:scheme="http" android:host="localhost" android:pathPrefix="/verify-email" />
             </intent-filter>
             
             <intent-filter android:autoVerify="true">
@@ -41,9 +47,20 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 
-                <!-- Deep link scheme: healthguard://reset-password?token=xxx -->
-                <data android:scheme="healthguard"/>
-                <data android:host="reset-password"/>
+                <!-- Match standard HTTPS links from app.healthguard.com -->
+                <data android:scheme="https" android:host="app.healthguard.com" android:pathPrefix="/reset-password" />
+                <data android:scheme="http" android:host="192.168.1.101" android:pathPrefix="/reset-password" />
+                <data android:scheme="http" android:host="localhost" android:pathPrefix="/reset-password" />
+            </intent-filter>
+
+            <!-- Specific intent filter for custom scheme (No autoVerify to prevent validation failures) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                
+                <data android:scheme="healthguard" android:host="verify-email" />
+                <data android:scheme="healthguard" android:host="reset-password" />
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
@@ -51,6 +68,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- Disable Impeller for Emulator Black Screen issue -->
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -61,6 +82,14 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="google.navigation" />
         </intent>
     </queries>
 </manifest>

@@ -7,7 +7,11 @@ class AuthRepository {
 
   Future<AuthResponse> login(UserModel user) async {
     try {
-      final result = await _apiClient.post('/auth/login', body: user.toJson());
+      final result = await _apiClient.post(
+        '/auth/login',
+        body: user.toJson(),
+        requiresAuth: false,
+      );
       return AuthResponse.fromJson(result);
     } catch (e) {
       return AuthResponse(
@@ -22,6 +26,7 @@ class AuthRepository {
       final result = await _apiClient.post(
         '/auth/register',
         body: user.toJson(),
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
@@ -32,11 +37,12 @@ class AuthRepository {
     }
   }
 
-  Future<AuthResponse> verifyEmail(String verificationToken) async {
+  Future<AuthResponse> verifyEmail(String email, String code) async {
     try {
       final result = await _apiClient.post(
         '/auth/verify-email',
-        body: {'verification_token': verificationToken},
+        body: {'email': email, 'code': code},
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
@@ -52,6 +58,7 @@ class AuthRepository {
       final result = await _apiClient.post(
         '/auth/resend-verification',
         body: {'email': email},
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
@@ -67,6 +74,7 @@ class AuthRepository {
       final result = await _apiClient.post(
         '/auth/forgot-password',
         body: {'email': email},
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {
@@ -78,13 +86,31 @@ class AuthRepository {
   }
 
   Future<AuthResponse> resetPassword(
-    String resetToken,
+    String email,
+    String code,
     String newPassword,
   ) async {
     try {
       final result = await _apiClient.post(
         '/auth/reset-password',
-        body: {'reset_token': resetToken, 'new_password': newPassword},
+        body: {'email': email, 'code': code, 'new_password': newPassword},
+        requiresAuth: false,
+      );
+      return AuthResponse.fromJson(result);
+    } catch (e) {
+      return AuthResponse(
+        success: false,
+        message: 'Lỗi kết nối: ${e.toString()}',
+      );
+    }
+  }
+
+  Future<AuthResponse> verifyResetOtp(String email, String code) async {
+    try {
+      final result = await _apiClient.post(
+        '/auth/verify-reset-otp',
+        body: {'email': email, 'code': code},
+        requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
     } catch (e) {

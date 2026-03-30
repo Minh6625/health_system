@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 import 'package:healthguard/features/emergency/widgets/sos_card.dart';
-import 'package:healthguard/features/emergency/screens/emergency_sos_detail_screen.dart';
 
 /// SOS Received List screen for Caregiver
 class EmergencySOSReceivedListScreen extends StatefulWidget {
@@ -35,8 +35,12 @@ class _EmergencySOSReceivedListScreenState
     super.didChangeDependencies();
     if (!_isInitialized) {
       _isInitialized = true;
-      // Fetch initial data immediately
-      context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
+      // Fetch initial data immediately after build
+      Future.microtask(() {
+        if (mounted) {
+          context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
+        }
+      });
     }
   }
 
@@ -57,10 +61,6 @@ class _EmergencySOSReceivedListScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFEBEBEB),
-      appBar: AppBar(
-        title: const Text('Danh sách SOS nhận được'),
-        elevation: 0,
-      ),
       body: Column(
         children: [
           // Search Bar
@@ -213,12 +213,10 @@ class _EmergencySOSReceivedListScreenState
               final sos = filteredList[index];
               return SOSCard(
                 sos: sos,
-                onTap: () => Navigator.push(
+                onTap: () => Navigator.pushNamed(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        EmergencySOSDetailScreen(sosId: sos.id),
-                  ),
+                  AppRouter.emergencySosDetail,
+                  arguments: {'sosId': sos.id},
                 ),
                 onCallPressed: () => provider.makePhoneCall(sos.patient.phone),
                 onMapPressed: () => provider.openMapNavigation(
