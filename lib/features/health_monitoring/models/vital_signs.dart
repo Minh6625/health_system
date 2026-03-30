@@ -6,7 +6,7 @@ class VitalSigns {
   final double? bloodPressureSys; // mmHg (tâm thu)
   final double? bloodPressureDia; // mmHg (tâm trương)
   final DateTime timestamp;
-  final bool isStale; // Data older than 5 minutes
+  final bool isStale; // Data older than the backend stale threshold
 
   VitalSigns({
     this.heartRate,

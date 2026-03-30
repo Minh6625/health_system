@@ -6,6 +6,7 @@ import 'package:healthguard/features/device/models/device_model.dart';
 
 class DeviceProvider extends ChangeNotifier {
   final ApiClient _apiClient = ApiClient();
+  static const Duration _cacheTTL = Duration(seconds: 30);
 
   List<DeviceModel> _devices = [];
   bool _isLoading = false;
@@ -13,6 +14,7 @@ class DeviceProvider extends ChangeNotifier {
   String _statusFilter = 'all';
   String? _typeFilter;
   int _total = 0;
+  DateTime? _lastFetchTime;
 
   List<DeviceModel> get devices => _devices;
   bool get isLoading => _isLoading;
@@ -27,21 +29,38 @@ class DeviceProvider extends ChangeNotifier {
       _devices.where((d) => _deviceNeedsAttention(d)).toList();
 
   bool _deviceNeedsAttention(DeviceModel device) {
-    if (!device.isOnline) return true;
-    if (device.batteryLevel != null && device.batteryLevel! <= 20) return true;
-    if (device.lastSyncAt == null) return true;
-    if (DateTime.now().difference(device.lastSyncAt!).inHours >= 24) return true;
+    final batteryLevel = device.batteryLevel;
+    if (batteryLevel != null && batteryLevel <= 20) {
+      return true;
+    }
+
+    final lastSyncAt = device.lastSyncAt;
+    if (device.isActive && lastSyncAt != null) {
+      final syncedRecently = DateTime.now().difference(lastSyncAt).inHours < 24;
+      if (syncedRecently) {
+        return false;
+      }
+    }
+
+    if (device.isActive && lastSyncAt == null) {
+      return true;
+    }
+
+    if (lastSyncAt != null && DateTime.now().difference(lastSyncAt).inHours >= 24) {
+      return true;
+    }
+
     return false;
   }
 
   Future<void> setStatusFilter(String value) async {
     _statusFilter = value;
-    await fetchDevices();
+    await fetchDevices(forceRefresh: true);
   }
 
   Future<void> setTypeFilter(String? value) async {
     _typeFilter = value;
-    await fetchDevices();
+    await fetchDevices(forceRefresh: true);
   }
 
   Future<bool> updateDevice({
@@ -140,10 +159,24 @@ class DeviceProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> fetchDevices() async {
+  bool _isCacheValid() {
+    if (_lastFetchTime == null) {
+      return false;
+    }
+    return DateTime.now().difference(_lastFetchTime!) < _cacheTTL;
+  }
+
+  Future<void> fetchDevices({bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid()) {
+      return;
+    }
+
+    final shouldNotifyLoading = _devices.isEmpty || forceRefresh;
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
+    if (shouldNotifyLoading) {
+      notifyListeners();
+    }
 
     if (DeviceMockConfig.useMockData) {
       // ── Mock mode ──────────────────────────────────────────────────────
@@ -191,6 +224,7 @@ class DeviceProvider extends ChangeNotifier {
       _sortDevices(mockList);
       _devices = mockList;
       _total = _devices.length;
+      _lastFetchTime = DateTime.now();
       _isLoading = false;
       notifyListeners();
       return;
@@ -222,6 +256,7 @@ class DeviceProvider extends ChangeNotifier {
           
       _sortDevices(liveList);
       _devices = liveList;
+      _lastFetchTime = DateTime.now();
     } catch (e) {
       _errorMessage = 'Khong the tai danh sach thiet bi: ${e.toString()}';
     } finally {

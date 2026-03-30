@@ -11,6 +11,57 @@ from app.utils.jwt import decode_token
 
 
 security = HTTPBearer()
+optional_security = HTTPBearer(auto_error=False)
+
+
+def _resolve_user_from_credentials(
+    credentials: HTTPAuthorizationCredentials,
+    db: Session,
+) -> User:
+    token = credentials.credentials
+
+    payload = decode_token(token)
+
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token không hợp lệ hoặc đã hết hạn",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Access tokens don't have "type" field, refresh tokens have type="refresh"
+    if payload.get("type") == "refresh":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Không thể sử dụng refresh token cho endpoint này",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_id = payload.get("user_id")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token không hợp lệ",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = UserRepository.get_by_id(db, user_id)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User không tồn tại",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản đã bị khóa",
+        )
+
+    return user
 
 
 def get_current_user(
@@ -30,50 +81,16 @@ def get_current_user(
     Raises:
         HTTPException: If token is invalid or user not found
     """
-    token = credentials.credentials
-    
-    payload = decode_token(token)
-    
-    if not payload:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token không hợp lệ hoặc đã hết hạn",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Access tokens don't have "type" field, refresh tokens have type="refresh"
-    if payload.get("type") == "refresh":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Không thể sử dụng refresh token cho endpoint này",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user_id = payload.get("user_id")
-    
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token không hợp lệ",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    user = UserRepository.get_by_id(db, user_id)
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User không tồn tại",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tài khoản đã bị khóa",
-        )
-    
-    return user
+    return _resolve_user_from_credentials(credentials, db)
+
+
+def get_optional_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
+    db: Session = Depends(get_db),
+) -> User | None:
+    if credentials is None:
+        return None
+    return _resolve_user_from_credentials(credentials, db)
 
 
 def get_target_profile_id(
@@ -104,3 +121,13 @@ def get_target_profile_id(
         )
         
     return x_target_profile_id
+
+
+def require_internal_service(
+    x_internal_service: str | None = Header(default=None, alias="X-Internal-Service")
+) -> None:
+    if x_internal_service != "iot-simulator":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Endpoint này chỉ dành cho IoT Simulator internal service",
+        )

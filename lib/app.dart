@@ -14,6 +14,7 @@ import 'package:healthguard/features/emergency/providers/emergency_caregiver_pro
 // ignore: unused_import — giữ để dễ switch sang real backend
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_mock_repository.dart';
+import 'package:healthguard/features/home/presentation/providers/home_dashboard_provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:provider/provider.dart';
@@ -170,6 +171,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         ChangeNotifierProvider(create: (_) => AuthProvider(AuthRepository())),
         ChangeNotifierProvider(create: (_) => SleepProvider()),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
+        ChangeNotifierProvider(create: (_) => HomeDashboardProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(
           create: (_) => EmergencyCaregiverProvider(
