@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+import hashlib
 import json
 
 from sqlalchemy import text
@@ -12,6 +13,8 @@ from app.schemas.monitoring import SleepSessionResponse, VitalSignsResponse, Hea
 
 class MonitoringService:
     """Fetch real-time telemetry from database - NO MOCK DATA."""
+
+    VITALS_STALE_AFTER = timedelta(seconds=30)
 
     @staticmethod
     def get_latest_vital_signs(patient_id: int, db: Session) -> VitalSignsResponse:
@@ -235,6 +238,11 @@ class MonitoringService:
                     phases=phases,
                     start_time=start_time,
                     end_time=end_time,
+                    session_id=session_id,
+                    sleep_minutes=sleep_minutes,
+                    awake_minutes=awake_minutes,
+                    efficiency_ratio=efficiency_ratio,
+                    quality_label=quality_label,
                 )
             )
 

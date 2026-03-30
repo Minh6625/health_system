@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/routes/app_router.dart';
+import '../../../../shared/presentation/emergency/emergency_sticky_bar.dart';
 import '../../../../shared/presentation/shell/app_shell_bottom_nav.dart';
 import '../../../../shared/presentation/shell/main_scaffold_shell.dart';
-import '../../../../shared/presentation/emergency/emergency_sticky_bar.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../providers/home_dashboard_provider.dart';
+import '../../../auth/providers/auth_provider.dart';
+import '../../../device/models/device_model.dart';
+import '../../../device/providers/device_provider.dart';
+import '../../../health_monitoring/models/vital_signs.dart';
+import '../../../health_monitoring/providers/vital_signs_provider.dart'
+    show VitalsUIState;
+import '../../../sleep_analysis/models/sleep_session.dart';
+import '../../../sleep_analysis/providers/sleep_provider.dart';
 import '../models/home_dashboard_view_model.dart';
+import '../providers/home_dashboard_provider.dart';
+import '../widgets/connection_status_strip.dart' show DeviceConnectionUiState;
 import '../widgets/dashboard_greeting_header.dart';
 import '../widgets/dashboard_secondary_links.dart';
-import '../widgets/connection_status_strip.dart' show DeviceConnectionUiState;
 import '../widgets/dashboard_top_banner_area.dart';
 import '../widgets/health_status_hero_card.dart';
 import '../widgets/live_vitals_section.dart';
@@ -17,6 +26,45 @@ import '../widgets/risk_insight_card.dart';
 import '../widgets/sleep_insight_card.dart';
 import '../widgets/vital_metric_card.dart';
 import '../../../auth/providers/auth_provider.dart';
+
+bool hasRecentDeviceConnection(
+  DeviceModel device, {
+  DateTime? now,
+  Duration syncGrace = const Duration(minutes: 5),
+}) {
+  if (!device.isActive) {
+    return false;
+  }
+  if (device.isOnline) {
+    return true;
+  }
+  final referenceTime = now ?? DateTime.now();
+  final lastSyncAt = device.lastSyncAt;
+  if (lastSyncAt == null) {
+    return false;
+  }
+  return !referenceTime.difference(lastSyncAt).isNegative &&
+      referenceTime.difference(lastSyncAt) <= syncGrace;
+}
+
+DeviceConnectionUiState resolveDashboardConnectionState({
+  required List<DeviceModel> activeDevices,
+  required bool isStale,
+  DateTime? now,
+}) {
+  if (activeDevices.isEmpty) {
+    return DeviceConnectionUiState.notPaired;
+  }
+
+  final referenceTime = now ?? DateTime.now();
+  final hasConnectedDevice = activeDevices.any(
+    (device) => hasRecentDeviceConnection(device, now: referenceTime),
+  );
+  if (hasConnectedDevice || !isStale) {
+    return DeviceConnectionUiState.connected;
+  }
+  return DeviceConnectionUiState.offline;
+}
 
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
@@ -26,14 +74,38 @@ class HomeDashboardScreen extends StatefulWidget {
 }
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Load dashboard data when screen initializes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<HomeDashboardProvider>().loadDashboardData();
-    });
-  }
+late final HomeDashboardProvider _dashboardProvider;
+late final SleepProvider _sleepProvider;
+late final DeviceProvider _deviceProvider;
+late final Listenable _dashboardListenable;
+
+@override
+void initState() {
+  super.initState();
+
+  _dashboardProvider = context.read<HomeDashboardProvider>();
+  _sleepProvider = context.read<SleepProvider>();
+  _deviceProvider = context.read<DeviceProvider>();
+
+  _dashboardListenable = Listenable.merge([
+    _dashboardProvider,
+    _sleepProvider,
+    _deviceProvider,
+  ]);
+
+  // Gọi sau khi build xong (an toàn context)
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _dashboardProvider.startPolling();
+
+    if (_sleepProvider.loadState == SleepLoadState.initial) {
+      _sleepProvider.loadAll();
+    }
+
+    if (_deviceProvider.devices.isEmpty && !_deviceProvider.isLoading) {
+      _deviceProvider.fetchDevices();
+    }
+  });
+}
 
   @override
   Widget build(BuildContext context) {
@@ -116,7 +188,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           value: heartRateStr,
           statusLabel: provider.heartRate == null ? 'Đang tải' : (provider.heartRate! < 60 || provider.heartRate! > 100  ? 'Cảnh báo' : 'Bình thường'),
           onTap: () {
-            Navigator.pushNamed(context, '/vital-detail', arguments: {'vitalType': 'hr'});
+            Navigator.pushNamed(
+              context,
+              '/vital-detail',
+              arguments: {'vitalType': 'hr'},
+            );
           },
         ),
         VitalMetricItem(
@@ -125,7 +201,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           value: spo2Str,
           statusLabel: provider.spo2 == null ? 'Đang tải' : (provider.spo2! < 95 ? 'Cảnh báo' : 'Tốt'),
           onTap: () {
-            Navigator.pushNamed(context, '/vital-detail', arguments: {'vitalType': 'spo2'});
+            Navigator.pushNamed(
+              context,
+              '/vital-detail',
+              arguments: {'vitalType': 'spo2'},
+            );
           },
         ),
         VitalMetricItem(
@@ -135,7 +215,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           statusLabel: provider.bloodPressureSys == null ? 'Đang tải' : 'Theo dõi',
           visualState: bpState,
           onTap: () {
-            Navigator.pushNamed(context, '/vital-detail', arguments: {'vitalType': 'bp'});
+            Navigator.pushNamed(
+              context,
+              '/vital-detail',
+              arguments: {'vitalType': 'bp'},
+            );
           },
         ),
         VitalMetricItem(
@@ -144,7 +228,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           value: tempStr,
           statusLabel: provider.temperature == null ? 'Đang tải' : 'Tốt',
           onTap: () {
-            Navigator.pushNamed(context, '/vital-detail', arguments: {'vitalType': 'temp'});
+            Navigator.pushNamed(
+              context,
+              '/vital-detail',
+              arguments: {'vitalType': 'temp'},
+            );
           },
         ),
       ],

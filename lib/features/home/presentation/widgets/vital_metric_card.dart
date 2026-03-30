@@ -13,7 +13,6 @@ class VitalMetricItem {
   final String label;
   final String value;
   final String statusLabel;
-  final String? timestampLabel;
   final VitalMetricVisualState visualState;
   final VoidCallback onTap;
 
@@ -22,7 +21,6 @@ class VitalMetricItem {
     required this.label,
     required this.value,
     required this.statusLabel,
-    this.timestampLabel,
     this.visualState = VitalMetricVisualState.normal,
     required this.onTap,
   });
@@ -106,30 +104,28 @@ class VitalMetricCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: item.visualState == VitalMetricVisualState.warning || item.visualState == VitalMetricVisualState.critical 
-                            ? accentColor.withValues(alpha: 0.1) 
-                            : Colors.transparent,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(iconData, color: accentColor, size: 28),
-                      ),
-                      const SizedBox(width: AppSpacing.gapSm),
-                      Text(item.label, style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                  if (item.timestampLabel != null)
-                    Text(
-                      item.timestampLabel!,
-                      style: AppTextStyles.caption.copyWith(fontSize: 11),
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: item.visualState == VitalMetricVisualState.warning ||
+                              item.visualState == VitalMetricVisualState.critical
+                          ? accentColor.withValues(alpha: 0.1)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
                     ),
+                    child: Icon(iconData, color: accentColor, size: 28),
+                  ),
+                  const SizedBox(width: AppSpacing.gapSm),
+                  Expanded(
+                    child: Text(
+                      item.label,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import '../models/vital_signs.dart';
-import '../providers/vital_detail_mock_provider.dart';
+import '../providers/vital_signs_provider.dart';
 import '../widgets/animated_vital_value.dart';
 import '../widgets/mini_line_chart.dart';
 import '../widgets/vital_detail_skeleton.dart';
 import '../widgets/empty_chart_placeholder.dart';
-import '../widgets/invalid_vital_card.dart';
 import '../widgets/error_view.dart';
 
 class VitalDetailScreen extends StatefulWidget {
@@ -24,15 +23,21 @@ class VitalDetailScreen extends StatefulWidget {
 }
 
 class _VitalDetailScreenState extends State<VitalDetailScreen> {
+  late final VitalSignsProvider _vitalsProvider;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<VitalDetailMockProvider>().loadDetail(
-            widget.vitalType,
-            widget.profileId,
-          );
-    });
+    _vitalsProvider = VitalSignsProvider(
+      vitalType: widget.vitalType,
+      profileId: widget.profileId,
+    )..startPolling();
+  }
+
+  @override
+  void dispose() {
+    _vitalsProvider.dispose();
+    super.dispose();
   }
 
   Color _getStatusColor(VitalStatus status) => switch (status) {
@@ -51,20 +56,21 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<VitalDetailMockProvider>(
-      builder: (context, provider, child) {
+    return ListenableBuilder(
+      listenable: _vitalsProvider,
+      builder: (context, _) {
         return Scaffold(
           backgroundColor: Colors.grey.shade50,
-          appBar: _buildAppBar(provider),
+          appBar: _buildAppBar(_vitalsProvider),
           body: SafeArea(
-            child: _buildBody(provider),
+            child: _buildBody(_vitalsProvider),
           ),
         );
       },
     );
   }
 
-  PreferredSizeWidget _buildAppBar(VitalDetailMockProvider provider) {
+  PreferredSizeWidget _buildAppBar(VitalSignsProvider provider) {
     return AppBar(
       title: Column(
         children: [
@@ -86,27 +92,28 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     );
   }
 
-  Widget _buildBody(VitalDetailMockProvider provider) {
+  Widget _buildBody(VitalSignsProvider provider) {
     switch (provider.state) {
-      case VitalDetailUIState.loading:
+      case VitalsUIState.initial:
+      case VitalsUIState.loading:
         return const VitalDetailSkeleton();
-      case VitalDetailUIState.error:
+      case VitalsUIState.error:
         return ErrorView(
           message: 'Không thể tải dữ liệu.\nVui lòng kiểm tra kết nối mạng.',
-          onRetry: () => provider.loadDetail(widget.vitalType, widget.profileId),
+          onRetry: () {
+            provider.refresh();
+          },
         );
-      case VitalDetailUIState.invalid:
-      case VitalDetailUIState.empty:
-      case VitalDetailUIState.success:
+      case VitalsUIState.empty:
+      case VitalsUIState.success:
         return _buildContent(provider);
     }
   }
 
-  Widget _buildContent(VitalDetailMockProvider provider) {
+  Widget _buildContent(VitalSignsProvider provider) {
     final statusColor = _getStatusColor(provider.vitalStatus);
     final isCritical = provider.vitalStatus == VitalStatus.critical;
-    final isInvalid = provider.state == VitalDetailUIState.invalid;
-    final isEmpty = provider.state == VitalDetailUIState.empty;
+    final isEmpty = provider.state == VitalsUIState.empty;
 
     return Column(
       children: [
@@ -117,10 +124,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // 1. Nổi bật hiện tại (Huge latest value)
-                if (isInvalid)
-                  const InvalidVitalCard()
-                else
-                  _buildVitalValueCard(provider, statusColor),
+                _buildVitalValueCard(provider, statusColor),
                 
                 const SizedBox(height: 24),
 
@@ -149,8 +153,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                if (isEmpty || isInvalid)
-                  const EmptyChartPlaceholder()
+                if (isEmpty || provider.chartData.isEmpty)
+                  const EmptyChartPlaceholder(message: 'Chưa có dữ liệu xu hướng')
                 else
                   Container(
                     height: 180,
@@ -208,7 +212,9 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     );
   }
 
-  Widget _buildVitalValueCard(VitalDetailMockProvider provider, Color statusColor) {
+  Widget _buildVitalValueCard(VitalSignsProvider provider, Color statusColor) {
+    final updatedAt = provider.vitals?.timestamp;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
       decoration: BoxDecoration(
@@ -264,12 +270,23 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
               ],
             ),
           ),
+          if (updatedAt != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              'Cập nhật lúc ${DateFormat('HH:mm:ss').format(updatedAt.toLocal())}',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildCriticalAction(VitalDetailMockProvider provider) {
+  Widget _buildCriticalAction(VitalSignsProvider provider) {
     if (provider.isSelf) {
       // Self + Critical -> SOS Button
       return Container(
@@ -320,7 +337,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Chỉ số nguy hiểm! Vui lòng liên hệ ${provider.linkedProfileName} ngay.',
+                'Chỉ số nguy hiểm! Vui lòng liên hệ ${provider.linkedProfileName.isNotEmpty ? provider.linkedProfileName : 'người thân'} ngay.',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,

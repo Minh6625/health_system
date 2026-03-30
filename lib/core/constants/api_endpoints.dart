@@ -7,6 +7,7 @@ class ApiEndpoints {
   static const String latestVitals = '/metrics/vital-signs/latest';
   static const String latestSleep = '/metrics/sleep/latest';
   static const String sleepHistory = '/metrics/sleep/history';
+  static const String vitalsLatest = latestVitals;
   static const String profile = '/profile';
 
   const ApiEndpoints._();
