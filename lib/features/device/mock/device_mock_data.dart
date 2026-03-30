@@ -8,13 +8,14 @@
 //   - [DeviceStatusDetailProvider] (mock mode) → uses [DeviceMockSnapshots]
 //
 // ⚙️  To enable mock mode:
-//   Set [DeviceMockConfig.useMockData = true] (default: true)
+//   Set `MOCK_DEVICE=true` in `.env.*`
 //
 // ⚠️  DEMO NOTE
 //   BLE discovery is being mocked to demonstrate the connection UX.
 //   This is NOT a real BLE integration. Device data continues to come
 //   from the Python IoT simulator via MQTT/HTTP.
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
 
 
@@ -32,9 +33,10 @@ enum MockListScenario {
 class DeviceMockConfig {
   DeviceMockConfig._();
 
-  /// Set to [true] to use local mock instead of real API calls.
-  /// In production builds this should be [false].
-  static bool useMockData = true; // ← flip to false for production
+  /// Reads mock mode from dotenv so the same build can switch between
+  /// local demo data and live backend data without code changes.
+  static bool get useMockData =>
+      dotenv.env['MOCK_DEVICE']?.toLowerCase() == 'true';
 
   /// Simulated network delay for mock API calls (ms).
   static const int fakeApiDelayMs = 800;

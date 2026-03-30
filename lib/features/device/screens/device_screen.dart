@@ -35,7 +35,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       context,
       MaterialPageRoute(builder: (_) => const DeviceConnectScreen()),
     ).then((_) {
-      if (mounted) context.read<DeviceProvider>().fetchDevices();
+      if (mounted) context.read<DeviceProvider>().fetchDevices(forceRefresh: true);
     });
   }
 
@@ -78,7 +78,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               tooltip: 'Mock Scenarios',
               onSelected: (scenario) {
                 DeviceMockConfig.listScenario = scenario;
-                context.read<DeviceProvider>().fetchDevices();
+                context.read<DeviceProvider>().fetchDevices(forceRefresh: true);
               },
               itemBuilder: (context) => const [
                 PopupMenuItem(value: MockListScenario.normal, child: Text('Test: Demo (Normal)')),
@@ -88,7 +88,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               ],
             ),
           IconButton(
-            onPressed: () => context.read<DeviceProvider>().fetchDevices(),
+            onPressed: () => context.read<DeviceProvider>().fetchDevices(forceRefresh: true),
             icon: const Icon(Icons.refresh),
             tooltip: 'Làm mới',
           ),
@@ -123,7 +123,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     ),
                     const SizedBox(height: 18),
                     ElevatedButton.icon(
-                      onPressed: () => provider.fetchDevices(),
+                      onPressed: () => provider.fetchDevices(forceRefresh: true),
                       icon: const Icon(Icons.refresh),
                       label: const Text('Thử lại'),
                     ),
@@ -137,7 +137,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
             children: [
               Expanded(
                 child: RefreshIndicator(
-                  onRefresh: () => provider.fetchDevices(),
+                  onRefresh: () => provider.fetchDevices(forceRefresh: true),
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 24),
@@ -158,7 +158,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                               needsAttention: provider.needsAttentionDevices.contains(device),
                               onActionSelected: (d, action) => _handleDeviceAction(d, action),
                               onRefreshRequested: () {
-                                if (mounted) context.read<DeviceProvider>().fetchDevices();
+                                if (mounted) context.read<DeviceProvider>().fetchDevices(forceRefresh: true);
                               },
                             )),
                     ],

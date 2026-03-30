@@ -20,3 +20,8 @@ class SleepSessionResponse(BaseModel):
     phases: dict[str, int]
     start_time: datetime
     end_time: datetime
+    session_id: str = ""
+    sleep_minutes: int = 0
+    awake_minutes: int = 0
+    efficiency_ratio: float = 0.0
+    quality_label: str = "AVERAGE"

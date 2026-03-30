@@ -17,8 +17,12 @@ router = APIRouter(tags=["mobile-monitoring"])
 )
 def get_latest_vital_signs(
     target_profile_id: int = Depends(get_target_profile_id),
+    db: Session = Depends(get_db),
 ) -> VitalSignsResponse:
-    return MonitoringService.get_latest_vital_signs(patient_id=target_profile_id)
+    return MonitoringService.get_latest_vital_signs(
+        patient_id=target_profile_id,
+        db=db,
+    )
 
 
 @router.get(

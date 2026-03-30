@@ -46,6 +46,49 @@ class FallEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_current_time)
 
 
+class Alert(Base):
+    """Generic alert persisted from simulator or backend detection flows."""
+    __tablename__ = "alerts"
+
+    __table_args__ = (
+        CheckConstraint("severity IN ('normal', 'high', 'critical')", name="check_alert_severity"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    uuid: Mapped[str] = mapped_column(UUID, unique=True, server_default=text("gen_random_uuid()"))
+
+    # Source
+    device_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("devices.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    fall_event_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("fall_events.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Alert payload
+    alert_type: Mapped[str] = mapped_column(String(50), index=True)
+    severity: Mapped[str] = mapped_column(String(20), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    details: Mapped[Optional[dict]] = mapped_column("data", JSONB, nullable=True)
+
+    # Metadata
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_current_time)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=get_current_time,
+        onupdate=get_current_time,
+    )
+
+
 class SOSEvent(Base):
     """Model for emergency SOS events."""
     __tablename__ = "sos_events"
