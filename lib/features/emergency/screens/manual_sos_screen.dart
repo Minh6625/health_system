@@ -84,15 +84,26 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
         return null;
       }
 
-      final position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.best,
-          timeLimit: Duration(seconds: 5),
-        ),
-      );
-      debugPrint(
-        "Grabbed position: ${position.latitude}, ${position.longitude}",
-      );
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.best,
+            timeLimit: Duration(seconds: 8),
+          ),
+        );
+      } catch (e) {
+        debugPrint("Current position failed, trying last known: $e");
+      }
+
+      position ??= await Geolocator.getLastKnownPosition();
+
+      if (position != null) {
+        debugPrint(
+          "Grabbed position: ${position.latitude}, ${position.longitude}",
+        );
+      }
+
       return position;
     } catch (e) {
       debugPrint("Exception determining position: $e");

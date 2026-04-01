@@ -62,3 +62,27 @@ class RelationshipResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class FamilyProfileSnapshot(BaseModel):
+    id: str
+    name: str
+    relation: str
+    heart_rate: int = 0
+    spo2: int = 0
+    blood_pressure_systolic: Optional[int] = None
+    blood_pressure_diastolic: Optional[int] = None
+    body_temperature: Optional[float] = None
+    risk_level: str = "low"
+    is_sos_active: bool = False
+    sos_id: Optional[str] = None
+    has_view_vitals_permission: bool = True
+    has_vitals_data: bool = True
+    vitals_data_message: Optional[str] = None
+    is_pinned: bool = False
+    last_updated: datetime
+    special_note: str = ""
+    sleep_duration_minutes: int = 0
+    sleep_quality: str = "Tốt"
+    health_score_7_days: int = 0
+    health_score_level: str = "Trung bình"
+

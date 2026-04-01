@@ -118,32 +118,35 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
           ),
         ),
 
-        const SizedBox(height: 24),
-
-        // Loading Indicator (Skeleton)
-        if (_isSearching) _buildSkeletonLoading(),
-
-        // Search Result Card
-        if (!_isSearching && _results.isNotEmpty)
-          ..._results.map(
-            (user) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _buildResultCard(user),
-            ),
-          ),
-
-        if (!_isSearching &&
-            _results.isEmpty &&
-            _searchController.text.trim().isNotEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 20),
-            child: Text(
-              'Không tìm thấy người dùng nào',
-              style: TextStyle(color: Color(0xFF90A3B6)),
-            ),
-          ),
+        const SizedBox(height: 16),
+        Expanded(child: _buildResultsView()),
       ],
     );
+  }
+
+  Widget _buildResultsView() {
+    if (_isSearching) {
+      return ListView(children: [_buildSkeletonLoading()]);
+    }
+
+    if (_results.isNotEmpty) {
+      return ListView.separated(
+        itemCount: _results.length,
+        separatorBuilder: (_, index) => const SizedBox(height: 12),
+        itemBuilder: (_, index) => _buildResultCard(_results[index]),
+      );
+    }
+
+    if (_searchController.text.trim().isNotEmpty) {
+      return const Center(
+        child: Text(
+          'Không tìm thấy người dùng nào',
+          style: TextStyle(color: Color(0xFF90A3B6)),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   Widget _buildSkeletonLoading() {
@@ -228,7 +231,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
     if (isAccepted) {
       bgColor = Colors.red.shade50;
       fgColor = Colors.red.shade600;
-      btnText = 'Đã kết nối';
+      btnText = 'Hủy kết nối';
     } else if (isPending) {
       bgColor = Colors.grey.shade300;
       fgColor = const Color(0xFF5B7288);

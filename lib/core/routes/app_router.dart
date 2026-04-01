@@ -181,20 +181,19 @@ class AppRouter {
       case familyDashboard:
         return MaterialPageRoute(builder: (_) => const FamilyDashboardScreen());
       case linkedContactDetail:
+        final contactId = routeArgs['contactId']?.toString() ?? '';
         return MaterialPageRoute(
-          settings: RouteSettings(name: linkedContactDetail, arguments: routeArgs),
-          builder: (_) => LinkedContactDetailScreen(
-            contactId: routeArgs['contactId'] as String? ?? 'some-mock-id',
+          settings: RouteSettings(
+            name: linkedContactDetail,
+            arguments: routeArgs,
           ),
+          builder: (_) => LinkedContactDetailScreen(contactId: contactId),
         );
       case personDetail:
         return MaterialPageRoute(
           settings: RouteSettings(name: personDetail, arguments: routeArgs),
-          builder: (_) => ChangeNotifierProvider.value(
-            value: SharedFamilyMockProvider(),
-            child: PersonDetailScreen(
-              profileId: routeArgs['profileId'] as String? ?? '1',
-            ),
+          builder: (_) => PersonDetailScreen(
+            profileId: routeArgs['profileId'] as String? ?? '1',
           ),
         );
       case device:
@@ -218,9 +217,8 @@ class AppRouter {
       case sleepHistory:
         return MaterialPageRoute(
           settings: RouteSettings(name: sleepHistory, arguments: routeArgs),
-          builder: (_) => SleepHistoryScreen(
-            profileId: routeArgs['profileId'] as String?,
-          ),
+          builder: (_) =>
+              SleepHistoryScreen(profileId: routeArgs['profileId'] as String?),
         );
       case sleepSettings:
         return MaterialPageRoute(builder: (_) => const SleepSettingsScreen());
@@ -236,9 +234,7 @@ class AppRouter {
           ),
         );
       case manualSos:
-        return MaterialPageRoute(
-          builder: (_) => const ManualSOSScreen(),
-        );
+        return MaterialPageRoute(builder: (_) => const ManualSOSScreen());
       case sosConfirm:
         return MaterialPageRoute(
           builder: (_) => SosConfirmScreen(
@@ -247,7 +243,10 @@ class AppRouter {
         );
       case emergencySosDetail:
         return MaterialPageRoute(
-          settings: RouteSettings(name: emergencySosDetail, arguments: routeArgs),
+          settings: RouteSettings(
+            name: emergencySosDetail,
+            arguments: routeArgs,
+          ),
           builder: (_) => EmergencySOSDetailScreen(
             sosId: routeArgs['sosId'] as String? ?? '',
           ),

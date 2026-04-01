@@ -1,9 +1,39 @@
 import '../../../core/network/api_client.dart';
 import '../models/user_search_model.dart';
+import '../models/family_profile_snapshot.dart';
+import '../models/linked_contact_model.dart';
 import 'package:flutter/foundation.dart';
 
 class FamilyRepository {
   final ApiClient _apiClient = ApiClient();
+
+  Future<List<FamilyProfileSnapshot>> getFamilyDashboard() async {
+    try {
+      final response = await _apiClient.get('/relationships/dashboard');
+      if (response != null && response is List) {
+        return response
+            .map((json) => FamilyProfileSnapshot.fromJson(json))
+            .toList();
+      }
+      return [];
+    } catch (e) {
+      debugPrint('Error getting family dashboard: $e');
+      throw Exception('Không thể tải dashboard.');
+    }
+  }
+
+  Future<LinkedContactModel> getLinkedContactDetail(String id) async {
+    try {
+      final response = await _apiClient.get('/relationships/$id/detail');
+      if (response != null) {
+        return LinkedContactModel.fromJson(response);
+      }
+      throw Exception('Data is null');
+    } catch (e) {
+      debugPrint('Error getting linked contact detail: $e');
+      throw Exception('Không thể tải chi tiết liên hệ.');
+    }
+  }
 
   /// Lấy danh sách bạn bè / người thân và các lời mời
   Future<List<Map<String, dynamic>>> getRelationships() async {

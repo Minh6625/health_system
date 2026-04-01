@@ -81,14 +81,9 @@ class SharedFamilyMockProvider extends ChangeNotifier {
           }
         }
 
-        // Fallback for mock/empty data
-        if (parsedTags.isEmpty && role == ContactRole.family) {
-          parsedTags = [ContactTagsConfig.defaultTags[0]];
-        }
-
         String primaryLabel =
             rel['primary_relationship_label'] ??
-            (relationshipType == 'family' ? 'Gia đình' : 'Chưa phân loại');
+            (parsedTags.isNotEmpty ? parsedTags.first.name : 'Chưa gắn tag');
 
         return LinkedContactModel(
           id: rel['id'].toString(),

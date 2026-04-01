@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/family/models/contact_tag.dart';
-import 'package:healthguard/features/family/providers/linked_contact_detail_mock_provider.dart';
+import 'package:healthguard/features/family/providers/linked_contact_detail_provider.dart';
 import 'package:healthguard/features/family/widgets/label_management_card.dart';
 import 'package:healthguard/features/family/widgets/linked_contact_hero_card.dart';
 import 'package:healthguard/features/family/widgets/permission_toggle_card.dart';
@@ -17,7 +17,7 @@ class LinkedContactDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => LinkedContactDetailMockProvider()..loadContact(contactId),
+      create: (_) => LinkedContactDetailProvider()..loadContact(contactId),
       child: const _LinkedContactDetailContent(),
     );
   }
@@ -28,7 +28,7 @@ class _LinkedContactDetailContent extends StatelessWidget {
 
   void _showTagPicker(
     BuildContext context,
-    LinkedContactDetailMockProvider provider,
+    LinkedContactDetailProvider provider,
   ) {
     final contact = provider.contact;
     if (contact == null) return;
@@ -42,14 +42,26 @@ class _LinkedContactDetailContent extends StatelessWidget {
           initialTags: contact.tags,
           onConfirm: (tags) async {
             Navigator.pop(ctx);
-            await provider.updateTags(tags);
+
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (ctx2) =>
+                  const Center(child: CircularProgressIndicator()),
+            );
+
+            final success = await provider.updateTags(tags);
+
             if (context.mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã cập nhật nhãn liên hệ'),
-                  backgroundColor: Color(0xFF2F80ED),
-                ),
-              );
+              Navigator.pop(context); // Close loading dialog
+              if (success) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã cập nhật nhãn liên hệ'),
+                    backgroundColor: Color(0xFF2F80ED),
+                  ),
+                );
+              }
             }
           },
         );
@@ -59,7 +71,7 @@ class _LinkedContactDetailContent extends StatelessWidget {
 
   void _showLabelEditor(
     BuildContext context,
-    LinkedContactDetailMockProvider provider,
+    LinkedContactDetailProvider provider,
   ) {
     final contact = provider.contact;
     if (contact == null) return;
@@ -88,7 +100,29 @@ class _LinkedContactDetailContent extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await provider.updatePrimaryLabel(controller.text);
+
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (ctx2) =>
+                    const Center(child: CircularProgressIndicator()),
+              );
+
+              final success = await provider.updatePrimaryLabel(
+                controller.text,
+              );
+
+              if (context.mounted) {
+                Navigator.pop(context); // Close loading dialog
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Đã cập nhật nhãn chính'),
+                      backgroundColor: Color(0xFF2F80ED),
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Lưu'),
           ),
@@ -99,7 +133,7 @@ class _LinkedContactDetailContent extends StatelessWidget {
 
   void _handleUnlink(
     BuildContext context,
-    LinkedContactDetailMockProvider provider,
+    LinkedContactDetailProvider provider,
   ) {
     showDialog(
       context: context,
@@ -116,7 +150,7 @@ class _LinkedContactDetailContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<LinkedContactDetailMockProvider>();
+    final provider = context.watch<LinkedContactDetailProvider>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
@@ -139,7 +173,7 @@ class _LinkedContactDetailContent extends StatelessWidget {
 
   Widget _buildBody(
     BuildContext context,
-    LinkedContactDetailMockProvider provider,
+    LinkedContactDetailProvider provider,
   ) {
     if (provider.isLoading) {
       return const Center(

@@ -1,11 +1,17 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:healthguard/features/auth/services/token_storage_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiClient {
-  String get baseUrl =>
-      dotenv.env['API_URL'] ?? 'http://10.0.2.2:8000/api/v1/mobile';
+  String get baseUrl {
+    String url = dotenv.env['API_URL'] ?? 'http://10.0.2.2:8000/api/v1/mobile';
+    if (kIsWeb) {
+      url = url.replaceFirst('10.0.2.2', '127.0.0.1');
+    }
+    return url;
+  }
 
   static final ApiClient _instance = ApiClient._internal();
 

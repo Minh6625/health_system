@@ -9,13 +9,8 @@ import '../../providers/home_dashboard_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../../device/models/device_model.dart';
 import '../../../device/providers/device_provider.dart';
-import '../../../health_monitoring/models/vital_signs.dart';
-import '../../../health_monitoring/providers/vital_signs_provider.dart'
-    show VitalsUIState;
-import '../../../sleep_analysis/models/sleep_session.dart';
 import '../../../sleep_analysis/providers/sleep_provider.dart';
 import '../models/home_dashboard_view_model.dart';
-import '../providers/home_dashboard_provider.dart';
 import '../widgets/connection_status_strip.dart' show DeviceConnectionUiState;
 import '../widgets/dashboard_greeting_header.dart';
 import '../widgets/dashboard_secondary_links.dart';
@@ -25,7 +20,6 @@ import '../widgets/live_vitals_section.dart';
 import '../widgets/risk_insight_card.dart';
 import '../widgets/sleep_insight_card.dart';
 import '../widgets/vital_metric_card.dart';
-import '../../../auth/providers/auth_provider.dart';
 
 bool hasRecentDeviceConnection(
   DeviceModel device, {
@@ -74,38 +68,31 @@ class HomeDashboardScreen extends StatefulWidget {
 }
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
-late final HomeDashboardProvider _dashboardProvider;
-late final SleepProvider _sleepProvider;
-late final DeviceProvider _deviceProvider;
-late final Listenable _dashboardListenable;
+  late final HomeDashboardProvider _dashboardProvider;
+  late final SleepProvider _sleepProvider;
+  late final DeviceProvider _deviceProvider;
 
-@override
-void initState() {
-  super.initState();
+  @override
+  void initState() {
+    super.initState();
 
-  _dashboardProvider = context.read<HomeDashboardProvider>();
-  _sleepProvider = context.read<SleepProvider>();
-  _deviceProvider = context.read<DeviceProvider>();
+    _dashboardProvider = context.read<HomeDashboardProvider>();
+    _sleepProvider = context.read<SleepProvider>();
+    _deviceProvider = context.read<DeviceProvider>();
 
-  _dashboardListenable = Listenable.merge([
-    _dashboardProvider,
-    _sleepProvider,
-    _deviceProvider,
-  ]);
+    // Gọi sau khi build xong (an toàn context)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _dashboardProvider.loadDashboardData();
 
-  // Gọi sau khi build xong (an toàn context)
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _dashboardProvider.startPolling();
+      if (_sleepProvider.loadState == SleepLoadState.initial) {
+        _sleepProvider.loadAll();
+      }
 
-    if (_sleepProvider.loadState == SleepLoadState.initial) {
-      _sleepProvider.loadAll();
-    }
-
-    if (_deviceProvider.devices.isEmpty && !_deviceProvider.isLoading) {
-      _deviceProvider.fetchDevices();
-    }
-  });
-}
+      if (_deviceProvider.devices.isEmpty && !_deviceProvider.isLoading) {
+        _deviceProvider.fetchDevices();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -141,24 +128,37 @@ void initState() {
               Navigator.pushNamed(context, AppRouter.manualSos);
             },
           ),
-          child: SafeArea(bottom: false, child: _DashboardBody(vm: vm, provider: provider)),
+          child: SafeArea(
+            bottom: false,
+            child: _DashboardBody(vm: vm, provider: provider),
+          ),
         );
       },
     );
   }
 
-  HomeDashboardViewModel _buildViewModel(BuildContext context, HomeDashboardProvider provider) {
+  HomeDashboardViewModel _buildViewModel(
+    BuildContext context,
+    HomeDashboardProvider provider,
+  ) {
     // Get current user from AuthProvider
     final authProvider = context.read<AuthProvider>();
     final displayName = authProvider.currentUser?.fullName ?? 'Người dùng';
 
     // Format vital values
-    final heartRateStr = provider.heartRate != null ? '${provider.heartRate!.toStringAsFixed(0)} BPM' : '--';
-    final spo2Str = provider.spo2 != null ? '${provider.spo2!.toStringAsFixed(0)}%' : '--';
-    final bpStr = provider.bloodPressureSys != null && provider.bloodPressureDia != null
+    final heartRateStr = provider.heartRate != null
+        ? '${provider.heartRate!.toStringAsFixed(0)} BPM'
+        : '--';
+    final spo2Str = provider.spo2 != null
+        ? '${provider.spo2!.toStringAsFixed(0)}%'
+        : '--';
+    final bpStr =
+        provider.bloodPressureSys != null && provider.bloodPressureDia != null
         ? '${provider.bloodPressureSys!.toStringAsFixed(0)}/${provider.bloodPressureDia!.toStringAsFixed(0)}'
         : '--';
-    final tempStr = provider.temperature != null ? '${provider.temperature!.toStringAsFixed(1)}°C' : '--';
+    final tempStr = provider.temperature != null
+        ? '${provider.temperature!.toStringAsFixed(1)}°C'
+        : '--';
 
     // Determine BP status
     VitalMetricVisualState bpState = VitalMetricVisualState.normal;
@@ -175,7 +175,9 @@ void initState() {
           ? 'Cập nhật lúc ${provider.vitalsTimestamp!.hour}:${provider.vitalsTimestamp!.minute.toString().padLeft(2, '0')}'
           : 'Đang tải dữ liệu...',
       overallStatus: DashboardOverallStatus.normal,
-      heroTitle: provider.riskLevel == 'low' ? 'Ổn định hôm nay' : 'Cần theo dõi',
+      heroTitle: provider.riskLevel == 'low'
+          ? 'Ổn định hôm nay'
+          : 'Cần theo dõi',
       heroSummary: provider.riskLevel != null
           ? 'Mức rủi ro: ${provider.riskLevel}'
           : 'Các chỉ số đang được đồng bộ...',
@@ -186,7 +188,11 @@ void initState() {
           type: VitalMetricType.heartRate,
           label: 'Nhịp tim',
           value: heartRateStr,
-          statusLabel: provider.heartRate == null ? 'Đang tải' : (provider.heartRate! < 60 || provider.heartRate! > 100  ? 'Cảnh báo' : 'Bình thường'),
+          statusLabel: provider.heartRate == null
+              ? 'Đang tải'
+              : (provider.heartRate! < 60 || provider.heartRate! > 100
+                    ? 'Cảnh báo'
+                    : 'Bình thường'),
           onTap: () {
             Navigator.pushNamed(
               context,
@@ -199,7 +205,9 @@ void initState() {
           type: VitalMetricType.spo2,
           label: 'SpO2',
           value: spo2Str,
-          statusLabel: provider.spo2 == null ? 'Đang tải' : (provider.spo2! < 95 ? 'Cảnh báo' : 'Tốt'),
+          statusLabel: provider.spo2 == null
+              ? 'Đang tải'
+              : (provider.spo2! < 95 ? 'Cảnh báo' : 'Tốt'),
           onTap: () {
             Navigator.pushNamed(
               context,
@@ -212,7 +220,9 @@ void initState() {
           type: VitalMetricType.bloodPressure,
           label: 'Huyết áp',
           value: bpStr,
-          statusLabel: provider.bloodPressureSys == null ? 'Đang tải' : 'Theo dõi',
+          statusLabel: provider.bloodPressureSys == null
+              ? 'Đang tải'
+              : 'Theo dõi',
           visualState: bpState,
           onTap: () {
             Navigator.pushNamed(
@@ -239,7 +249,8 @@ void initState() {
       sleepDurationLabel: provider.sleepData != null
           ? '${(provider.sleepData!['in_bed_minutes'] as int?) ?? 0 ~/ 60}h'
           : '-- h',
-      sleepDurationMinutes: (provider.sleepData?['in_bed_minutes'] as int?) ?? 0,
+      sleepDurationMinutes:
+          (provider.sleepData?['in_bed_minutes'] as int?) ?? 0,
       sleepInsightSummary: provider.sleepData != null
           ? 'Quality: ${provider.sleepData!['quality_score']}%'
           : 'Chưa có dữ liệu giấc ngủ',
@@ -248,8 +259,8 @@ void initState() {
       riskSummary: provider.riskLevel == 'low'
           ? 'Sức khoẻ của bạn đang ở mức ổn định'
           : provider.riskLevel == 'high'
-              ? 'Cần theo dõi các chỉ số sức khỏe'
-              : 'Cập nhật dữ liệu...',
+          ? 'Cần theo dõi các chỉ số sức khỏe'
+          : 'Cập nhật dữ liệu...',
       riskVisualState: _getRiskVisualState(provider.riskLevel),
     );
   }
@@ -274,9 +285,7 @@ class _DashboardBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (provider.isLoading && provider.heartRate == null) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (provider.error != null && provider.heartRate == null) {
