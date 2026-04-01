@@ -175,10 +175,8 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(
           create: (_) => EmergencyCaregiverProvider(
-            // ⚡ DEV: dùng mock repository — comment dòng dưới & uncomment dòng
-            // trên khi có backend thật
-            EmergencyCaregiverMockRepository(),
-            // EmergencyCaregiverRepository(),
+            // ✅ Using live API - backend ready
+            EmergencyCaregiverRepository(),
           ),
         ),
       ],

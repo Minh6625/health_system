@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import text
@@ -332,3 +333,190 @@ class DeviceService:
             limit=limit,
             offset=offset,
         )
+
+    @staticmethod
+    def get_device_by_id(
+        user_id: int,
+        device_id: int,
+        db: Session,
+    ) -> DeviceItemResponse | None:
+        """
+        Get a single device by ID for the current user.
+        Returns None if device not found or doesn't belong to user.
+        """
+        try:
+            row = db.execute(
+                text(
+                    """
+                    SELECT
+                        id,
+                        uuid,
+                        device_name,
+                        device_type,
+                        model,
+                        firmware_version,
+                        mac_address,
+                        serial_number,
+                        is_active,
+                        battery_level,
+                        signal_strength,
+                        last_seen_at,
+                        last_sync_at,
+                        mqtt_client_id,
+                        registered_at
+                    FROM devices
+                    WHERE id = :device_id
+                      AND user_id = :user_id
+                      AND deleted_at IS NULL
+                    """
+                ),
+                {
+                    "device_id": device_id,
+                    "user_id": user_id,
+                },
+            ).mappings().first()
+        except ProgrammingError as error:
+            if DeviceService._is_missing_devices_table(error):
+                return None
+            raise
+
+        if not row:
+            return None
+
+        now = datetime.now(UTC)
+        online_threshold = now - timedelta(minutes=5)
+        return DeviceService._map_device_row(row, online_threshold=online_threshold)
+
+    @staticmethod
+    def pair_new_device(
+        user_id: int,
+        mac_address: str,
+        device_name: str,
+        device_type: str,
+        model: str | None,
+        db: Session,
+    ) -> DeviceItemResponse:
+        """
+        Pair new device via BLE scan - for DEVICE_Connect screen.
+        Creates device record after successful pairing.
+        """
+        # Check duplicate MAC address
+        DeviceService._check_duplicate_identity(
+            user_id=user_id,
+            serial_number=None,
+            mac_address=mac_address,
+            mqtt_client_id=None,
+            db=db,
+        )
+
+        # Insert new device
+        row = db.execute(
+            text(
+                """
+                INSERT INTO devices (
+                    user_id,
+                    device_name,
+                    device_type,
+                    model,
+                    mac_address,
+                    is_active,
+                    battery_level,
+                    registered_at,
+                    updated_at
+                )
+                VALUES (
+                    :user_id,
+                    :device_name,
+                    :device_type,
+                    :model,
+                    :mac_address,
+                    TRUE,
+                    100,
+                    NOW(),
+                    NOW()
+                )
+                RETURNING
+                    id,
+                    uuid,
+                    device_name,
+                    device_type,
+                    model,
+                    firmware_version,
+                    mac_address,
+                    serial_number,
+                    is_active,
+                    battery_level,
+                    signal_strength,
+                    last_seen_at,
+                    last_sync_at,
+                    mqtt_client_id,
+                    registered_at
+                """
+            ),
+            {
+                "user_id": user_id,
+                "device_name": device_name.strip(),
+                "device_type": device_type,
+                "model": model.strip() if model else None,
+                "mac_address": mac_address.upper(),
+            },
+        ).mappings().first()
+
+        if row is None:
+            db.rollback()
+            raise ValueError("Failed to create device")
+
+        db.commit()
+        online_threshold = datetime.now(UTC) - timedelta(minutes=5)
+        return DeviceService._map_device_row(row, online_threshold=online_threshold)
+
+    @staticmethod
+    def update_device_settings(
+        user_id: int,
+        device_id: int,
+        settings,  # DeviceSettingsRequest
+        db: Session,
+    ) -> dict | None:
+        """
+        Update device configuration & calibration - for DEVICE_Configure screen.
+        Stores sensor calibration parameters and notification preferences.
+        """
+        # Verify device ownership
+        device = db.execute(
+            text("SELECT id, calibration_data FROM devices WHERE id = :id AND user_id = :user_id"),
+            {"id": device_id, "user_id": user_id},
+        ).mappings().first()
+
+        if device is None:
+            raise PermissionError("Không có quyền truy cập thiết bị này")
+
+        # Build calibration data JSON
+        calibration_data = {
+            "heart_rate_offset": settings.heart_rate_offset or 0,
+            "spo2_calibration": settings.spo2_calibration or 1.0,
+            "temperature_offset": settings.temperature_offset or 0.0,
+            "notify_high_hr": settings.notify_high_hr if settings.notify_high_hr is not None else True,
+            "notify_low_spo2": settings.notify_low_spo2 if settings.notify_low_spo2 is not None else True,
+            "notify_high_bp": settings.notify_high_bp if settings.notify_high_bp is not None else True,
+            "wear_side": settings.wear_side or "left",
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+
+        # Update calibration_data in DB
+        db.execute(
+            text(
+                """
+                UPDATE devices
+                SET calibration_data = :calibration_data,
+                    updated_at = NOW()
+                WHERE id = :device_id
+                """
+            ),
+            {
+                "device_id": device_id,
+                "calibration_data": json.dumps(calibration_data),  # Store as proper JSON
+            },
+        )
+
+        db.commit()
+        return calibration_data

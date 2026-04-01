@@ -33,10 +33,9 @@ enum MockListScenario {
 class DeviceMockConfig {
   DeviceMockConfig._();
 
-  /// Reads mock mode from dotenv so the same build can switch between
-  /// local demo data and live backend data without code changes.
-  static bool get useMockData =>
-      dotenv.env['MOCK_DEVICE']?.toLowerCase() == 'true';
+  /// Set to [true] to use local mock instead of real API calls.
+  /// In production builds this should be [false].
+  static bool useMockData = false; // ✅ Using live API data from backend
 
   /// Simulated network delay for mock API calls (ms).
   static const int fakeApiDelayMs = 800;

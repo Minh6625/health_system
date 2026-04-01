@@ -7,7 +7,7 @@ import 'package:healthguard/features/sleep_analysis/repositories/sleep_repositor
 enum SleepLoadState { initial, loading, success, empty, error, noDataYet }
 
 class SleepProvider extends ChangeNotifier {
-  /// 🔧 ĐỔI THÀNH false khi backend API đã sẵn sàng
+  /// ✅ Live API mode enabled - using backend data
   static const bool _useMock = false;
 
   /// Cache TTL = 1 phút

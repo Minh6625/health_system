@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS vitals (
     heart_rate SMALLINT CHECK (heart_rate > 0 AND heart_rate < 300),  -- BPM (beats per minute)
     spo2 DECIMAL(4,2) CHECK (spo2 >= 0 AND spo2 <= 100),  -- % (0-100)
     temperature DECIMAL(4,2) CHECK (temperature > 30 AND temperature < 45),  -- Celsius
+    blood_pressure_sys SMALLINT CHECK (blood_pressure_sys > 0 AND blood_pressure_sys < 300),  -- Systolic mmHg
+    blood_pressure_dia SMALLINT CHECK (blood_pressure_dia > 0 AND blood_pressure_dia < 200),  -- Diastolic mmHg
     
     -- Derived Metrics
     hrv SMALLINT,  -- Heart Rate Variability (ms)
@@ -43,9 +45,11 @@ SELECT create_hypertable('vitals', 'time',
 -- Add composite primary key
 ALTER TABLE vitals ADD PRIMARY KEY (device_id, time);
 
-COMMENT ON TABLE vitals IS 'Hypertable lưu trữ chỉ số sinh tồn (heart rate, SpO2, temperature) - 1 record/giây';
+COMMENT ON TABLE vitals IS 'Hypertable lưu trữ chỉ số sinh tồn (heart rate, SpO2, temperature, blood pressure) - 1 record/giây';
 COMMENT ON COLUMN vitals.heart_rate IS 'Nhịp tim (BPM - beats per minute)';
 COMMENT ON COLUMN vitals.spo2 IS 'Độ bão hòa oxy trong máu (%, 0-100)';
+COMMENT ON COLUMN vitals.blood_pressure_sys IS 'Huyết áp tâm thu (Systolic)';
+COMMENT ON COLUMN vitals.blood_pressure_dia IS 'Huyết áp tâm trương (Diastolic)';
 COMMENT ON COLUMN vitals.hrv IS 'Heart Rate Variability - biến thiên nhịp tim (ms)';
 COMMENT ON COLUMN vitals.signal_quality IS 'Chất lượng tín hiệu PPG (0-100), < 50 = unreliable';
 COMMENT ON COLUMN vitals.motion_artifact IS 'True nếu phát hiện chuyển động khi đo (có thể ảnh hưởng độ chính xác)';

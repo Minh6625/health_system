@@ -20,8 +20,47 @@ class SleepSessionResponse(BaseModel):
     phases: dict[str, int]
     start_time: datetime
     end_time: datetime
-    session_id: str = ""
-    sleep_minutes: int = 0
-    awake_minutes: int = 0
-    efficiency_ratio: float = 0.0
-    quality_label: str = "AVERAGE"
+
+
+class HealthReportResponse(BaseModel):
+    """Comprehensive health report with vitals 24h stats and risk assessment."""
+    vitals_24h_avg: dict = {}
+    latest_risk_score: float | None = None
+    risk_level: str | None = None
+    risk_type: str | None = None
+    last_updated: datetime | None = None
+
+
+class RiskReportResponse(BaseModel):
+    """Risk report summary for listing."""
+    id: int
+    risk_type: str
+    score: float
+    risk_level: str
+    timestamp: datetime
+    key_features: list[str] = []
+
+
+class RiskReportDetailResponse(BaseModel):
+    """Detailed risk report with explanation and recommendations."""
+    id: int
+    risk_type: str
+    score: float
+    risk_level: str
+    timestamp: datetime
+    explanation: str = ""
+    features: dict = {}
+    feature_importance: dict = {}
+    recommendations: list[str] = []
+    model_version: str = "1.0"
+    algorithm: str = "unknown"
+
+
+class RiskHistoryResponse(BaseModel):
+    """Risk history statistics aggregated by date."""
+    risk_type: str
+    date: str
+    avg_score: float
+    max_score: float
+    min_score: float
+    measurements: int
