@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -27,7 +29,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
   late AnimationController _arrowAnimationController;
   late AnimationController _warningAnimationController;
   late Animation<double> _arrowAnimation;
-  late Animation<double> _warningAnimation;
+  bool _isWarningAnimating = false;
 
   @override
   void initState() {
@@ -59,29 +61,11 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
       }
     });
 
-    // Setup warning icon shake animation (rotate)
+    // Setup warning icon shake animation (translate + rotate)
     _warningAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 100),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-
-    _warningAnimation = Tween<double>(begin: -0.1, end: 0.1).animate(
-      CurvedAnimation(
-        parent: _warningAnimationController,
-        curve: Curves.linear,
-      ),
-    );
-
-    // Shake warning 5 times then stop to save battery
-    Future.delayed(const Duration(milliseconds: 500), () async {
-      if (!mounted) return;
-      for (int i = 0; i < 5; i++) {
-        if (!mounted) break;
-        await _warningAnimationController.forward();
-        if (!mounted) break;
-        await _warningAnimationController.reverse();
-      }
-    });
   }
 
   @override
@@ -114,6 +98,20 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     }
   }
 
+  void _syncWarningAnimation(bool shouldAnimate) {
+    if (shouldAnimate && !_isWarningAnimating) {
+      _warningAnimationController.repeat();
+      _isWarningAnimating = true;
+      return;
+    }
+
+    if (!shouldAnimate && _isWarningAnimating) {
+      _warningAnimationController.stop();
+      _warningAnimationController.value = 0;
+      _isWarningAnimating = false;
+    }
+  }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -141,7 +139,9 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             (p) => p.sosDetail != null,
           );
 
-          if (isLoading) return const Center(child: CircularProgressIndicator());
+          if (isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
           if (error != null) return _buildErrorState(error);
           if (hasDetail) return _buildDetailContent(context);
 
@@ -152,7 +152,6 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
   }
 
   Widget _buildDetailContent(BuildContext context) {
-
     return Column(
       children: [
         // Patient Header
@@ -160,121 +159,132 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
           selector: (context, provider) => provider.sosDetail,
           builder: (context, sos, child) {
             if (sos == null) return const SizedBox.shrink();
+            _syncWarningAnimation(sos.isActive);
             return Stack(
               children: [
                 Container(
                   width: double.infinity,
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: sos.isActive ? const Color(0xFFFFABAF) : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
                     color: sos.isActive
-                        ? const Color(0xFFE53935).withValues(alpha: 0.25)
-                        : Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
-                        radius: 32,
-                        backgroundImage: sos.patient.photoUrl != null
-                            ? CachedNetworkImageProvider(sos.patient.photoUrl!)
-                            : null,
-                        backgroundColor: Colors.grey[400],
-                        child: sos.patient.photoUrl == null
-                            ? const Icon(
-                                Icons.person,
-                                size: 32,
-                                color: Colors.white,
-                              )
-                            : null,
+                        ? const Color(0xFFFFABAF)
+                        : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: sos.isActive
+                            ? const Color(0xFFE53935).withValues(alpha: 0.25)
+                            : Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          sos.patient.name,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: sos.isActive
-                                ? const Color(0xFF1A1A1A)
-                                : Colors.black87,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 48), // Space for warning icon
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _getTriggerIcon(sos.triggerType),
-                          size: 18,
-                          color: Colors.grey[800],
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _getTriggerLabel(sos.triggerType),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.grey[800],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          CircleAvatar(
+                            radius: 32,
+                            backgroundImage: sos.patient.photoUrl != null
+                                ? CachedNetworkImageProvider(
+                                    sos.patient.photoUrl!,
+                                  )
+                                : null,
+                            backgroundColor: Colors.grey[400],
+                            child: sos.patient.photoUrl == null
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 32,
+                                    color: Colors.white,
+                                  )
+                                : null,
                           ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              sos.patient.name,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: sos.isActive
+                                    ? const Color(0xFF1A1A1A)
+                                    : Colors.black87,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 48), // Space for warning icon
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Animated warning icon for active SOS
-            if (sos.isActive)
-              Positioned(
-                top:
-                    28, // Thay đổi số này để điều chỉnh khoảng cách từ trên xuống
-                right:
-                    28, // Thay đổi số này để điều chỉnh khoảng cách từ phải sang trái
-                child: RepaintBoundary(
-                  child: AnimatedBuilder(
-                    animation: _warningAnimation,
-                    builder: (context, child) {
-                      return Transform.rotate(
-                        angle: _warningAnimation.value,
-                        child: child,
-                      );
-                    },
-                    child: const Icon(
-                      Icons.warning_amber_rounded,
-                      color: Color(0xFFE53935),
-                      size: 40,
-                    ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              _getTriggerIcon(sos.triggerType),
+                              size: 18,
+                              color: Colors.grey[800],
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _getTriggerLabel(sos.triggerType),
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-          ],
-        );
+                // Animated warning icon for active SOS
+                if (sos.isActive)
+                  Positioned(
+                    top:
+                        28, // Thay đổi số này để điều chỉnh khoảng cách từ trên xuống
+                    right:
+                        28, // Thay đổi số này để điều chỉnh khoảng cách từ phải sang trái
+                    child: RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: _warningAnimationController,
+                        builder: (context, child) {
+                          final wave = math.sin(
+                            _warningAnimationController.value * math.pi * 2 * 4,
+                          );
+                          return Transform.translate(
+                            offset: Offset(wave * 4, 0),
+                            child: Transform.rotate(
+                              angle: wave * 0.10,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: const Icon(
+                          Icons.warning_amber_rounded,
+                          color: Color(0xFFE53935),
+                          size: 40,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
           },
         ),
 
@@ -285,83 +295,83 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
           builder: (context, locStr, child) {
             final sos = context.read<EmergencyCaregiverProvider>().sosDetail!;
             return Container(
-          height: 220,
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+              height: 220,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              color: Colors.grey[300],
-              child:
-                  (sos.location.latitude != null &&
-                      sos.location.longitude != null)
-                  ? FlutterMap(
-                      options: MapOptions(
-                        initialCenter: LatLng(
-                          sos.location.latitude!,
-                          sos.location.longitude!,
-                        ),
-                        initialZoom: 15.0,
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate:
-                              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.example.healthguard',
-                        ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: LatLng(
-                                sos.location.latitude!,
-                                sos.location.longitude!,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  color: Colors.grey[300],
+                  child:
+                      (sos.location.latitude != null &&
+                          sos.location.longitude != null)
+                      ? FlutterMap(
+                          options: MapOptions(
+                            initialCenter: LatLng(
+                              sos.location.latitude!,
+                              sos.location.longitude!,
+                            ),
+                            initialZoom: 15.0,
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.example.healthguard',
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: LatLng(
+                                    sos.location.latitude!,
+                                    sos.location.longitude!,
+                                  ),
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(
+                                    Icons.location_on,
+                                    color: Colors.red,
+                                    size: 40,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        )
+                      : Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.map, size: 64, color: Colors.grey[600]),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Map view',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
                               ),
-                              width: 40,
-                              height: 40,
-                              child: const Icon(
-                                Icons.location_on,
-                                color: Colors.red,
-                                size: 40,
+                            ),
+                            Text(
+                              'Vị trí không xác định',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    )
-                  : Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.map, size: 64, color: Colors.grey[600]),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Map view',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        Text(
-                          'Vị trí không xác định',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          ),
-        );
+                ),
+              ),
+            );
           },
         ),
 
@@ -375,25 +385,25 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
                   if (sos == null) return const SizedBox.shrink();
                   return SingleChildScrollView(
                     controller: _scrollController,
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildLocationInfo(sos),
-                    const SizedBox(height: 16),
-                    _buildTimeInfo(sos),
-                    if (sos.fallDetectionXAI != null) ...[
-                      const SizedBox(height: 16),
-                      _buildXAITimeline(sos.fallDetectionXAI!),
-                    ],
-                    if (sos.resolution != null) ...[
-                      const SizedBox(height: 16),
-                      _buildResolutionInfo(sos.resolution!),
-                    ],
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              );
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildLocationInfo(sos),
+                        const SizedBox(height: 16),
+                        _buildTimeInfo(sos),
+                        if (sos.fallDetectionXAI != null) ...[
+                          const SizedBox(height: 16),
+                          _buildXAITimeline(sos.fallDetectionXAI!),
+                        ],
+                        if (sos.resolution != null) ...[
+                          const SizedBox(height: 16),
+                          _buildResolutionInfo(sos.resolution!),
+                        ],
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  );
                 },
               ),
               // Gradient shadow at bottom to indicate more content below

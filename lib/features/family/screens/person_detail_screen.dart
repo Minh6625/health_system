@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/core/routes/app_router.dart';
-import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
+import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/family/models/family_profile_snapshot.dart';
 import 'package:healthguard/features/home/presentation/widgets/vital_metric_card.dart';
 import 'package:provider/provider.dart';
@@ -12,8 +12,8 @@ class PersonDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<SharedFamilyMockProvider>();
-    final snapshots = provider.generateDashboardSnapshots();
+    final provider = context.watch<FamilyDashboardProvider>();
+    final snapshots = provider.profiles;
     final profile = snapshots.isNotEmpty
         ? snapshots.firstWhere(
             (p) => p.id == profileId,
@@ -45,6 +45,7 @@ class PersonDetailScreen extends StatelessWidget {
           children: [
             if (profile.isSosActive) _buildSosBanner(context),
             _buildHeroState(profile),
+            if (!profile.hasVitalsData) _buildNoVitalsDataBanner(profile),
             _buildLiveVitals(context, profile),
             _buildHealthScoreBanner(context, profile),
             _buildSleepCard(context, profile),
@@ -116,12 +117,16 @@ class PersonDetailScreen extends StatelessWidget {
   Widget _buildHeroState(FamilyProfileSnapshot profile) {
     final statusLabel = profile.isSosActive
         ? 'Khẩn cấp'
-        : (profile.riskLevel != 'low' ? 'Cần theo dõi' : 'Đang ổn định');
+        : (!profile.hasVitalsData
+              ? 'Chưa có dữ liệu'
+              : (profile.riskLevel != 'low' ? 'Cần theo dõi' : 'Đang ổn định'));
     final statusColor = profile.isSosActive
         ? const Color(0xFFE53935)
-        : (profile.riskLevel != 'low'
-              ? const Color(0xFFF2A93B)
-              : const Color(0xFF2E9B6F));
+        : (!profile.hasVitalsData
+              ? const Color(0xFF5B7288)
+              : (profile.riskLevel != 'low'
+                    ? const Color(0xFFF2A93B)
+                    : const Color(0xFF2E9B6F)));
 
     return Container(
       color: Colors.white,
@@ -219,6 +224,46 @@ class PersonDetailScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildNoVitalsDataBanner(FamilyProfileSnapshot profile) {
+    final message =
+        profile.vitalsDataMessage ??
+        'Người dùng chưa có dữ liệu sức khỏe để hiển thị.';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7ED),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFF2A93B)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              color: Color(0xFFF2A93B),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF7A5A0A),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLiveVitals(BuildContext context, FamilyProfileSnapshot profile) {
     final items = _buildVitalItems(context, profile);
     return Padding(
@@ -259,6 +304,59 @@ class PersonDetailScreen extends StatelessWidget {
     BuildContext context,
     FamilyProfileSnapshot profile,
   ) {
+    if (!profile.hasVitalsData) {
+      return [
+        VitalMetricItem(
+          type: VitalMetricType.heartRate,
+          label: 'Nhịp tim',
+          value: '-- bpm',
+          statusLabel: 'Chưa có dữ liệu',
+          visualState: VitalMetricVisualState.empty,
+          onTap: () => Navigator.pushNamed(
+            context,
+            AppRouter.vitalDetail,
+            arguments: {'profileId': profile.id, 'vitalType': 'hr'},
+          ),
+        ),
+        VitalMetricItem(
+          type: VitalMetricType.spo2,
+          label: 'SpO2',
+          value: '--%',
+          statusLabel: 'Chưa có dữ liệu',
+          visualState: VitalMetricVisualState.empty,
+          onTap: () => Navigator.pushNamed(
+            context,
+            AppRouter.vitalDetail,
+            arguments: {'profileId': profile.id, 'vitalType': 'spo2'},
+          ),
+        ),
+        VitalMetricItem(
+          type: VitalMetricType.bloodPressure,
+          label: 'Huyết áp',
+          value: '--/--',
+          statusLabel: 'Chưa có dữ liệu',
+          visualState: VitalMetricVisualState.empty,
+          onTap: () => Navigator.pushNamed(
+            context,
+            AppRouter.vitalDetail,
+            arguments: {'profileId': profile.id, 'vitalType': 'bp'},
+          ),
+        ),
+        VitalMetricItem(
+          type: VitalMetricType.temperature,
+          label: 'Nhiệt độ',
+          value: '--°C',
+          statusLabel: 'Chưa có dữ liệu',
+          visualState: VitalMetricVisualState.empty,
+          onTap: () => Navigator.pushNamed(
+            context,
+            AppRouter.vitalDetail,
+            arguments: {'profileId': profile.id, 'vitalType': 'temp'},
+          ),
+        ),
+      ];
+    }
+
     // HR visual state
     VitalMetricVisualState hrState;
     String hrStatus;

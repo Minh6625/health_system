@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/core/routes/app_router.dart';
-import 'package:healthguard/features/family/providers/family_dashboard_mock_provider.dart';
+import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/family/widgets/family_health_hero_card.dart';
 import 'package:healthguard/features/family/widgets/family_onboarding_empty_state.dart';
 import 'package:healthguard/features/family/widgets/family_profile_health_card.dart';
@@ -10,24 +10,30 @@ import 'package:provider/provider.dart';
 
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 
-class FamilyDashboardScreen extends StatelessWidget {
+class FamilyDashboardScreen extends StatefulWidget {
   const FamilyDashboardScreen({super.key});
 
   @override
+  State<FamilyDashboardScreen> createState() => _FamilyDashboardScreenState();
+}
+
+class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      if (auth.currentUser != null) {
+        context.read<FamilyDashboardProvider>().loadDashboard(
+          auth.currentUser!.userId,
+        );
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) {
-        final auth = context.read<AuthProvider>();
-        final provider = FamilyDashboardMockProvider();
-        if (auth.currentUser != null) {
-          Future.microtask(
-            () => provider.loadDashboard(auth.currentUser!.userId),
-          );
-        }
-        return provider;
-      },
-      child: const _FamilyDashboardContent(),
-    );
+    return const _FamilyDashboardContent();
   }
 }
 
@@ -45,7 +51,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final provider = context.watch<FamilyDashboardMockProvider>();
+    final provider = context.watch<FamilyDashboardProvider>();
     if (!provider.isLoading && !_sosOverlayShown && provider.sosCount > 0) {
       _sosOverlayShown = true;
       WidgetsBinding.instance.addPostFrameCallback(
@@ -54,7 +60,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     }
   }
 
-  void _showSosOverlay(FamilyDashboardMockProvider provider) {
+  void _showSosOverlay(FamilyDashboardProvider provider) {
     if (!mounted) return;
     final sosProfiles = provider.displayList
         .where((p) => p.isSosActive)
@@ -94,7 +100,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<FamilyDashboardMockProvider>();
+    final provider = context.watch<FamilyDashboardProvider>();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
@@ -102,10 +108,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     );
   }
 
-  Widget _buildBody(
-    BuildContext context,
-    FamilyDashboardMockProvider provider,
-  ) {
+  Widget _buildBody(BuildContext context, FamilyDashboardProvider provider) {
     if (provider.isLoading) {
       return const Center(
         child: CircularProgressIndicator(
@@ -202,10 +205,20 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
             if (!profile.hasViewVitalsPermission) {
               return LockedProfileCard(
                 profile: profile,
-                onManageRoles: () => Navigator.of(context).pushNamed(
-                  AppRouter.linkedContactDetail,
-                  arguments: {'contactId': profile.id},
-                ),
+                onManageRoles: () async {
+                  await Navigator.of(context).pushNamed(
+                    AppRouter.linkedContactDetail,
+                    arguments: {'contactId': profile.id},
+                  );
+                  if (context.mounted) {
+                    final auth = context.read<AuthProvider>();
+                    if (auth.currentUser != null) {
+                      context.read<FamilyDashboardProvider>().loadDashboard(
+                        auth.currentUser!.userId,
+                      );
+                    }
+                  }
+                },
               );
             }
             return FamilyProfileHealthCard(
@@ -243,7 +256,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
 
   Widget _buildFilterChips(
     BuildContext context,
-    FamilyDashboardMockProvider provider,
+    FamilyDashboardProvider provider,
   ) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -260,7 +273,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
   }
 
   Widget _buildChip(
-    FamilyDashboardMockProvider provider,
+    FamilyDashboardProvider provider,
     String label,
     FamilyFilter filter,
   ) {

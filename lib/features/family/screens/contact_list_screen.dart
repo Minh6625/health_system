@@ -28,8 +28,16 @@ class _ContactListScreenState extends State<ContactListScreen> {
     });
   }
 
-  void _navigateToAddContact() {
-    Navigator.pushNamed(context, '/add-contact');
+  Future<void> _navigateToAddContact() async {
+    await Navigator.pushNamed(context, '/add-contact');
+    if (!mounted) return;
+
+    final auth = context.read<AuthProvider>();
+    if (auth.currentUser != null) {
+      await context.read<SharedFamilyMockProvider>().loadInitialData(
+        auth.currentUser!.userId,
+      );
+    }
   }
 
   @override

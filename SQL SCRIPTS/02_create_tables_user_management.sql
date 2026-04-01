@@ -66,7 +66,10 @@ CREATE TABLE IF NOT EXISTS user_relationships (
     
     -- Relationship
     relationship_type VARCHAR(50) CHECK (relationship_type IN ('family', 'friend', 'doctor', 'nurse', 'other')),
+    status VARCHAR(20) DEFAULT 'pending',
     is_primary BOOLEAN DEFAULT false,  -- Primary emergency contact
+    primary_relationship_label VARCHAR(100),
+    tags JSONB,
     
     -- Permissions (GDPR - fine-grained access control)
     can_view_vitals BOOLEAN DEFAULT true,

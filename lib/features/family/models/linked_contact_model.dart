@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:healthguard/features/family/models/contact_tag.dart';
 
 class LinkedContactModel {
@@ -34,7 +35,7 @@ class LinkedContactModel {
   }) : tags = tags ?? const [],
        primaryRelationshipLabel =
            primaryRelationshipLabel ??
-           (tags != null && tags.isNotEmpty ? tags.first.name : role.label);
+           (tags != null && tags.isNotEmpty ? tags.first.name : 'Chưa gắn tag');
 
   LinkedContactModel copyWith({
     String? id,
@@ -60,6 +61,48 @@ class LinkedContactModel {
       status: status ?? this.status,
       permissions: permissions ?? this.permissions,
       isIncomingRequest: isIncomingRequest ?? this.isIncomingRequest,
+    );
+  }
+
+  factory LinkedContactModel.fromJson(Map<String, dynamic> json) {
+    return LinkedContactModel(
+      id: json['id'] as String,
+      displayName: json['displayName'] as String? ?? 'N/A',
+      email: json['email'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String? ?? '',
+      primaryRelationshipLabel: json['primaryRelationshipLabel'] as String?,
+      tags: (json['tags'] as List<dynamic>?)?.map((e) {
+        if (e is Map<String, dynamic>) {
+          final id = e['id'] as String;
+          final fallback = ContactTagsConfig.findById(id);
+          return ContactTag(
+            id: id,
+            name: e['name'] as String,
+            color: fallback?.color ?? const Color(0xFF5B7288),
+          );
+        }
+        final str = e.toString();
+        final fallback = ContactTagsConfig.findById(str);
+        return ContactTag(
+          id: str,
+          name: str,
+          color: fallback?.color ?? const Color(0xFF5B7288),
+        );
+      }).toList(),
+      role: ContactRole.values.firstWhere(
+        (r) => r.name == json['role'],
+        orElse: () => ContactRole.unclassified,
+      ),
+      status: ContactStatus.values.firstWhere(
+        (s) => s.name == json['status'],
+        orElse: () => ContactStatus.accepted,
+      ),
+      permissions:
+          (json['permissions'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      isIncomingRequest: json['isIncomingRequest'] as bool? ?? false,
     );
   }
 }

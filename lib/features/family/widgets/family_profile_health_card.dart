@@ -13,11 +13,17 @@ class FamilyProfileHealthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isNoData = !profile.hasVitalsData;
+
     Color cardColor;
     Color iconBgColor;
     Color iconColor;
 
-    if (profile.isSosActive) {
+    if (isNoData) {
+      cardColor = const Color(0xFFF8FAFC);
+      iconBgColor = const Color(0xFFE2E8F0);
+      iconColor = const Color(0xFF5B7288);
+    } else if (profile.isSosActive) {
       cardColor = const Color(0xFFFDEEEE);
       iconBgColor = const Color(0xFFD95C5C);
       iconColor = Colors.white;
@@ -36,9 +42,9 @@ class FamilyProfileHealthCard extends StatelessWidget {
     }
 
     final diff = DateTime.now().difference(profile.lastUpdated).inMinutes;
-    String updatedText = diff < 1
-        ? 'Vừa cập nhật'
-        : 'Cập nhật $diff phút trước';
+    String updatedText = isNoData
+        ? 'Chưa có dữ liệu đo'
+        : (diff < 1 ? 'Vừa cập nhật' : 'Cập nhật $diff phút trước');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -113,17 +119,21 @@ class FamilyProfileHealthCard extends StatelessWidget {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          if (profile.specialNote.isNotEmpty)
+                          if (isNoData || profile.specialNote.isNotEmpty)
                             Text(
-                              profile.specialNote,
+                              isNoData
+                                  ? (profile.vitalsDataMessage ??
+                                        'Chưa có dữ liệu sức khỏe')
+                                  : profile.specialNote,
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
-                                color:
-                                    profile.isSosActive ||
-                                        profile.riskLevel == 'high'
-                                    ? const Color(0xFFD95C5C)
-                                    : const Color(0xFFF2A93B),
+                                color: isNoData
+                                    ? const Color(0xFF5B7288)
+                                    : (profile.isSosActive ||
+                                              profile.riskLevel == 'high'
+                                          ? const Color(0xFFD95C5C)
+                                          : const Color(0xFFF2A93B)),
                               ),
                             ),
                         ],
@@ -137,16 +147,20 @@ class FamilyProfileHealthCard extends StatelessWidget {
                   children: [
                     _buildVitalItem(
                       Icons.favorite_rounded,
-                      '${profile.heartRate}',
+                      isNoData ? '--' : '${profile.heartRate}',
                       'bpm',
-                      const Color(0xFFD95C5C),
+                      isNoData
+                          ? const Color(0xFF5B7288)
+                          : const Color(0xFFD95C5C),
                     ),
                     const SizedBox(width: 16),
                     _buildVitalItem(
                       Icons.water_drop_rounded,
-                      '${profile.spo2}',
+                      isNoData ? '--' : '${profile.spo2}',
                       '%',
-                      const Color(0xFF2F80ED),
+                      isNoData
+                          ? const Color(0xFF5B7288)
+                          : const Color(0xFF2F80ED),
                     ),
                   ],
                 ),
@@ -156,16 +170,24 @@ class FamilyProfileHealthCard extends StatelessWidget {
                   children: [
                     _buildVitalItem(
                       Icons.monitor_heart_outlined,
-                      profile.bloodPressureDisplay ?? '--/--',
+                      isNoData
+                          ? '--/--'
+                          : (profile.bloodPressureDisplay ?? '--/--'),
                       'mmHg',
-                      const Color(0xFF2E9B6F),
+                      isNoData
+                          ? const Color(0xFF5B7288)
+                          : const Color(0xFF2E9B6F),
                     ),
                     const SizedBox(width: 16),
                     _buildVitalItem(
                       Icons.thermostat_rounded,
-                      profile.bodyTemperatureDisplay ?? '--',
+                      isNoData
+                          ? '--'
+                          : (profile.bodyTemperatureDisplay ?? '--'),
                       '°C',
-                      const Color(0xFFF2A93B),
+                      isNoData
+                          ? const Color(0xFF5B7288)
+                          : const Color(0xFFF2A93B),
                     ),
                   ],
                 ),

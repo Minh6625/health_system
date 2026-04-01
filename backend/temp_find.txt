@@ -1,0 +1,207 @@
+5:from app.models.relationship_model import UserRelationship
+7:from app.repositories.relationship_repository import RelationshipRepository
+9:from app.schemas.relationship import AccessProfileResponse, RelationshipRequestCreate, RelationshipResponse, UserSearchResponse
+19:        q = query.strip().lower()
+20:        users = db.query(User).filter(
+21:            (User.id != current_user.id) & 
+31:                id=u.id,
+32:                full_name=u.full_name,
+33:                email=u.email,
+34:                phone=u.phone,
+35:                avatar_url=u.avatar_url
+40:        profiles = []
+44:            id=current_user.id,
+45:            full_name=current_user.full_name,
+46:            avatar_url=current_user.avatar_url,
+47:            relationship_type="self",
+48:            can_view_vitals=True,
+49:            can_receive_alerts=True,
+50:            can_view_location=True
+54:        linked_relationships = RelationshipRepository.get_viewable_profiles(db, current_user.id)
+55:        for rel in linked_relationships:
+56:            patient = UserRepository.get_by_id(db, rel.patient_id)
+59:                    id=patient.id,
+60:                    full_name=patient.full_name,
+61:                    avatar_url=patient.avatar_url,
+62:                    relationship_type=rel.relationship_type,
+63:                    can_view_vitals=rel.can_view_vitals,
+64:                    can_receive_alerts=rel.can_receive_alerts,
+65:                    can_view_location=rel.can_view_location
+71:    def request_relationship(db: Session, current_user: User, payload: RelationshipRequestCreate) -> UserRelationship:
+74:                status_code=status.HTTP_400_BAD_REQUEST,
+75:                detail="Must provide email, phone number, or target_user_id to find user"
+78:        target_user = None
+80:            target_user = UserRepository.get_by_id(db, payload.target_user_id)
+82:            target_user = UserRepository.get_by_email(db, payload.email)
+85:            target_user = db.query(User).filter(User.phone == payload.phone).first()
+89:                status_code=status.HTTP_404_NOT_FOUND,
+90:                detail="Không tìm thấy người dùng với thông tin này"
+93:        if target_user.id == current_user.id:
+95:                status_code=status.HTTP_400_BAD_REQUEST,
+96:                detail="Không thể gửi yêu cầu cho chính mình"
+99:        # Check if relationship already exists
+100:        existing_rel = db.query(UserRelationship).filter(
+101:            UserRelationship.patient_id == target_user.id,
+102:            UserRelationship.caregiver_id == current_user.id
+105:        if existing_rel:
+107:                status_code=status.HTTP_400_BAD_REQUEST,
+108:                detail="Mối quan hệ đã tồn tại hoặc đang chờ xác nhận"
+112:        new_rel = UserRelationship(
+113:            patient_id=target_user.id,        # The one being requested (they must accept)
+114:            caregiver_id=current_user.id,     # The one sending the request (wants to view)
+115:            relationship_type=payload.relationship_type,
+116:            status="pending",
+117:            primary_relationship_label=payload.primary_relationship_label,
+118:            tags=payload.tags if payload.tags else [],
+119:            can_view_vitals=False,
+120:            can_receive_alerts=False,
+121:            can_view_location=False
+124:        return RelationshipRepository.create(db, new_rel)
+127:    def accept_relationship(db: Session, current_user: User, relationship_id: int) -> UserRelationship:
+128:        rel = RelationshipRepository.get_by_id(db, relationship_id)
+129:        if not rel:
+130:            raise HTTPException(status_code=404, detail="Không tìm thấy yêu cầu")
+133:        if rel.patient_id != current_user.id:
+134:            raise HTTPException(status_code=403, detail="Không có quyền xác nhận yêu cầu này")
+136:        rel.status = "accepted"
+137:        rel.can_view_vitals = True
+138:        rel.can_receive_alerts = True
+139:        RelationshipRepository.update(db, rel)
+141:        # Check if inverse relationship already exists
+142:        existing_inverse_rel = db.query(UserRelationship).filter(
+143:            UserRelationship.patient_id == rel.caregiver_id,
+144:            UserRelationship.caregiver_id == rel.patient_id
+148:        if not existing_inverse_rel:
+149:            inverse_rel = UserRelationship(
+150:                patient_id=rel.caregiver_id,
+151:                caregiver_id=rel.patient_id,
+152:                relationship_type=rel.relationship_type,
+153:                status="accepted",
+154:                can_view_vitals=True,
+155:                can_receive_alerts=True,
+156:                can_view_location=False
+158:            RelationshipRepository.create(db, inverse_rel)
+160:        return rel
+163:    def delete_relationship(db: Session, current_user: User, relationship_id: int) -> None:
+164:        rel = RelationshipRepository.get_by_id(db, relationship_id)
+165:        if not rel:
+166:            raise HTTPException(status_code=404, detail="Không tìm thấy liên kết")
+168:        if rel.patient_id != current_user.id and rel.caregiver_id != current_user.id:
+169:            raise HTTPException(status_code=403, detail="Không có quyền xóa liên kết này")
+171:        inverse_rel = db.query(UserRelationship).filter(
+172:            UserRelationship.patient_id == rel.caregiver_id,
+173:            UserRelationship.caregiver_id == rel.patient_id
+176:        RelationshipRepository.delete(db, rel)
+177:        if inverse_rel:
+178:            RelationshipRepository.delete(db, inverse_rel)
+181:    def update_relationship(db: Session, current_user: User, relationship_id: int, payload: Any) -> UserRelationship:
+182:        rel = RelationshipRepository.get_by_id(db, relationship_id)
+183:        if not rel:
+184:            raise HTTPException(status_code=404, detail="Không tìm thấy liên kết")
+186:        if rel.patient_id != current_user.id and rel.caregiver_id != current_user.id:
+187:            raise HTTPException(status_code=403, detail="Không có quyền cập nhật liên kết này")
+189:        update_data = payload.dict(exclude_unset=True)
+191:            setattr(rel, key, value)
+193:        return RelationshipRepository.update(db, rel)
+196:    def format_relationships(db: Session, user_id: int) -> List[Dict[str, Any]]:
+197:        rels = db.query(UserRelationship).filter(
+198:            (UserRelationship.patient_id == user_id) | 
+199:            (UserRelationship.caregiver_id == user_id)
+203:        grouped = {}
+204:        for r in rels:
+205:            partner_id = r.caregiver_id if r.patient_id == user_id else r.patient_id
+207:                grouped[partner_id] = []
+210:        result = []
+211:        for partner_id, partner_rels in grouped.items():
+212:            primary_rel = None
+213:            if len(partner_rels) > 1:
+215:                for r in partner_rels:
+216:                    if r.patient_id == user_id:
+217:                        primary_rel = r
+219:                if not primary_rel:
+220:                    primary_rel = partner_rels[0]
+222:                primary_rel = partner_rels[0]
+224:            patient = UserRepository.get_by_id(db, primary_rel.patient_id)
+225:            caregiver = UserRepository.get_by_id(db, primary_rel.caregiver_id)
+229:            inverse_rel = next((r for r in partner_rels if r.caregiver_id == user_id), None)
+231:            res_dict = {
+232:                "id": primary_rel.id,
+233:                "patient_id": primary_rel.patient_id,
+236:                "caregiver_id": primary_rel.caregiver_id,
+239:                "relationship_type": primary_rel.relationship_type,
+240:                "status": primary_rel.status,
+241:                "primary_relationship_label": primary_rel.primary_relationship_label,
+242:                "tags": primary_rel.tags if primary_rel.tags else [],
+243:                "can_view_vitals": primary_rel.can_view_vitals,
+244:                "can_receive_alerts": primary_rel.can_receive_alerts,
+245:                "can_view_location": primary_rel.can_view_location,
+246:                "created_at": primary_rel.created_at
+249:            if inverse_rel:
+250:                res_dict["has_view_vitals_permission"] = inverse_rel.can_view_vitals
+251:                res_dict["has_receive_alerts_permission"] = inverse_rel.can_receive_alerts
+252:                res_dict["has_view_location_permission"] = inverse_rel.can_view_location
+254:                res_dict["has_view_vitals_permission"] = False
+255:                res_dict["has_receive_alerts_permission"] = False
+256:                res_dict["has_view_location_permission"] = False
+264:        from app.schemas.relationship import FamilyProfileSnapshot
+267:        # Get all accepted relationships where current_user is caregiver or patient
+268:        relationships = RelationshipRepository.get_user_relationships(db, current_user.id)
+270:        # Group by contact_id to handle bidirectional relationships
+271:        contact_rels = {}
+272:        for rel in relationships:
+273:            if rel.status == "accepted":
+274:                contact_id = rel.patient_id if rel.caregiver_id == current_user.id else rel.caregiver_id
+275:                if contact_id not in contact_rels:
+276:                    contact_rels[contact_id] = []
+277:                contact_rels[contact_id].append(rel)
+279:        snapshots = []
+280:        for contact_id, rels in contact_rels.items():
+281:            contact = UserRepository.get_by_id(db, contact_id)
+286:            # current_user must be the caregiver of the contact, and that specific relationship must allow it.
+287:            can_view_vitals = any((r.caregiver_id == current_user.id and getattr(r, 'can_view_vitals', False)) for r in rels)
+289:            # Setup detail label. Prefer the relationship where current_user is caregiver
+290:            rel = next((r for r in rels if r.caregiver_id == current_user.id), rels[0])
+293:            sys, dia, hr, spo2, temp = None, None, 0, 0, None
+294:            last_updated = datetime.now(UTC)
+296:                vitals = MonitoringService.get_latest_vital_signs(contact.id, db)
+298:                    sys = int(vitals.blood_pressure_sys) if vitals.blood_pressure_sys else None
+299:                    dia = int(vitals.blood_pressure_dia) if vitals.blood_pressure_dia else None
+300:                    hr = int(vitals.heart_rate) if vitals.heart_rate else 0 
+301:                    spo2 = int(vitals.spo2) if vitals.spo2 else 0
+302:                    temp = float(vitals.body_temperature) if vitals.body_temperature else None
+304:                        last_updated = vitals.timestamp
+308:            snapshot = FamilyProfileSnapshot(
+309:                id=str(contact.id),
+310:                name=contact.full_name.split(" ")[-1] if contact.full_name else "Name",
+311:                relation=rel.primary_relationship_label if rel.primary_relationship_label else rel.relationship_type,
+312:                heart_rate=hr,
+313:                spo2=spo2,
+314:                blood_pressure_systolic=sys,
+315:                blood_pressure_diastolic=dia,
+316:                body_temperature=temp,
+317:                risk_level="low",
+318:                is_sos_active=False,
+319:                has_view_vitals_permission=can_view_vitals,
+320:                is_pinned=False,
+321:                last_updated=last_updated
+329:        relationships = RelationshipRepository.get_user_relationships(db, current_user.id)
+332:        rels = [r for r in relationships if r.status == "accepted" and (r.patient_id == contact_id or r.caregiver_id == contact_id)]
+333:        real_contact_id = contact_id
+335:        # Fallback: maybe contact_id is actually relationship_id
+336:        if not rels:
+337:            rel_by_id = next((r for r in relationships if r.status == "accepted" and r.id == contact_id), None)
+338:            if rel_by_id:
+339:                real_contact_id = rel_by_id.caregiver_id if rel_by_id.patient_id == current_user.id else rel_by_id.patient_id
+340:                rels = [r for r in relationships if r.status == "accepted" and (r.patient_id == real_contact_id or r.caregiver_id == real_contact_id)]
+342:        if not rels:
+343:            raise HTTPException(status_code=404, detail="Không tìm thấy dữ liệu liên hệ này")
+345:        contact = UserRepository.get_by_id(db, real_contact_id)
+347:            raise HTTPException(status_code=404, detail="Không tìm thấy tài khoản liên hệ")
+349:        primary_rel = next((r for r in rels if r.patient_id == current_user.id), rels[0])
+351:        permissions = []
+355:            if any((r.patient_id == current_user.id and getattr(r, p, False)) for r in rels):
+358:        tags = primary_rel.tags if isinstance(primary_rel.tags, list) else []
+359:        role_label = primary_rel.relationship_type if primary_rel.relationship_type else 'unclassified'
+362:            "id": str(primary_rel.id),
+366:            "primaryRelationshipLabel": primary_rel.primary_relationship_label,
+369:            "status": primary_rel.status,

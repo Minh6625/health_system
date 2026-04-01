@@ -5,7 +5,9 @@ import 'package:healthguard/features/emergency/providers/emergency_caregiver_pro
 import 'package:healthguard/features/emergency/screens/emergency_sos_received_list_screen.dart';
 import 'package:healthguard/features/family/screens/contact_list_screen.dart';
 import 'package:healthguard/features/family/screens/family_dashboard_screen.dart';
+import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/shared/presentation/shell/app_shell_bottom_nav.dart';
 import 'package:healthguard/shared/presentation/shell/main_scaffold_shell.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
@@ -36,6 +38,10 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
     super.initState();
     _familyProvider = SharedFamilyMockProvider();
     _tabController = TabController(length: _tabCount, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshTabBadges();
+    });
+
     if (widget.initialTab != 0 && widget.initialTab < _tabCount) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _tabController.animateTo(widget.initialTab);
@@ -49,8 +55,61 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
     super.dispose();
   }
 
-  void _navigateToAddContact() {
-    Navigator.pushNamed(context, AppRouter.addContact);
+  Future<void> _navigateToAddContact() async {
+    await Navigator.pushNamed(context, AppRouter.addContact);
+    if (!mounted) return;
+
+    final auth = context.read<AuthProvider>();
+    if (auth.currentUser != null) {
+      await _familyProvider.loadInitialData(auth.currentUser!.userId);
+      await _refreshTabBadges();
+    }
+  }
+
+  Future<void> _refreshTabBadges() async {
+    final auth = context.read<AuthProvider>();
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    await context.read<FamilyDashboardProvider>().loadDashboard(user.userId);
+    await context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
+  }
+
+  Widget _buildTabLabelWithBadge({
+    required String label,
+    required int count,
+    Color badgeColor = const Color(0xFFD95C5C),
+  }) {
+    if (count <= 0) {
+      return Text(label);
+    }
+
+    final displayCount = count.toString();
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(label),
+        const SizedBox(width: 6),
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(color: badgeColor, shape: BoxShape.circle),
+          alignment: Alignment.center,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              displayCount,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -151,38 +210,29 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
                       fontSize: 15,
                     ),
                     tabs: [
-                      const Tab(text: 'Theo dõi'),
+                      Tab(
+                        child: Selector<FamilyDashboardProvider, int>(
+                          selector: (context, provider) =>
+                              provider.trackingAlertCount,
+                          builder: (context, trackingCount, child) {
+                            return _buildTabLabelWithBadge(
+                              label: 'Theo dõi',
+                              count: trackingCount,
+                              badgeColor: const Color(0xFFEF6C00),
+                            );
+                          },
+                        ),
+                      ),
                       // Tab Liên hệ với badge pending
                       Tab(
                         child: Selector<SharedFamilyMockProvider, int>(
                           selector: (context, provider) =>
                               provider.pendingRequests.length,
                           builder: (context, pendingCount, child) {
-                            if (pendingCount > 0) {
-                              return Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Text('Liên hệ'),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFD95C5C),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Text(
-                                      pendingCount.toString(),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }
-                            return const Text('Liên hệ');
+                            return _buildTabLabelWithBadge(
+                              label: 'Liên hệ',
+                              count: pendingCount,
+                            );
                           },
                         ),
                       ),
@@ -193,24 +243,11 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
                             selector: (context, provider) =>
                                 provider.activeCount,
                             builder: (context, activeCount, child) {
-                              if (activeCount > 0) {
-                                return Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    const Text('SOS'),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      width: 10,
-                                      height: 10,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.emergency,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }
-                              return const Text('SOS');
+                              return _buildTabLabelWithBadge(
+                                label: 'SOS',
+                                count: activeCount,
+                                badgeColor: AppColors.emergency,
+                              );
                             },
                           ),
                         ),
