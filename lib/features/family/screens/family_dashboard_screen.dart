@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
@@ -17,18 +19,73 @@ class FamilyDashboardScreen extends StatefulWidget {
   State<FamilyDashboardScreen> createState() => _FamilyDashboardScreenState();
 }
 
-class _FamilyDashboardScreenState extends State<FamilyDashboardScreen> {
+class _FamilyDashboardScreenState extends State<FamilyDashboardScreen>
+    with WidgetsBindingObserver {
+  static const Duration _autoRefreshInterval = Duration(seconds: 1);
+
+  Timer? _autoRefreshTimer;
+  bool _isRefreshing = false;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final auth = context.read<AuthProvider>();
-      if (auth.currentUser != null) {
-        context.read<FamilyDashboardProvider>().loadDashboard(
-          auth.currentUser!.userId,
-        );
-      }
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _refreshDashboard();
+      _startAutoRefresh();
     });
+  }
+
+  Future<void> _refreshDashboard({bool silent = false}) async {
+    if (!mounted || _isRefreshing) return;
+
+    final auth = context.read<AuthProvider>();
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    _isRefreshing = true;
+    try {
+      await context.read<FamilyDashboardProvider>().loadDashboard(
+        user.userId,
+        silent: silent,
+      );
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      _refreshDashboard(silent: true);
+    });
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startAutoRefresh();
+      _refreshDashboard(silent: true);
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopAutoRefresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopAutoRefresh();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override

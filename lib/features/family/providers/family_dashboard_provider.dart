@@ -84,18 +84,23 @@ class FamilyDashboardProvider extends ChangeNotifier {
     return list;
   }
 
-  Future<void> loadDashboard(int currentUserId) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  Future<void> loadDashboard(int currentUserId, {bool silent = false}) async {
+    if (!silent) {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+    }
 
     try {
       _profiles = await _repository.getFamilyDashboard();
+      _error = null;
     } catch (e) {
       _error = e.toString();
     }
 
-    _isLoading = false;
+    if (!silent) {
+      _isLoading = false;
+    }
     notifyListeners();
   }
 }

@@ -366,7 +366,10 @@ class RelationshipService:
                     dia = int(vitals.blood_pressure_dia) if vitals.blood_pressure_dia else None
                     hr = int(vitals.heart_rate) if vitals.heart_rate else 0 
                     spo2 = int(vitals.spo2) if vitals.spo2 else 0
-                    temp = float(vitals.body_temperature) if vitals.body_temperature else None
+                    temp_value = getattr(vitals, "temperature", None)
+                    if temp_value is None:
+                        temp_value = getattr(vitals, "body_temperature", None)
+                    temp = float(temp_value) if temp_value is not None else None
                     if vitals.timestamp:
                         last_updated = vitals.timestamp
             except Exception:
