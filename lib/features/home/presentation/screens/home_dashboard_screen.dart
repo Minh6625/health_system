@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/routes/app_router.dart';
@@ -67,14 +69,46 @@ class HomeDashboardScreen extends StatefulWidget {
   State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
 }
 
-class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
+class _HomeDashboardScreenState extends State<HomeDashboardScreen>
+    with WidgetsBindingObserver {
+  static const Duration _autoRefreshInterval = Duration(seconds: 1);
+
   late final HomeDashboardProvider _dashboardProvider;
   late final SleepProvider _sleepProvider;
   late final DeviceProvider _deviceProvider;
+  Timer? _autoRefreshTimer;
+  bool _isRefreshing = false;
+
+  Future<void> _refreshDashboard({bool silent = false}) async {
+    if (!mounted || _isRefreshing) {
+      return;
+    }
+
+    _isRefreshing = true;
+    try {
+      await _dashboardProvider.loadDashboardData(silent: silent);
+    } finally {
+      _isRefreshing = false;
+    }
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      _refreshDashboard(silent: true);
+    });
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
 
   @override
   void initState() {
     super.initState();
+
+    WidgetsBinding.instance.addObserver(this);
 
     _dashboardProvider = context.read<HomeDashboardProvider>();
     _sleepProvider = context.read<SleepProvider>();
@@ -82,7 +116,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
     // Gọi sau khi build xong (an toàn context)
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _dashboardProvider.loadDashboardData();
+      _refreshDashboard();
+      _startAutoRefresh();
 
       if (_sleepProvider.loadState == SleepLoadState.initial) {
         _sleepProvider.loadAll();
@@ -92,6 +127,28 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         _deviceProvider.fetchDevices();
       }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startAutoRefresh();
+      _refreshDashboard(silent: true);
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopAutoRefresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopAutoRefresh();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   @override
@@ -160,11 +217,26 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         ? '${provider.temperature!.toStringAsFixed(1)}°C'
         : '--';
 
-    // Determine BP status
-    VitalMetricVisualState bpState = VitalMetricVisualState.normal;
-    if (provider.bloodPressureSys != null && provider.bloodPressureSys! > 140) {
-      bpState = VitalMetricVisualState.warning;
-    }
+    final hrState = _getHeartRateState(heartRate: provider.heartRate);
+    final spo2State = _getSpo2State(spo2: provider.spo2);
+    final bpState = _getBloodPressureState(
+      systolic: provider.bloodPressureSys,
+      diastolic: provider.bloodPressureDia,
+    );
+    final tempState = _getTemperatureState(temperature: provider.temperature);
+
+    final activeDevices = _deviceProvider.devices
+        .where((device) => device.isActive)
+        .toList();
+    final deviceConnectionState = resolveDashboardConnectionState(
+      activeDevices: activeDevices,
+      isStale: provider.vitalsStale,
+    );
+    final primaryDevice = _pickPrimaryDevice(activeDevices);
+    final overallStatus = _getOverallStatus(
+      level: provider.riskLevel,
+      deviceState: deviceConnectionState,
+    );
 
     return HomeDashboardViewModel(
       onRefresh: () async {
@@ -174,25 +246,29 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       latestUpdatedLabel: provider.vitalsTimestamp != null
           ? 'Cập nhật lúc ${provider.vitalsTimestamp!.hour}:${provider.vitalsTimestamp!.minute.toString().padLeft(2, '0')}'
           : 'Đang tải dữ liệu...',
-      overallStatus: DashboardOverallStatus.normal,
-      heroTitle: provider.riskLevel == 'low'
-          ? 'Ổn định hôm nay'
-          : 'Cần theo dõi',
+      overallStatus: overallStatus,
+      heroTitle: _heroTitleForStatus(overallStatus),
       heroSummary: provider.riskLevel != null
           ? 'Mức rủi ro: ${provider.riskLevel}'
           : 'Các chỉ số đang được đồng bộ...',
-      deviceConnectionState: DeviceConnectionUiState.connected,
-      batteryPercent: 82,
+      deviceConnectionState: deviceConnectionState,
+      batteryPercent: primaryDevice?.batteryLevel,
+      isOffline: deviceConnectionState == DeviceConnectionUiState.offline,
+      hasWarningBanner:
+          overallStatus == DashboardOverallStatus.warning ||
+          overallStatus == DashboardOverallStatus.critical,
+      hasError: provider.error != null,
       vitalItems: [
         VitalMetricItem(
           type: VitalMetricType.heartRate,
           label: 'Nhịp tim',
           value: heartRateStr,
-          statusLabel: provider.heartRate == null
-              ? 'Đang tải'
-              : (provider.heartRate! < 60 || provider.heartRate! > 100
-                    ? 'Cảnh báo'
-                    : 'Bình thường'),
+          statusLabel: _statusLabelForState(
+            hrState,
+            isStale: provider.vitalsStale,
+            hasValue: provider.heartRate != null,
+          ),
+          visualState: hrState,
           onTap: () {
             Navigator.pushNamed(
               context,
@@ -205,9 +281,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           type: VitalMetricType.spo2,
           label: 'SpO2',
           value: spo2Str,
-          statusLabel: provider.spo2 == null
-              ? 'Đang tải'
-              : (provider.spo2! < 95 ? 'Cảnh báo' : 'Tốt'),
+          statusLabel: _statusLabelForState(
+            spo2State,
+            isStale: provider.vitalsStale,
+            hasValue: provider.spo2 != null,
+          ),
+          visualState: spo2State,
           onTap: () {
             Navigator.pushNamed(
               context,
@@ -220,9 +299,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           type: VitalMetricType.bloodPressure,
           label: 'Huyết áp',
           value: bpStr,
-          statusLabel: provider.bloodPressureSys == null
-              ? 'Đang tải'
-              : 'Theo dõi',
+          statusLabel: _statusLabelForState(
+            bpState,
+            isStale: provider.vitalsStale,
+            hasValue:
+                provider.bloodPressureSys != null &&
+                provider.bloodPressureDia != null,
+          ),
           visualState: bpState,
           onTap: () {
             Navigator.pushNamed(
@@ -236,7 +319,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           type: VitalMetricType.temperature,
           label: 'Nhiệt độ',
           value: tempStr,
-          statusLabel: provider.temperature == null ? 'Đang tải' : 'Tốt',
+          statusLabel: _statusLabelForState(
+            tempState,
+            isStale: provider.vitalsStale,
+            hasValue: provider.temperature != null,
+          ),
+          visualState: tempState,
           onTap: () {
             Navigator.pushNamed(
               context,
@@ -258,6 +346,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       riskLevelLabel: provider.riskLevel ?? 'Không xác định',
       riskSummary: provider.riskLevel == 'low'
           ? 'Sức khoẻ của bạn đang ở mức ổn định'
+          : provider.riskLevel == 'medium' || provider.riskLevel == 'moderate'
+          ? 'Một số chỉ số cần chú ý trong hôm nay'
           : provider.riskLevel == 'high'
           ? 'Cần theo dõi các chỉ số sức khỏe'
           : 'Cập nhật dữ liệu...',
@@ -265,10 +355,120 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     );
   }
 
+  DeviceModel? _pickPrimaryDevice(List<DeviceModel> activeDevices) {
+    for (final device in activeDevices) {
+      if (hasRecentDeviceConnection(device)) {
+        return device;
+      }
+    }
+    return activeDevices.isNotEmpty ? activeDevices.first : null;
+  }
+
+  DashboardOverallStatus _getOverallStatus({
+    required String? level,
+    required DeviceConnectionUiState deviceState,
+  }) {
+    if (deviceState == DeviceConnectionUiState.notPaired) {
+      return DashboardOverallStatus.noDevice;
+    }
+    if (deviceState == DeviceConnectionUiState.offline) {
+      return DashboardOverallStatus.offline;
+    }
+
+    final normalized = level?.trim().toLowerCase();
+    return switch (normalized) {
+      'high' || 'critical' => DashboardOverallStatus.critical,
+      'medium' || 'moderate' => DashboardOverallStatus.warning,
+      _ => DashboardOverallStatus.normal,
+    };
+  }
+
+  String _heroTitleForStatus(DashboardOverallStatus status) {
+    return switch (status) {
+      DashboardOverallStatus.normal => 'Ổn định hôm nay',
+      DashboardOverallStatus.warning => 'Cần chú ý',
+      DashboardOverallStatus.critical => 'Nguy cơ cao',
+      DashboardOverallStatus.noDevice => 'Chưa kết nối thiết bị',
+      DashboardOverallStatus.offline => 'Thiết bị ngoại tuyến',
+    };
+  }
+
+  VitalMetricVisualState _getHeartRateState({required double? heartRate}) {
+    if (heartRate == null) return VitalMetricVisualState.empty;
+    if (heartRate < 50 || heartRate > 120) {
+      return VitalMetricVisualState.critical;
+    }
+    if (heartRate < 60 || heartRate > 100) {
+      return VitalMetricVisualState.warning;
+    }
+    return VitalMetricVisualState.normal;
+  }
+
+  VitalMetricVisualState _getSpo2State({required double? spo2}) {
+    if (spo2 == null) return VitalMetricVisualState.empty;
+    if (spo2 < 90) {
+      return VitalMetricVisualState.critical;
+    }
+    if (spo2 < 95) {
+      return VitalMetricVisualState.warning;
+    }
+    return VitalMetricVisualState.normal;
+  }
+
+  VitalMetricVisualState _getBloodPressureState({
+    required double? systolic,
+    required double? diastolic,
+  }) {
+    if (systolic == null || diastolic == null) {
+      return VitalMetricVisualState.empty;
+    }
+    if (systolic >= 180 ||
+        diastolic >= 120 ||
+        systolic < 80 ||
+        diastolic < 50) {
+      return VitalMetricVisualState.critical;
+    }
+    if (systolic >= 140 || diastolic >= 90 || systolic < 90 || diastolic < 60) {
+      return VitalMetricVisualState.warning;
+    }
+    return VitalMetricVisualState.normal;
+  }
+
+  VitalMetricVisualState _getTemperatureState({required double? temperature}) {
+    if (temperature == null) return VitalMetricVisualState.empty;
+    if (temperature >= 39 || temperature < 35) {
+      return VitalMetricVisualState.critical;
+    }
+    if (temperature >= 37.5 || temperature < 36) {
+      return VitalMetricVisualState.warning;
+    }
+    return VitalMetricVisualState.normal;
+  }
+
+  String _statusLabelForState(
+    VitalMetricVisualState state, {
+    required bool isStale,
+    required bool hasValue,
+  }) {
+    final baseLabel = switch (state) {
+      VitalMetricVisualState.normal => 'Bình thường',
+      VitalMetricVisualState.warning => 'Cảnh báo',
+      VitalMetricVisualState.critical => 'Nguy cấp',
+      VitalMetricVisualState.stale => 'Dữ liệu cũ',
+      VitalMetricVisualState.empty => 'Đang tải',
+    };
+
+    if (isStale && hasValue && state != VitalMetricVisualState.empty) {
+      return '$baseLabel (cũ)';
+    }
+
+    return baseLabel;
+  }
+
   RiskVisualState _getRiskVisualState(String? level) {
     return switch (level?.toLowerCase()) {
       'low' => RiskVisualState.low,
-      'medium' => RiskVisualState.moderate,
+      'medium' || 'moderate' => RiskVisualState.moderate,
       'high' => RiskVisualState.high,
       'critical' => RiskVisualState.high,
       _ => RiskVisualState.moderate,
@@ -320,6 +520,12 @@ class _DashboardBody extends StatelessWidget {
                   onTapNotifications: () {},
                 ),
                 const SizedBox(height: AppSpacing.sectionGapMd),
+                HealthStatusHeroCard(
+                  overallStatus: vm.overallStatus,
+                  title: vm.heroTitle,
+                  summary: vm.heroSummary,
+                ),
+                const SizedBox(height: AppSpacing.gapMd),
                 RiskInsightCard(
                   scoreLabel: vm.riskScoreLabel,
                   levelLabel: vm.riskLevelLabel,

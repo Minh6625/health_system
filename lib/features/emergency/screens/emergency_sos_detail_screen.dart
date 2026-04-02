@@ -24,6 +24,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     with TickerProviderStateMixin {
   late EmergencyCaregiverProvider _provider;
   bool _isInitialized = false;
+  bool _isResolving = false;
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<double> _shadowOpacity = ValueNotifier<double>(1.0);
   late AnimationController _arrowAnimationController;
@@ -139,14 +140,41 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             (p) => p.sosDetail != null,
           );
 
-          if (isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (error != null) return _buildErrorState(error);
-          if (hasDetail) return _buildDetailContent(context);
+          final showLoadingOverlay = isLoading || _isResolving;
 
-          return const SizedBox.shrink();
+          Widget content;
+          if (hasDetail) {
+            content = _buildDetailContent(context);
+          } else if (error != null) {
+            content = _buildErrorState(error);
+          } else {
+            content = const SizedBox.expand();
+          }
+
+          return Stack(
+            children: [
+              Positioned.fill(child: content),
+              if (showLoadingOverlay) _buildUnifiedLoadingOverlay(),
+            ],
+          );
         },
+      ),
+    );
+  }
+
+  Widget _buildUnifiedLoadingOverlay() {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.black.withValues(alpha: 0.2),
+        child: const Center(
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2F80ED)),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -857,9 +885,17 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => _confirmSafety(provider, sos.id),
-                icon: const Icon(Icons.check_circle),
-                label: const Text('Xác nhận'),
+                onPressed: _isResolving
+                    ? null
+                    : () => _confirmSafety(provider, sos.id),
+                icon: _isResolving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.check_circle),
+                label: Text(_isResolving ? 'Đang xác nhận...' : 'Xác nhận'),
                 style: OutlinedButton.styleFrom(minimumSize: const Size(0, 56)),
               ),
             ),
@@ -936,6 +972,10 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     );
 
     if (confirmed == true && mounted) {
+      setState(() {
+        _isResolving = true;
+      });
+
       final success = await provider.resolveSOSByCaregiver(
         sosId: sosId,
         resolutionStatus: 'safe',
@@ -946,6 +986,12 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Đã xác nhận xử lý')));
+      }
+
+      if (mounted) {
+        setState(() {
+          _isResolving = false;
+        });
       }
     }
   }

@@ -23,12 +23,12 @@ class PersonDetailScreen extends StatelessWidget {
     final remainSeconds = snappedDiffSeconds % 60;
 
     if (diffMinutes == 0) {
-      return 'Cập nhật ${remainSeconds} giây trước';
+      return 'Cập nhật $remainSeconds giây trước';
     }
     if (remainSeconds == 0) {
       return 'Cập nhật ${diffMinutes}p trước';
     }
-    return 'Cập nhật ${diffMinutes}p${remainSeconds} giây trước';
+    return 'Cập nhật ${diffMinutes}p$remainSeconds giây trước';
   }
 
   @override
@@ -206,30 +206,35 @@ class PersonDetailScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: statusColor,
-                        shape: BoxShape.circle,
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: statusColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          statusLabel,
+                          style: TextStyle(
+                            color: statusColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
                     Text(
-                      statusLabel,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
-                    const SizedBox(width: 8),
-                    Text(
-                      _buildUpdatedText(profile.lastUpdated),
+                      '• ${_buildUpdatedText(profile.lastUpdated)}',
                       style: TextStyle(
                         color: Colors.grey.shade500,
                         fontSize: 13,
@@ -382,12 +387,15 @@ class PersonDetailScreen extends StatelessWidget {
     VitalMetricVisualState hrState;
     String hrStatus;
     final hr = profile.heartRate;
-    if (hr < 50 || hr > 120) {
+    if (hr <= 0) {
+      hrState = VitalMetricVisualState.empty;
+      hrStatus = 'Chưa có dữ liệu';
+    } else if (hr < 50 || hr > 120) {
       hrState = VitalMetricVisualState.critical;
-      hrStatus = 'Nguy hiểm';
+      hrStatus = 'Nguy cấp';
     } else if (hr < 60 || hr > 100) {
       hrState = VitalMetricVisualState.warning;
-      hrStatus = 'Cần chú ý';
+      hrStatus = 'Cảnh báo';
     } else {
       hrState = VitalMetricVisualState.normal;
       hrStatus = 'Bình thường';
@@ -397,12 +405,15 @@ class PersonDetailScreen extends StatelessWidget {
     VitalMetricVisualState spo2State;
     String spo2Status;
     final spo2 = profile.spo2;
-    if (spo2 < 90) {
+    if (spo2 <= 0) {
+      spo2State = VitalMetricVisualState.empty;
+      spo2Status = 'Chưa có dữ liệu';
+    } else if (spo2 < 90) {
       spo2State = VitalMetricVisualState.critical;
-      spo2Status = 'Nguy hiểm';
+      spo2Status = 'Nguy cấp';
     } else if (spo2 < 95) {
       spo2State = VitalMetricVisualState.warning;
-      spo2Status = 'Thấp';
+      spo2Status = 'Cảnh báo';
     } else {
       spo2State = VitalMetricVisualState.normal;
       spo2Status = 'Bình thường';
@@ -411,14 +422,17 @@ class PersonDetailScreen extends StatelessWidget {
     // BP visual state
     VitalMetricVisualState bpState;
     String bpStatus;
-    final sys = profile.bloodPressureSystolic ?? 0;
-    final dia = profile.bloodPressureDiastolic ?? 0;
-    if (sys > 160 || dia > 100) {
+    final sys = profile.bloodPressureSystolic;
+    final dia = profile.bloodPressureDiastolic;
+    if (sys == null || dia == null) {
+      bpState = VitalMetricVisualState.empty;
+      bpStatus = 'Chưa có dữ liệu';
+    } else if (sys >= 180 || dia >= 120 || sys < 80 || dia < 50) {
       bpState = VitalMetricVisualState.critical;
-      bpStatus = 'Nguy hiểm';
-    } else if (sys > 140 || dia > 90) {
+      bpStatus = 'Nguy cấp';
+    } else if (sys >= 140 || dia >= 90 || sys < 90 || dia < 60) {
       bpState = VitalMetricVisualState.warning;
-      bpStatus = 'Cao';
+      bpStatus = 'Cảnh báo';
     } else {
       bpState = VitalMetricVisualState.normal;
       bpStatus = 'Bình thường';
@@ -427,13 +441,16 @@ class PersonDetailScreen extends StatelessWidget {
     // Temp visual state
     VitalMetricVisualState tempState;
     String tempStatus;
-    final temp = profile.bodyTemperature ?? 36.5;
-    if (temp > 38.5) {
+    final temp = profile.bodyTemperature;
+    if (temp == null) {
+      tempState = VitalMetricVisualState.empty;
+      tempStatus = 'Chưa có dữ liệu';
+    } else if (temp >= 39 || temp < 35) {
       tempState = VitalMetricVisualState.critical;
-      tempStatus = 'Sốt cao';
-    } else if (temp > 37.5) {
+      tempStatus = 'Nguy cấp';
+    } else if (temp >= 37.5 || temp < 36) {
       tempState = VitalMetricVisualState.warning;
-      tempStatus = 'Sốt nhẹ';
+      tempStatus = 'Cảnh báo';
     } else {
       tempState = VitalMetricVisualState.normal;
       tempStatus = 'Bình thường';
@@ -443,7 +460,7 @@ class PersonDetailScreen extends StatelessWidget {
       VitalMetricItem(
         type: VitalMetricType.heartRate,
         label: 'Nhịp tim',
-        value: '$hr bpm',
+        value: hr > 0 ? '$hr bpm' : '-- bpm',
         statusLabel: hrStatus,
         visualState: hrState,
         onTap: () => Navigator.pushNamed(
@@ -455,7 +472,7 @@ class PersonDetailScreen extends StatelessWidget {
       VitalMetricItem(
         type: VitalMetricType.spo2,
         label: 'SpO2',
-        value: '$spo2%',
+        value: spo2 > 0 ? '$spo2%' : '--%',
         statusLabel: spo2Status,
         visualState: spo2State,
         onTap: () => Navigator.pushNamed(

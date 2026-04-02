@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/core/routes/app_router.dart';
@@ -14,15 +16,59 @@ class EmergencySOSReceivedListScreen extends StatefulWidget {
 }
 
 class _EmergencySOSReceivedListScreenState
-    extends State<EmergencySOSReceivedListScreen> {
+    extends State<EmergencySOSReceivedListScreen>
+    with WidgetsBindingObserver {
+  static const Duration _autoRefreshInterval = Duration(seconds: 2);
+
   bool _isInitialized = false;
   String _selectedStatus = 'all';
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  Timer? _autoRefreshTimer;
+  bool _isAutoRefreshing = false;
+  bool _pendingRefresh = false;
+
+  Future<void> _refreshCurrentStatus({bool silent = true}) async {
+    if (!mounted) {
+      return;
+    }
+
+    if (_isAutoRefreshing) {
+      _pendingRefresh = true;
+      return;
+    }
+
+    _isAutoRefreshing = true;
+    try {
+      await context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(
+        _selectedStatus,
+        silent: silent,
+      );
+    } finally {
+      _isAutoRefreshing = false;
+      if (_pendingRefresh && mounted) {
+        _pendingRefresh = false;
+        unawaited(_refreshCurrentStatus(silent: silent));
+      }
+    }
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      _refreshCurrentStatus(silent: true);
+    });
+  }
+
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
+  }
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(() {
       setState(() {
         _searchQuery = _searchController.text.toLowerCase();
@@ -39,8 +85,24 @@ class _EmergencySOSReceivedListScreenState
       Future.microtask(() {
         if (mounted) {
           context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
+          _startAutoRefresh();
         }
       });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startAutoRefresh();
+      _refreshCurrentStatus(silent: true);
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopAutoRefresh();
     }
   }
 
@@ -48,11 +110,13 @@ class _EmergencySOSReceivedListScreenState
     setState(() {
       _selectedStatus = status;
     });
-    context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(status);
+    _refreshCurrentStatus(silent: false);
   }
 
   @override
   void dispose() {
+    _stopAutoRefresh();
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
   }
@@ -181,16 +245,6 @@ class _EmergencySOSReceivedListScreenState
   Widget _buildSOSList() {
     return Consumer<EmergencyCaregiverProvider>(
       builder: (context, provider, child) {
-        // Loading state
-        if (provider.isLoadingList) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        // Error state
-        if (provider.listErrorMessage != null) {
-          return _buildErrorState(provider.listErrorMessage!);
-        }
-
         // Filter list based on status and search query
         final filteredList = _filterList(
           provider.sosList,
@@ -198,13 +252,22 @@ class _EmergencySOSReceivedListScreenState
           _searchQuery,
         );
 
+        // Loading state
+        if (provider.isLoadingList && filteredList.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // Error state
+        if (provider.listErrorMessage != null && filteredList.isEmpty) {
+          return _buildErrorState(provider.listErrorMessage!);
+        }
+
         // Empty state
         if (filteredList.isEmpty) {
           return _buildEmptyState();
         }
 
-        // Success state
-        return RefreshIndicator(
+        final listView = RefreshIndicator(
           onRefresh: () => provider.refreshSOSAlerts(_selectedStatus),
           child: ListView.builder(
             itemCount: filteredList.length,
@@ -213,11 +276,17 @@ class _EmergencySOSReceivedListScreenState
               final sos = filteredList[index];
               return SOSCard(
                 sos: sos,
-                onTap: () => Navigator.pushNamed(
-                  context,
-                  AppRouter.emergencySosDetail,
-                  arguments: {'sosId': sos.id},
-                ),
+                onTap: () async {
+                  await Navigator.pushNamed(
+                    context,
+                    AppRouter.emergencySosDetail,
+                    arguments: {'sosId': sos.id},
+                  );
+                  if (!mounted) {
+                    return;
+                  }
+                  await _refreshCurrentStatus(silent: false);
+                },
                 onCallPressed: () => provider.makePhoneCall(sos.patient.phone),
                 onMapPressed: () => provider.openMapNavigation(
                   sos.location.latitude,
@@ -226,6 +295,23 @@ class _EmergencySOSReceivedListScreenState
               );
             },
           ),
+        );
+
+        // Keep showing existing list while refreshing in background.
+        if (!provider.isLoadingList) {
+          return listView;
+        }
+
+        return Stack(
+          children: [
+            listView,
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: LinearProgressIndicator(minHeight: 2),
+            ),
+          ],
         );
       },
     );

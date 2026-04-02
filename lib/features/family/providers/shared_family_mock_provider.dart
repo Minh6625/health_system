@@ -29,10 +29,12 @@ class SharedFamilyMockProvider extends ChangeNotifier {
   List<LinkedContactModel> get acceptedContacts =>
       _contacts.where((c) => c.status == ContactStatus.accepted).toList();
 
-  Future<void> loadInitialData(int currentUserId) async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  Future<void> loadInitialData(int currentUserId, {bool silent = false}) async {
+    if (!silent) {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+    }
 
     try {
       final relationships = await _repository.getRelationships();
@@ -48,15 +50,26 @@ class SharedFamilyMockProvider extends ChangeNotifier {
         String? relationshipType = rel['relationship_type'];
 
         ContactRole role = ContactRole.unclassified;
-        if (relationshipType == 'family') role = ContactRole.family;
-        if (relationshipType == 'doctor') role = ContactRole.doctor;
+        if (relationshipType == 'family') {
+          role = ContactRole.family;
+        }
+        if (relationshipType == 'doctor') {
+          role = ContactRole.doctor;
+        }
 
         List<String> perms = [];
-        if (rel['can_view_vitals'] == true) perms.add('can_view_vitals');
-        if (rel['can_receive_alerts'] == true) perms.add('can_receive_alerts');
-        if (rel['can_view_location'] == true) perms.add('can_view_location');
-        if (rel['has_view_vitals_permission'] == true)
+        if (rel['can_view_vitals'] == true) {
+          perms.add('can_view_vitals');
+        }
+        if (rel['can_receive_alerts'] == true) {
+          perms.add('can_receive_alerts');
+        }
+        if (rel['can_view_location'] == true) {
+          perms.add('can_view_location');
+        }
+        if (rel['has_view_vitals_permission'] == true) {
           perms.add('has_view_vitals_permission');
+        }
 
         // Parse tags from API
         List<ContactTag> parsedTags = [];
@@ -103,7 +116,9 @@ class SharedFamilyMockProvider extends ChangeNotifier {
       _error = e.toString().replaceAll('Exception: ', '').trim();
     }
 
-    _isLoading = false;
+    if (!silent) {
+      _isLoading = false;
+    }
     notifyListeners();
   }
 
