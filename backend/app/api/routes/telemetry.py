@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json as _json
+import logging
 from datetime import datetime
 from typing import Any
 
@@ -12,8 +13,10 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.device_model import Device
 from app.models.sos_event_model import Alert, FallEvent
+from app.services.settings_service import SettingsService
 
 router = APIRouter(prefix="/telemetry", tags=["mobile-telemetry"])
+logger = logging.getLogger(__name__)
 
 
 class VitalIngestVitals(BaseModel):
@@ -248,6 +251,14 @@ def ingest_alert(
 
     try:
         metadata = dict(payload.metadata or {})
+        if str(metadata.get("sleep_context") or "").strip().lower() == "true":
+            sleep_thresholds = SettingsService.get_vitals_sleep_thresholds(db)
+            logger.info(
+                "Sleep-context alert received: event_type=%s sleep_spo2_critical=%s apnea_rr_threshold=%s",
+                payload.event_type,
+                sleep_thresholds.get("spo2_critical"),
+                sleep_thresholds.get("apnea_rr_threshold"),
+            )
         resolved_user_id = _resolve_alert_user_id(
             db,
             db_device_id=payload.db_device_id,
@@ -301,9 +312,24 @@ def ingest_sleep_session(
     db: Session = Depends(get_db),
 ) -> IngestResponse:
     try:
+        has_updated_at = bool(
+            db.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.columns
+                        WHERE table_name = 'sleep_sessions'
+                          AND column_name = 'updated_at'
+                    )
+                    """
+                )
+            ).scalar()
+        )
+        updated_at_assignment = ",\n                    updated_at = NOW()" if has_updated_at else ""
         db.execute(
             text(
-                """
+                f"""
                 INSERT INTO sleep_sessions (
                     user_id,
                     device_id,
@@ -311,7 +337,8 @@ def ingest_sleep_session(
                     end_time,
                     sleep_score,
                     phases,
-                    wake_count
+                    wake_count,
+                    sleep_date
                 )
                 VALUES (
                     :user_id,
@@ -320,9 +347,15 @@ def ingest_sleep_session(
                     :end_time,
                     :sleep_score,
                     CAST(:phases AS jsonb),
-                    :wake_count
+                    :wake_count,
+                    CAST(:sleep_date AS DATE)
                 )
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (user_id, device_id, sleep_date) DO UPDATE SET
+                    start_time = EXCLUDED.start_time,
+                    end_time = EXCLUDED.end_time,
+                    sleep_score = EXCLUDED.sleep_score,
+                    phases = EXCLUDED.phases,
+                    wake_count = EXCLUDED.wake_count{updated_at_assignment}
                 """
             ),
             {
@@ -333,6 +366,7 @@ def ingest_sleep_session(
                 "sleep_score": min(100, max(0, payload.score)),
                 "phases": _json.dumps(payload.phases),
                 "wake_count": payload.phases.get("awake", 30) // 30,
+                "sleep_date": payload.date,
             },
         )
         db.commit()
