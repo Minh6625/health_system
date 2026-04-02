@@ -12,6 +12,7 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
 
   // State for SOS Alerts List
   List<SOSEventModel> sosList = [];
+  int _activeAlertsCount = 0;
   String currentFilter = 'all';
   bool isLoadingList = false;
   bool isRefreshing = false;
@@ -26,7 +27,7 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
   StreamSubscription? _sosUpdateSubscription;
 
   /// Get count of active SOS alerts
-  int get activeCount => sosList.where((sos) => sos.isActive).length;
+  int get activeCount => _activeAlertsCount;
 
   /// Fetch SOS alerts with status filter
   Future<void> fetchSOSAlerts(String status) async {
@@ -36,7 +37,9 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      sosList = await repository.getSOSAlerts(status: status);
+      final result = await repository.getSOSAlerts(status: status);
+      sosList = result.sosAlerts;
+      _activeAlertsCount = result.activeCount;
     } catch (e) {
       listErrorMessage = _getErrorMessage(e);
     } finally {
@@ -52,7 +55,9 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      sosList = await repository.getSOSAlerts(status: status);
+      final result = await repository.getSOSAlerts(status: status);
+      sosList = result.sosAlerts;
+      _activeAlertsCount = result.activeCount;
     } catch (e) {
       listErrorMessage = _getErrorMessage(e);
     } finally {

@@ -11,12 +11,37 @@ from app.schemas.relationship import (
     RelationshipAcceptRequest,
     RelationshipUpdate,
     RelationshipResponse,
-    UserSearchResponse
+    UserSearchResponse,
+    FamilyProfileSnapshot
 )
 from app.services.relationship_service import RelationshipService
 
 router = APIRouter(tags=["mobile-relationships"])
 
+@router.get(
+    "/relationships/dashboard",
+    response_model=List[FamilyProfileSnapshot],
+    summary="Get family monitoring dashboard metrics"
+)
+def get_family_dashboard(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Retrieve realtime vital snapshot list for the current users relatives."""
+    return RelationshipService.get_dashboard_snapshots(db, current_user)
+
+@router.get(
+    "/relationships/{contact_id}/detail",
+    response_model=dict,
+    summary="Get detail health data of a linked contact"
+)
+def get_linked_contact_detail(
+    contact_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """View the dashboard stats of a specific tracked person."""
+    return RelationshipService.get_linked_contact_detail(db, current_user, contact_id)
 
 @router.get(
     "/access-profiles",

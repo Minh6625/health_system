@@ -1,20 +1,41 @@
 import 'package:healthguard/core/network/api_client.dart';
 import 'package:healthguard/features/emergency/models/sos_event_model.dart';
 
+class SOSAlertsResult {
+  final List<SOSEventModel> sosAlerts;
+  final int totalCount;
+  final int activeCount;
+  final int resolvedCount;
+
+  const SOSAlertsResult({
+    required this.sosAlerts,
+    required this.totalCount,
+    required this.activeCount,
+    required this.resolvedCount,
+  });
+}
+
 class EmergencyCaregiverRepository {
   final ApiClient _apiClient = ApiClient();
 
   /// Get list of SOS alerts with optional status filter
-  Future<List<SOSEventModel>> getSOSAlerts({required String status}) async {
+  Future<SOSAlertsResult> getSOSAlerts({required String status}) async {
     try {
       final result = await _apiClient.get(
         '/emergency/caregiver/sos-alerts?status=$status',
       );
 
       final List<dynamic> sosAlertsJson = result['sos_alerts'] as List;
-      return sosAlertsJson
+      final alerts = sosAlertsJson
           .map((json) => SOSEventModel.fromJson(json as Map<String, dynamic>))
           .toList();
+
+      return SOSAlertsResult(
+        sosAlerts: alerts,
+        totalCount: (result['total_count'] as num?)?.toInt() ?? alerts.length,
+        activeCount: (result['active_count'] as num?)?.toInt() ?? 0,
+        resolvedCount: (result['resolved_count'] as num?)?.toInt() ?? 0,
+      );
     } catch (e) {
       throw Exception('Không thể tải danh sách SOS: ${e.toString()}');
     }

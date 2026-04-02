@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 // ignore: depend_on_referenced_packages
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -13,8 +14,8 @@ import 'package:healthguard/features/device/providers/device_provider.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 // ignore: unused_import — giữ để dễ switch sang real backend
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
-import 'package:healthguard/features/emergency/repositories/emergency_caregiver_mock_repository.dart';
 import 'package:healthguard/features/home/presentation/providers/home_dashboard_provider.dart';
+import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:provider/provider.dart';
@@ -60,7 +61,13 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
           _navigatorKey.currentState?.pushNamed(route, arguments: args);
         }
       }
-      FlutterNativeSplash.remove();
+      if (!kIsWeb) {
+        try {
+          FlutterNativeSplash.remove();
+        } catch (e) {
+          debugPrint('Splash remove skipped: $e');
+        }
+      }
       debugPrint("==== SPLASH REMOVED IN INITSTATE ====");
     });
   }
@@ -173,6 +180,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
         ChangeNotifierProvider(create: (_) => HomeDashboardProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
+        ChangeNotifierProvider(create: (_) => FamilyDashboardProvider()),
         ChangeNotifierProvider(
           create: (_) => EmergencyCaregiverProvider(
             // ✅ Using live API - backend ready

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class MyCodeHeroCard extends StatelessWidget {
+  final String qrData;
   final String pinCode;
-  final String expiryText;
   final VoidCallback onShare;
 
   const MyCodeHeroCard({
     super.key,
+    required this.qrData,
     required this.pinCode,
-    required this.expiryText,
     required this.onShare,
   });
 
@@ -31,7 +32,7 @@ class MyCodeHeroCard extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Mock QR Code Block
+          // Account QR block for sharing/add-contact flow
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -39,10 +40,23 @@ class MyCodeHeroCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: Colors.grey.shade200, width: 2),
             ),
-            child: const Icon(
-              Icons.qr_code_2,
-              size: 180,
-              color: Color(0xFF12304A),
+            child: QrImageView(
+              data: qrData,
+              size: 220,
+              backgroundColor: Colors.white,
+              errorStateBuilder: (context, error) {
+                return const SizedBox(
+                  width: 180,
+                  height: 180,
+                  child: Center(
+                    child: Icon(
+                      Icons.qr_code_2,
+                      size: 120,
+                      color: Color(0xFF12304A),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(height: 24),
@@ -55,27 +69,6 @@ class MyCodeHeroCard extends StatelessWidget {
               letterSpacing: 8,
               color: Color(0xFF2F80ED),
             ),
-          ),
-          const SizedBox(height: 8),
-          // Expiry info
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.timer_outlined,
-                size: 16,
-                color: Color(0xFFF2A93B),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                'Có hiệu lực đến $expiryText',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFFF2A93B),
-                ),
-              ),
-            ],
           ),
           const SizedBox(height: 32),
           // Share Button

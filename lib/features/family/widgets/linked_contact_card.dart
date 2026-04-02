@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
+import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import '../models/linked_contact_model.dart';
 
@@ -24,12 +27,21 @@ class LinkedContactCard extends StatelessWidget {
     return pItems.join(' • ');
   }
 
-  void _onTap(BuildContext context) {
-    Navigator.pushNamed(
+  void _onTap(BuildContext context) async {
+    await Navigator.pushNamed(
       context,
       AppRouter.linkedContactDetail,
       arguments: {'contactId': contact.id},
     );
+
+    if (context.mounted) {
+      final auth = context.read<AuthProvider>();
+      if (auth.currentUser != null) {
+        context.read<SharedFamilyMockProvider>().loadInitialData(
+          auth.currentUser!.userId,
+        );
+      }
+    }
   }
 
   @override
