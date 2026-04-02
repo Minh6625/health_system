@@ -58,7 +58,7 @@ def get_latest_sleep_session(
 
 @metrics_router.get(
     "/sleep/history",
-    response_model=list[SleepSessionResponse],
+    response_model=dict,
 )
 def get_sleep_history(
     target_profile_id: int = Depends(get_target_profile_id),
@@ -66,15 +66,16 @@ def get_sleep_history(
     from_date: str | None = None,
     to_date: str | None = None,
     limit: int = 30,
-) -> list[SleepSessionResponse]:
+) -> dict:
     """Get sleep session history within a date range."""
-    return MonitoringService.get_sleep_history(
+    sessions = MonitoringService.get_sleep_history(
         patient_id=target_profile_id,
         db=db,
         from_date=from_date,
         to_date=to_date,
         limit=limit,
     )
+    return {"data": sessions}
 
 
 @metrics_router.get(

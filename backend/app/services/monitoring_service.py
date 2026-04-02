@@ -17,6 +17,28 @@ class MonitoringService:
     VITALS_STALE_AFTER = timedelta(seconds=30)
 
     @staticmethod
+    def _calculate_sleep_metrics(
+        phases: dict,
+        quality_score: int,
+        in_bed_minutes: int,
+    ) -> tuple[int, int, float, str]:
+        """Calculate derived sleep metrics from phases and quality score."""
+        sleep_minutes = phases.get('light', 0) + phases.get('deep', 0) + phases.get('rem', 0)
+        awake_minutes = phases.get('awake', 0)
+        efficiency_ratio = (
+            sleep_minutes / in_bed_minutes if in_bed_minutes > 0 else 0.0
+        )
+        
+        if quality_score >= 70:
+            quality_label = "GOOD"
+        elif quality_score >= 50:
+            quality_label = "AVERAGE"
+        else:
+            quality_label = "POOR"
+        
+        return sleep_minutes, awake_minutes, efficiency_ratio, quality_label
+
+    @staticmethod
     def get_latest_vital_signs(patient_id: int, db: Session) -> VitalSignsResponse:
         """
         Query latest vital signs from DB for the user's primary device.
@@ -132,14 +154,25 @@ class MonitoringService:
             0,
             int((end_time - start_time).total_seconds() // 60),
         )
+        
+        quality_score = int(row.get("sleep_score") or 0)
+        sleep_minutes, awake_minutes, efficiency_ratio, quality_label = (
+            MonitoringService._calculate_sleep_metrics(
+                phases, quality_score, in_bed_minutes
+            )
+        )
 
         return SleepSessionResponse(
-            quality_score=int(row.get("sleep_score") or 0),
+            quality_score=quality_score,
             in_bed_minutes=in_bed_minutes,
             wake_count=int(row.get("wake_count") or 0),
             phases=phases,
             start_time=start_time,
             end_time=end_time,
+            sleep_minutes=sleep_minutes,
+            awake_minutes=awake_minutes,
+            efficiency_ratio=efficiency_ratio,
+            quality_label=quality_label,
         )
 
     @staticmethod
@@ -229,16 +262,22 @@ class MonitoringService:
                 0,
                 int((end_time - start_time).total_seconds() // 60),
             )
+            
+            quality_score = int(row.get("sleep_score") or 0)
+            sleep_minutes, awake_minutes, efficiency_ratio, quality_label = (
+                MonitoringService._calculate_sleep_metrics(
+                    phases, quality_score, in_bed_minutes
+                )
+            )
 
             results.append(
                 SleepSessionResponse(
-                    quality_score=int(row.get("sleep_score") or 0),
+                    quality_score=quality_score,
                     in_bed_minutes=in_bed_minutes,
                     wake_count=int(row.get("wake_count") or 0),
                     phases=phases,
                     start_time=start_time,
                     end_time=end_time,
-                    session_id=session_id,
                     sleep_minutes=sleep_minutes,
                     awake_minutes=awake_minutes,
                     efficiency_ratio=efficiency_ratio,
