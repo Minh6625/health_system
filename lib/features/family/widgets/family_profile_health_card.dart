@@ -41,10 +41,31 @@ class FamilyProfileHealthCard extends StatelessWidget {
       iconColor = const Color(0xFF2F80ED);
     }
 
-    final diff = DateTime.now().difference(profile.lastUpdated).inMinutes;
-    String updatedText = isNoData
-        ? 'Chưa có dữ liệu đo'
-        : (diff < 1 ? 'Vừa cập nhật' : 'Cập nhật $diff phút trước');
+    final diffSecondsRaw = DateTime.now()
+        .difference(profile.lastUpdated)
+        .inSeconds;
+    final diffSeconds = diffSecondsRaw < 0 ? 0 : diffSecondsRaw;
+    final snappedDiffSeconds = (diffSeconds ~/ 30) * 30;
+    String updatedText;
+    if (isNoData) {
+      updatedText = 'Chưa có dữ liệu đo';
+    } else {
+      if (snappedDiffSeconds < 30) {
+        updatedText = 'Vừa cập nhật';
+      } else {
+        final diffMinutes = snappedDiffSeconds ~/ 60;
+        final remainSeconds = snappedDiffSeconds % 60;
+
+        if (diffMinutes == 0) {
+          updatedText = 'Vừa cập nhật ${remainSeconds} giây trước';
+        } else if (remainSeconds == 0) {
+          updatedText = 'Vừa cập nhật ${diffMinutes} phút trước';
+        } else {
+          updatedText =
+              'Vừa cập nhật ${diffMinutes}p${remainSeconds} giây trước';
+        }
+      }
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

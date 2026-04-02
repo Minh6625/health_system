@@ -10,6 +10,27 @@ class PersonDetailScreen extends StatelessWidget {
 
   const PersonDetailScreen({super.key, required this.profileId});
 
+  String _buildUpdatedText(DateTime lastUpdated) {
+    final diffSecondsRaw = DateTime.now().difference(lastUpdated).inSeconds;
+    final diffSeconds = diffSecondsRaw < 0 ? 0 : diffSecondsRaw;
+    final snappedDiffSeconds = (diffSeconds ~/ 30) * 30;
+
+    if (snappedDiffSeconds < 30) {
+      return 'Vừa cập nhật';
+    }
+
+    final diffMinutes = snappedDiffSeconds ~/ 60;
+    final remainSeconds = snappedDiffSeconds % 60;
+
+    if (diffMinutes == 0) {
+      return 'Cập nhật ${remainSeconds} giây trước';
+    }
+    if (remainSeconds == 0) {
+      return 'Cập nhật ${diffMinutes}p trước';
+    }
+    return 'Cập nhật ${diffMinutes}p${remainSeconds} giây trước';
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<FamilyDashboardProvider>();
@@ -208,7 +229,7 @@ class PersonDetailScreen extends StatelessWidget {
                     const Text('•', style: TextStyle(color: Color(0xFFCBD5E1))),
                     const SizedBox(width: 8),
                     Text(
-                      'Cập nhật 2p trước',
+                      _buildUpdatedText(profile.lastUpdated),
                       style: TextStyle(
                         color: Colors.grey.shade500,
                         fontSize: 13,
