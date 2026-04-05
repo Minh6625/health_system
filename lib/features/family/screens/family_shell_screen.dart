@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/core/routes/app_router.dart';
@@ -23,9 +25,15 @@ class FamilyShellScreen extends StatefulWidget {
 }
 
 class _FamilyShellScreenState extends State<FamilyShellScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  static const Duration _badgeRefreshInterval = Duration(seconds: 2);
+
   late TabController _tabController;
   late SharedFamilyMockProvider _familyProvider;
+  late AuthProvider _authProvider;
+  Timer? _badgeRefreshTimer;
+  bool _isRefreshingBadges = false;
+  int? _lastRefreshedUserId;
 
   // Mock: canReceiveAlerts luôn = true trong dev
   // Sau này check từ API: user có ít nhất 1 relationship với can_receive_alerts = true
@@ -36,10 +44,15 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _familyProvider = SharedFamilyMockProvider();
+    _authProvider = context.read<AuthProvider>();
+    _authProvider.addListener(_handleAuthChanged);
     _tabController = TabController(length: _tabCount, vsync: this);
+    _tabController.addListener(_handleTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshTabBadges();
+      _startBadgeAutoRefresh();
     });
 
     if (widget.initialTab != 0 && widget.initialTab < _tabCount) {
@@ -51,8 +64,59 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
 
   @override
   void dispose() {
+    _stopBadgeAutoRefresh();
+    WidgetsBinding.instance.removeObserver(this);
+    _authProvider.removeListener(_handleAuthChanged);
+    _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handleAuthChanged() {
+    if (!mounted) {
+      return;
+    }
+
+    final userId = _authProvider.currentUser?.userId;
+    if (userId == null || userId == _lastRefreshedUserId) {
+      return;
+    }
+
+    _refreshTabBadges(silent: true);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startBadgeAutoRefresh();
+      _refreshTabBadges(silent: true);
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      _stopBadgeAutoRefresh();
+    }
+  }
+
+  void _startBadgeAutoRefresh() {
+    _badgeRefreshTimer?.cancel();
+    _badgeRefreshTimer = Timer.periodic(_badgeRefreshInterval, (_) {
+      _refreshTabBadges(silent: true);
+    });
+  }
+
+  void _stopBadgeAutoRefresh() {
+    _badgeRefreshTimer?.cancel();
+    _badgeRefreshTimer = null;
+  }
+
+  void _handleTabChanged() {
+    if (_tabController.indexIsChanging) {
+      return;
+    }
+    _refreshTabBadges(silent: true);
   }
 
   Future<void> _navigateToAddContact() async {
@@ -66,13 +130,40 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
     }
   }
 
-  Future<void> _refreshTabBadges() async {
+  Future<void> _refreshTabBadges({bool silent = false}) async {
+    if (!mounted || _isRefreshingBadges) {
+      return;
+    }
+
     final auth = context.read<AuthProvider>();
     final user = auth.currentUser;
     if (user == null) return;
+    _lastRefreshedUserId = user.userId;
 
-    await context.read<FamilyDashboardProvider>().loadDashboard(user.userId);
-    await context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
+    _isRefreshingBadges = true;
+    try {
+      final futures = <Future<void>>[
+        _familyProvider.loadInitialData(user.userId, silent: silent),
+        context.read<FamilyDashboardProvider>().loadDashboard(
+          user.userId,
+          silent: silent,
+        ),
+      ];
+
+      final isOnSosTab = _canReceiveAlerts && _tabController.index == 2;
+      if (!isOnSosTab) {
+        futures.add(
+          context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(
+            'all',
+            silent: silent,
+          ),
+        );
+      }
+
+      await Future.wait(futures);
+    } finally {
+      _isRefreshingBadges = false;
+    }
   }
 
   Widget _buildTabLabelWithBadge({

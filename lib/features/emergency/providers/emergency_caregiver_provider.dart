@@ -12,6 +12,7 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
 
   // State for SOS Alerts List
   List<SOSEventModel> sosList = [];
+  final Map<String, List<SOSEventModel>> _alertsCacheByStatus = {};
   int _activeAlertsCount = 0;
   String currentFilter = 'all';
   bool isLoadingList = false;
@@ -30,20 +31,48 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
   int get activeCount => _activeAlertsCount;
 
   /// Fetch SOS alerts with status filter
-  Future<void> fetchSOSAlerts(String status) async {
-    isLoadingList = true;
-    listErrorMessage = null;
-    currentFilter = status;
-    notifyListeners();
+  Future<void> fetchSOSAlerts(String status, {bool silent = false}) async {
+    final cachedAlerts = _alertsCacheByStatus[status];
+    final hasCachedAlerts = cachedAlerts != null;
+
+    if (!silent) {
+      currentFilter = status;
+      if (hasCachedAlerts) {
+        sosList = List<SOSEventModel>.from(cachedAlerts);
+      }
+      isLoadingList = !hasCachedAlerts && sosList.isEmpty;
+      listErrorMessage = null;
+      notifyListeners();
+    } else if (hasCachedAlerts && status == currentFilter) {
+      sosList = List<SOSEventModel>.from(cachedAlerts);
+      notifyListeners();
+    }
 
     try {
       final result = await repository.getSOSAlerts(status: status);
-      sosList = result.sosAlerts;
       _activeAlertsCount = result.activeCount;
+      _alertsCacheByStatus[status] = result.sosAlerts;
+
+      if (status == 'all') {
+        _alertsCacheByStatus['active'] = result.sosAlerts
+            .where((alert) => alert.status == 'active')
+            .toList();
+        _alertsCacheByStatus['resolved'] = result.sosAlerts
+            .where((alert) => alert.status == 'resolved')
+            .toList();
+      }
+
+      // Silent badge polling (e.g. status='all') should not clobber
+      // an actively filtered SOS list in the tab view.
+      if (!silent || status == currentFilter) {
+        sosList = result.sosAlerts;
+      }
     } catch (e) {
       listErrorMessage = _getErrorMessage(e);
     } finally {
-      isLoadingList = false;
+      if (!silent) {
+        isLoadingList = false;
+      }
       notifyListeners();
     }
   }
@@ -56,6 +85,7 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
 
     try {
       final result = await repository.getSOSAlerts(status: status);
+      _alertsCacheByStatus[status] = result.sosAlerts;
       sosList = result.sosAlerts;
       _activeAlertsCount = result.activeCount;
     } catch (e) {

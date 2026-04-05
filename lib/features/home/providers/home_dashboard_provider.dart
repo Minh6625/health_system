@@ -49,10 +49,12 @@ class HomeDashboardProvider extends ChangeNotifier {
   Map<String, dynamic>? get sleepData => _sleepData;
 
   /// Load all dashboard data from API
-  Future<void> loadDashboardData() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+  Future<void> loadDashboardData({bool silent = false}) async {
+    if (!silent) {
+      _isLoading = true;
+      _error = null;
+      notifyListeners();
+    }
 
     try {
       // Fetch all data in parallel
@@ -64,7 +66,9 @@ class HomeDashboardProvider extends ChangeNotifier {
     } catch (e) {
       _error = 'Không thể tải dữ liệu: $e';
     } finally {
-      _isLoading = false;
+      if (!silent) {
+        _isLoading = false;
+      }
       notifyListeners();
     }
   }
