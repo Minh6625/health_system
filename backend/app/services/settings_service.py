@@ -69,7 +69,9 @@ class SettingsService:
             ).fetchone()
             value = row[0] if row is not None else default
             if isinstance(value, str):
-                value = json.loads(value)
+                stripped = value.strip()
+                if stripped.startswith("{") or stripped.startswith("["):
+                    value = json.loads(value)
             cls._cache[key] = (now, value)
             return value
         except Exception as exc:
@@ -85,6 +87,215 @@ class SettingsService:
     def get_vitals_daytime_thresholds(cls, db: Session) -> dict[str, Any]:
         result = cls.get_setting("vitals_default_thresholds", db, _DEFAULT_DAYTIME)
         return cls._normalize_thresholds(result, _DEFAULT_DAYTIME)
+
+    @classmethod
+    def upsert_setting(
+        cls,
+        db: Session,
+        *,
+        key: str,
+        value: Any,
+        group: str,
+        description: str,
+        updated_by: int | None = None,
+        is_editable: bool = True,
+    ) -> None:
+        payload = json.dumps(value)
+        db.execute(
+            text(
+                """
+                INSERT INTO system_settings (
+                    setting_key,
+                    setting_group,
+                    setting_value,
+                    description,
+                    is_editable,
+                    updated_by
+                )
+                VALUES (
+                    :setting_key,
+                    :setting_group,
+                    CAST(:setting_value AS jsonb),
+                    :description,
+                    :is_editable,
+                    :updated_by
+                )
+                ON CONFLICT (setting_key)
+                DO UPDATE SET
+                    setting_group = EXCLUDED.setting_group,
+                    setting_value = EXCLUDED.setting_value,
+                    description = EXCLUDED.description,
+                    is_editable = EXCLUDED.is_editable,
+                    updated_by = EXCLUDED.updated_by,
+                    updated_at = NOW()
+                """
+            ),
+            {
+                "setting_key": key,
+                "setting_group": group,
+                "setting_value": payload,
+                "description": description,
+                "is_editable": is_editable,
+                "updated_by": updated_by,
+            },
+        )
+        db.commit()
+        cls.invalidate_cache(key)
+
+    @classmethod
+    def get_general_settings(cls, db: Session) -> dict[str, Any]:
+        language = cls.get_setting("app_language", db, "vi")
+        theme = cls.get_setting("app_theme", db, "system")
+        timezone = cls.get_setting("default_timezone", db, "Asia/Ho_Chi_Minh")
+
+        gateways = cls.get_setting("notification_gateways", db, {"push_enabled": True})
+        if not isinstance(gateways, dict):
+            gateways = {"push_enabled": bool(gateways)}
+        push_enabled = bool(gateways.get("push_enabled", True))
+
+        maintenance_scalar = cls.get_setting("maintenance_mode", db, None)
+        system_security = cls.get_setting(
+            "system_security",
+            db,
+            {"maintenance_mode": False, "session_timeout_minutes": 60},
+        )
+        if not isinstance(system_security, dict):
+            system_security = {"maintenance_mode": False, "session_timeout_minutes": 60}
+
+        jwt_expiry_minutes = cls.get_setting("jwt_access_expiry_minutes", db, None)
+        session_timeout = int(
+            jwt_expiry_minutes
+            if isinstance(jwt_expiry_minutes, (int, float))
+            else system_security.get("session_timeout_minutes", 60)
+        )
+
+        maintenance_mode = bool(
+            maintenance_scalar
+            if isinstance(maintenance_scalar, bool)
+            else system_security.get("maintenance_mode", False)
+        )
+
+        return {
+            "language": str(language),
+            "theme": str(theme),
+            "timezone": str(timezone),
+            "push_notifications_enabled": push_enabled,
+            "maintenance_mode": maintenance_mode,
+            "session_timeout_minutes": session_timeout,
+        }
+
+    @classmethod
+    def update_general_settings(
+        cls,
+        db: Session,
+        *,
+        user_id: int,
+        language: str | None = None,
+        theme: str | None = None,
+        timezone: str | None = None,
+        push_notifications_enabled: bool | None = None,
+        maintenance_mode: bool | None = None,
+        session_timeout_minutes: int | None = None,
+    ) -> dict[str, Any]:
+        if language is not None:
+            cls.upsert_setting(
+                db,
+                key="app_language",
+                value=language,
+                group="ui",
+                description="Ngon ngu giao dien mobile app",
+                updated_by=user_id,
+            )
+
+        if theme is not None:
+            cls.upsert_setting(
+                db,
+                key="app_theme",
+                value=theme,
+                group="ui",
+                description="Che do giao dien mobile app",
+                updated_by=user_id,
+            )
+
+        if timezone is not None:
+            cls.upsert_setting(
+                db,
+                key="default_timezone",
+                value=timezone,
+                group="infra",
+                description="Mui gio mac dinh cho app",
+                updated_by=user_id,
+            )
+
+        if push_notifications_enabled is not None:
+            gateways = cls.get_setting("notification_gateways", db, {"push_enabled": True})
+            if not isinstance(gateways, dict):
+                gateways = {}
+            gateways["push_enabled"] = bool(push_notifications_enabled)
+            cls.upsert_setting(
+                db,
+                key="notification_gateways",
+                value=gateways,
+                group="infra",
+                description="Cau hinh kenh thong bao",
+                updated_by=user_id,
+            )
+
+        if maintenance_mode is not None:
+            cls.upsert_setting(
+                db,
+                key="maintenance_mode",
+                value=bool(maintenance_mode),
+                group="security",
+                description="Maintenance mode cho mobile app",
+                updated_by=user_id,
+            )
+
+            system_security = cls.get_setting(
+                "system_security",
+                db,
+                {"maintenance_mode": False, "session_timeout_minutes": 60},
+            )
+            if not isinstance(system_security, dict):
+                system_security = {}
+            system_security["maintenance_mode"] = bool(maintenance_mode)
+            cls.upsert_setting(
+                db,
+                key="system_security",
+                value=system_security,
+                group="security",
+                description="Cau hinh bao mat he thong",
+                updated_by=user_id,
+            )
+
+        if session_timeout_minutes is not None:
+            cls.upsert_setting(
+                db,
+                key="jwt_access_expiry_minutes",
+                value=int(session_timeout_minutes),
+                group="security",
+                description="Thoi gian het han session (phut)",
+                updated_by=user_id,
+            )
+
+            system_security = cls.get_setting(
+                "system_security",
+                db,
+                {"maintenance_mode": False, "session_timeout_minutes": 60},
+            )
+            if not isinstance(system_security, dict):
+                system_security = {}
+            system_security["session_timeout_minutes"] = int(session_timeout_minutes)
+            cls.upsert_setting(
+                db,
+                key="system_security",
+                value=system_security,
+                group="security",
+                description="Cau hinh bao mat he thong",
+                updated_by=user_id,
+            )
+
+        return cls.get_general_settings(db)
 
     @classmethod
     def invalidate_cache(cls, key: str | None = None) -> None:

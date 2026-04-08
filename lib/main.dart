@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/app.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
 
 void main() async {
   debugPrint("==== MAIN STARTED ====");
@@ -16,6 +19,14 @@ void main() async {
       debugPrint("==== DOTENV LOADED ====");
     } catch (e) {
       debugPrint("==== DOTENV ERROR (IGNORING) ==== $e");
+    }
+
+    try {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      debugPrint("==== FIREBASE INITIALIZED ====");
+    } catch (e) {
+      debugPrint("==== FIREBASE INIT ERROR (IGNORING) ==== $e");
     }
 
     runApp(const HealthSystemApp());

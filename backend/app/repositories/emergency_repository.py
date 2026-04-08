@@ -165,3 +165,27 @@ class EmergencyRepository:
         db.refresh(sos)
         
         return sos
+
+    @staticmethod
+    def get_alert_recipient_user_ids(
+        db: Session,
+        patient_user_id: int,
+    ) -> list[int]:
+        """Return caregiver user IDs that should receive SOS/fall alerts for a patient."""
+        caregiver_rows = (
+            db.query(UserRelationship.caregiver_id)
+            .filter(
+                UserRelationship.patient_id == patient_user_id,
+                UserRelationship.status == "accepted",
+                UserRelationship.can_receive_alerts.is_(True),
+                UserRelationship.deleted_at.is_(None),
+            )
+            .all()
+        )
+
+        recipient_ids: set[int] = set()
+        for (caregiver_id,) in caregiver_rows:
+            if caregiver_id is not None:
+                recipient_ids.add(int(caregiver_id))
+
+        return list(recipient_ids)

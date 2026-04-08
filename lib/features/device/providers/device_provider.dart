@@ -6,7 +6,6 @@ import 'package:healthguard/features/device/models/device_model.dart';
 
 class DeviceProvider extends ChangeNotifier {
   final ApiClient _apiClient = ApiClient();
-  static const Duration _cacheTTL = Duration(seconds: 30);
 
   List<DeviceModel> _devices = [];
   bool _isLoading = false;
@@ -14,7 +13,6 @@ class DeviceProvider extends ChangeNotifier {
   String _statusFilter = 'all';
   String? _typeFilter;
   int _total = 0;
-  DateTime? _lastFetchTime;
 
   List<DeviceModel> get devices => _devices;
   bool get isLoading => _isLoading;
@@ -46,7 +44,8 @@ class DeviceProvider extends ChangeNotifier {
       return true;
     }
 
-    if (lastSyncAt != null && DateTime.now().difference(lastSyncAt).inHours >= 24) {
+    if (lastSyncAt != null &&
+        DateTime.now().difference(lastSyncAt).inHours >= 24) {
       return true;
     }
 
@@ -159,18 +158,7 @@ class DeviceProvider extends ChangeNotifier {
     });
   }
 
-  bool _isCacheValid() {
-    if (_lastFetchTime == null) {
-      return false;
-    }
-    return DateTime.now().difference(_lastFetchTime!) < _cacheTTL;
-  }
-
   Future<void> fetchDevices({bool forceRefresh = false}) async {
-    if (!forceRefresh && _isCacheValid()) {
-      return;
-    }
-
     final shouldNotifyLoading = _devices.isEmpty || forceRefresh;
     _isLoading = true;
     _errorMessage = null;
@@ -183,7 +171,7 @@ class DeviceProvider extends ChangeNotifier {
       await Future.delayed(
         Duration(milliseconds: DeviceMockConfig.fakeApiDelayMs),
       );
-      
+
       var mockList = <DeviceModel>[];
       switch (DeviceMockConfig.listScenario) {
         case MockListScenario.empty:
@@ -195,14 +183,28 @@ class DeviceProvider extends ChangeNotifier {
           notifyListeners();
           return;
         case MockListScenario.allOffline:
-          mockList = DeviceMockSnapshots.all.map((d) => DeviceModel(
-            id: d.id, uuid: d.uuid, deviceName: d.deviceName, deviceType: d.deviceType,
-            model: d.model, firmwareVersion: d.firmwareVersion, macAddress: d.macAddress,
-            serialNumber: d.serialNumber, mqttClientId: d.mqttClientId,
-            isActive: d.isActive, isOnline: false, batteryLevel: d.batteryLevel,
-            signalStrength: d.signalStrength, lastSeenAt: d.lastSeenAt,
-            lastSyncAt: d.lastSyncAt, registeredAt: d.registeredAt,
-          )).toList();
+          mockList = DeviceMockSnapshots.all
+              .map(
+                (d) => DeviceModel(
+                  id: d.id,
+                  uuid: d.uuid,
+                  deviceName: d.deviceName,
+                  deviceType: d.deviceType,
+                  model: d.model,
+                  firmwareVersion: d.firmwareVersion,
+                  macAddress: d.macAddress,
+                  serialNumber: d.serialNumber,
+                  mqttClientId: d.mqttClientId,
+                  isActive: d.isActive,
+                  isOnline: false,
+                  batteryLevel: d.batteryLevel,
+                  signalStrength: d.signalStrength,
+                  lastSeenAt: d.lastSeenAt,
+                  lastSyncAt: d.lastSyncAt,
+                  registeredAt: d.registeredAt,
+                ),
+              )
+              .toList();
           break;
         case MockListScenario.normal:
           mockList = List<DeviceModel>.from(DeviceMockSnapshots.all);
@@ -224,7 +226,6 @@ class DeviceProvider extends ChangeNotifier {
       _sortDevices(mockList);
       _devices = mockList;
       _total = _devices.length;
-      _lastFetchTime = DateTime.now();
       _isLoading = false;
       notifyListeners();
       return;
@@ -242,21 +243,24 @@ class DeviceProvider extends ChangeNotifier {
       }
 
       final queryString = query.entries
-          .map((entry) => '${entry.key}=${Uri.encodeQueryComponent(entry.value)}')
+          .map(
+            (entry) => '${entry.key}=${Uri.encodeQueryComponent(entry.value)}',
+          )
           .join('&');
 
-      final response = await _apiClient.get('${ApiEndpoints.devices}?$queryString');
+      final response = await _apiClient.get(
+        '${ApiEndpoints.devices}?$queryString',
+      );
       final rawDevices = response['devices'] as List<dynamic>? ?? [];
       _total = (response['total'] as num?)?.toInt() ?? rawDevices.length;
-      
+
       var liveList = rawDevices
           .whereType<Map<String, dynamic>>()
           .map(DeviceModel.fromJson)
           .toList();
-          
+
       _sortDevices(liveList);
       _devices = liveList;
-      _lastFetchTime = DateTime.now();
     } catch (e) {
       _errorMessage = 'Khong the tai danh sach thiet bi: ${e.toString()}';
     } finally {

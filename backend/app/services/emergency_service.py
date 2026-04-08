@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.repositories.emergency_repository import EmergencyRepository
+from app.models.sos_event_model import Alert
+from app.services.push_notification_service import PushNotificationService
 from app.schemas.emergency import (
     SOSAlertsResponse,
     SOSEventListItem,
@@ -26,20 +28,100 @@ class EmergencyService:
         trigger_type: str = "manual",
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
-        address: Optional[str] = None
+        address: Optional[str] = None,
+        fall_event_id: Optional[int] = None,
     ) -> bool:
         """Trigger a new SOS event."""
-        
-        EmergencyRepository.create_sos_event(
+
+        sos_event = EmergencyRepository.create_sos_event(
             db=db,
             user_id=user_id,
             device_id=None,  # Manual SOS is sent from the phone directly, not a wearable
             trigger_type=trigger_type,
             latitude=latitude,
             longitude=longitude,
-            address=address
+            address=address,
+            fall_event_id=fall_event_id,
         )
+
+        EmergencyService._create_alerts_for_sos_event(db, sos_event)
         return True
+
+    @staticmethod
+    def _create_alerts_for_sos_event(db: Session, sos_event) -> None:
+        """Fan out SOS/fall alerts to patient and linked caregivers."""
+        patient = EmergencyRepository.get_user_by_id(db, sos_event.user_id)
+        patient_name = patient.full_name if patient else f"User #{sos_event.user_id}"
+
+        normalized_trigger = (sos_event.trigger_type or "").strip().lower()
+        is_fall = normalized_trigger in {"auto", "fall_detected", "fall_detection"}
+
+        alert_type = "fall_detected" if is_fall else "sos"
+        title = (
+            f"Phát hiện té ngã: {patient_name}"
+            if is_fall
+            else f"Cảnh báo SOS: {patient_name}"
+        )
+        message = (
+            "Phát hiện té ngã tự động. Cần kiểm tra ngay."
+            if is_fall
+            else "Người dùng đã kích hoạt SOS thủ công. Cần hỗ trợ ngay."
+        )
+
+        base_details = {
+            "sos_id": sos_event.id,
+            "sos_event_id": sos_event.id,
+            "trigger_type": sos_event.trigger_type,
+            "patient_user_id": sos_event.user_id,
+            "patient_name": patient_name,
+            "address": sos_event.address,
+            "latitude": float(sos_event.latitude)
+            if sos_event.latitude is not None
+            else None,
+            "longitude": float(sos_event.longitude)
+            if sos_event.longitude is not None
+            else None,
+        }
+
+        recipient_user_ids = EmergencyRepository.get_alert_recipient_user_ids(
+            db,
+            sos_event.user_id,
+        )
+
+        created_alerts: list[Alert] = []
+        for recipient_user_id in recipient_user_ids:
+            alert = Alert(
+                device_id=sos_event.device_id,
+                user_id=recipient_user_id,
+                fall_event_id=sos_event.fall_event_id,
+                alert_type=alert_type,
+                severity="critical",
+                title=title,
+                message=message,
+                details={**base_details, "recipient_user_id": recipient_user_id},
+            )
+            db.add(alert)
+            created_alerts.append(alert)
+
+        db.flush()
+
+        notification_id_by_user = {
+            int(alert.user_id): int(alert.id)
+            for alert in created_alerts
+            if alert.user_id is not None and alert.id is not None
+        }
+        db.commit()
+
+        PushNotificationService.send_sos_push_alerts(
+            db,
+            recipient_user_ids=recipient_user_ids,
+            title=title,
+            body=message,
+            sos_id=int(sos_event.id),
+            alert_type=alert_type,
+            trigger_type=sos_event.trigger_type,
+            notification_id_by_user=notification_id_by_user,
+        )
 
     @staticmethod
     def get_sos_alerts_for_caregiver(

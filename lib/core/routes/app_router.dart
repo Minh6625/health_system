@@ -34,6 +34,7 @@ import 'package:healthguard/features/analysis/presentation/screens/risk_report_d
 import 'package:healthguard/features/analysis/presentation/screens/risk_history_screen.dart';
 import 'package:healthguard/features/analysis/providers/risk_report_provider.dart';
 import 'package:healthguard/features/analysis/providers/risk_history_provider.dart';
+import 'package:healthguard/features/notifications/screens/notifications_screen.dart';
 import 'package:provider/provider.dart';
 
 class AppRouter {
@@ -67,6 +68,7 @@ class AppRouter {
   static const String riskReport = '/risk-report';
   static const String riskReportDetail = '/risk-report-detail';
   static const String riskHistory = '/risk-history';
+  static const String notifications = '/notifications';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     String routePath = settings.name ?? login;
@@ -282,6 +284,8 @@ class AppRouter {
             ),
           ),
         );
+      case notifications:
+        return MaterialPageRoute(builder: (_) => const NotificationsScreen());
       case start:
         return MaterialPageRoute(builder: (_) => const AuthPagesScreen());
       case login:
