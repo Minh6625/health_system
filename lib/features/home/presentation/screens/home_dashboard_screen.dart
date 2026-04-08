@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/network/api_client.dart';
 import '../../../../core/routes/app_router.dart';
 import '../../../../shared/presentation/emergency/emergency_sticky_bar.dart';
 import '../../../../shared/presentation/shell/app_shell_bottom_nav.dart';
@@ -72,12 +73,17 @@ class HomeDashboardScreen extends StatefulWidget {
 class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     with WidgetsBindingObserver {
   static const Duration _autoRefreshInterval = Duration(seconds: 1);
+  static const Duration _notificationRefreshInterval = Duration(seconds: 5);
 
+  final ApiClient _apiClient = ApiClient();
   late final HomeDashboardProvider _dashboardProvider;
   late final SleepProvider _sleepProvider;
   late final DeviceProvider _deviceProvider;
   Timer? _autoRefreshTimer;
+  Timer? _notificationRefreshTimer;
   bool _isRefreshing = false;
+  bool _isFetchingUnreadCount = false;
+  int _unreadNotificationCount = 0;
 
   Future<void> _refreshDashboard({bool silent = false}) async {
     if (!mounted || _isRefreshing) {
@@ -104,6 +110,54 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     _autoRefreshTimer = null;
   }
 
+  Future<void> _fetchUnreadNotificationCount() async {
+    if (!mounted || _isFetchingUnreadCount) {
+      return;
+    }
+
+    _isFetchingUnreadCount = true;
+    try {
+      final result = await _apiClient.get(
+        '/notifications',
+        queryParams: {'limit': 1, 'offset': 0},
+      );
+
+      final unreadCount = (result['unread_count'] as num?)?.toInt() ?? 0;
+      if (!mounted) {
+        return;
+      }
+
+      if (unreadCount != _unreadNotificationCount) {
+        setState(() {
+          _unreadNotificationCount = unreadCount;
+        });
+      }
+    } catch (_) {
+      // Ignore transient errors and keep the previous unread count.
+    } finally {
+      _isFetchingUnreadCount = false;
+    }
+  }
+
+  void _startNotificationRefresh() {
+    _notificationRefreshTimer?.cancel();
+    _notificationRefreshTimer = Timer.periodic(_notificationRefreshInterval, (
+      _,
+    ) {
+      _fetchUnreadNotificationCount();
+    });
+  }
+
+  void _stopNotificationRefresh() {
+    _notificationRefreshTimer?.cancel();
+    _notificationRefreshTimer = null;
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.pushNamed(context, AppRouter.notifications);
+    await _fetchUnreadNotificationCount();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -118,6 +172,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshDashboard();
       _startAutoRefresh();
+      _fetchUnreadNotificationCount();
+      _startNotificationRefresh();
 
       if (_sleepProvider.loadState == SleepLoadState.initial) {
         _sleepProvider.loadAll();
@@ -134,6 +190,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     if (state == AppLifecycleState.resumed) {
       _startAutoRefresh();
       _refreshDashboard(silent: true);
+      _fetchUnreadNotificationCount();
+      _startNotificationRefresh();
       return;
     }
 
@@ -141,12 +199,14 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
         state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
       _stopAutoRefresh();
+      _stopNotificationRefresh();
     }
   }
 
   @override
   void dispose() {
     _stopAutoRefresh();
+    _stopNotificationRefresh();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -187,7 +247,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
           ),
           child: SafeArea(
             bottom: false,
-            child: _DashboardBody(vm: vm, provider: provider),
+            child: _DashboardBody(
+              vm: vm,
+              provider: provider,
+              unreadNotificationCount: _unreadNotificationCount,
+              onOpenNotifications: _openNotifications,
+            ),
           ),
         );
       },
@@ -477,10 +542,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
 }
 
 class _DashboardBody extends StatelessWidget {
-  const _DashboardBody({required this.vm, required this.provider});
+  const _DashboardBody({
+    required this.vm,
+    required this.provider,
+    required this.unreadNotificationCount,
+    required this.onOpenNotifications,
+  });
 
   final HomeDashboardViewModel vm;
   final HomeDashboardProvider provider;
+  final int unreadNotificationCount;
+  final Future<void> Function() onOpenNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -517,7 +589,9 @@ class _DashboardBody extends StatelessWidget {
                   displayName: vm.displayName,
                   avatarUrl: vm.avatarUrl,
                   latestUpdatedLabel: vm.latestUpdatedLabel,
-                  onTapNotifications: () {},
+                  hasUnreadNotifications: unreadNotificationCount > 0,
+                  unreadNotificationCount: unreadNotificationCount,
+                  onTapNotifications: () => onOpenNotifications(),
                 ),
                 const SizedBox(height: AppSpacing.sectionGapMd),
                 HealthStatusHeroCard(
@@ -553,7 +627,9 @@ class _DashboardBody extends StatelessWidget {
                   onTapDeviceSettings: () {
                     Navigator.pushReplacementNamed(context, '/device');
                   },
-                  onTapNotifications: () {},
+                  onTapNotifications: () {
+                    onOpenNotifications();
+                  },
                 ),
                 const SizedBox(height: AppSpacing.sectionGapXl),
               ]),

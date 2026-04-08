@@ -23,7 +23,7 @@ class FamilySOSFullScreenOverlay extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: Container(
-        color: Colors.black.withValues(alpha: 0.65),
+        color: Colors.black.withValues(alpha: 0.82),
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -35,7 +35,7 @@ class FamilySOSFullScreenOverlay extends StatelessWidget {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE53935).withValues(alpha: 0.15),
+                    color: const Color(0xFFE53935).withValues(alpha: 0.28),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: const Color(0xFFE53935),
@@ -72,10 +72,10 @@ class FamilySOSFullScreenOverlay extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: Colors.white.withValues(alpha: 0.22),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: const Color(0xFFE53935).withValues(alpha: 0.5),
+                      color: const Color(0xFFE53935).withValues(alpha: 0.8),
                     ),
                   ),
                   child: Column(
@@ -132,7 +132,7 @@ class FamilySOSFullScreenOverlay extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: const Color(0xFFE53935).withValues(alpha: 0.2),
+            backgroundColor: const Color(0xFFE53935).withValues(alpha: 0.35),
             child: Text(
               p.name.isNotEmpty ? p.name[0].toUpperCase() : 'U',
               style: const TextStyle(

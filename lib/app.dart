@@ -14,6 +14,7 @@ import 'package:healthguard/features/device/providers/device_provider.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 // ignore: unused_import — giữ để dễ switch sang real backend
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
+import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
 import 'package:healthguard/features/home/presentation/providers/home_dashboard_provider.dart';
 import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
@@ -29,6 +30,8 @@ class HealthSystemApp extends StatefulWidget {
 
 class _HealthSystemAppState extends State<HealthSystemApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final SOSRealtimeAlertService _sosRealtimeAlertService =
+      SOSRealtimeAlertService.instance;
   late AppLinks _appLinks;
   StreamSubscription? _linkSubscription;
 
@@ -43,6 +46,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
   void initState() {
     super.initState();
     _appLinks = AppLinks();
+    unawaited(_sosRealtimeAlertService.initialize(navigatorKey: _navigatorKey));
     _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_deepLinkDispatched && _pendingDeepLinkRoute != null) {
@@ -167,6 +171,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
 
   @override
   void dispose() {
+    unawaited(_sosRealtimeAlertService.dispose());
     _linkSubscription?.cancel();
     super.dispose();
   }
@@ -188,14 +193,67 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
           ),
         ),
       ],
-      child: MaterialApp(
-        navigatorKey: _navigatorKey,
-        debugShowCheckedModeBanner: false,
-        title: AppStrings.appName,
-        theme: AppTheme.lightTheme,
-        initialRoute: AppRouter.start,
-        onGenerateRoute: AppRouter.onGenerateRoute,
+      child: _SOSAlertAuthBridge(
+        service: _sosRealtimeAlertService,
+        child: MaterialApp(
+          navigatorKey: _navigatorKey,
+          debugShowCheckedModeBanner: false,
+          title: AppStrings.appName,
+          theme: AppTheme.lightTheme,
+          initialRoute: AppRouter.start,
+          onGenerateRoute: AppRouter.onGenerateRoute,
+        ),
       ),
     );
   }
+}
+
+class _SOSAlertAuthBridge extends StatefulWidget {
+  const _SOSAlertAuthBridge({required this.service, required this.child});
+
+  final SOSRealtimeAlertService service;
+  final Widget child;
+
+  @override
+  State<_SOSAlertAuthBridge> createState() => _SOSAlertAuthBridgeState();
+}
+
+class _SOSAlertAuthBridgeState extends State<_SOSAlertAuthBridge> {
+  AuthProvider? _authProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextProvider = context.read<AuthProvider>();
+    if (identical(nextProvider, _authProvider)) {
+      return;
+    }
+
+    _authProvider?.removeListener(_onAuthChanged);
+    _authProvider = nextProvider;
+    _authProvider?.addListener(_onAuthChanged);
+    _onAuthChanged();
+  }
+
+  void _onAuthChanged() {
+    final authProvider = _authProvider;
+    if (authProvider == null) {
+      return;
+    }
+
+    unawaited(
+      widget.service.onAuthStateChanged(
+        isAuthenticated: authProvider.isAuthenticated,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _authProvider?.removeListener(_onAuthChanged);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

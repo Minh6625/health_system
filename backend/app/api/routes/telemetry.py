@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.models.device_model import Device
 from app.models.sos_event_model import Alert, FallEvent
+from app.services.emergency_service import EmergencyService
 from app.services.settings_service import SettingsService
 
 router = APIRouter(prefix="/telemetry", tags=["mobile-telemetry"])
@@ -282,6 +283,19 @@ def ingest_alert(
             db.flush()
             fall_event_id = fall_event.id
             ingested += 1
+
+            if resolved_user_id is not None:
+                EmergencyService.trigger_sos(
+                    db=db,
+                    user_id=resolved_user_id,
+                    trigger_type="auto",
+                    latitude=_pick_float(metadata, "latitude"),
+                    longitude=_pick_float(metadata, "longitude"),
+                    address=_pick_value(metadata, "address"),
+                    fall_event_id=fall_event_id,
+                )
+                ingested += 1
+                return IngestResponse(ingested=ingested, errors=errors)
 
         mapped_severity = _map_alert_severity(payload.severity)
         alert_type = _map_alert_type(payload.event_type)

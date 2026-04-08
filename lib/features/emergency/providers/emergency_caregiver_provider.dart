@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:healthguard/features/emergency/models/sos_event_model.dart';
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
@@ -137,17 +138,50 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
 
   /// Make phone call to patient
   Future<void> makePhoneCall(String phoneNumber) async {
+    final normalizedPhone = _normalizePhoneNumber(phoneNumber);
+    if (normalizedPhone.isEmpty) {
+      listErrorMessage = 'So dien thoai khong hop le';
+      notifyListeners();
+      return;
+    }
+
     try {
-      final uri = Uri.parse('tel:$phoneNumber');
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        throw Exception('Không thể gọi điện thoại');
+      var didLaunchDirectCall = false;
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        didLaunchDirectCall =
+            await FlutterPhoneDirectCaller.callNumber(normalizedPhone) ?? false;
+      }
+
+      if (!didLaunchDirectCall) {
+        final uri = Uri.parse('tel:$normalizedPhone');
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          throw Exception('Khong the goi dien thoai');
+        }
       }
     } catch (e) {
-      listErrorMessage = 'Không thể mở ứng dụng điện thoại';
+      listErrorMessage = 'Khong the mo ung dung dien thoai';
       notifyListeners();
     }
+  }
+
+  String _normalizePhoneNumber(String phoneNumber) {
+    final value = phoneNumber.trim();
+    if (value.isEmpty) {
+      return '';
+    }
+
+    final buffer = StringBuffer();
+    for (var i = 0; i < value.length; i++) {
+      final char = value[i];
+      final isDigit = char.codeUnitAt(0) >= 48 && char.codeUnitAt(0) <= 57;
+      final isLeadingPlus = char == '+' && buffer.isEmpty;
+      if (isDigit || isLeadingPlus) {
+        buffer.write(char);
+      }
+    }
+    return buffer.toString();
   }
 
   /// Open map navigation to patient location
