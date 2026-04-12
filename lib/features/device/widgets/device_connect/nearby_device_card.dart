@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/mock/device_mock_data.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class NearbyDeviceCard extends StatelessWidget {
   final MockBleDevice device;
@@ -20,50 +24,44 @@ class NearbyDeviceCard extends StatelessWidget {
 
     return Card(
       elevation: 1,
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.only(bottom: AppSpacing.gapMd),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+        side: BorderSide(color: AppColors.strokeSoft),
       ),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(AppSpacing.sectionGapMd),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.all(AppSpacing.gapMd),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE6FFFB),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.bgElevated,
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                 ),
-                child: Icon(iconData, color: const Color(0xFF0F766E), size: 32),
+                child: Icon(iconData, color: AppColors.brandPrimary, size: 32),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: AppSpacing.sectionGapMd),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       device.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: AppTextStyles.bodyMedium,
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: AppSpacing.gapXs),
                     Text(
                       'Loại: ${device.deviceType == 'smartwatch' ? 'Đồng hồ thông minh' : 'Vòng đeo tay'}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
+                      style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right, color: Colors.grey.shade400),
+              Icon(Icons.chevron_right, color: AppColors.textSecondary),
             ],
           ),
         ),

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import '../widgets/linked_contacts_hero_card.dart';
 import '../widgets/pending_requests_section.dart';
 import '../widgets/grouped_contacts_section.dart';
@@ -43,7 +46,7 @@ class _ContactListScreenState extends State<ContactListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: AppColors.bgPrimary,
       body: Consumer<SharedFamilyMockProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading && provider.contacts.isEmpty) {
@@ -63,7 +66,7 @@ class _ContactListScreenState extends State<ContactListScreen> {
             },
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.gapLg, vertical: AppSpacing.gapLg),
               children: [
                 if (provider.error != null && provider.contacts.isNotEmpty)
                   _buildOfflineBanner(provider.error!),
@@ -72,18 +75,18 @@ class _ContactListScreenState extends State<ContactListScreen> {
                   pendingCount: provider.pendingRequests.length,
                   onAddPressed: _navigateToAddContact,
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppSpacing.gapLg),
                 if (provider.contacts.isEmpty)
                   LinkedContactsEmptyState(onAddPressed: _navigateToAddContact)
                 else ...[
                   if (provider.pendingRequests.isNotEmpty) ...[
                     PendingRequestsSection(requests: provider.pendingRequests),
-                    const SizedBox(height: 24),
+                    SizedBox(height: AppSpacing.sectionGapXl),
                   ],
                   if (provider.acceptedContacts.isNotEmpty)
                     GroupedContactsSection(contacts: provider.acceptedContacts),
                 ],
-                const SizedBox(height: 48), // Bottom Safe Spacer
+                const SizedBox(height: 48),
               ],
             ),
           );
@@ -95,22 +98,22 @@ class _ContactListScreenState extends State<ContactListScreen> {
   Widget _buildErrorState(SharedFamilyMockProvider provider) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(AppSpacing.sectionGapXl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               Icons.contact_mail_outlined,
               size: 68,
-              color: Colors.teal.shade300,
+              color: AppColors.brandPrimaryLight,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppSpacing.gapLg),
             Text(
               provider.error!,
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 15, color: Colors.grey.shade700),
+              style: TextStyle(fontSize: 15, color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: AppSpacing.sectionGapMd),
             ElevatedButton.icon(
               onPressed: () {
                 final auth = context.read<AuthProvider>();
@@ -129,18 +132,18 @@ class _ContactListScreenState extends State<ContactListScreen> {
 
   Widget _buildOfflineBanner(String msg) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: AppSpacing.gapLg),
+      padding: EdgeInsets.all(AppSpacing.gapMd),
       decoration: BoxDecoration(
-        color: Colors.amber.shade100,
-        borderRadius: BorderRadius.circular(12),
+        color: AppStateColors.warningBg,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
       ),
       child: Row(
         children: [
-          Icon(Icons.offline_bolt, color: Colors.amber.shade800),
-          const SizedBox(width: 8),
+          Icon(Icons.offline_bolt, color: AppColors.warning),
+          SizedBox(width: AppSpacing.gapSm),
           Expanded(
-            child: Text(msg, style: TextStyle(color: Colors.amber.shade900)),
+            child: Text(msg, style: TextStyle(color: AppColors.warning)),
           ),
         ],
       ),

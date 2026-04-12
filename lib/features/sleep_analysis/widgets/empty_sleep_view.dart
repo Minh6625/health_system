@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 /// Hiển thị khi user chưa có dữ liệu giấc ngủ (new account / không đeo đồng hồ).
 class EmptySleepView extends StatelessWidget {
@@ -31,7 +32,7 @@ class EmptySleepView extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.sectionGapXl),
 
             const Text(
               'Chưa có dữ liệu giấc ngủ',
@@ -43,7 +44,7 @@ class EmptySleepView extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.gapMd),
 
             const Text(
               'Hãy đeo đồng hồ khi ngủ để\nứng dụng có thể theo dõi\nvà phân tích giấc ngủ của bạn.',
@@ -90,7 +91,7 @@ class _Instruction extends StatelessWidget {
     return Row(
       children: [
         Icon(icon, size: 18, color: const Color(0xFF48A9D6)),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.gapSm),
         Expanded(
           child: Text(
             text,

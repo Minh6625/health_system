@@ -39,13 +39,7 @@ class RiskScoreHeroCard extends StatelessWidget {
         color: AppColors.bgSurface,
         borderRadius: AppRadii.cardRadius,
         border: Border.all(color: AppColors.strokeSoft),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: AppShadows.softShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,14 +85,14 @@ class RiskScoreHeroCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     RiskLevelPill(level: report.level),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.gapSm),
                     Text(
                       report.displayStatus,
                       style: AppTextStyles.bodyLarge.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: AppSpacing.gapXs),
                     Text(
                       '$deltaStr so với lần trước',
                       style: AppTextStyles.caption,

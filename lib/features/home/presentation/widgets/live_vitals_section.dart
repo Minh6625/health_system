@@ -29,14 +29,14 @@ class LiveVitalsSection extends StatelessWidget {
             if (useSingleColumn)
               ...items.map(
                 (item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: AppSpacing.gapMd),
                   child: VitalMetricCard(item: item),
                 ),
               )
             else
               // Manual 2-column grid to avoid unbounded height / assertion errors
               // when used inside CustomScrollView/SliverList
-              ..._buildGridRows(items, 12),
+              ..._buildGridRows(items, AppSpacing.gapMd),
           ],
         );
       },

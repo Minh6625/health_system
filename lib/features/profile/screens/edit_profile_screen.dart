@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -110,7 +112,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Cập nhật thông tin thành công'),
-          backgroundColor: Color(0xFF0F766E),
+          backgroundColor: AppColors.brandPrimary,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -119,7 +121,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(provider.errorMessage ?? 'Cập nhật thất bại'),
-          backgroundColor: Colors.red.shade700,
+          backgroundColor: AppColors.critical,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -131,11 +133,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Consumer<ProfileProvider>(
       builder: (context, provider, _) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF4F7FB),
+          backgroundColor: AppColors.bgPrimary,
           appBar: AppBar(
             title: const Text('Chỉnh sửa thông tin'),
-            backgroundColor: const Color(0xFF0F766E),
-            foregroundColor: Colors.white,
+            backgroundColor: AppColors.brandPrimary,
+            foregroundColor: AppColors.bgSurface,
           ),
           body: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 32),
@@ -212,7 +214,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         decoration:
                             _inputDecoration('Giới tính', Icons.wc_outlined),
                         style: const TextStyle(
-                            fontSize: 16, color: Colors.black87),
+                            fontSize: 16, color: AppColors.textPrimary),
                         items: _genders
                             .map((g) =>
                                 DropdownMenuItem(value: g, child: Text(g)))
@@ -253,21 +255,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                           child: Image.network(
                             _avatarController.text.trim(),
                             height: 100,
                             width: 100,
                             fit: BoxFit.cover,
+                            cacheWidth: 300,
+                            cacheHeight: 300,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                height: 100,
+                                width: 100,
+                                alignment: Alignment.center,
+                                child: const CircularProgressIndicator(strokeWidth: 2),
+                              );
+                            },
                             errorBuilder: (_, _, _) => Container(
                               height: 100,
                               width: 100,
                               decoration: BoxDecoration(
-                                color: Colors.grey.shade200,
-                                borderRadius: BorderRadius.circular(12),
+                                color: AppColors.strokeSoft,
+                                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                               ),
                               child: Icon(Icons.broken_image_outlined,
-                                  color: Colors.grey.shade400),
+                                  color: AppColors.textSecondary),
                             ),
                           ),
                         ),
@@ -279,7 +292,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       padding: const EdgeInsets.only(top: 12),
                       child: Text(
                         provider.errorMessage!,
-                        style: TextStyle(color: Colors.red.shade700),
+                        style: TextStyle(color: AppColors.critical),
                       ),
                     ),
                   const SizedBox(height: 28),
@@ -295,7 +308,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                  strokeWidth: 2, color: AppColors.bgSurface),
                             )
                           : const Icon(Icons.save_outlined),
                       label: Text(
@@ -304,12 +317,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                             fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F766E),
-                        foregroundColor: Colors.white,
+                        backgroundColor: AppColors.brandPrimary,
+                        foregroundColor: AppColors.bgSurface,
                         disabledBackgroundColor:
-                            const Color(0xFF0F766E).withValues(alpha: 0.5),
+                            AppColors.brandPrimary.withValues(alpha: 0.5),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
                       ),
                     ),
                   ),
@@ -329,7 +342,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       style: const TextStyle(
         fontSize: 15,
         fontWeight: FontWeight.w700,
-        color: Color(0xFF0F766E),
+        color: AppColors.brandPrimary,
         letterSpacing: 0.3,
       ),
     );
@@ -338,8 +351,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget _buildCard(List<Widget> children) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -363,12 +376,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       {Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: const Color(0xFF0F766E), size: 20),
+      prefixIcon: Icon(icon, color: AppColors.brandPrimary, size: 20),
       suffixIcon: suffixIcon,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.radiusSm)),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Color(0xFF0F766E), width: 2),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+        borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
       ),
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 14, vertical: 14),

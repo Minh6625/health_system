@@ -9,6 +9,9 @@ import 'package:healthguard/features/device/widgets/device_list/device_onboardin
 import 'package:healthguard/features/device/widgets/device_list/attention_zone_card.dart';
 import 'package:healthguard/features/device/widgets/device_list/filter_toolbar.dart';
 import 'package:healthguard/features/device/widgets/device_list/add_device_primary_action.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:provider/provider.dart';
 
 import 'package:healthguard/shared/presentation/shell/app_shell_bottom_nav.dart';
@@ -64,11 +67,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
         },
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F7FB),
+        backgroundColor: AppColors.bgPrimary,
         appBar: AppBar(
           title: const Text('Thiết bị'),
           automaticallyImplyLeading: false, // No back button for main tabs
-          backgroundColor: const Color(0xFF0F766E),
+          backgroundColor: AppColors.brandPrimary,
           foregroundColor: Colors.white,
           actions: [
           // ── Debug menu để test các State Mock ──
@@ -103,25 +106,24 @@ class _DeviceScreenState extends State<DeviceScreen> {
           if (provider.errorMessage != null && provider.devices.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpacing.sectionGapXl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.devices_other_outlined,
                       size: 68,
-                      color: Colors.teal.shade300,
+                      color: AppColors.brandPrimaryLight,
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.sectionGapMd),
                     Text(
                       provider.errorMessage!,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey.shade700,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.sectionGapLg),
                     ElevatedButton.icon(
                       onPressed: () => provider.fetchDevices(forceRefresh: true),
                       icon: const Icon(Icons.refresh),
@@ -140,16 +142,21 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   onRefresh: () => provider.fetchDevices(forceRefresh: true),
                   child: ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 24),
+                    padding: const EdgeInsets.only(
+                      left: AppSpacing.sectionGapMd,
+                      right: AppSpacing.sectionGapMd,
+                      top: AppSpacing.sectionGapMd,
+                      bottom: AppSpacing.sectionGapXl,
+                    ),
                     children: [
                       const DeviceHealthHeroCard(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.sectionGapMd),
                       if (provider.needsAttentionDevices.isNotEmpty) ...[
                         const AttentionZoneCard(),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: AppSpacing.sectionGapMd),
                       ],
                       const FilterToolbar(),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.sectionGapMd),
                       if (provider.devices.isEmpty)
                         const DeviceOnboardingEmptyState()
                       else
@@ -263,7 +270,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(backgroundColor: AppColors.critical),
               child: const Text('Xóa'),
             ),
           ],
@@ -310,7 +317,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       controller: nameController,
                       decoration: const InputDecoration(labelText: 'Tên thiết bị'),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.gapMd),
                     DropdownButtonFormField<String>(
                       initialValue: selectedType,
                       decoration: const InputDecoration(labelText: 'Loại thiết bị'),
@@ -336,34 +343,34 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         }
                       },
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.gapMd),
                     TextField(
                       controller: modelController,
                       decoration: const InputDecoration(labelText: 'Model'),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.gapMd),
                     TextField(
                       controller: firmwareController,
                       decoration: const InputDecoration(labelText: 'Firmware'),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.gapMd),
                     TextField(
                       controller: macController,
                       decoration: const InputDecoration(labelText: 'Địa chỉ MAC'),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.gapMd),
                     TextField(
                       controller: serialController,
                       decoration: const InputDecoration(labelText: 'Số serial'),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.gapMd),
                     TextField(
                       controller: mqttController,
                       decoration: const InputDecoration(labelText: 'MQTT Client ID'),
                     ),
                     if (localError != null) ...[
-                      const SizedBox(height: 12),
-                      Text(localError!, style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: AppSpacing.gapMd),
+                      Text(localError!, style: const TextStyle(color: AppColors.critical)),
                     ],
                   ],
                 ),

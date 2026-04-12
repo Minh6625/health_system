@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 /// Content section của StartScreen: Tiêu đề, tagline, mô tả — với staggered slide-up + fade-in.
 class StartScreenContent extends StatelessWidget {
@@ -23,7 +23,7 @@ class StartScreenContent extends StatelessWidget {
           'HealthGuard',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                color: const Color(0xFF1E293B),
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w800,
                 fontSize: titleFontSize,
                 letterSpacing: -0.5,
@@ -40,7 +40,7 @@ class StartScreenContent extends StatelessWidget {
           'Chăm sóc sức khỏe gia đình bạn',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.primary,
+                color: AppColors.brandPrimary,
                 fontWeight: FontWeight.w600,
                 fontSize: subtitleFontSize,
               ),
@@ -56,7 +56,7 @@ class StartScreenContent extends StatelessWidget {
           'Theo dõi chỉ số từ smartwatch.\nCảnh báo sớm đột quỵ & té ngã.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
                 fontSize: bodyFontSize,
                 height: 1.5,
               ),

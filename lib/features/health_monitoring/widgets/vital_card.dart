@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 import '../models/vital_signs.dart';
 import 'animated_vital_value.dart';
 
@@ -23,39 +27,39 @@ class VitalCard extends StatelessWidget {
   Color _getBackgroundColor() {
     switch (status) {
       case VitalStatus.normal:
-        return Colors.green.shade50;
+        return AppStateColors.successBg;
       case VitalStatus.warning:
-        return Colors.orange.shade50;
+        return AppStateColors.warningBg;
       case VitalStatus.critical:
-        return Colors.red.shade50;
+        return AppStateColors.criticalBg;
       case VitalStatus.unknown:
-        return Colors.grey.shade50;
+        return AppColors.bgPrimary;
     }
   }
 
   Color _getIconColor() {
     switch (status) {
       case VitalStatus.normal:
-        return Colors.green.shade700;
+        return AppColors.success;
       case VitalStatus.warning:
-        return Colors.orange.shade700;
+        return AppColors.warning;
       case VitalStatus.critical:
-        return Colors.red.shade700;
+        return AppColors.critical;
       case VitalStatus.unknown:
-        return Colors.grey.shade700;
+        return AppColors.textSecondary;
     }
   }
 
   Color _getBorderColor() {
     switch (status) {
       case VitalStatus.normal:
-        return Colors.green.shade200;
+        return AppColors.success;
       case VitalStatus.warning:
-        return Colors.orange.shade300;
+        return AppColors.warning;
       case VitalStatus.critical:
-        return Colors.red.shade300;
+        return AppColors.critical;
       case VitalStatus.unknown:
-        return Colors.grey.shade300;
+        return AppColors.strokeSoft;
     }
   }
 
@@ -76,12 +80,12 @@ class VitalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: AppRadii.cardRadius,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: AppSpacing.cardPadding,
         decoration: BoxDecoration(
           color: _getBackgroundColor(),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadii.cardRadius,
           border: Border.all(
             color: _getBorderColor(),
             width: 2,
@@ -108,16 +112,17 @@ class VitalCard extends StatelessWidget {
                   color: _getIconColor(),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.gapSm,
+                    vertical: AppSpacing.gapXs,
+                  ),
                   decoration: BoxDecoration(
                     color: _getIconColor().withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                   ),
                   child: Text(
                     _getStatusText(),
-                    style: TextStyle(
-                      fontSize: 14,
+                    style: AppTextStyles.caption.copyWith(
                       fontWeight: FontWeight.w700,
                       color: _getIconColor(),
                     ),
@@ -125,17 +130,16 @@ class VitalCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: AppSpacing.gapMd),
             // Title
             Text(
               title,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade800,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: AppSpacing.gapXs),
             // Value
             Row(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -151,15 +155,13 @@ class VitalCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: AppSpacing.gapXs),
                 Padding(
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Text(
                     unit,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey.shade600,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),

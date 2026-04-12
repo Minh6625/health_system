@@ -8,6 +8,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:mobile_scanner/mobile_scanner.dart' as mobile;
 import 'package:provider/provider.dart';
 import 'package:yomu/yomu.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import '../widgets/add_contact_intro_card.dart';
 import '../widgets/mode_segmented_control.dart';
 import '../widgets/my_code_hero_card.dart';
@@ -111,7 +114,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                           ? 'Đã từ chối yêu cầu thành công!'
                           : 'Đã hủy liên kết thành công!',
                     ),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.success,
                   ),
                 );
               }
@@ -134,7 +137,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(
                     content: Text('Đã xác nhận yêu cầu thành công!'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.success,
                   ),
                 );
               }
@@ -147,7 +150,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(
                     content: Text('Đã hủy lời mời thành công!'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.success,
                   ),
                 );
               }
@@ -180,7 +183,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(
                     content: Text('Đã gửi lời mời thành công!'),
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.success,
                   ),
                 );
               }
@@ -199,7 +202,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                   content: Text(
                     isAlreadySent ? 'Lời mời đã được gửi trước đó!' : errorMsg,
                   ),
-                  backgroundColor: isAlreadySent ? Colors.orange : Colors.red,
+                  backgroundColor: isAlreadySent ? AppColors.warning : AppColors.critical,
                 ),
               );
             }
@@ -228,7 +231,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Mã QR không hợp lệ.'),
-        backgroundColor: Colors.orange,
+        backgroundColor: AppColors.warning,
       ),
     );
   }
@@ -533,7 +536,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
       }
 
       final imagePath = pickedFile.path;
-      if (imagePath == null || imagePath.isEmpty) {
+      if (imagePath.isEmpty) {
         _simulateScanError();
         return;
       }
@@ -551,7 +554,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Không đọc được mã QR từ ảnh đã chọn.'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.warning,
           ),
         );
         return;
@@ -599,11 +602,11 @@ class _AddContactScreenState extends State<AddContactScreen> {
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF2F80ED),
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.brandPrimary,
+              foregroundColor: AppColors.bgSurface,
               alignment: Alignment.center,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
               ),
             ),
           ),
@@ -617,7 +620,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
       case AddContactMode.scan:
         return Padding(
           key: const ValueKey('scan_mode'),
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(AppSpacing.gapLg),
           child: Column(
             children: [
               Expanded(
@@ -633,7 +636,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
       case AddContactMode.myCode:
         return Padding(
           key: const ValueKey('my_code_mode'),
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(AppSpacing.gapLg),
           child: MyCodeHeroCard(
             qrData: _buildMyQrPayload(),
             pinCode: '482 931',
@@ -643,7 +646,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
       case AddContactMode.searchPhone:
         return Padding(
           key: const ValueKey('search_phone_mode'),
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(AppSpacing.gapLg),
           child: SearchPhoneView(onConnect: _simulateScanSuccess),
         );
     }
@@ -652,15 +655,15 @@ class _AddContactScreenState extends State<AddContactScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB), // bg.primary
+      backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         title: const Text(
           'Thêm liên hệ',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF12304A),
+        backgroundColor: AppColors.bgSurface,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
@@ -670,11 +673,11 @@ class _AddContactScreenState extends State<AddContactScreen> {
       body: Column(
         children: [
           const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 0),
+            padding: EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapLg, AppSpacing.gapLg, 0),
             child: AddContactIntroCard(),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.gapLg, vertical: AppSpacing.gapLg),
             child: ModeSegmentedControl(
               currentMode: _currentMode,
               onModeChanged: _onModeChanged,

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../providers/device_connect_provider.dart';
 
 class MethodSelectStep extends StatelessWidget {
@@ -10,36 +14,33 @@ class MethodSelectStep extends StatelessWidget {
     final provider = context.read<DeviceConnectProvider>();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.sectionGapLg,
+        vertical: AppSpacing.sectionGapXl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Kết nối đồng hồ của bạn',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF12304A), // text.primary
-            ),
+            style: AppTextStyles.sectionTitle.copyWith(fontSize: 24),
           ),
-          const SizedBox(height: 12),
-          const Text(
+          SizedBox(height: AppSpacing.gapMd),
+          Text(
             'Chỉ cần quét mã QR trên màn hình đồng hồ hoặc nhập mã thiết bị để bắt đầu theo dõi sức khoẻ.',
-            style: TextStyle(
-              fontSize: 16,
+            style: AppTextStyles.body.copyWith(
               height: 1.5,
-              color: Color(0xFF5B7288), // text.secondary
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 48),
-          
           _buildMethodCard(
             title: 'Quét QR thiết bị',
             subtitle: 'Nhanh hơn, ít phải nhập tay',
             icon: Icons.qr_code_scanner_rounded,
             onTap: provider.openQrScanner,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppSpacing.sectionGapMd),
           _buildMethodCard(
             title: 'Nhập mã thiết bị',
             subtitle: 'Dùng khi camera lỗi hoặc QR mờ',
@@ -59,56 +60,43 @@ class MethodSelectStep extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppRadii.radiusXl),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: EdgeInsets.all(AppSpacing.sectionGapLg),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x05000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
+          borderRadius: BorderRadius.circular(AppRadii.radiusXl),
+          border: Border.all(color: AppColors.strokeSoft),
+          boxShadow: AppShadows.softShadow,
         ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(
-                color: Color(0xFFE6FFFB), // brand.soft
+              padding: EdgeInsets.all(AppSpacing.gapMd),
+              decoration: BoxDecoration(
+                color: AppColors.bgElevated,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, size: 28, color: const Color(0xFF0F766E)), // brand.primary
+              child: Icon(icon, size: 28, color: AppColors.brandPrimary),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: AppSpacing.sectionGapMd),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF12304A),
-                    ),
+                    style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: AppSpacing.gapXs),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF5B7288),
-                    ),
+                    style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+            Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
           ],
         ),
       ),

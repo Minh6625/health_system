@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class AddContactIntroCard extends StatelessWidget {
   const AddContactIntroCard({super.key});
@@ -6,26 +9,26 @@ class AddContactIntroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSpacing.gapLg),
       decoration: BoxDecoration(
-        color: const Color(0xFFEEF4FF), // bg.elevated
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.brandPrimaryLight,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(AppSpacing.gapSm),
             decoration: const BoxDecoration(
-              color: Colors.white,
+              color: AppColors.bgSurface,
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.qr_code_scanner,
-              color: Color(0xFF2F80ED),
-            ), // brand.primary
+              color: AppColors.brandPrimary,
+            ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppSpacing.gapLg),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,15 +38,15 @@ class AddContactIntroCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF12304A), // text.primary
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                SizedBox(height: 4),
+                SizedBox(height: AppSpacing.gapXs),
                 Text(
                   'Thêm liên hệ an toàn bằng cách quét mã, chia sẻ mã QR hoặc tìm qua số điện thoại.',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF5B7288), // text.secondary
+                    color: AppColors.textSecondary,
                     height: 1.4,
                   ),
                 ),

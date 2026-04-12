@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 
 /// Hero section của StartScreen: Logo chính với hiệu ứng "breathing" (phóng to thu nhỏ liên tục).
 class StartScreenHero extends StatelessWidget {
@@ -16,7 +17,7 @@ class StartScreenHero extends StatelessWidget {
       height: logoHeight,
       padding: EdgeInsets.all(logoPadding),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
         child: Image.asset(
           'assets/images/logo.png',
           fit: BoxFit.contain,

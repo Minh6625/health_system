@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 class LinkedContactsEmptyState extends StatelessWidget {
   final VoidCallback onAddPressed;
@@ -31,21 +32,21 @@ class LinkedContactsEmptyState extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF12304A),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
           const Text(
             'Dùng tính năng chia sẻ kết nối để theo dõi sức khoẻ người thân hoặc chia sẻ cho bác sĩ.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Color(0xFF5B7288)),
+            style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: onAddPressed,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2F80ED),
-              foregroundColor: Colors.white,
+              backgroundColor: AppColors.brandPrimary,
+              foregroundColor: AppColors.bgSurface,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(50),

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class AttentionZoneCard extends StatelessWidget {
   const AttentionZoneCard({super.key});
@@ -13,54 +17,51 @@ class AttentionZoneCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7ED), // orange.50
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFFED7AA)), // orange.200
+        color: AppStateColors.warningBg,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFEDD5), // orange.100
+            padding: EdgeInsets.all(AppSpacing.gapMd),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFE67E22), size: 28), // critical
+            child: Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 28),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: AppSpacing.sectionGapMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Cần kiểm tra ngay',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: AppTextStyles.bodyLarge.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFFD97706), // critical
+                    color: AppColors.warning,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'Có $count thiết bị đang pin yếu hoặc mất kết nối lâu.',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    color: Color(0xFFD97706),
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.warning,
                     height: 1.4,
+                    fontSize: 15,
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: AppSpacing.gapMd),
                 InkWell(
-                  onTap: () {
-                    // Optional quick filter interaction
-                  },
-                  child: const Text(
+                  onTap: () {},
+                  child: Text(
                     'Xem thiết bị cần chú ý →',
-                    style: TextStyle(
-                      fontSize: 15,
+                    style: AppTextStyles.caption.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFFD97706),
+                      color: AppColors.warning,
+                      fontSize: 15,
                     ),
                   ),
                 ),

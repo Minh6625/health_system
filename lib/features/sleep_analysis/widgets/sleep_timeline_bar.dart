@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:intl/intl.dart';
 
 /// Horizontal colored timeline bar visualizing sleep phases.
@@ -22,7 +24,7 @@ class SleepTimelineBar extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: const Color(0xFF0D1E38),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         border: Border.all(color: const Color(0x264B5E82)),
       ),
       child: Column(
@@ -31,7 +33,7 @@ class SleepTimelineBar extends StatelessWidget {
           _buildBar(),
           const SizedBox(height: 10),
           _buildTimeLabels(),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.gapMd),
           _buildLegend(),
         ],
       ),
@@ -44,7 +46,7 @@ class SleepTimelineBar extends StatelessWidget {
     // No phase data → simple single-colour bar
     if (phases == null || phases.totalMinutes == 0) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
         child: Container(height: 20, color: _noDataColor),
       );
     }
@@ -57,13 +59,13 @@ class SleepTimelineBar extends StatelessWidget {
 
     if (total == 0) {
       return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
         child: Container(height: 20, color: _noDataColor),
       );
     }
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(AppRadii.radiusSm),
       child: SizedBox(
         height: 20,
         child: Row(

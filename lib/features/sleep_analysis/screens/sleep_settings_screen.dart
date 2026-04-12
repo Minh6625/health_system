@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class SleepSettingsScreen extends StatefulWidget {
   const SleepSettingsScreen({super.key});
@@ -47,7 +49,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
         elevation: 0,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: AppSpacing.cardPadding,
         children: [
           _buildCard(
             child: SwitchListTile(
@@ -58,7 +60,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
               onChanged: (val) => setState(() => _isTrackingEnabled = val),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.gapLg),
           
           if (_isTrackingEnabled) ...[
             _buildCard(
@@ -93,7 +95,7 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF0D1E38),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadii.cardRadius,
         border: Border.all(color: const Color(0x332C4367)),
       ),
       child: child,

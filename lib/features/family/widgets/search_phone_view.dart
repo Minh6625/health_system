@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import '../repositories/family_repository.dart';
 import '../models/user_search_model.dart';
 
@@ -91,13 +93,13 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(AppRadii.radiusMd),
             border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
           ),
           child: Row(
             children: [
-              const Icon(Icons.search, color: Color(0xFF5B7288)),
+              const Icon(Icons.search, color: AppColors.textSecondary),
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
@@ -154,8 +156,8 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -172,7 +174,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+              color: AppColors.strokeSoft,
               shape: BoxShape.circle,
             ),
           ),
@@ -187,7 +189,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                   width: 120,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: AppColors.strokeSoft,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -197,7 +199,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                   width: 80,
                   height: 14,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
+                    color: AppColors.strokeSoft,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -207,8 +209,8 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                   width: double.infinity,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.strokeSoft,
+                    borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                   ),
                 ),
               ],
@@ -224,7 +226,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
         user.connectionStatus == 'pending' || _sentRequests.contains(user.id);
     bool isAccepted = user.connectionStatus == 'accepted';
 
-    Color bgColor = const Color(0xFF0D92F4);
+    Color bgColor = AppColors.info;
     Color fgColor = Colors.white;
     String btnText = 'Kết nối';
 
@@ -233,8 +235,8 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
       fgColor = Colors.red.shade600;
       btnText = 'Hủy kết nối';
     } else if (isPending) {
-      bgColor = Colors.grey.shade300;
-      fgColor = const Color(0xFF5B7288);
+      bgColor = AppColors.strokeSoft;
+      fgColor = AppColors.textSecondary;
       btnText = 'Đã gửi (Hủy)';
     }
 
@@ -242,8 +244,8 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -257,7 +259,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
         children: [
           CircleAvatar(
             radius: 40,
-            backgroundColor: const Color(0xFFEEF4FF),
+            backgroundColor: AppColors.brandPrimaryLight,
             backgroundImage: user.avatarUrl != null
                 ? NetworkImage(user.avatarUrl!)
                 : null,
@@ -268,7 +270,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                         : 'A',
                     style: const TextStyle(
                       fontSize: 28,
-                      color: Color(0xFF2F80ED),
+                      color: AppColors.brandPrimary,
                       fontWeight: FontWeight.bold,
                     ),
                   )
@@ -285,7 +287,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF12304A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -315,11 +317,11 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                             }
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0D92F4),
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppColors.info,
+                            foregroundColor: AppColors.bgSurface,
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                             ),
                             elevation: 0,
                           ),
@@ -352,7 +354,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                             side: BorderSide(color: Colors.red.shade600),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                             ),
                           ),
                           child: const Text(
@@ -416,7 +418,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                         foregroundColor: fgColor,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                         ),
                         elevation: 0,
                       ),

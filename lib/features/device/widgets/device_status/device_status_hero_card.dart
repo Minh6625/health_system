@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 class DeviceStatusHeroCard extends StatelessWidget {
   final DeviceModel device;
@@ -9,11 +13,11 @@ class DeviceStatusHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(AppSpacing.sectionGapXl),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
+        border: Border.all(color: AppColors.strokeSoft),
         boxShadow: const [
           BoxShadow(
             color: Color(0x05000000),
@@ -33,18 +37,13 @@ class DeviceStatusHeroCard extends StatelessWidget {
                   children: [
                     Text(
                       device.displayName,
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF12304A),
-                      ),
+                      style: AppTextStyles.displayCompact,
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: AppSpacing.gapXs),
                     Text(
                       device.typeLabel,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Color(0xFF5B7288),
+                      style: AppTextStyles.body.copyWith(
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -52,32 +51,27 @@ class DeviceStatusHeroCard extends StatelessWidget {
               ),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE6FFFB),
+                decoration: BoxDecoration(
+                  color: AppColors.bgElevated,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.watch_rounded, size: 32, color: Color(0xFF0F766E)),
+                child: Icon(Icons.watch_rounded, size: 32, color: AppColors.brandPrimary),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: AppSpacing.sectionGapXl),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 device.batteryLevel != null ? 'Pin ${device.batteryLevel}%' : 'Pin --',
-                style: const TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF12304A),
-                  height: 1.0,
-                ),
+                style: AppTextStyles.vitalValue,
               ),
               const Spacer(),
               _buildStatusBadge(),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppSpacing.gapLg),
           _buildSyncInfoRow(),
         ],
       ),
@@ -86,21 +80,21 @@ class DeviceStatusHeroCard extends StatelessWidget {
 
   Widget _buildStatusBadge() {
     final isOnline = device.isOnline;
-    final color = isOnline ? const Color(0xFF0F9D7A) : const Color(0xFF94A3B8);
-    final bgColor = isOnline ? const Color(0xFFE6FFFB) : const Color(0xFFF1F5F9);
+    final color = isOnline ? AppColors.success : AppColors.textSecondary;
+    final bgColor = isOnline ? AppColors.bgElevated : const Color(0xFFF1F5F9);
     final text = isOnline ? 'Online' : 'Offline';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(isOnline ? Icons.check_circle_rounded : Icons.offline_bolt_rounded, size: 16, color: color),
-          const SizedBox(width: 4),
+          SizedBox(width: AppSpacing.gapXs),
           Text(text, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
@@ -111,13 +105,12 @@ class DeviceStatusHeroCard extends StatelessWidget {
     final timeStr = _timeText(device.lastSyncAt);
     return Row(
       children: [
-        const Icon(Icons.sync, size: 16, color: Color(0xFF5B7288)),
-        const SizedBox(width: 6),
+        Icon(Icons.sync, size: 16, color: AppColors.textSecondary),
+        SizedBox(width: AppSpacing.gapXs + 2),
         Text(
           'Đồng bộ: $timeStr',
-          style: const TextStyle(
-            fontSize: 16,
-            color: Color(0xFF5B7288),
+          style: AppTextStyles.body.copyWith(
+            color: AppColors.textSecondary,
           ),
         ),
       ],

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/emergency/screens/emergency_sos_received_list_screen.dart';
 import 'package:healthguard/features/emergency/screens/warning_screen.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 class EmergencyMainScreen extends StatefulWidget {
   const EmergencyMainScreen({super.key});
@@ -29,32 +31,37 @@ class _EmergencyMainScreenState extends State<EmergencyMainScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Padding(
-          padding: EdgeInsets.only(left: 10),
+        title: Padding(
+          padding: const EdgeInsets.only(left: 10),
           child: Text(
             'Khẩn cấp',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            style: AppTextStyles.bodyLarge.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppColors.bgSurface,
+            ),
           ),
         ),
         centerTitle: false,
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.brandPrimary,
+        foregroundColor: AppColors.bgSurface,
         elevation: 0,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(48.0),
           child: Container(
-            color: Colors.white,
+            color: AppColors.bgSurface,
             child: TabBar(
               controller: _tabController,
-              labelColor: Colors.blue.shade700,
-              unselectedLabelColor: Colors.black54,
+              labelColor: AppColors.brandPrimary,
+              unselectedLabelColor: AppColors.textSecondary,
               indicator: UnderlineTabIndicator(
-                borderSide: BorderSide(color: Colors.blue.shade700, width: 3.0),
+                borderSide:
+                    BorderSide(color: AppColors.brandPrimary, width: 3.0),
                 insets: const EdgeInsets.symmetric(horizontal: 24.0),
               ),
               indicatorSize: TabBarIndicatorSize.tab,
               dividerColor: Colors.transparent,
-              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              labelStyle:
+                  const TextStyle(fontWeight: FontWeight.bold),
               tabs: const [
                 Tab(text: 'SOS'),
                 Tab(text: 'Danh sách SOS'),

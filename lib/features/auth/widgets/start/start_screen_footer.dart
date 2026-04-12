@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 /// Footer của StartScreen: Nút "Bắt đầu ngay" pulsing glow + sliding arrow icon + Trust indicators.
 /// Chỉ hiển thị khi màn hình KHÔNG nằm trong PageView (`isInPageView == false`).
@@ -29,10 +29,10 @@ class StartScreenFooter extends StatelessWidget {
           child: ElevatedButton(
             onPressed: onGetStarted,
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.brandPrimary,
               foregroundColor: Colors.white,
               elevation: 8,
-              shadowColor: AppColors.primary.withValues(alpha: 0.4),
+              shadowColor: AppColors.brandPrimary.withValues(alpha: 0.4),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
               ),
@@ -77,7 +77,7 @@ class StartScreenFooter extends StatelessWidget {
         // Trust Divider
         Row(
           children: [
-            Expanded(child: Divider(color: Colors.grey[300])),
+            Expanded(child: Divider(color: AppColors.strokeSoft)),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
@@ -85,12 +85,12 @@ class StartScreenFooter extends StatelessWidget {
                 style: TextStyle(
                   fontSize: trustFontSize,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey[400],
+                  color: AppColors.textSecondary,
                   letterSpacing: 1.5,
                 ),
               ),
             ),
-            Expanded(child: Divider(color: Colors.grey[300])),
+            Expanded(child: Divider(color: AppColors.strokeSoft)),
           ],
         ).animate().fadeIn(duration: 400.ms, delay: 1300.ms),
 
@@ -136,14 +136,14 @@ class _TrustBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: AppColors.primary, size: 16),
+        Icon(icon, color: AppColors.brandPrimary, size: 16),
         const SizedBox(width: 6),
         Text(
           label,
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
+            color: AppColors.textSecondary,
           ),
         ),
       ],

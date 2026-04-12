@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 class StatusInsightBanner extends StatelessWidget {
   final bool isOnline;
@@ -19,49 +23,45 @@ class StatusInsightBanner extends StatelessWidget {
     }
 
     final isLowBattery = batteryLevel != null && batteryLevel! <= 20;
-    
+
     // Determine priority: Battery > Offline
     final title = isLowBattery ? 'Thiết bị cần chú ý' : 'Đã mất kết nối';
-    final description = isLowBattery 
-        ? 'Pin đang ở mức rất thấp ($batteryLevel%). Vui lòng sạc thiết bị để duy trì theo dõi liên tục.' 
+    final description = isLowBattery
+        ? 'Pin đang ở mức rất thấp ($batteryLevel%). Vui lòng sạc thiết bị để duy trì theo dõi liên tục.'
         : 'Thiết bị đã ngắt kết nối $_lastSeenText. Hãy đảm bảo thiết bị đang bật và ở gần.';
 
-    final icon = isLowBattery ? Icons.battery_alert_rounded : Icons.wifi_off_rounded;
-    final color = const Color(0xFFD97706); // strong warning (amber-600 logic)
-    final bgColor = const Color(0xFFFEF3C7); // amber-100 logic
-    final borderColor = const Color(0xFFFDE68A); // amber-200 logic
+    final icon =
+        isLowBattery ? Icons.battery_alert_rounded : Icons.wifi_off_rounded;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 24),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: AppSpacing.sectionGapXl),
+      padding: const EdgeInsets.all(AppSpacing.gapLg),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
+        color: AppStateColors.warningBg,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(width: 12),
+          Icon(icon, color: AppColors.warning, size: 24),
+          const SizedBox(width: AppSpacing.gapMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    fontSize: 16,
+                  style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: color.withValues(alpha: 0.9), // Darker text tint
+                    color: AppColors.warning,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: AppSpacing.gapXs),
                 Text(
                   description,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: color.withValues(alpha: 0.8),
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.warning.withValues(alpha: 0.8),
                     height: 1.4,
                   ),
                 ),

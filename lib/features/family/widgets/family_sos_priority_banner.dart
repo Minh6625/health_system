@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class FamilySOSPriorityBanner extends StatelessWidget {
   final int sosCount;
@@ -15,14 +18,20 @@ class FamilySOSPriorityBanner extends StatelessWidget {
     if (sosCount == 0) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapLg,
+        vertical: AppSpacing.gapSm,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapLg,
+        vertical: AppSpacing.sectionGapSm,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFFD95C5C),
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.critical,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFD95C5C).withValues(alpha: 0.3),
+            color: AppColors.critical.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -32,10 +41,10 @@ class FamilySOSPriorityBanner extends StatelessWidget {
         children: [
           const Icon(
             Icons.warning_amber_rounded,
-            color: Colors.white,
+            color: AppColors.bgSurface,
             size: 28,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sectionGapSm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,7 +52,7 @@ class FamilySOSPriorityBanner extends StatelessWidget {
                 Text(
                   'Có $sosCount người đang cần trợ giúp ngay!',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.bgSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
@@ -51,17 +60,20 @@ class FamilySOSPriorityBanner extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.gapSm),
           ElevatedButton(
             onPressed: onTap,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFFD95C5C),
+              backgroundColor: AppColors.bgSurface,
+              foregroundColor: AppColors.critical,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sectionGapSm,
+                vertical: 0,
+              ),
               minimumSize: const Size(60, 36),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadii.radiusSm),
               ),
             ),
             child: const Text('Xem ngay'),

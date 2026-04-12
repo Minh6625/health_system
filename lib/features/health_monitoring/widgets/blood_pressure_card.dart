@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 import '../models/vital_signs.dart';
 import 'animated_vital_value.dart';
 
@@ -12,24 +16,24 @@ class BloodPressureCard extends StatelessWidget {
   const BloodPressureCard({super.key, required this.vitals, this.onTap});
 
   Color _bgColor(VitalStatus s) => switch (s) {
-        VitalStatus.normal => Colors.green.shade50,
-        VitalStatus.warning => Colors.orange.shade50,
-        VitalStatus.critical => Colors.red.shade50,
-        VitalStatus.unknown => Colors.grey.shade50,
+        VitalStatus.normal => AppStateColors.successBg,
+        VitalStatus.warning => AppStateColors.warningBg,
+        VitalStatus.critical => AppStateColors.criticalBg,
+        VitalStatus.unknown => AppColors.bgPrimary,
       };
 
   Color _borderColor(VitalStatus s) => switch (s) {
-        VitalStatus.normal => Colors.green.shade200,
-        VitalStatus.warning => Colors.orange.shade300,
-        VitalStatus.critical => Colors.red.shade300,
-        VitalStatus.unknown => Colors.grey.shade300,
+        VitalStatus.normal => AppColors.success,
+        VitalStatus.warning => AppColors.warning,
+        VitalStatus.critical => AppColors.critical,
+        VitalStatus.unknown => AppColors.strokeSoft,
       };
 
   Color _iconColor(VitalStatus s) => switch (s) {
-        VitalStatus.normal => Colors.green.shade700,
-        VitalStatus.warning => Colors.orange.shade700,
-        VitalStatus.critical => Colors.red.shade700,
-        VitalStatus.unknown => Colors.grey.shade700,
+        VitalStatus.normal => AppColors.success,
+        VitalStatus.warning => AppColors.warning,
+        VitalStatus.critical => AppColors.critical,
+        VitalStatus.unknown => AppColors.textSecondary,
       };
 
   @override
@@ -45,14 +49,14 @@ class BloodPressureCard extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: AppRadii.cardRadius,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 400),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.all(16),
+        padding: AppSpacing.cardPadding,
         decoration: BoxDecoration(
           color: _bgColor(overallStatus),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: AppRadii.cardRadius,
           border: Border.all(color: _borderColor(overallStatus), width: 2),
           boxShadow: [
             BoxShadow(
@@ -73,20 +77,18 @@ class BloodPressureCard extends StatelessWidget {
                 color: iconColor,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: AppSpacing.gapLg),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Huyết áp',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: AppSpacing.gapXs),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
@@ -102,10 +104,9 @@ class BloodPressureCard extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 6),
                           child: Text(
                             ' / ',
-                            style: TextStyle(
+                            style: AppTextStyles.sectionTitle.copyWith(
                               fontSize: 24,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey.shade600,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
@@ -114,25 +115,25 @@ class BloodPressureCard extends StatelessWidget {
                           color: iconColor,
                           fontSize: 32,
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: AppSpacing.gapXs),
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6),
                           child: Text(
                             'mmHg',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.grey.shade600,
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: AppSpacing.gapXs),
                   Text(
                     'Tâm thu / Tâm trương',
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),

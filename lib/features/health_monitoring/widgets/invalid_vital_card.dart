@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 
 class InvalidVitalCard extends StatelessWidget {
   const InvalidVitalCard({super.key});
@@ -6,49 +10,52 @@ class InvalidVitalCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+      padding: EdgeInsets.symmetric(
+        vertical: AppSpacing.sectionGapXl.toDouble() + 8,
+        horizontal: AppSpacing.gapLg,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
+        boxShadow: AppShadows.softShadow,
       ),
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.gapLg,
+              vertical: AppSpacing.gapSm,
+            ),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(20),
+              color: AppStateColors.warningBg,
+              borderRadius: AppRadii.pillRadius,
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
-                const SizedBox(width: 8),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: AppColors.warning,
+                  size: 20,
+                ),
+                SizedBox(width: AppSpacing.gapSm),
                 Text(
                   'Không đo được',
-                  style: TextStyle(
-                    fontSize: 18,
+                  style: AppTextStyles.bodyMedium.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.orange.shade700,
+                    fontSize: 18,
+                    color: AppColors.warning,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          const Text(
+          SizedBox(height: AppSpacing.sectionGapXl.toDouble()),
+          Text(
             '--',
-            style: TextStyle(
+            style: AppTextStyles.displayCompact.copyWith(
               fontSize: 84,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey,
+              color: AppColors.textSecondary,
             ),
           ),
         ],

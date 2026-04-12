@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 
 class AuthTextField extends StatefulWidget {
   final String label;
@@ -27,7 +28,7 @@ class AuthTextField extends StatefulWidget {
     this.inputFormatters,
     this.borderColor,
     this.focusNode,
-    this.fillColor = Colors.white,
+    this.fillColor,
   });
 
   @override
@@ -56,7 +57,7 @@ class _AuthTextFieldState extends State<AuthTextField> {
       decoration: InputDecoration(
         labelText: widget.label,
         filled: true,
-        fillColor: widget.fillColor,
+        fillColor: widget.fillColor ?? AppColors.bgSurface,
         prefixIcon: Icon(widget.icon, color: widget.borderColor),
         suffixIcon: widget.obscureText
             ? IconButton(
@@ -69,20 +70,20 @@ class _AuthTextFieldState extends State<AuthTextField> {
               )
             : null,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: widget.borderColor != null 
+          borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+          borderSide: widget.borderColor != null
               ? BorderSide(color: widget.borderColor!, width: 1.5)
               : const BorderSide(),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: widget.borderColor != null 
+          borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+          borderSide: widget.borderColor != null
               ? BorderSide(color: widget.borderColor!, width: 1.5)
-              : BorderSide(color: Colors.grey.shade400, width: 1.0),
+              : BorderSide(color: AppColors.strokeSoft, width: 1.0),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: widget.borderColor ?? AppColors.primary, width: 2),
+          borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+          borderSide: BorderSide(color: widget.borderColor ?? AppColors.brandPrimary, width: 2),
         ),
       ),
     );

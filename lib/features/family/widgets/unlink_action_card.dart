@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 class UnlinkActionCard extends StatelessWidget {
   final VoidCallback onUnlink;
@@ -16,10 +18,10 @@ class UnlinkActionCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFFDEEEE),
-        borderRadius: BorderRadius.circular(16),
+        color: AppStateColors.criticalBg,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         border: Border.all(
-          color: const Color(0xFFC94A4A).withValues(alpha: 0.3),
+          color: AppColors.critical.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -30,7 +32,7 @@ class UnlinkActionCard extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFFC94A4A),
+              color: AppColors.critical,
             ),
           ),
           const SizedBox(height: 16),
@@ -40,11 +42,11 @@ class UnlinkActionCard extends StatelessWidget {
             child: OutlinedButton(
               onPressed: isUnlinking ? null : onUnlink,
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFC94A4A)),
+                side: const BorderSide(color: AppColors.critical),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                 ),
-                foregroundColor: const Color(0xFFC94A4A),
+                foregroundColor: AppColors.critical,
               ),
               child: isUnlinking
                   ? const SizedBox(
@@ -53,7 +55,7 @@ class UnlinkActionCard extends StatelessWidget {
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFFC94A4A),
+                          AppColors.critical,
                         ),
                       ),
                     )

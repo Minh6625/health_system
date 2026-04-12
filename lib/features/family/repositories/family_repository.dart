@@ -82,8 +82,9 @@ class FamilyRepository {
       if (email != null) body['email'] = email;
       if (targetUserId != null) body['target_user_id'] = targetUserId;
       if (tags != null) body['tags'] = tags;
-      if (primaryLabel != null)
+      if (primaryLabel != null) {
         body['primary_relationship_label'] = primaryLabel;
+      }
       if (targetUserId != null) body['target_user_id'] = targetUserId;
 
       await _apiClient.post('/relationships/request', body: body);

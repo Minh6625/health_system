@@ -5,6 +5,10 @@ import 'package:healthguard/features/device/widgets/device_configure/configure_h
 import 'package:healthguard/features/device/widgets/device_configure/config_section_card.dart';
 import 'package:healthguard/features/device/widgets/device_configure/danger_zone_card.dart';
 import 'package:healthguard/features/device/widgets/device_configure/dirty_footer_bar.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:provider/provider.dart';
 
 class DeviceConfigureScreen extends StatelessWidget {
@@ -60,7 +64,7 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
               Navigator.pop(ctx);
               Navigator.of(context).pop(); // Actually pop the screen
             },
-            child: const Text('Thoát (Không lưu)', style: TextStyle(color: Colors.red)),
+            child: const Text('Thoát (Không lưu)', style: TextStyle(color: AppColors.critical)),
           ),
         ],
       ),
@@ -72,7 +76,7 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ngắt kết nối thiết bị?'),
-        content: const Text('Thiết bị sẽ bị xóa khỏi tài khoản của bạn. Hành động này không thể hoàn tác.', style: TextStyle(color: Colors.red)),
+        content: const Text('Thiết bị sẽ bị xóa khỏi tài khoản của bạn. Hành động này không thể hoàn tác.', style: TextStyle(color: AppColors.critical)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -87,7 +91,7 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
                 Navigator.of(context).pop('deleted');
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.critical),
             child: const Text('Ngắt kết nối', style: TextStyle(color: Colors.white)),
           ),
         ],
@@ -106,20 +110,20 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
         _showDiscardDialog(context);
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFFF4F7FB),
+        backgroundColor: AppColors.bgPrimary,
         appBar: AppBar(
-          title: const Text('Cấu hình thiết bị', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF12304A))),
+          title: Text('Cấu hình thiết bị', style: AppTextStyles.sectionTitle),
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
-          iconTheme: const IconThemeData(color: Color(0xFF12304A)),
+          iconTheme: const IconThemeData(color: AppColors.textPrimary),
         ),
         body: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapMd, vertical: AppSpacing.sectionGapMd),
           physics: const AlwaysScrollableScrollPhysics(),
           children: [
             ConfigureHeroHeader(device: widget.device),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.sectionGapXl),
 
             ConfigSectionCard(
               title: 'Cơ bản',
@@ -128,37 +132,37 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
                   controller: _nameController,
                   decoration: InputDecoration(
                     labelText: 'Tên thiết bị',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapMd, vertical: AppSpacing.sectionGapMd),
                   ),
                   onChanged: provider.updateName,
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.sectionGapXl),
 
             ConfigSectionCard(
               title: 'Theo dõi & cảnh báo',
               children: [
                 SwitchListTile(
-                  title: const Text('Rung khi cảnh báo', style: TextStyle(fontWeight: FontWeight.w600)),
-                  subtitle: const Text('Thiết bị sẽ rung khi có bất thường.', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                  title: Text('Rung khi cảnh báo', style: AppTextStyles.bodyMedium),
+                  subtitle: Text('Thiết bị sẽ rung khi có bất thường.', style: AppTextStyles.caption),
                   value: provider.vibrationAlert,
                   onChanged: provider.updateVibration,
                   contentPadding: EdgeInsets.zero,
-                  activeThumbColor: const Color(0xFF0F766E),
+                  activeThumbColor: AppColors.brandPrimary,
                 ),
-                const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                const Divider(height: 1, color: AppColors.strokeSoft),
                 SwitchListTile(
-                  title: const Text('Theo dõi giấc ngủ', style: TextStyle(fontWeight: FontWeight.w600)),
+                  title: Text('Theo dõi giấc ngủ', style: AppTextStyles.bodyMedium),
                   value: provider.sleepTracking,
                   onChanged: provider.updateSleepTracking,
                   contentPadding: EdgeInsets.zero,
-                  activeThumbColor: const Color(0xFF0F766E),
+                  activeThumbColor: AppColors.brandPrimary,
                 ),
-                const SizedBox(height: 12),
-                const Text('Cảnh báo pin yếu định mức', style: TextStyle(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppSpacing.gapMd),
+                Text('Cảnh báo pin yếu định mức', style: AppTextStyles.bodyMedium),
+                const SizedBox(height: AppSpacing.gapSm),
                 Row(
                   children: [
                     Expanded(
@@ -168,16 +172,16 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
                         max: 40,
                         divisions: 7,
                         label: '${provider.lowBatteryThreshold.round()}%',
-                        activeColor: const Color(0xFF0F766E),
+                        activeColor: AppColors.brandPrimary,
                         onChanged: provider.updateBatteryThreshold,
                       ),
                     ),
-                    Text('${provider.lowBatteryThreshold.round()}%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text('${provider.lowBatteryThreshold.round()}%', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.sectionGapXl),
 
             ConfigSectionCard(
               title: 'Đồng bộ',
@@ -186,7 +190,7 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
                   initialValue: provider.syncInterval,
                   decoration: InputDecoration(
                     labelText: 'Tần suất đồng bộ dữ liệu',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
                   ),
                   items: const [
                     DropdownMenuItem(value: '15m', child: Text('Mỗi 15 phút (Tốn pin)')),
@@ -198,23 +202,23 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
                     if (val != null) provider.updateSyncInterval(val);
                   },
                 ),
-                const SizedBox(height: 12),
-                const Row(
+                const SizedBox(height: AppSpacing.gapMd),
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.info_outline, size: 16, color: Color(0xFF5B7288)),
-                    SizedBox(width: 8),
+                    const Icon(Icons.info_outline, size: 16, color: AppColors.textSecondary),
+                    const SizedBox(width: AppSpacing.gapSm),
                     Expanded(
                       child: Text(
                         'Cấu hình sẽ tự động đồng bộ khi thiết bị online.',
-                        style: TextStyle(fontSize: 13, color: Color(0xFF5B7288), height: 1.5),
+                        style: AppTextStyles.caption,
                       ),
                     ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.sectionGapXl),
 
             DangerZoneCard(
               isUnpairing: provider.isUnpairing,
@@ -232,7 +236,7 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Lưu thay đổi thành công'),
-                  backgroundColor: Color(0xFF0F9D7A),
+                  backgroundColor: AppColors.success,
                   duration: Duration(seconds: 2),
                 ),
               );

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:healthguard/core/constants/app_sizes.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/models/user_model.dart';
@@ -70,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
           duration: const Duration(seconds: 5),
           action: SnackBarAction(
             label: 'Xác thực',
-            textColor: Colors.white,
+            textColor: AppColors.bgSurface,
             onPressed: () {
               // Resend verification email first
               _resendVerification(emailController.text.trim());
@@ -91,7 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+      ).showSnackBar(SnackBar(content: Text(message), backgroundColor: AppColors.critical));
     }
 
     if (success) {
@@ -122,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: success ? Colors.green : null,
+          backgroundColor: success ? AppColors.success : null,
         ),
       );
     }
@@ -150,12 +152,12 @@ class _LoginScreenState extends State<LoginScreen> {
         FocusScope.of(context).unfocus();
       },
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.bgSurface,
         resizeToAvoidBottomInset: true,
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppColors.primaryLight, Colors.white],
+              colors: [AppColors.brandPrimaryLight, AppColors.bgSurface],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -183,10 +185,10 @@ class _LoginScreenState extends State<LoginScreen> {
                               height: 160,
                               decoration: BoxDecoration(
                                 color: Colors.transparent,
-                                borderRadius: BorderRadius.circular(32),
-                              ),
+                                borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
+                               ),
                               child: ClipRRect(
-                                borderRadius: BorderRadius.circular(32),
+                                borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
                                 child: Image.asset(
                                   'assets/images/logo_rmbg.png',
                                   fit: BoxFit.contain,
@@ -201,13 +203,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           const SizedBox(height: 24),
                           
                           // Header Section
-                          const Center(
+                          Center(
                             child: Text(
                               'Đăng Nhập',
-                              style: TextStyle(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                              style: AppTextStyles.displayCompact.copyWith(
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
@@ -264,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 );
                               },
                               style: TextButton.styleFrom(
-                                foregroundColor: AppColors.primary,
+                                foregroundColor: AppColors.brandPrimary,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 8,
                                   vertical: 4,
@@ -291,10 +291,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ? null
                                   : handleLogin,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
+                                backgroundColor: AppColors.brandPrimary,
+                                foregroundColor: AppColors.bgSurface,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(AppRadii.radiusLg),
                                 ),
                                 elevation: 0,
                               ),
@@ -303,7 +303,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       width: 24,
                                       height: 24,
                                       child: CircularProgressIndicator(
-                                        color: Colors.white,
+                                        color: AppColors.bgSurface,
                                         strokeWidth: 2.5,
                                       ),
                                     )
@@ -324,11 +324,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Text(
+                              Text(
                                 'Chưa có tài khoản? ',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey,
+                                style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.textSecondary,
                                 ),
                               ),
                               GestureDetector(
@@ -338,7 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.primary,
+                                    color: AppColors.brandPrimary,
                                   ),
                                 ),
                               ),

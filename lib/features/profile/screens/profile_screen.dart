@@ -7,9 +7,7 @@ import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
 import 'package:healthguard/features/profile/widgets/profile_widgets.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
-
-// Primary teal used as accent – matches existing brand color across the app.
-const _kTeal = Color(0xFF0F766E);
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -61,7 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.radiusLg)),
         title: const Text('Xác nhận đăng xuất'),
         content: const Text('Bạn có chắc chắn muốn đăng xuất không?'),
         actions: [
@@ -74,10 +72,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.critical,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusSm)),
             ),
             child: const Text('Đăng xuất',
-                style: TextStyle(color: Colors.white)),
+                style: TextStyle(color: AppColors.bgSurface)),
           ),
         ],
       ),
@@ -121,12 +119,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.person_off_outlined,
-                  size: 64, color: Colors.grey.shade400),
+                  size: 64, color: AppColors.textSecondary),
               const SizedBox(height: 16),
               Text(
                 profileProvider.errorMessage!,
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 15),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 15),
               ),
               const SizedBox(height: 16),
               ElevatedButton.icon(
@@ -135,8 +133,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Thử lại'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _kTeal,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: AppColors.bgSurface,
                 ),
               ),
             ],
@@ -207,7 +205,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const ProfileMenuDivider(),
                 ProfileMenuTile(
                   icon: Icons.family_restroom_rounded,
-                  iconColor: const Color(0xFF0369A1),
+                  iconColor: AppColors.info,
                   title: 'Quản lý gia đình',
                   subtitle: 'Liên kết, danh bạ, người chăm sóc',
                   isLast: true,
@@ -262,14 +260,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0F766E), Color(0xFF14B8A6)],
+          colors: [AppColors.brandPrimary, AppColors.brandPrimaryLight],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
         boxShadow: [
           BoxShadow(
-            color: _kTeal.withValues(alpha: 0.28),
+            color: AppColors.brandPrimary.withValues(alpha: 0.28),
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -279,7 +277,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           CircleAvatar(
             radius: 44,
-            backgroundColor: Colors.white,
+            backgroundColor: AppColors.bgSurface,
             backgroundImage: (profile.avatarUrl?.isNotEmpty ?? false)
                 ? NetworkImage(profile.avatarUrl!)
                 : null,
@@ -288,7 +286,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 : Text(
                     initial,
                     style: const TextStyle(
-                      color: _kTeal,
+                      color: AppColors.brandPrimary,
                       fontWeight: FontWeight.bold,
                       fontSize: 34,
                     ),
@@ -298,7 +296,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             profile.fullName,
             style: const TextStyle(
-              color: Colors.white,
+              color: AppColors.bgSurface,
               fontSize: 20,
               fontWeight: FontWeight.w700,
             ),
@@ -307,7 +305,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Text(
             profile.email,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.82),
+              color: AppColors.bgSurface.withValues(alpha: 0.82),
               fontSize: 13,
             ),
           ),
@@ -322,8 +320,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _HeroBadge(
                 profile.isVerified ? 'Đã xác minh ✓' : 'Chưa xác minh',
                 bgColor: profile.isVerified
-                    ? Colors.green.shade400.withValues(alpha: 0.28)
-                    : Colors.orange.shade400.withValues(alpha: 0.28),
+                    ? AppColors.success.withValues(alpha: 0.28)
+                    : AppColors.warning.withValues(alpha: 0.28),
               ),
             ],
           ),
@@ -348,14 +346,14 @@ class _HeroBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: bgColor ?? Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+        color: bgColor ?? AppColors.bgSurface.withValues(alpha: 0.18),
+        borderRadius: AppRadii.pillRadius,
+        border: Border.all(color: AppColors.bgSurface.withValues(alpha: 0.35)),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          color: Colors.white,
+          color: AppColors.bgSurface,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
@@ -381,7 +379,7 @@ class _DeviceTile extends StatelessWidget {
 
     return ProfileMenuTile(
       icon: Icons.watch_rounded,
-      iconColor: hasDevice ? const Color(0xFF059669) : const Color(0xFF0F766E),
+      iconColor: hasDevice ? AppColors.success : AppColors.brandPrimary,
       title: 'Thiết bị kết nối',
       subtitle: deviceName,
       isFirst: isFirst,

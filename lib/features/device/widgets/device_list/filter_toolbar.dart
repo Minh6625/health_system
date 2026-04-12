@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class FilterToolbar extends StatelessWidget {
   const FilterToolbar({super.key});
@@ -21,27 +24,27 @@ class FilterToolbar extends StatelessWidget {
           child: Row(
             children: [
               _buildFilterChip(context, provider, 'all', 'Tất cả'),
-              const SizedBox(width: 8),
+              SizedBox(width: AppSpacing.gapSm),
               _buildFilterChip(context, provider, 'online', 'Ổn định'),
-              const SizedBox(width: 8),
+              SizedBox(width: AppSpacing.gapSm),
               _buildFilterChip(context, provider, 'offline', 'Offline'),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: AppSpacing.sectionGapSm),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: EdgeInsets.symmetric(horizontal: AppSpacing.gapLg),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade200),
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+            border: Border.all(color: AppColors.strokeSoft),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String?>(
               isExpanded: true,
               value: provider.typeFilter,
-              hint: const Text('Tất cả loại', style: TextStyle(color: Color(0xFF5B7288))),
-              icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF5B7288)),
+              hint: Text('Tất cả loại', style: TextStyle(color: AppColors.textSecondary)),
+              icon: Icon(Icons.arrow_drop_down_rounded, color: AppColors.textSecondary),
               items: const [
                 DropdownMenuItem<String?>(
                   value: null,
@@ -78,19 +81,19 @@ class FilterToolbar extends StatelessWidget {
       onSelected: (_) {
         context.read<DeviceProvider>().setStatusFilter(value);
       },
-      selectedColor: const Color(0xFFE6FFFB), // brand.soft
+      selectedColor: AppColors.bgElevated,
       labelStyle: TextStyle(
-        color: selected ? const Color(0xFF0F766E) : const Color(0xFF5B7288),
+        color: selected ? AppColors.brandPrimary : AppColors.textSecondary,
         fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
         fontSize: 14,
       ),
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgSurface,
       side: BorderSide(
-        color: selected ? const Color(0xFF0F766E) : Colors.grey.shade200,
+        color: selected ? AppColors.brandPrimary : AppColors.strokeSoft,
       ),
       showCheckmark: false,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.radiusXl)),
     );
   }
 }

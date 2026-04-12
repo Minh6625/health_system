@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class MyCodeHeroCard extends StatelessWidget {
@@ -19,8 +21,8 @@ class MyCodeHeroCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -36,14 +38,14 @@ class MyCodeHeroCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200, width: 2),
+              color: AppColors.bgSurface,
+              borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+              border: Border.all(color: AppColors.strokeSoft, width: 2),
             ),
             child: QrImageView(
               data: qrData,
               size: 220,
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.bgSurface,
               errorStateBuilder: (context, error) {
                 return const SizedBox(
                   width: 180,
@@ -52,7 +54,7 @@ class MyCodeHeroCard extends StatelessWidget {
                     child: Icon(
                       Icons.qr_code_2,
                       size: 120,
-                      color: Color(0xFF12304A),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 );
@@ -67,7 +69,7 @@ class MyCodeHeroCard extends StatelessWidget {
               fontSize: 48,
               fontWeight: FontWeight.w800,
               letterSpacing: 8,
-              color: Color(0xFF2F80ED),
+              color: AppColors.brandPrimary,
             ),
           ),
           const SizedBox(height: 32),
@@ -82,12 +84,12 @@ class MyCodeHeroCard extends StatelessWidget {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFEEF4FF),
-                foregroundColor: const Color(0xFF2F80ED),
+                backgroundColor: AppColors.brandPrimaryLight,
+                foregroundColor: AppColors.brandPrimary,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                 ),
               ),
             ),

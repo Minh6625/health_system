@@ -31,7 +31,7 @@ class RiskInsightCard extends StatelessWidget {
         scoreColor = AppColors.success;
         break;
       case RiskVisualState.moderate:
-        scoreColor = Colors.orange;
+        scoreColor = AppColors.warning;
         break;
       case RiskVisualState.high:
         scoreColor = AppColors.emergency;
@@ -122,7 +122,7 @@ class RiskInsightCard extends StatelessWidget {
                             color: Colors.white70,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.gapXs),
                         // Large number
                         Text(
                           scoreLabel,
@@ -133,7 +133,7 @@ class RiskInsightCard extends StatelessWidget {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.gapSm),
                         // Summary
                         Text(
                           summary,

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../providers/device_connect_provider.dart';
 
 class DeviceConnectErrorCard extends StatelessWidget {
@@ -10,38 +14,44 @@ class DeviceConnectErrorCard extends StatelessWidget {
     final provider = context.watch<DeviceConnectProvider>();
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.sectionGapLg,
+        vertical: AppSpacing.sectionGapXl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(AppSpacing.sectionGapXl),
             decoration: BoxDecoration(
-              color: const Color(0xFFFEF2F2),
+              color: AppStateColors.criticalBg,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.error_outline_rounded, size: 64, color: Color(0xFFDC2626)),
+            child: Icon(Icons.error_outline_rounded, size: 64, color: AppColors.critical),
           ),
-          const SizedBox(height: 24),
-          const Text(
+          SizedBox(height: AppSpacing.sectionGapXl),
+          Text(
             'Không thể kết nối',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Color(0xFF12304A)),
+            style: AppTextStyles.sectionTitle.copyWith(fontSize: 24),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppSpacing.gapMd),
           Text(
             provider.errorMessage ?? 'Đã có lỗi xảy ra trong quá trình nhận diện. Vui lòng thử lại.',
-            style: const TextStyle(fontSize: 16, color: Color(0xFF5B7288), height: 1.5),
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
           ElevatedButton(
             onPressed: provider.backToIntro,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF12304A),
+              backgroundColor: AppColors.textPrimary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.radiusLg)),
               elevation: 0,
             ),
             child: const Text('Thử lại', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),

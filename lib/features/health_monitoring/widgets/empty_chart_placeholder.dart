@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 
 class EmptyChartPlaceholder extends StatelessWidget {
   final String message;
@@ -14,9 +18,9 @@ class EmptyChartPlaceholder extends StatelessWidget {
       height: 180,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200, style: BorderStyle.solid),
+        color: AppColors.bgPrimary,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
+        border: Border.all(color: AppColors.strokeSoft, style: BorderStyle.solid),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -24,16 +28,14 @@ class EmptyChartPlaceholder extends StatelessWidget {
           Icon(
             Icons.bar_chart_outlined,
             size: 48,
-            color: Colors.grey.shade400,
+            color: AppColors.textSecondary,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: AppSpacing.gapLg),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w500,
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
             ),
           ),
         ],

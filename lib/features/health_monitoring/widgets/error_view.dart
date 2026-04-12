@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 
 class ErrorView extends StatelessWidget {
   final String message;
@@ -21,30 +25,28 @@ class ErrorView extends StatelessWidget {
             Icon(
               Icons.error_outline_rounded,
               size: 64,
-              color: Colors.red.shade400,
+              color: AppColors.critical,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: AppSpacing.gapLg),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey.shade800,
-                fontWeight: FontWeight.w500,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.textPrimary,
               ),
             ),
             if (onRetry != null) ...[
-              const SizedBox(height: 24),
+              SizedBox(height: AppSpacing.sectionGapXl),
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
                 label: const Text('Thử lại'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade600,
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.brandPrimary,
+                  foregroundColor: AppColors.bgSurface,
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                   ),
                 ),
               ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/quality_badge.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:intl/intl.dart';
 
 /// SleepHeroCard – redesigned with 3 sections:
@@ -32,7 +34,7 @@ class SleepHeroCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -128,7 +130,7 @@ class _WeeklyDatePicker extends StatelessWidget {
                     width: 40,
                     height: 58,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                       color: isSelected
                           ? const Color(0xFF1A3B66)
                           : Colors.transparent,
@@ -196,7 +198,7 @@ class _WeeklyDatePicker extends StatelessWidget {
               width: 40,
               height: 58,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                 color: const Color(0x0F48D6FF),
                 border: Border.all(
                     color: const Color(0x3348D6FF), width: 1),
@@ -269,7 +271,7 @@ class _ScoreAndDurationRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.gapSm),
             // QualityBadge centered below the ring
             QualityBadge(session: session),
           ],
@@ -364,7 +366,7 @@ class _InfoRow extends StatelessWidget {
           ),
           child: Icon(icon, size: 14, color: iconColor),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSpacing.gapSm),
         Expanded(
           child: Text(
             label,

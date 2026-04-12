@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 class PermissionSetupBottomSheet extends StatefulWidget {
   final String contactName;
@@ -26,7 +28,7 @@ class _PermissionSetupBottomSheetState
     return Container(
       padding: const EdgeInsets.only(top: 24, left: 24, right: 24, bottom: 32),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.bgSurface,
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
           topRight: Radius.circular(24),
@@ -41,13 +43,13 @@ class _PermissionSetupBottomSheetState
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF12304A),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           const Text(
             'Lưu ý: Bạn có thể thay đổi các quyền này bất kỳ lúc nào trong cài đặt liên hệ.',
-            style: TextStyle(fontSize: 14, color: Color(0xFF5B7288)),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 24),
           _buildToggle(
@@ -85,11 +87,11 @@ class _PermissionSetupBottomSheetState
                     ]);
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF5B7288),
-                    side: const BorderSide(color: Color(0xFF5B7288)),
+                    foregroundColor: AppColors.textSecondary,
+                    side: const BorderSide(color: AppColors.textSecondary),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                     ),
                   ),
                   child: const Text(
@@ -111,11 +113,11 @@ class _PermissionSetupBottomSheetState
                     widget.onConfirm(perms);
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2F80ED),
-                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.brandPrimary,
+                    foregroundColor: AppColors.bgSurface,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                     ),
                     elevation: 0,
                   ),
@@ -141,8 +143,8 @@ class _PermissionSetupBottomSheetState
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF4F7FB),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.bgPrimary,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
       ),
       child: Row(
         children: [
@@ -155,7 +157,7 @@ class _PermissionSetupBottomSheetState
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF12304A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -163,7 +165,7 @@ class _PermissionSetupBottomSheetState
                   description,
                   style: const TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF5B7288),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -174,7 +176,7 @@ class _PermissionSetupBottomSheetState
             value: value,
             onChanged: onChanged,
             activeThumbColor: Colors.white,
-            activeTrackColor: const Color(0xFF2E9B6F),
+            activeTrackColor: AppColors.success,
           ),
         ],
       ),

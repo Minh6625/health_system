@@ -41,7 +41,7 @@ class RecommendationPreviewCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.gapMd),
           ...recommendations.take(2).map((rec) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: AppSpacing.gapMd),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

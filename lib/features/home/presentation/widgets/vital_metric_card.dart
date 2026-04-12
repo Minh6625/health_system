@@ -128,7 +128,7 @@ class VitalMetricCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.gapMd),
               Text(
                 item.value, 
                 style: AppTextStyles.vitalValue.copyWith(

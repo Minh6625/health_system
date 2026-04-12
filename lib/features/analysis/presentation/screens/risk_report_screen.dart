@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/routes/app_router.dart';
 import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../../../shared/presentation/feedback/inline_error_block.dart';
@@ -118,12 +119,18 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.brandPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.gapLg),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppRadii.cardRadius,
                         ),
                       ),
-                      child: const Text('Xem mô hình AI (xAI)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                      child: Text(
+                        'Xem mô hình AI (xAI)',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.bgSurface,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: AppSpacing.gapMd),
                     OutlinedButton(
@@ -133,13 +140,18 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                         });
                       },
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.gapLg),
                         side: const BorderSide(color: AppColors.brandPrimary),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: AppRadii.cardRadius,
                         ),
                       ),
-                      child: const Text('Xem lịch sử', style: TextStyle(fontSize: 16, color: AppColors.brandPrimary)),
+                      child: Text(
+                        'Xem lịch sử',
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.brandPrimary,
+                        ),
+                      ),
                     ),
                   ],
                 ),

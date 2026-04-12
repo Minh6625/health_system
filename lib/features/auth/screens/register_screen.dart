@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/core/constants/app_sizes.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/models/user_model.dart';
@@ -202,14 +203,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         children: [
           Icon(
             isMet ? Icons.check_circle : Icons.radio_button_unchecked,
-            color: isMet ? Colors.green : Colors.grey,
+            color: isMet ? AppColors.success : AppColors.textSecondary,
             size: 16,
           ),
           const SizedBox(width: 8),
           Text(
             text,
             style: TextStyle(
-              color: isMet ? Colors.green : Colors.grey,
+              color: isMet ? AppColors.success : AppColors.textSecondary,
               fontSize: 12,
             ),
           ),
@@ -298,7 +299,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               labelText: 'Ngày sinh',
                               prefixIcon: const Icon(Icons.calendar_today),
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                               ),
                               errorText: state.errorText,
                             ),
@@ -309,8 +310,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 color: selectedDate != null
-                                    ? Colors.black87
-                                    : Colors.grey,
+                                    ? AppColors.textPrimary
+                                    : AppColors.textSecondary,
                               ),
                             ),
                           ),
@@ -354,7 +355,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   focusNode: _passwordFocusNode,
                   obscureText: true,
                   textInputAction: TextInputAction.next,
-                  borderColor: _isPasswordComplete ? Colors.green : null,
+                  borderColor: _isPasswordComplete ? AppColors.success : null,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Vui lòng nhập mật khẩu';
@@ -396,7 +397,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: confirmPasswordController,
                   obscureText: true,
                   textInputAction: TextInputAction.done,
-                  borderColor: _isConfirmPasswordPristine ? null : (_isConfirmPasswordMatch ? Colors.green : Colors.red),
+                  borderColor: _isConfirmPasswordPristine ? null : (_isConfirmPasswordMatch ? AppColors.success : AppColors.critical),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Vui lòng xác nhận mật khẩu';
@@ -414,7 +415,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Mật khẩu xác nhận không khớp',
-                        style: TextStyle(color: Colors.red, fontSize: 12),
+                        style: TextStyle(color: AppColors.critical, fontSize: 12),
                       ),
                     ),
                   ),
@@ -430,7 +431,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           _agreedToTerms = value ?? false;
                         });
                       },
-                      activeColor: AppColors.primary,
+                      activeColor: AppColors.brandPrimary,
                     ),
                     Expanded(
                       child: GestureDetector(
@@ -443,7 +444,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               TextSpan(
                                 text: 'Điều khoản Sử dụng',
                                 style: TextStyle(
-                                  color: AppColors.primary,
+                                  color: AppColors.brandPrimary,
                                   fontWeight: FontWeight.bold,
                                   decoration: TextDecoration.underline,
                                 ),
@@ -452,7 +453,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               TextSpan(
                                 text: 'Chính sách Bảo mật',
                                 style: TextStyle(
-                                  color: AppColors.primary,
+                                  color: AppColors.brandPrimary,
                                   fontWeight: FontWeight.bold,
                                   decoration: TextDecoration.underline,
                                 ),
@@ -471,10 +472,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: ElevatedButton(
                     onPressed: authProvider.isLoading ? null : handleRegister,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.brandPrimary,
+                      foregroundColor: AppColors.bgSurface,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
                       ),
                       elevation: 0,
                     ),
@@ -483,7 +484,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             width: 24,
                             height: 24,
                             child: CircularProgressIndicator(
-                              color: Colors.white,
+                              color: AppColors.bgSurface,
                               strokeWidth: 2.5,
                             ),
                           )

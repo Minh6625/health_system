@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:healthguard/core/constants/app_sizes.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
 import 'package:healthguard/features/auth/widgets/auth_text_field.dart';
@@ -63,7 +65,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Đổi mật khẩu thành công!'),
-            backgroundColor: Color(0xFF0F766E),
+            backgroundColor: AppColors.brandPrimary,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -78,7 +80,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(response.message),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: AppColors.critical,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -92,7 +94,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi: ${e.toString()}'),
-          backgroundColor: Colors.red.shade700,
+          backgroundColor: AppColors.critical,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -125,11 +127,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.bgSurface,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          iconTheme: const IconThemeData(color: AppColors.primary),
+          iconTheme: const IconThemeData(color: AppColors.brandPrimary),
         ),
         body: SafeArea(
           child: LayoutBuilder(
@@ -155,7 +157,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryLight.withAlpha(25),
+                              color: AppColors.brandPrimaryLight.withAlpha(25),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -164,8 +166,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                   : Icons.lock_rounded,
                               size: 72,
                               color: _success
-                                  ? const Color(0xFF16A34A)
-                                  : AppColors.primary,
+                                  ? AppColors.success
+                                  : AppColors.brandPrimary,
                             ),
                           )
                               .animate(
@@ -179,12 +181,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           const SizedBox(height: 32),
 
                           // ── Title ────────────────────────────────────────
-                          const Text(
+                          Text(
                             'Đổi Mật Khẩu',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                            style: AppTextStyles.displayCompact.copyWith(
+                              color: AppColors.textPrimary,
                             ),
                             textAlign: TextAlign.center,
                           )
@@ -195,12 +195,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                           const SizedBox(height: 10),
 
                           // ── Subtitle ─────────────────────────────────────
-                          const Text(
+                          Text(
                             'Nhập mật khẩu hiện tại và tạo mật khẩu mới\nan toàn hơn cho tài khoản của bạn.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 15,
-                              color: Colors.grey,
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
                               height: 1.5,
                             ),
                           )
@@ -303,12 +302,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                               onPressed:
                                   (_isLoading || _success) ? null : _handleSubmit,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
+                                backgroundColor: AppColors.brandPrimary,
+                                foregroundColor: AppColors.bgSurface,
                                 disabledBackgroundColor:
-                                    AppColors.primary.withAlpha(120),
+                                    AppColors.brandPrimary.withAlpha(120),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(AppRadii.radiusLg),
                                 ),
                                 elevation: 0,
                               ),
@@ -317,7 +316,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                                       width: 24,
                                       height: 24,
                                       child: CircularProgressIndicator(
-                                        color: Colors.white,
+                                        color: AppColors.bgSurface,
                                         strokeWidth: 2.5,
                                       ),
                                     )
@@ -360,7 +359,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                             child: const Text(
                               'Quay lại',
                               style: TextStyle(
-                                color: AppColors.primary,
+                                color: AppColors.brandPrimary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -392,10 +391,10 @@ class _StrengthIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color, filled) = switch (strength) {
-      _PasswordStrength.weak => ('Yếu', Colors.red.shade600, 1),
-      _PasswordStrength.moderate => ('Trung bình', Colors.orange.shade600, 2),
-      _PasswordStrength.strong => ('Mạnh', const Color(0xFF16A34A), 3),
-      _PasswordStrength.empty => ('', Colors.grey, 0),
+      _PasswordStrength.weak => ('Yếu', AppColors.critical, 1),
+      _PasswordStrength.moderate => ('Trung bình', AppColors.warning, 2),
+      _PasswordStrength.strong => ('Mạnh', AppColors.success, 3),
+      _PasswordStrength.empty => ('', AppColors.textSecondary, 0),
     };
 
     return Column(
@@ -409,7 +408,7 @@ class _StrengthIndicator extends StatelessWidget {
                 margin: EdgeInsets.only(right: i < 2 ? 6 : 0),
                 height: 5,
                 decoration: BoxDecoration(
-                  color: i < filled ? color : Colors.grey.shade200,
+                  color: i < filled ? color : AppColors.strokeSoft,
                   borderRadius: BorderRadius.circular(3),
                 ),
               ),
@@ -441,9 +440,9 @@ class _PasswordRequirementsHint extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEFF6FF),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFBFDBFE)),
+        color: AppStateColors.infoBg,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+        border: Border.all(color: AppColors.info.withAlpha(80)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,14 +450,14 @@ class _PasswordRequirementsHint extends StatelessWidget {
           const Row(
             children: [
               Icon(Icons.info_outline_rounded,
-                  color: Color(0xFF2563EB), size: 18),
+                  color: AppColors.info, size: 18),
               SizedBox(width: 8),
               Text(
                 'Yêu cầu mật khẩu:',
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
-                  color: Color(0xFF1E40AF),
+                  color: AppColors.info,
                 ),
               ),
             ],
@@ -484,14 +483,14 @@ class _Req extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('• ',
-              style: TextStyle(color: Color(0xFF2563EB), fontSize: 12)),
+          Text('• ',
+              style: TextStyle(color: AppColors.info, fontSize: 12)),
           Expanded(
             child: Text(
               text,
               style: const TextStyle(
                 fontSize: 12,
-                color: Color(0xFF1E40AF),
+                color: AppColors.info,
                 height: 1.4,
               ),
             ),

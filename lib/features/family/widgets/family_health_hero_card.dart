@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class FamilyHealthHeroCard extends StatelessWidget {
   final int totalCount;
@@ -15,11 +18,14 @@ class FamilyHealthHeroCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.gapLg),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapLg,
+        vertical: AppSpacing.sectionGapSm,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFFEEF4FF),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.brandPrimaryLight,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -30,12 +36,12 @@ class FamilyHealthHeroCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.bgSurface,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
                   Icons.family_restroom,
-                  color: Color(0xFF2F80ED),
+                  color: AppColors.brandPrimary,
                   size: 20,
                 ),
               ),
@@ -46,7 +52,7 @@ class FamilyHealthHeroCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF12304A),
+                    color: AppColors.textPrimary,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -60,22 +66,22 @@ class FamilyHealthHeroCard extends StatelessWidget {
               _buildStatChip(
                 label: 'Tổng',
                 value: totalCount.toString(),
-                color: const Color(0xFF2F80ED),
-                bgColor: Colors.white,
+                color: AppColors.brandPrimary,
+                bgColor: AppColors.bgSurface,
               ),
               const SizedBox(width: 6),
               _buildStatChip(
                 label: 'Ổn định',
                 value: stableCount.toString(),
-                color: const Color(0xFF2E9B6F),
-                bgColor: const Color(0xFFE8F5EE),
+                color: AppColors.success,
+                bgColor: AppStateColors.successBg,
               ),
               const SizedBox(width: 6),
               _buildStatChip(
                 label: 'Cần chú ý',
                 value: attentionCount.toString(),
-                color: const Color(0xFFF2A93B),
-                bgColor: const Color(0xFFFDF4E5),
+                color: AppColors.warning,
+                bgColor: AppStateColors.warningBg,
               ),
             ],
           ),
@@ -91,10 +97,13 @@ class FamilyHealthHeroCard extends StatelessWidget {
     required Color bgColor,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapSm,
+        vertical: 6,
+      ),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
         border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -108,7 +117,7 @@ class FamilyHealthHeroCard extends StatelessWidget {
               color: color,
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.gapXs),
           Text(
             label,
             style: TextStyle(

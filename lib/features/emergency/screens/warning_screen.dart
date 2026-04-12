@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/emergency/screens/manual_sos_screen.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 class WarningScreen extends StatelessWidget {
   const WarningScreen({super.key});
@@ -7,21 +10,21 @@ class WarningScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: AppColors.bgPrimary,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.sectionGapXl),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: AppColors.critical.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(AppSpacing.sectionGapXl),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade100,
+                  color: AppColors.critical.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: Material(
@@ -40,11 +43,11 @@ class WarningScreen extends StatelessWidget {
                       width: 180,
                       height: 180,
                       decoration: BoxDecoration(
-                        color: Colors.red.shade700,
+                        color: AppColors.critical,
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.red.shade300,
+                            color: AppColors.critical.withValues(alpha: 0.4),
                             blurRadius: 20,
                             spreadRadius: 5,
                           ),
@@ -56,13 +59,13 @@ class WarningScreen extends StatelessWidget {
                           Icon(
                             Icons.sos_rounded,
                             size: 64,
-                            color: Colors.white,
+                            color: AppColors.bgSurface,
                           ),
-                          SizedBox(height: 8),
+                          SizedBox(height: AppSpacing.gapSm),
                           Text(
                             'CHẠM ĐỂ GỌI',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: AppColors.bgSurface,
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -70,7 +73,7 @@ class WarningScreen extends StatelessWidget {
                           Text(
                             'KHẨN CẤP (SOS)',
                             style: TextStyle(
-                              color: Colors.white,
+                              color: AppColors.bgSurface,
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                             ),
@@ -83,14 +86,14 @@ class WarningScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 48),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Text(
                 'Nhấn vào nút bên trên nếu bạn hoặc người thân đang trong tình trạng nguy hiểm cần cấp cứu lập tức.',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
                   fontSize: 15,
-                  color: Colors.black54,
                   height: 1.5,
                 ),
               ),

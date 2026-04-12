@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
@@ -48,9 +50,9 @@ class LinkedContactCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
+        border: Border.all(color: AppColors.strokeSoft),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -63,14 +65,14 @@ class LinkedContactCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _onTap(context),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.radiusXl),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 26,
-                  backgroundColor: const Color(0xFFEEF4FF),
+                  backgroundColor: AppColors.brandPrimaryLight,
                   child: Text(
                     contact.displayName.isNotEmpty
                         ? contact.displayName[0].toUpperCase()
@@ -78,7 +80,7 @@ class LinkedContactCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF2F80ED),
+                      color: AppColors.brandPrimary,
                     ),
                   ),
                 ),
@@ -92,7 +94,7 @@ class LinkedContactCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF12304A),
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -129,7 +131,7 @@ class LinkedContactCard extends StatelessWidget {
                         _buildPermissionsText(),
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF5B7288),
+                          color: AppColors.textSecondary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -137,7 +139,7 @@ class LinkedContactCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Color(0xFFCBD5E1)),
+                const Icon(Icons.chevron_right, color: AppColors.strokeSoft),
               ],
             ),
           ),

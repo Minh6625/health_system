@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 class InfoRow extends StatelessWidget {
   final String label;
@@ -17,24 +20,24 @@ class InfoRow extends StatelessWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.gapLg,
+            horizontal: AppSpacing.gapLg,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF475569),
-                  fontWeight: FontWeight.w400,
+                style: AppTextStyles.body.copyWith(
+                  color: AppColors.textSecondary,
                 ),
               ),
               Expanded(
                 child: Text(
                   value,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF0F172A),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textPrimary,
                     fontWeight: FontWeight.w600,
                   ),
                   textAlign: TextAlign.right,
@@ -46,10 +49,10 @@ class InfoRow extends StatelessWidget {
           ),
         ),
         if (!isLast)
-          Divider(
+          const Divider(
             height: 1,
             thickness: 1,
-            color: Colors.grey.shade200,
+            color: AppColors.strokeSoft,
           ),
       ],
     );

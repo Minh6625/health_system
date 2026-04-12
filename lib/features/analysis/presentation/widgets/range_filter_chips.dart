@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class RangeFilterChips extends StatelessWidget {
   final String currentRange;
@@ -18,9 +21,9 @@ class RangeFilterChips extends StatelessWidget {
       child: Row(
         children: [
           _buildChip('7d', '7 ngày'),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.gapMd),
           _buildChip('30d', '30 ngày'),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.gapMd),
           _buildChip('90d', '90 ngày'),
         ],
       ),
@@ -31,22 +34,24 @@ class RangeFilterChips extends StatelessWidget {
     final isSelected = currentRange == value;
     return InkWell(
       onTap: () => onRangeSelected(value),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: AppRadii.pillRadius,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.gapLg,
+          vertical: AppSpacing.gapSm,
+        ),
         decoration: BoxDecoration(
           color: isSelected ? AppColors.brandPrimary : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: AppRadii.pillRadius,
           border: Border.all(
             color: isSelected ? AppColors.brandPrimary : AppColors.strokeSoft,
           ),
         ),
         child: Text(
           label,
-          style: TextStyle(
-            fontSize: 14,
+          style: AppTextStyles.caption.copyWith(
             fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : AppColors.textPrimary,
+            color: isSelected ? AppColors.bgSurface : AppColors.textPrimary,
           ),
         ),
       ),

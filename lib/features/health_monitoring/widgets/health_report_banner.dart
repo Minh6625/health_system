@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 
 /// A full-width banner card that replaces [QuickActionsPanel].
 ///
@@ -19,26 +23,26 @@ class HealthReportBanner extends StatelessWidget {
       button: true,
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadii.cardRadius,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          splashColor: Colors.blue.shade100,
-          highlightColor: Colors.blue.shade50,
+          borderRadius: AppRadii.cardRadius,
+          splashColor: AppColors.brandPrimary.withValues(alpha: 0.15),
+          highlightColor: AppColors.brandPrimary.withValues(alpha: 0.08),
           child: Ink(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.blue.shade700,
-                  Colors.blue.shade500,
+                  AppColors.brandPrimary,
+                  AppColors.brandPrimary.withValues(alpha: 0.8),
                 ],
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: AppRadii.cardRadius,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.blue.shade400.withValues(alpha: 0.35),
+                  color: AppColors.brandPrimary.withValues(alpha: 0.35),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -47,24 +51,26 @@ class HealthReportBanner extends StatelessWidget {
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 72),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.sectionGapXl.toDouble(),
+                  vertical: AppSpacing.gapLg,
+                ),
                 child: Row(
                   children: [
                     // Leading icon cluster
                     Container(
-                      padding: const EdgeInsets.all(10),
+                      padding: EdgeInsets.all(AppSpacing.sectionGapSm.toDouble()),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(12),
+                        color: AppColors.bgSurface.withValues(alpha: 0.20),
+                        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                       ),
                       child: const Icon(
                         Icons.insert_chart_outlined_rounded,
                         size: 32,
-                        color: Colors.white,
+                        color: AppColors.bgSurface,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: AppSpacing.gapLg),
 
                     // Text block
                     Expanded(
@@ -72,20 +78,18 @@ class HealthReportBanner extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
+                          Text(
                             'Báo cáo & Nhật ký sức khoẻ',
-                            style: TextStyle(
-                              fontSize: 16,
+                            style: AppTextStyles.body.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                              color: AppColors.bgSurface,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: AppSpacing.gapXs),
                           Text(
                             'Xem lịch sử đo, xu hướng và thống kê',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white.withValues(alpha: 0.85),
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.bgSurface.withValues(alpha: 0.85),
                             ),
                           ),
                         ],
@@ -96,7 +100,7 @@ class HealthReportBanner extends StatelessWidget {
                     Icon(
                       Icons.arrow_forward_ios_rounded,
                       size: 18,
-                      color: Colors.white.withValues(alpha: 0.80),
+                      color: AppColors.bgSurface.withValues(alpha: 0.80),
                     ),
                   ],
                 ),

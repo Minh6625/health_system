@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/routes/app_router.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
 
 enum _NotificationFilter { all, unread, read }
 
@@ -18,34 +21,48 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   final ApiClient _apiClient = ApiClient();
   final TextEditingController _searchController = TextEditingController();
   static const int _pageSize = 10;
+  static const int _fetchAllPageSize = 100;
 
   _NotificationFilter _selectedFilter = _NotificationFilter.all;
   bool _isLoading = true;
   bool _isRefreshing = false;
   String? _error;
   List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
-  int _totalCount = 0;
   int _currentPage = 1;
   int _totalPages = 1;
   int _unreadCount = 0;
   String _searchQuery = '';
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _searchQuery = _searchController.text.trim().toLowerCase();
-      });
-    });
+    _searchController.addListener(_onSearchChanged);
     _loadNotifications();
+  }
+
+  void _onSearchChanged() {
+    if (!mounted) {
+      return;
+    }
+    final newQuery = _searchController.text.trim().toLowerCase();
+    if (newQuery == _searchQuery) {
+      return;
+    }
+    setState(() {
+      _searchQuery = newQuery;
+    });
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      _currentPage = 1;
+      _loadNotifications(showLoading: false, page: 1);
+    });
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -117,47 +134,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     try {
-      final requestedPage = page ?? _currentPage;
-      final normalizedPage = requestedPage < 1 ? 1 : requestedPage;
-      final offset = (normalizedPage - 1) * _pageSize;
+      final isSearching = _searchQuery.isNotEmpty;
       final unreadOnly = _selectedFilter == _NotificationFilter.unread;
-      final result = await _apiClient.get(
-        '/notifications',
-        queryParams: {
-          'limit': _pageSize,
-          'offset': offset,
-          'unread_only': unreadOnly,
-        },
-      );
 
-      final raw = result['notifications'] as List? ?? const [];
-      final fetched = raw
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-      final totalCount =
-          (result['total_count'] as num?)?.toInt() ?? fetched.length;
-      final totalPages = math.max(1, (totalCount + _pageSize - 1) ~/ _pageSize);
-      final clampedPage = normalizedPage > totalPages
-          ? totalPages
-          : normalizedPage;
-      final unreadCount = (result['unread_count'] as num?)?.toInt() ?? 0;
-      if (!mounted) {
-        return;
+      if (isSearching) {
+        await _fetchAllForSearch(unreadOnly: unreadOnly);
+      } else {
+        await _fetchSinglePage(
+          page: page ?? _currentPage,
+          showLoading: showLoading,
+          unreadOnly: unreadOnly,
+        );
       }
-
-      if (clampedPage != normalizedPage) {
-        await _loadNotifications(showLoading: showLoading, page: clampedPage);
-        return;
-      }
-
-      setState(() {
-        _items = _sortNotifications(fetched);
-        _totalCount = totalCount;
-        _currentPage = clampedPage;
-        _totalPages = totalPages;
-        _unreadCount = unreadCount;
-      });
     } catch (e) {
       if (!mounted) {
         return;
@@ -175,7 +163,112 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
   }
 
-  List<Map<String, dynamic>> get _filteredItems {
+  /// Fetches ALL notifications across multiple pages for client-side search.
+  ///
+  /// Backend enforces max `limit=100`, so this method loops through pages
+  /// of [_fetchAllPageSize] until all items are retrieved.
+  Future<void> _fetchAllForSearch({required bool unreadOnly}) async {
+    final allItems = <Map<String, dynamic>>[];
+    var offset = 0;
+    int? totalCount;
+    var unreadCount = 0;
+
+    while (true) {
+      if (!mounted) return;
+
+      final result = await _apiClient.get(
+        '/notifications',
+        queryParams: {
+          'limit': _fetchAllPageSize,
+          'offset': offset,
+          'unread_only': unreadOnly,
+        },
+      );
+
+      final raw = result['notifications'] as List? ?? const [];
+      final fetched = raw
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+
+      totalCount ??= (result['total_count'] as num?)?.toInt();
+      unreadCount = (result['unread_count'] as num?)?.toInt() ?? unreadCount;
+
+      allItems.addAll(fetched);
+
+      // Stop when: no more items returned, or we've fetched everything
+      if (fetched.isEmpty || fetched.length < _fetchAllPageSize) {
+        break;
+      }
+      if (totalCount != null && allItems.length >= totalCount) {
+        break;
+      }
+
+      offset += _fetchAllPageSize;
+    }
+
+    if (!mounted) return;
+
+    final effectiveTotal = totalCount ?? allItems.length;
+    final totalPages =
+        math.max(1, (effectiveTotal + _pageSize - 1) ~/ _pageSize);
+
+    setState(() {
+      _items = _sortNotifications(allItems);
+      _currentPage = 1;
+      _totalPages = totalPages;
+      _unreadCount = unreadCount;
+    });
+  }
+
+  /// Fetches a single page of notifications for normal (non-search) browsing.
+  Future<void> _fetchSinglePage({
+    required int page,
+    required bool showLoading,
+    required bool unreadOnly,
+  }) async {
+    final normalizedPage = page < 1 ? 1 : page;
+    final offset = (normalizedPage - 1) * _pageSize;
+
+    final result = await _apiClient.get(
+      '/notifications',
+      queryParams: {
+        'limit': _pageSize,
+        'offset': offset,
+        'unread_only': unreadOnly,
+      },
+    );
+
+    final raw = result['notifications'] as List? ?? const [];
+    final fetched = raw
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    final totalCount =
+        (result['total_count'] as num?)?.toInt() ?? fetched.length;
+    final totalPages =
+        math.max(1, (totalCount + _pageSize - 1) ~/ _pageSize);
+    final clampedPage =
+        normalizedPage > totalPages ? totalPages : normalizedPage;
+    final unreadCount = (result['unread_count'] as num?)?.toInt() ?? 0;
+
+    if (!mounted) return;
+
+    if (clampedPage != normalizedPage) {
+      await _loadNotifications(showLoading: showLoading, page: clampedPage);
+      return;
+    }
+
+    setState(() {
+      _items = _sortNotifications(fetched);
+      _currentPage = clampedPage;
+      _totalPages = totalPages;
+      _unreadCount = unreadCount;
+    });
+  }
+
+  /// Returns ALL items matching the current filter + search query (no pagination).
+  List<Map<String, dynamic>> get _allFilteredItems {
     List<Map<String, dynamic>> filtered;
     switch (_selectedFilter) {
       case _NotificationFilter.read:
@@ -198,6 +291,32 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       final message = (item['message'] as String? ?? '').toLowerCase();
       return title.contains(_searchQuery) || message.contains(_searchQuery);
     }).toList();
+  }
+
+  /// Total pages based on filtered data (client-side) when searching,
+  /// or server-side total when not searching.
+  int get _effectiveTotalPages {
+    if (_searchQuery.isNotEmpty) {
+      final count = _allFilteredItems.length;
+      return math.max(1, (count + _pageSize - 1) ~/ _pageSize);
+    }
+    return _totalPages;
+  }
+
+  /// Returns the paginated slice of filtered items for the current page.
+  List<Map<String, dynamic>> get _paginatedItems {
+    final allFiltered = _allFilteredItems;
+    if (_searchQuery.isNotEmpty) {
+      // Client-side pagination on filtered results
+      final startIndex = (_currentPage - 1) * _pageSize;
+      if (startIndex >= allFiltered.length) {
+        return <Map<String, dynamic>>[];
+      }
+      final endIndex = math.min(startIndex + _pageSize, allFiltered.length);
+      return allFiltered.sublist(startIndex, endIndex);
+    }
+    // When not searching, _items already contains only the current page from API
+    return allFiltered;
   }
 
   Future<void> _changeFilter(_NotificationFilter next) async {
@@ -260,14 +379,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (severity.toLowerCase()) {
       case 'critical':
       case 'high':
-        return const Color(0xFFE53935);
+        return AppColors.critical;
       case 'moderate':
       case 'medium':
-        return const Color(0xFFEF6C00);
+        return AppColors.warning;
       case 'low':
       case 'normal':
       default:
-        return const Color(0xFF43A047);
+        return AppColors.success;
     }
   }
 
@@ -310,14 +429,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (alertType.toLowerCase()) {
       case 'fall_detected':
       case 'fall_detection':
-        return const Color(0xFFFFEEF0);
+        return AppStateColors.criticalBg;
       case 'manual':
       case 'sos':
-        return const Color(0xFFFFF1E5);
+        return AppStateColors.warningBg;
       case 'medication_missed':
-        return const Color(0xFFEAF7EC);
+        return AppStateColors.successBg;
       default:
-        return const Color(0xFFE9F2FF);
+        return AppStateColors.infoBg;
     }
   }
 
@@ -708,32 +827,48 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (_currentPage <= 1 || _isLoading || _isRefreshing) {
       return;
     }
+    if (_searchQuery.isNotEmpty) {
+      // Client-side pagination: just change page, no API call
+      setState(() {
+        _currentPage = _currentPage - 1;
+      });
+      return;
+    }
     await _loadNotifications(showLoading: false, page: _currentPage - 1);
   }
 
   Future<void> _goToNextPage() async {
-    if (_currentPage >= _totalPages || _isLoading || _isRefreshing) {
+    final totalPages = _effectiveTotalPages;
+    if (_currentPage >= totalPages || _isLoading || _isRefreshing) {
+      return;
+    }
+    if (_searchQuery.isNotEmpty) {
+      // Client-side pagination: just change page, no API call
+      setState(() {
+        _currentPage = _currentPage + 1;
+      });
       return;
     }
     await _loadNotifications(showLoading: false, page: _currentPage + 1);
   }
 
   Widget _buildPaginationControls() {
-    if (_totalPages <= 1) {
+    final totalPages = _effectiveTotalPages;
+    if (totalPages <= 1) {
       return const SizedBox.shrink();
     }
 
     final canGoPrev = _currentPage > 1 && !_isLoading && !_isRefreshing;
     final canGoNext =
-        _currentPage < _totalPages && !_isLoading && !_isRefreshing;
+        _currentPage < totalPages && !_isLoading && !_isRefreshing;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE4E7EC)),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+        border: Border.all(color: AppColors.strokeSoft),
       ),
       child: Row(
         children: [
@@ -745,11 +880,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           Expanded(
             child: Center(
               child: Text(
-                'Trang $_currentPage/$_totalPages',
+                'Trang $_currentPage/$totalPages',
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF1F2937),
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -812,7 +947,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEBEBEB),
+      backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         title: const Text('Thông báo'),
         actions: [
@@ -836,20 +971,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                color: AppColors.bgSurface,
+                borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                border: Border.all(color: AppColors.strokeSoft),
               ),
               child: TextField(
                 controller: _searchController,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Tìm theo tiêu đề hoặc nội dung...',
-                  hintStyle: TextStyle(color: Colors.grey[500], fontSize: 13),
+                  hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                   prefixIcon: Icon(
                     Icons.search,
                     size: 20,
-                    color: Colors.grey[600],
+                    color: AppColors.textSecondary,
                   ),
                   suffixIcon: _searchQuery.isEmpty
                       ? null
@@ -857,7 +992,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           icon: Icon(
                             Icons.close,
                             size: 18,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                           ),
                           onPressed: () {
                             _searchController.clear();
@@ -913,23 +1048,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }) {
     final isSelected = filter == _selectedFilter;
     final selectedColor = switch (filter) {
-      _NotificationFilter.unread => const Color(0xFFE53935),
-      _NotificationFilter.read => const Color(0xFF43A047),
-      _NotificationFilter.all => const Color(0xFF1976D2),
+      _NotificationFilter.unread => AppColors.critical,
+      _NotificationFilter.read => AppColors.success,
+      _NotificationFilter.all => AppColors.info,
     };
 
     return Material(
-      color: isSelected ? selectedColor.withValues(alpha: 0.12) : Colors.white,
-      borderRadius: BorderRadius.circular(10),
+      color: isSelected ? selectedColor.withValues(alpha: 0.12) : AppColors.bgSurface,
+      borderRadius: BorderRadius.circular(AppRadii.radiusSm),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
         onTap: () => _changeFilter(filter),
         child: Container(
           height: 36,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadii.radiusSm),
             border: Border.all(
-              color: isSelected ? selectedColor : const Color(0xFFD7DEE8),
+              color: isSelected ? selectedColor : AppColors.strokeSoft,
               width: isSelected ? 1.4 : 1,
             ),
           ),
@@ -940,7 +1075,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: isSelected ? selectedColor : const Color(0xFF475467),
+              color: isSelected ? selectedColor : AppColors.textSecondary,
             ),
           ),
         ),
@@ -985,7 +1120,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     }
 
-    final items = _filteredItems;
+    final items = _paginatedItems;
     if (items.isEmpty) {
       return Column(
         children: [
@@ -1030,14 +1165,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
-              color: isRead ? Colors.white : const Color(0xFFDDE8FA),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE4E7EC), width: 1),
+              color: isRead ? AppColors.bgSurface : const Color(0xFFDDE8FA),
+              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+              border: Border.all(color: AppColors.strokeSoft, width: 1),
               boxShadow: [
                 BoxShadow(
                   color: isRead
                       ? Colors.black.withValues(alpha: 0.03)
-                      : const Color(0xFF2F6FED).withValues(alpha: 0.14),
+                      : AppColors.brandPrimary.withValues(alpha: 0.14),
                   blurRadius: isRead ? 8 : 12,
                   offset: Offset(0, isRead ? 2 : 4),
                   spreadRadius: -2,
@@ -1051,12 +1186,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     left: 0,
                     top: 0,
                     bottom: 0,
-                    child: Container(width: 3, color: const Color(0xFF5F8EF6)),
+                    child: Container(width: 3, color: AppColors.info),
                   ),
                 Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                     onTap: () => _openNotification(item),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
@@ -1086,7 +1221,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                     fontWeight: isRead
                                         ? FontWeight.w600
                                         : FontWeight.w700,
-                                    color: const Color(0xFF111827),
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ),
@@ -1096,7 +1231,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                   _timeAgoLabel(createdAt),
                                   style: TextStyle(
                                     fontSize: 12,
-                                    color: Colors.grey[600],
+                                    color: AppColors.textSecondary,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -1109,7 +1244,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.grey[800],
+                              color: AppColors.textPrimary,
                               height: 1.35,
                             ),
                           ),
@@ -1124,12 +1259,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               ),
                               _InfoChip(
                                 label: _severityLabel(severity),
-                                color: const Color(0xFFF3F4F6),
+                                color: AppColors.bgPrimary,
                               ),
                               if (!isRead)
                                 const _InfoChip(
                                   label: 'Mới',
-                                  color: Color(0xFFEAF0FF),
+                                  color: AppStateColors.infoBg,
                                 ),
                             ],
                           ),
@@ -1179,7 +1314,7 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppRadii.pillRadius,
         color: color,
       ),
       child: Text(
@@ -1320,7 +1455,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 28, color: Color(0xFFDC2626)),
+            const Icon(Icons.error_outline, size: 28, color: AppColors.critical),
             const SizedBox(height: 10),
             const Text(
               'Không thể tải chi tiết thông báo',
@@ -1331,7 +1466,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
             Text(
               _error ?? 'Đã xảy ra lỗi không xác định',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF475467)),
+              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 14),
             FilledButton(onPressed: _loadDetail, child: const Text('Thử lại')),
@@ -1346,8 +1481,8 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFFE6EAF0),
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.strokeSoft,
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
       ),
     );
   }
@@ -1362,9 +1497,9 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE4E7EC)),
+              color: AppColors.bgSurface,
+             borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+             border: Border.all(color: AppColors.strokeSoft),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1390,9 +1525,9 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE4E7EC)),
+              color: AppColors.bgSurface,
+              borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+              border: Border.all(color: AppColors.strokeSoft),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1417,19 +1552,19 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
   ) {
     return switch (state) {
       _DetailVitalState.normal => (
-        bg: const Color(0xFFEFF8F2),
+        bg: AppStateColors.successBg,
         border: const Color(0xFFCDE9D7),
-        accent: const Color(0xFF2E7D32),
+        accent: AppColors.success,
       ),
       _DetailVitalState.warning => (
-        bg: const Color(0xFFFFF4E8),
+        bg: AppStateColors.warningBg,
         border: const Color(0xFFF8CF9B),
-        accent: const Color(0xFFEF6C00),
+        accent: AppColors.warning,
       ),
       _DetailVitalState.critical => (
-        bg: const Color(0xFFFDECEF),
+        bg: AppStateColors.criticalBg,
         border: const Color(0xFFF4B6BF),
-        accent: const Color(0xFFE53935),
+        accent: AppColors.critical,
       ),
     };
   }
@@ -1442,7 +1577,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: palette.bg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
         border: Border.all(color: palette.border, width: 1.4),
       ),
       child: Column(
@@ -1465,7 +1600,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -1477,7 +1612,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
             style: const TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF111827),
+              color: AppColors.textPrimary,
               letterSpacing: -0.4,
             ),
           ),
@@ -1501,7 +1636,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
 
     if (item == null) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF3F5F8),
+        backgroundColor: AppColors.bgPrimary,
         appBar: AppBar(title: const Text('Chi tiết thông báo')),
         body: _isLoading ? _buildInitialSkeleton() : _buildLoadError(),
       );
@@ -1531,7 +1666,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
     final vitalInsight = widget.vitalInsightBuilder(item);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F5F8),
+      backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(title: const Text('Chi tiết thông báo')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -1550,8 +1685,8 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                   vertical: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF4F4),
-                  borderRadius: BorderRadius.circular(10),
+                  color: AppStateColors.criticalBg,
+                  borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                   border: Border.all(color: const Color(0xFFF0C7C7)),
                 ),
                 child: Row(
@@ -1559,7 +1694,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                     const Icon(
                       Icons.wifi_tethering_error_rounded,
                       size: 18,
-                      color: Color(0xFFB42318),
+                      color: AppColors.critical,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1567,7 +1702,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                         _error!,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF7A271A),
+                          color: AppColors.critical,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -1585,9 +1720,9 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE4E7EC)),
+                color: AppColors.bgSurface,
+                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+                border: Border.all(color: AppColors.strokeSoft),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1609,7 +1744,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF111827),
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -1620,7 +1755,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                     message.isEmpty ? 'Không có nội dung mô tả.' : message,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[800],
+                      color: AppColors.textPrimary,
                       height: 1.45,
                     ),
                   ),
@@ -1631,7 +1766,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                     children: [
                       _InfoChip(
                         label: alertTypeLabel,
-                        color: const Color(0xFFE9F2FF),
+                        color: AppStateColors.infoBg,
                       ),
                       _InfoChip(
                         label: severityLabel,
@@ -1640,8 +1775,8 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                       _InfoChip(
                         label: readStatusText,
                         color: readStatusText == 'Đã đọc'
-                            ? const Color(0xFFE8F5E9)
-                            : const Color(0xFFFFF3E0),
+                            ? AppStateColors.successBg
+                            : AppStateColors.warningBg,
                       ),
                     ],
                   ),
@@ -1655,8 +1790,8 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildVitalInsightCard(vitalInsight!),
-                    if ((vitalInsight!.trendText ?? '').trim().isNotEmpty) ...[
+                    _buildVitalInsightCard(vitalInsight),
+                    if ((vitalInsight.trendText ?? '').trim().isNotEmpty) ...[
                       const SizedBox(height: 10),
                       Container(
                         width: double.infinity,
@@ -1665,16 +1800,16 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                           vertical: 9,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          color: AppColors.bgPrimary,
+                          borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                          border: Border.all(color: AppColors.strokeSoft),
                         ),
                         child: Text(
-                          vitalInsight!.trendText!,
+                          vitalInsight.trendText!,
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF334155),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -1725,7 +1860,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                   if (readAtText != null)
                     _NotificationDetailRow(
                       label: 'Đọc lúc',
-                      value: readAtText!,
+                      value: readAtText,
                     ),
                 ],
               ),
@@ -1749,9 +1884,9 @@ class _NotificationDetailSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE4E7EC)),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+        border: Border.all(color: AppColors.strokeSoft),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1761,7 +1896,7 @@ class _NotificationDetailSection extends StatelessWidget {
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 10),
@@ -1791,7 +1926,7 @@ class _NotificationDetailRow extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.grey[600],
+                color: AppColors.textSecondary,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1802,7 +1937,7 @@ class _NotificationDetailRow extends StatelessWidget {
               value,
               style: const TextStyle(
                 fontSize: 13,
-                color: Color(0xFF1F2937),
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),

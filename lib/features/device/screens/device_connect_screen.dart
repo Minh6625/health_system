@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/features/device/providers/device_connect_provider.dart';
 import 'package:healthguard/features/device/widgets/device_connect/method_select_step.dart';
@@ -26,13 +28,13 @@ class _DeviceConnectContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB), // bg.primary
+      backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: const Text('Kết nối thiết bị', style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF12304A))),
+        title: Text('Kết nối thiết bị', style: AppTextStyles.sectionTitle),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Color(0xFF12304A)),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         leading: Consumer<DeviceConnectProvider>(
           builder: (context, provider, _) {
             // Disable back button while verifying or pairing

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 import '../models/vital_signs.dart';
 
 /// A badge that shows when data was last updated.
@@ -12,10 +16,12 @@ class TimestampBadge extends StatelessWidget {
   String _getFullLabel(bool isStale) {
     final timeStr = _formatTime(vitals.timestamp);
     if (isStale) return 'Mất kết nối từ $timeStr';
-    
+
     final timeDiff = DateTime.now().difference(vitals.timestamp);
     if (timeDiff.inSeconds < 60) return 'Vừa cập nhật lúc $timeStr';
-    if (timeDiff.inMinutes < 60) return 'Cập nhật ${timeDiff.inMinutes} phút trước ($timeStr)';
+    if (timeDiff.inMinutes < 60) {
+      return 'Cập nhật ${timeDiff.inMinutes} phút trước ($timeStr)';
+    }
     return 'Cập nhật lúc $timeStr';
   }
 
@@ -26,48 +32,52 @@ class TimestampBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isStale = vitals.isStale;
-    final bgColor = isStale ? Colors.orange.shade50 : Colors.blue.shade50;
-    final borderColor =
-        isStale ? Colors.orange.shade200 : Colors.blue.shade200;
-    final iconColor =
-        isStale ? Colors.orange.shade700 : Colors.blue.shade700;
-    final textColor =
-        isStale ? Colors.orange.shade900 : Colors.blue.shade900;
+    final bgColor = isStale ? AppStateColors.warningBg : AppStateColors.infoBg;
+    final borderColor = isStale ? AppColors.warning : AppColors.info;
+    final iconColor = isStale ? AppColors.warning : AppColors.info;
+    final textColor = isStale ? AppColors.warning : AppColors.info;
     final icon = isStale ? Icons.warning_amber : Icons.check_circle;
     final label = _getFullLabel(isStale);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.sectionGapSm.toDouble() + 2,
+        vertical: AppSpacing.sectionGapSm.toDouble() - 2,
+      ),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
         border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 300),
-            child: Icon(icon, key: ValueKey(isStale), color: iconColor, size: 20),
+            child: Icon(
+              icon,
+              key: ValueKey(isStale),
+              color: iconColor,
+              size: 20,
+            ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: AppSpacing.gapSm),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               child: Text(
                 label,
                 key: ValueKey(label),
-                style: TextStyle(
+                style: AppTextStyles.caption.copyWith(
                   fontSize: 13,
                   color: textColor,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
             ),
           ),
           if (isStale)
-            Icon(Icons.sync_problem, color: Colors.orange.shade700, size: 20),
+            Icon(Icons.sync_problem, color: AppColors.warning, size: 20),
         ],
       ),
     );

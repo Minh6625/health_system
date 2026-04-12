@@ -4,6 +4,9 @@ import 'package:slide_to_act/slide_to_act.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
 import 'package:healthguard/features/emergency/screens/sos_confirm_screen.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class ManualSOSScreen extends StatefulWidget {
   const ManualSOSScreen({super.key});
@@ -124,13 +127,11 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
 
       if (_isCancelled) return;
 
-      // Call actual API (Mock: 1 recipient notified)
       await _repository.triggerSOS(
         latitude: position?.latitude,
         longitude: position?.longitude,
       );
 
-      // Navigate to confirmation screen (Decision D4)
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -170,42 +171,49 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
       valueListenable: _isSendingNotifier,
       builder: (context, isSending, child) {
         return Scaffold(
-          backgroundColor: Colors.red.shade900,
+          backgroundColor: AppColors.critical,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.close, color: Colors.white, size: 32),
+              icon: const Icon(
+                Icons.close,
+                color: AppColors.bgSurface,
+                size: 32,
+              ),
               onPressed: isSending ? null : _cancelSOS,
               tooltip: 'Hủy khẩn cấp',
             ),
           ),
           body: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sectionGapXl,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(
-                    width: double.infinity,
-                  ), // Đảm bảo tự động căn giữa toàn bộ khi không còn SlideAction
+                  const SizedBox(width: double.infinity),
                   if (_networkError)
                     Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.only(bottom: 24),
+                      padding: const EdgeInsets.all(AppSpacing.gapMd),
+                      margin: const EdgeInsets.only(
+                        bottom: AppSpacing.sectionGapXl,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.amber.shade700,
-                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.warning,
+                        borderRadius:
+                            BorderRadius.circular(AppRadii.radiusSm),
                       ),
                       child: const Row(
                         children: [
-                          Icon(Icons.wifi_off, color: Colors.black87),
-                          SizedBox(width: 12),
+                          Icon(Icons.wifi_off, color: AppColors.textPrimary),
+                          SizedBox(width: AppSpacing.gapMd),
                           Expanded(
                             child: Text(
                               "Đang thử kết nối... Sẽ tự động gửi lại.",
                               style: TextStyle(
-                                color: Colors.black87,
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w600,
                                 fontSize: 14,
                               ),
@@ -222,7 +230,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
                     child: const Icon(
                       Icons.warning_amber_rounded,
                       size: 100,
-                      color: Colors.white,
+                      color: AppColors.bgSurface,
                     ),
                   ),
                   const SizedBox(height: 32),
@@ -232,7 +240,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: AppColors.bgSurface,
                     ),
                   ),
 
@@ -240,7 +248,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 48.0),
                       child: CircularProgressIndicator(
-                        color: Colors.white,
+                        color: AppColors.bgSurface,
                         strokeWidth: 4,
                       ),
                     )
@@ -253,7 +261,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
                           style: const TextStyle(
                             fontSize: 120,
                             fontWeight: FontWeight.w900,
-                            color: Colors.white,
+                            color: AppColors.bgSurface,
                             height: 1.2,
                           ),
                         );
@@ -261,11 +269,11 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
                     ),
 
                   if (isSending)
-                    const Text(
+                    Text(
                       "Đang báo động...",
                       style: TextStyle(
                         fontSize: 20,
-                        color: Colors.white70,
+                        color: AppColors.bgSurface.withValues(alpha: 0.7),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -275,18 +283,18 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
                   if (!isSending) ...[
                     SlideAction(
                       height: 64,
-                      outerColor: Colors.white,
-                      innerColor: Colors.red.shade900,
-                      textColor: Colors.red.shade900,
+                      outerColor: AppColors.bgSurface,
+                      innerColor: AppColors.critical,
+                      textColor: AppColors.critical,
                       text: "Trượt để GỬI NGAY",
-                      textStyle: TextStyle(
+                      textStyle: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.red.shade900,
+                        color: AppColors.critical,
                       ),
                       sliderButtonIcon: const Icon(
                         Icons.double_arrow,
-                        color: Colors.white,
+                        color: AppColors.bgSurface,
                       ),
                       onSubmit: () async {
                         _timer?.cancel();
@@ -294,14 +302,15 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.gapLg),
 
                     SizedBox(
                       width: double.infinity,
                       height: 64,
                       child: TextButton(
                         style: TextButton.styleFrom(
-                          backgroundColor: Colors.white24,
+                          backgroundColor:
+                              AppColors.bgSurface.withValues(alpha: 0.24),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(32),
                           ),
@@ -312,7 +321,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                            color: AppColors.bgSurface,
                           ),
                         ),
                       ),

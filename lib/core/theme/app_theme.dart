@@ -1,32 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.blue,
-        primary: Colors.blue.shade700,
+        seedColor: AppColors.brandPrimary,
+        primary: AppColors.brandPrimary,
       ),
-      scaffoldBackgroundColor: Colors.white,
+      scaffoldBackgroundColor: AppColors.bgPrimary,
       useMaterial3: true,
       appBarTheme: AppBarTheme(
         centerTitle: true,
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: AppColors.brandPrimary,
         foregroundColor: Colors.white,
         elevation: 2,
-        titleTextStyle: const TextStyle(
+        titleTextStyle: TextStyle(
           color: Colors.white,
-          fontSize: 22,
+          fontSize: AppTextStyles.sectionTitle.fontSize,
           fontWeight: FontWeight.w700,
         ),
       ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: Colors.blue.shade600,
+      floatingActionButtonTheme: const FloatingActionButtonThemeData(
+        backgroundColor: AppColors.brandPrimary,
         foregroundColor: Colors.white,
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: AppColors.brandPrimary,
+        unselectedItemColor: AppColors.textSecondary,
       ),
     );
   }

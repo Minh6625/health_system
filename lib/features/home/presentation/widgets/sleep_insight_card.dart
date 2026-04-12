@@ -25,7 +25,7 @@ class SleepInsightCard extends StatelessWidget {
     if (sleepDurationMinutes >= 8 * 60) {
       durationColor = AppColors.success; // Ngủ ngon -> Xanh lá
     } else if (sleepDurationMinutes >= 6 * 60) {
-      durationColor = Colors.orange; // Thiếu ngủ -> Cam
+      durationColor = AppColors.warning; // Thiếu ngủ -> Cam
     } else if (sleepDurationMinutes >= 4 * 60) {
       durationColor = AppColors.warning; // Nặng -> Vàng
     } else {
@@ -116,7 +116,7 @@ class SleepInsightCard extends StatelessWidget {
                             color: Colors.white70,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: AppSpacing.gapXs),
                         // Large number
                         Text(
                           formattedDuration,
@@ -127,7 +127,7 @@ class SleepInsightCard extends StatelessWidget {
                             fontWeight: FontWeight.w800,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: AppSpacing.gapSm),
                         // Summary
                         Text(
                           insightSummary,

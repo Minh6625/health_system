@@ -3,8 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/profile/widgets/profile_widgets.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
-
-const _kTeal = Color(0xFF0F766E);
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 
 class MedicalInfoScreen extends StatefulWidget {
   const MedicalInfoScreen({super.key});
@@ -110,7 +109,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đã lưu thông tin y tế'),
-          backgroundColor: Color(0xFF059669),
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -123,7 +122,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
           behavior: SnackBarBehavior.floating,
           action: SnackBarAction(
             label: 'Thử lại',
-            textColor: Colors.white,
+            textColor: AppColors.bgSurface,
             onPressed: _handleSave,
           ),
         ),
@@ -173,7 +172,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                             decoration:
                                 _inputDecor('Nhóm máu', Icons.bloodtype_outlined),
                             style: const TextStyle(
-                                fontSize: 16, color: Color(0xFF12304A)),
+                                fontSize: 16, color: AppColors.textPrimary),
                             items: _bloodTypes
                                 .map((b) =>
                                     DropdownMenuItem(value: b, child: Text(b)))
@@ -265,8 +264,8 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                   const ProfileSectionLabel('Tiền sử bệnh lý'),
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFDF6E8),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppStateColors.warningBg,
+                      borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                       border:
                           Border.all(color: AppColors.warning.withValues(alpha: 0.4)),
                     ),
@@ -297,7 +296,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                           title: Text(e.value,
                               style: const TextStyle(fontSize: 15)),
                           value: _selectedConditions.contains(e.key),
-                          activeColor: _kTeal,
+                          activeColor: AppColors.brandPrimary,
                           controlAffinity: ListTileControlAffinity.leading,
                           contentPadding:
                               const EdgeInsets.symmetric(horizontal: 16),
@@ -336,7 +335,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                               width: 18,
                               height: 18,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                  strokeWidth: 2, color: AppColors.bgSurface),
                             )
                           : const Icon(Icons.save_outlined),
                       label: Text(
@@ -345,11 +344,11 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                             fontSize: 16, fontWeight: FontWeight.w600),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _kTeal,
-                        foregroundColor: Colors.white,
-                        disabledBackgroundColor: _kTeal.withValues(alpha: 0.5),
+                        backgroundColor: AppColors.brandPrimary,
+                        foregroundColor: AppColors.bgSurface,
+                        disabledBackgroundColor: AppColors.brandPrimary.withValues(alpha: 0.5),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
                       ),
                     ),
                   ),
@@ -364,12 +363,12 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(color: AppColors.strokeSoft),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                            borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
                       ),
                       child: const Text(
                         'Hủy',
                         style: TextStyle(
-                            fontSize: 16, color: Color(0xFF5B7288)),
+                            fontSize: 16, color: AppColors.textSecondary),
                       ),
                     ),
                   ),
@@ -385,8 +384,8 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   AppBar _buildAppBar(ProfileProvider provider) {
     return AppBar(
       title: const Text('Thông tin y tế'),
-      backgroundColor: _kTeal,
-      foregroundColor: Colors.white,
+      backgroundColor: AppColors.brandPrimary,
+      foregroundColor: AppColors.bgSurface,
       elevation: 0,
       actions: [
         if (provider.isSaving)
@@ -397,7 +396,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                 width: 18,
                 height: 18,
                 child: CircularProgressIndicator(
-                    strokeWidth: 2, color: Colors.white),
+                    strokeWidth: 2, color: AppColors.bgSurface),
               ),
             ),
           ),
@@ -408,11 +407,11 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   InputDecoration _inputDecor(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: _kTeal, size: 20),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+      prefixIcon: Icon(icon, color: AppColors.brandPrimary, size: 20),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.radiusSm)),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: _kTeal, width: 2),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+        borderSide: const BorderSide(color: AppColors.brandPrimary, width: 2),
       ),
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -450,8 +449,8 @@ class _WarningNote extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFEDF3F8),
-        borderRadius: BorderRadius.circular(10),
+        color: AppStateColors.infoBg,
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
         border: Border.all(color: AppColors.info.withValues(alpha: 0.35)),
       ),
       child: Row(

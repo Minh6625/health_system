@@ -7,6 +7,9 @@ import 'package:healthguard/features/family/widgets/permission_toggle_card.dart'
 import 'package:healthguard/features/family/widgets/sharing_context_info_banner.dart';
 import 'package:healthguard/features/family/widgets/unlink_action_card.dart';
 import 'package:healthguard/features/family/widgets/unlink_confirm_dialog.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:provider/provider.dart';
 
 class LinkedContactDetailScreen extends StatelessWidget {
@@ -56,9 +59,9 @@ class _LinkedContactDetailContent extends StatelessWidget {
               Navigator.pop(context); // Close loading dialog
               if (success) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Đã cập nhật nhãn liên hệ'),
-                    backgroundColor: Color(0xFF2F80ED),
+                  SnackBar(
+                    content: const Text('Đã cập nhật nhãn liên hệ'),
+                    backgroundColor: AppColors.brandPrimary,
                   ),
                 );
               }
@@ -116,9 +119,9 @@ class _LinkedContactDetailContent extends StatelessWidget {
                 Navigator.pop(context); // Close loading dialog
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Đã cập nhật nhãn chính'),
-                      backgroundColor: Color(0xFF2F80ED),
+                    SnackBar(
+                      content: const Text('Đã cập nhật nhãn chính'),
+                      backgroundColor: AppColors.brandPrimary,
                     ),
                   );
                 }
@@ -153,19 +156,19 @@ class _LinkedContactDetailContent extends StatelessWidget {
     final provider = context.watch<LinkedContactDetailProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Quyền chia sẻ',
           style: TextStyle(
             fontWeight: FontWeight.w700,
-            color: Color(0xFF12304A),
+            color: AppColors.textPrimary,
           ),
         ),
-        backgroundColor: const Color(0xFFF4F7FB),
+        backgroundColor: AppColors.bgPrimary,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Color(0xFF12304A)),
+        iconTheme: IconThemeData(color: AppColors.textPrimary),
       ),
       body: _buildBody(context, provider),
     );
@@ -176,9 +179,9 @@ class _LinkedContactDetailContent extends StatelessWidget {
     LinkedContactDetailProvider provider,
   ) {
     if (provider.isLoading) {
-      return const Center(
+      return Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2F80ED)),
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.brandPrimary),
         ),
       );
     }
@@ -188,17 +191,17 @@ class _LinkedContactDetailContent extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Color(0xFFC94A4A)),
-            const SizedBox(height: 16),
+            Icon(Icons.error_outline, size: 48, color: AppColors.critical),
+            SizedBox(height: AppSpacing.gapLg),
             Text(
               'Có lỗi xảy ra',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF12304A),
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppSpacing.gapSm),
             ElevatedButton(
               onPressed: () => provider.loadContact(provider.contact?.id ?? ''),
               child: const Text('Thử lại'),
@@ -213,24 +216,24 @@ class _LinkedContactDetailContent extends StatelessWidget {
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: EdgeInsets.only(bottom: AppSpacing.sectionGapXl),
       children: [
         LinkedContactHeroCard(contact: contact),
         SharingContextInfoBanner(contact: contact),
-        const SizedBox(height: 24),
+        SizedBox(height: AppSpacing.sectionGapXl),
 
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: const Text(
+          padding: EdgeInsets.symmetric(horizontal: AppSpacing.gapLg),
+          child: Text(
             'Quyền hạn của bạn trao',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF5B7288),
+              color: AppColors.textSecondary,
             ),
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: AppSpacing.gapSm),
         PermissionToggleCard(
           title: 'Cho phép xem chỉ số sức khoẻ của tôi',
           description:
@@ -255,14 +258,14 @@ class _LinkedContactDetailContent extends StatelessWidget {
               provider.togglePermission('can_view_location', val),
         ),
 
-        const SizedBox(height: 16),
+        SizedBox(height: AppSpacing.gapLg),
         LabelManagementCard(
           title: 'Nhãn chính hiển thị',
           currentLabel: contact.primaryRelationshipLabel,
           isUpdating: provider.isUpdatingLabel,
           onTapChange: () => _showLabelEditor(context, provider),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: AppSpacing.gapSm),
         LabelManagementCard(
           title: 'Tags phân nhóm',
           currentLabel: contact.tags.isEmpty
@@ -272,7 +275,7 @@ class _LinkedContactDetailContent extends StatelessWidget {
           onTapChange: () => _showTagPicker(context, provider),
         ),
 
-        const SizedBox(height: 24),
+        SizedBox(height: AppSpacing.sectionGapXl),
         UnlinkActionCard(
           isUnlinking: provider.isUnlinking,
           onUnlink: () => _handleUnlink(context, provider),
@@ -304,10 +307,10 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(24)),
+      padding: EdgeInsets.fromLTRB(AppSpacing.sectionGapXl, AppSpacing.sectionGapSm, AppSpacing.sectionGapXl, 32),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -315,27 +318,27 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
           Container(
             width: 40,
             height: 4,
-            margin: const EdgeInsets.only(bottom: 24),
+            margin: EdgeInsets.only(bottom: AppSpacing.sectionGapXl),
             decoration: BoxDecoration(
-              color: Colors.grey.shade300,
+              color: AppColors.strokeSoft,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const Text(
+          Text(
             'Phân nhóm liên hệ',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF12304A),
+              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: AppSpacing.gapSm),
+          Text(
             'Chọn một hoặc nhiều nhóm để phân loại người thân này.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Color(0xFF5B7288)),
+            style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: AppSpacing.sectionGapXl),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -357,19 +360,19 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                 selectedColor: tag.color.withValues(alpha: 0.12),
                 checkmarkColor: tag.color,
                 labelStyle: TextStyle(
-                  color: isSelected ? tag.color : const Color(0xFF5B7288),
+                  color: isSelected ? tag.color : AppColors.textSecondary,
                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                 ),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusXl),
                   side: BorderSide(
-                    color: isSelected ? tag.color : Colors.grey.shade300,
+                    color: isSelected ? tag.color : AppColors.strokeSoft,
                   ),
                 ),
               );
             }).toList(),
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 32), // intentional larger gap
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -380,11 +383,11 @@ class _TagPickerSheetState extends State<_TagPickerSheet> {
                 widget.onConfirm(selectedTags);
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2F80ED),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: AppColors.brandPrimary,
+                foregroundColor: AppColors.bgSurface,
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.gapLg),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                 ),
                 elevation: 0,
               ),

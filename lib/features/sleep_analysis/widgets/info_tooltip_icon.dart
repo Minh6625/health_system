@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 /// Small (i) icon button that opens a ModalBottomSheet explaining sleep phases.
 ///
@@ -45,7 +47,7 @@ class InfoTooltipIcon extends StatelessWidget {
       context: context,
       backgroundColor: const Color(0xFF0D1E38),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.radiusXl)),
       ),
       isScrollControlled: true,
       builder: (_) => _SleepInfoSheet(topic: topic),
@@ -71,7 +73,7 @@ class _SleepInfoSheet extends StatelessWidget {
         : _trendItems;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      padding: const EdgeInsets.fromLTRB(20, AppSpacing.gapLg, 20, 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,7 +102,7 @@ class _SleepInfoSheet extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.gapLg),
 
           // Items
           ...items.map((item) => _InfoItem(
@@ -188,7 +190,7 @@ class _InfoItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpacing.gapLg),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -201,7 +203,7 @@ class _InfoItem extends StatelessWidget {
             ),
             child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.gapMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

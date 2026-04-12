@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
 import 'package:healthguard/features/device/screens/device_status_detail_screen.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 class DevicePriorityCard extends StatelessWidget {
   final DeviceModel device;
@@ -23,30 +27,25 @@ class DevicePriorityCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
         border: needsAttention
-            ? Border.all(color: const Color(0xFFF2A93B), width: 1.5)
-            : Border.all(color: Colors.grey.shade100, width: 1),
-        boxShadow: [
-          if (needsAttention)
-            const BoxShadow(
-              color: Color(0x1AF2A93B),
-              blurRadius: 16,
-              offset: Offset(0, 4),
-            )
-          else
-            const BoxShadow(
-              color: Color(0x08000000),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-        ],
+            ? Border.all(color: AppColors.warning, width: 1.5)
+            : Border.all(color: AppColors.strokeSoft, width: 1),
+        boxShadow: needsAttention
+            ? [
+                BoxShadow(
+                  color: AppColors.warning.withValues(alpha: 0.1),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : AppShadows.softShadow,
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.radiusXl),
           onTap: () => _handleDeviceTap(context),
           child: Padding(
             padding: const EdgeInsets.all(18),
@@ -68,23 +67,21 @@ class DevicePriorityCard extends StatelessWidget {
                                   style: const TextStyle(
                                     fontSize: 19,
                                     fontWeight: FontWeight.w700,
-                                    color: Color(0xFF12304A), // text.primary
+                                    color: AppColors.textPrimary,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              SizedBox(width: AppSpacing.gapSm),
                               _buildStatusBadge(isOffline),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          SizedBox(height: AppSpacing.gapXs + 2),
                           Text(
                             _buildSubtitle(),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF5B7288), // text.secondary
-                              fontWeight: FontWeight.w400,
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -100,16 +97,16 @@ class DevicePriorityCard extends StatelessWidget {
                           value: 'toggle',
                           child: Text(device.isActive ? 'Tắt thiết bị' : 'Kích hoạt'),
                         ),
-                        const PopupMenuItem(
+                        PopupMenuItem(
                           value: 'delete',
-                          child: Text('Xóa thiết bị', style: TextStyle(color: Colors.red)),
+                          child: Text('Xóa thiết bị', style: TextStyle(color: AppColors.critical)),
                         ),
                       ],
-                      icon: const Icon(Icons.more_vert, color: Color(0xFF94A3B8)),
+                      icon: Icon(Icons.more_vert, color: AppColors.textSecondary),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: AppSpacing.gapLg),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -179,14 +176,14 @@ class DevicePriorityCard extends StatelessWidget {
   }
 
   Widget _buildStatusBadge(bool isOffline) {
-    final color = isOffline ? const Color(0xFF94A3B8) : const Color(0xFF0F9D7A); // offline vs success
+    final color = isOffline ? AppColors.textSecondary : AppColors.success;
     final label = isOffline ? 'Offline' : 'Online';
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
       ),
       child: Text(
         label,
@@ -200,24 +197,23 @@ class DevicePriorityCard extends StatelessWidget {
   }
 
   Widget _buildInfoPill(IconData icon, String label, {bool isWarning = false}) {
-    final color = isWarning ? const Color(0xFFD97706) : const Color(0xFF5B7288);
-    final bgColor = isWarning ? const Color(0xFFFEF3C7) : const Color(0xFFF4F7FB);
+    final color = isWarning ? AppColors.warning : AppColors.textSecondary;
+    final bgColor = isWarning ? AppStateColors.warningBg : AppColors.bgPrimary;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
+          SizedBox(width: AppSpacing.gapXs + 2),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 14,
+            style: AppTextStyles.caption.copyWith(
               fontWeight: FontWeight.w600,
               color: color,
             ),
@@ -235,17 +231,16 @@ class DevicePriorityCard extends StatelessWidget {
         children: [
           Text(
             needsAttention ? 'Kiểm tra ngay' : 'Chi tiết',
-            style: TextStyle(
-              fontSize: 14,
+            style: AppTextStyles.caption.copyWith(
               fontWeight: FontWeight.w700,
-              color: needsAttention ? const Color(0xFFD97706) : const Color(0xFF0F766E),
+              color: needsAttention ? AppColors.warning : AppColors.brandPrimary,
             ),
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: AppSpacing.gapXs),
           Icon(
             Icons.arrow_forward_rounded,
             size: 16,
-            color: needsAttention ? const Color(0xFFD97706) : const Color(0xFF0F766E),
+            color: needsAttention ? AppColors.warning : AppColors.brandPrimary,
           ),
         ],
       ),

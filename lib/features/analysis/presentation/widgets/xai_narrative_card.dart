@@ -39,9 +39,9 @@ class _XaiNarrativeCardState extends State<XaiNarrativeCard> {
               const SizedBox(width: AppSpacing.gapSm),
               Text(
                 'AI Giải thích',
-                style: AppTextStyles.sectionTitle.copyWith(
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
-                  fontSize: 16,
                 ),
               ),
             ],

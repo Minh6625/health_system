@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/features/auth/screens/start_screen.dart';
 import 'package:healthguard/features/auth/screens/login_screen.dart';
 
@@ -62,8 +64,8 @@ class _AuthPagesScreenState extends State<AuthPagesScreen> {
                           vertical: 12,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1565C0),
-                          borderRadius: BorderRadius.circular(30),
+                          color: AppColors.brandPrimary,
+                          borderRadius: AppRadii.pillRadius,
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.15),
@@ -75,19 +77,19 @@ class _AuthPagesScreenState extends State<AuthPagesScreen> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text(
+                            Text(
                               'Bắt đầu ngay',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: AppColors.bgSurface,
                                 letterSpacing: 0.5,
                               ),
                             ),
                             const SizedBox(width: 8),
-                            const Icon(
+                            Icon(
                               Icons.arrow_forward,
-                              color: Colors.white,
+                              color: AppColors.bgSurface,
                               size: 22,
                             ),
                           ],

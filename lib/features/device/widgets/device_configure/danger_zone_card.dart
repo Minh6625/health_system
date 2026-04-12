@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class DangerZoneCard extends StatelessWidget {
   final VoidCallback onUnpair;
@@ -15,44 +19,43 @@ class DangerZoneCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 4, bottom: 12),
+        Padding(
+          padding: EdgeInsets.only(left: 4, bottom: AppSpacing.gapMd),
           child: Text(
             'Vùng nguy hiểm',
-            style: TextStyle(
-              fontSize: 18,
+            style: AppTextStyles.bodyLarge.copyWith(
               fontWeight: FontWeight.w700,
-              color: Color(0xFFDC2626), // danger color
+              color: AppColors.critical,
             ),
           ),
         ),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2), // very light red
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFFCA5A5)), // light red border
+            color: AppStateColors.criticalBg,
+            borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+            border: Border.all(color: AppColors.critical.withValues(alpha: 0.4)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text(
+              Text(
                 'Ngắt kết nối thiết bị này khỏi tài khoản của bạn. Xóa bỏ toàn bộ cấu hình liên kết.',
-                style: TextStyle(color: Color(0xFFB91C1C), fontSize: 14),
+                style: AppTextStyles.caption.copyWith(color: AppColors.critical),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: AppSpacing.sectionGapMd),
               ElevatedButton.icon(
                 onPressed: isUnpairing ? null : onUnpair,
                 icon: isUnpairing ? const SizedBox.shrink() : const Icon(Icons.link_off_rounded),
-                label: isUnpairing 
+                label: isUnpairing
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : const Text('Ngắt kết nối thiết bị', style: TextStyle(fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDC2626),
+                  backgroundColor: AppColors.critical,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
                 ),
               ),
             ],

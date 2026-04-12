@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:healthguard/core/constants/app_sizes.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
@@ -100,7 +102,7 @@ class _ResetOtpVerificationScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(response.message),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.critical,
           ),
         );
       }
@@ -116,7 +118,7 @@ class _ResetOtpVerificationScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Lỗi: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.critical,
         ),
       );
     }
@@ -129,39 +131,39 @@ class _ResetOtpVerificationScreenState
       height: 60,
       textStyle: const TextStyle(
         fontSize: 22,
-        color: Colors.black87,
+        color: AppColors.textPrimary,
         fontWeight: FontWeight.w600,
       ),
       decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300, width: 1.5),
+        color: AppColors.bgPrimary,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+        border: Border.all(color: AppColors.strokeSoft, width: 1.5),
       ),
     );
 
     final focusedPinTheme = defaultPinTheme.copyDecorationWith(
-      border: Border.all(color: AppColors.primary, width: 2),
-      borderRadius: BorderRadius.circular(12),
-      color: Colors.white,
+      border: Border.all(color: AppColors.brandPrimary, width: 2),
+      borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+      color: AppColors.bgSurface,
     );
 
     final errorPinTheme = defaultPinTheme.copyDecorationWith(
-      border: Border.all(color: Colors.red.shade400, width: 2),
-      color: Colors.red.shade50,
+      border: Border.all(color: AppColors.critical, width: 2),
+      color: AppStateColors.criticalBg,
     );
 
     final submittedPinTheme = defaultPinTheme.copyDecorationWith(
-      color: Colors.white,
-      border: Border.all(color: AppColors.primaryLight, width: 1),
+      color: AppColors.bgSurface,
+      border: Border.all(color: AppColors.brandPrimaryLight, width: 1),
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgSurface,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: true,
-        iconTheme: const IconThemeData(color: AppColors.primary),
+        iconTheme: const IconThemeData(color: AppColors.brandPrimary),
       ),
       body: SafeArea(
         child: LayoutBuilder(
@@ -182,13 +184,13 @@ class _ResetOtpVerificationScreenState
                       Container(
                         padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
-                          color: AppColors.primaryLight.withAlpha(25),
+                          color: AppColors.brandPrimaryLight.withAlpha(25),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
                           Icons.lock_reset_rounded,
                           size: 72,
-                          color: AppColors.primary,
+                          color: AppColors.brandPrimary,
                         ),
                       )
                           .animate(
@@ -201,12 +203,10 @@ class _ResetOtpVerificationScreenState
                       const SizedBox(height: 32),
 
                       // Title
-                      const Text(
+                      Text(
                         'Xác Nhận OTP',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                        style: AppTextStyles.displayCompact.copyWith(
+                          color: AppColors.textPrimary,
                         ),
                         textAlign: TextAlign.center,
                       )
@@ -220,9 +220,9 @@ class _ResetOtpVerificationScreenState
                       RichText(
                         textAlign: TextAlign.center,
                         text: TextSpan(
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey,
+                            color: AppColors.textSecondary,
                             height: 1.5,
                           ),
                           children: [
@@ -233,7 +233,7 @@ class _ResetOtpVerificationScreenState
                               text: widget.email,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: Colors.black87,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],
@@ -283,7 +283,7 @@ class _ResetOtpVerificationScreenState
                           child: Text(
                             'Mã xác thực không hợp lệ',
                             style: TextStyle(
-                                color: Colors.red.shade600, fontSize: 13),
+                                color: AppColors.critical, fontSize: 13),
                           ).animate().fadeIn(),
                         ),
 
@@ -292,15 +292,15 @@ class _ResetOtpVerificationScreenState
                       // Verify Button
                       SizedBox(
                         width: double.infinity,
-                        height: 56,
+                        height: AppSizes.buttonHeight,
                         child: ElevatedButton(
                           onPressed:
                               _isVerifying ? null : _handleVerifyOtp,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
+                            backgroundColor: AppColors.brandPrimary,
+                            foregroundColor: AppColors.bgSurface,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(AppRadii.radiusLg),
                             ),
                             elevation: 0,
                           ),
@@ -309,7 +309,7 @@ class _ResetOtpVerificationScreenState
                                   width: 24,
                                   height: 24,
                                   child: CircularProgressIndicator(
-                                    color: Colors.white,
+                                    color: AppColors.bgSurface,
                                     strokeWidth: 2.5,
                                   ),
                                 )
@@ -340,7 +340,7 @@ class _ResetOtpVerificationScreenState
                           child: const Text(
                             'Quay lại đăng nhập',
                             style: TextStyle(
-                              color: AppColors.primary,
+                              color: AppColors.brandPrimary,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

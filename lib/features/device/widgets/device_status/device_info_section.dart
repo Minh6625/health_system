@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 class DeviceInfoSection extends StatelessWidget {
   final String title;
@@ -16,21 +20,19 @@ class DeviceInfoSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          padding: EdgeInsets.only(left: 4, bottom: AppSpacing.sectionGapSm),
           child: Text(
             title,
-            style: const TextStyle(
+            style: AppTextStyles.sectionTitle.copyWith(
               fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF12304A),
             ),
           ),
         ),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+            border: Border.all(color: AppColors.strokeSoft),
           ),
           child: Column(
             children: children,

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 import '../widgets/mini_line_chart.dart';
 
 /// Macro-view screen showing a consolidated report of all health events and trends.
@@ -11,19 +15,19 @@ class HealthReportScreen extends StatelessWidget {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: AppColors.bgPrimary,
         appBar: AppBar(
           title: const Text('Báo cáo & Nhật ký'),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
+          backgroundColor: AppColors.bgSurface,
+          foregroundColor: AppColors.textPrimary,
           elevation: 0,
           centerTitle: true,
           bottom: TabBar(
-            labelColor: Colors.blue.shade700,
-            unselectedLabelColor: Colors.grey.shade600,
-            indicatorColor: Colors.blue.shade700,
+            labelColor: AppColors.brandPrimary,
+            unselectedLabelColor: AppColors.textSecondary,
+            indicatorColor: AppColors.brandPrimary,
             indicatorWeight: 3,
-            labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            labelStyle: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
             tabs: const [
               Tab(text: 'Nhật ký'),
               Tab(text: 'Thống kê'),
@@ -50,18 +54,18 @@ class _TimelineTab extends StatelessWidget {
     // New design: Group by Date
     final Map<String, List<Map<String, dynamic>>> groupedEvents = {
       'Hôm nay': [
-        {'time': '10:30 AM', 'title': 'Nhịp tim cao (110 BPM)', 'type': 'alert', 'color': Colors.orange.shade600, 'icon': Icons.warning_rounded, 'desc': 'Phát hiện nhịp tim đập nhanh khi nghỉ ngơi.'},
-        {'time': '09:15 AM', 'title': 'Huyết áp bình thường', 'type': 'info', 'color': Colors.green.shade600, 'icon': Icons.favorite_rounded, 'desc': '120/80 mmHg - Chỉ số an toàn.'},
-        {'time': '08:00 AM', 'title': 'Đo nhịp tim (82 BPM)', 'type': 'info', 'color': Colors.green.shade600, 'icon': Icons.monitor_heart, 'desc': 'Chỉ số trong vùng an toàn.'},
+        {'time': '10:30 AM', 'title': 'Nhịp tim cao (110 BPM)', 'type': 'alert', 'color': AppColors.warning, 'icon': Icons.warning_rounded, 'desc': 'Phát hiện nhịp tim đập nhanh khi nghỉ ngơi.'},
+        {'time': '09:15 AM', 'title': 'Huyết áp bình thường', 'type': 'info', 'color': AppColors.success, 'icon': Icons.favorite_rounded, 'desc': '120/80 mmHg - Chỉ số an toàn.'},
+        {'time': '08:00 AM', 'title': 'Đo nhịp tim (82 BPM)', 'type': 'info', 'color': AppColors.success, 'icon': Icons.monitor_heart, 'desc': 'Chỉ số trong vùng an toàn.'},
       ],
       'Hôm qua': [
-        {'time': '08:45 PM', 'title': 'Mất kết nối cảm biến', 'type': 'error', 'color': Colors.grey.shade600, 'icon': Icons.bluetooth_disabled, 'desc': 'Đồng hồ mất tín hiệu trong 15 phút.'},
-        {'time': '02:10 PM', 'title': 'SpO2 thấp (90%)', 'type': 'critical', 'color': Colors.red.shade600, 'icon': Icons.water_drop, 'desc': 'Nồng độ oxy xuống thấp, cần theo dõi.'},
+        {'time': '08:45 PM', 'title': 'Mất kết nối cảm biến', 'type': 'error', 'color': AppColors.textSecondary, 'icon': Icons.bluetooth_disabled, 'desc': 'Đồng hồ mất tín hiệu trong 15 phút.'},
+        {'time': '02:10 PM', 'title': 'SpO2 thấp (90%)', 'type': 'critical', 'color': AppColors.critical, 'icon': Icons.water_drop, 'desc': 'Nồng độ oxy xuống thấp, cần theo dõi.'},
       ],
     };
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+      padding: AppSpacing.screenHorizontalPadding.copyWith(top: AppSpacing.sectionGapMd, bottom: AppSpacing.sectionGapMd),
       itemCount: groupedEvents.length,
       itemBuilder: (context, index) {
         final dateKey = groupedEvents.keys.elementAt(index);
@@ -72,19 +76,18 @@ class _TimelineTab extends StatelessWidget {
           children: [
             // Sticky-like Date Header
             Padding(
-              padding: EdgeInsets.only(bottom: 16, top: index == 0 ? 0 : 16),
+              padding: EdgeInsets.only(bottom: AppSpacing.sectionGapMd, top: index == 0 ? 0 : AppSpacing.sectionGapMd),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gapMd, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppStateColors.infoBg,
+                  borderRadius: AppRadii.cardRadius,
                 ),
                 child: Text(
                   dateKey,
-                  style: TextStyle(
-                    fontSize: 14,
+                  style: AppTextStyles.caption.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade800,
+                    color: AppColors.brandPrimary,
                   ),
                 ),
               ),
@@ -105,16 +108,16 @@ class _TimelineTab extends StatelessWidget {
                       Container(
                         width: 14,
                         height: 14,
-                        margin: const EdgeInsets.only(top: 4),
+                        margin: const EdgeInsets.only(top: AppSpacing.gapXs),
                         decoration: BoxDecoration(
-                          color: ev['type'] == 'critical' ? Colors.red : (ev['color'] as Color),
+                          color: ev['type'] == 'critical' ? AppColors.critical : (ev['color'] as Color),
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: AppColors.bgSurface, width: 2),
                           boxShadow: [
                             BoxShadow(
                               color: (ev['color'] as Color).withValues(alpha: 0.3),
                               blurRadius: 4,
-                            )
+                            ),
                           ],
                         ),
                       ),
@@ -122,21 +125,25 @@ class _TimelineTab extends StatelessWidget {
                         Container(
                           width: 2,
                           height: 70, // Connector line
-                          color: Colors.grey.shade200,
+                          color: AppColors.strokeSoft,
                         ),
                     ],
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: AppSpacing.sectionGapMd),
                   
                   // Event Card
                   Expanded(
                     child: Container(
-                      margin: const EdgeInsets.only(bottom: 20),
-                      padding: const EdgeInsets.all(16),
+                      margin: const EdgeInsets.only(bottom: AppSpacing.sectionGapLg),
+                      padding: AppSpacing.cardPadding,
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: ev['type'] == 'critical' ? Colors.red.shade200 : Colors.grey.shade100),
+                        color: AppColors.bgSurface,
+                        borderRadius: AppRadii.cardRadius,
+                        border: Border.all(
+                          color: ev['type'] == 'critical'
+                              ? AppColors.critical.withValues(alpha: 0.3)
+                              : AppColors.strokeSoft,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: Colors.black.withValues(alpha: 0.02),
@@ -149,14 +156,14 @@ class _TimelineTab extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppSpacing.gapSm),
                             decoration: BoxDecoration(
                               color: (ev['color'] as Color).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                             ),
                             child: Icon(ev['icon'] as IconData, color: ev['color'] as Color, size: 24),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: AppSpacing.sectionGapMd),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -167,23 +174,25 @@ class _TimelineTab extends StatelessWidget {
                                     Expanded(
                                       child: Text(
                                         ev['title'] as String,
-                                        style: TextStyle(
-                                          fontSize: 16, 
+                                        style: AppTextStyles.bodyMedium.copyWith(
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.grey.shade800,
+                                          color: AppColors.textPrimary,
                                         ),
                                       ),
                                     ),
                                     Text(
                                       ev['time'] as String,
-                                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                                      style: AppTextStyles.caption,
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   ev['desc'] as String,
-                                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600, height: 1.3),
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.textSecondary,
+                                    height: 1.3,
+                                  ),
                                 ),
                               ],
                             ),
@@ -209,7 +218,7 @@ class _TrendsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.screenHorizontalPadding.copyWith(top: AppSpacing.sectionGapMd, bottom: AppSpacing.sectionGapMd),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -219,14 +228,14 @@ class _TrendsTab extends StatelessWidget {
             child: Row(
               children: [
                 _FilterChip(label: 'Hôm nay', isSelected: false),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.gapSm),
                 _FilterChip(label: '7 Ngày qua', isSelected: true),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.gapSm),
                 _FilterChip(label: '1 Tháng qua', isSelected: false),
               ],
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.sectionGapXl),
           
           // Thống kê 1: Nhịp tim (Tách riêng để tránh lộn xộn trục Y)
           _buildMetricSection(
@@ -241,10 +250,10 @@ class _TrendsTab extends StatelessWidget {
             chartColors: [Colors.red.shade400],
             xLabels: const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN', 'HN'],
             legends: [
-              _Legend(Colors.red.shade400, 'Nhịp tim')
+              _Legend(Colors.red.shade400, 'Nhịp tim'),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.sectionGapXl),
 
           // Thống kê 2: Huyết áp (Chỉ chứa Tâm thu & Tâm trương vì cùng chung đơn vị mmHg)
           _buildMetricSection(
@@ -263,11 +272,11 @@ class _TrendsTab extends StatelessWidget {
             xLabels: const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN', 'HN'],
             legends: [
               _Legend(Colors.purple.shade400, 'Tâm thu'),
-              const SizedBox(width: 16),
+              const SizedBox(width: AppSpacing.sectionGapMd),
               _Legend(Colors.teal.shade400, 'Tâm trương'),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.sectionGapXl),
           
           // Thống kê 3: SpO2
           _buildMetricSection(
@@ -283,7 +292,7 @@ class _TrendsTab extends StatelessWidget {
             xLabels: const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN', 'HN'],
             legends: [], // 1 line, no legend needed
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: AppSpacing.sectionGapXl),
         ],
       ),
     );
@@ -303,11 +312,11 @@ class _TrendsTab extends StatelessWidget {
     required List<Widget> legends,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: AppSpacing.cardPadding,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        color: AppColors.bgSurface,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: AppColors.strokeSoft),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -324,16 +333,18 @@ class _TrendsTab extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
+              Expanded(
+                child: Text(
+                  title,
+                  style: AppTextStyles.sectionTitle,
+                ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
                     'Trung bình',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: AppTextStyles.caption,
                   ),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.baseline,
@@ -341,45 +352,48 @@ class _TrendsTab extends StatelessWidget {
                     children: [
                       Text(
                         avgValue,
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color.shade700),
+                        style: AppTextStyles.vitalValue.copyWith(color: color.shade700),
                       ),
                       const SizedBox(width: 2),
-                      Text(unit, style: TextStyle(fontSize: 12, color: color.shade700)),
+                      Text(unit, style: AppTextStyles.caption.copyWith(color: color.shade700)),
                     ],
                   ),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.gapMd),
           
           // Natural Language Insight (Soothes the user)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gapMd, vertical: 10),
             decoration: BoxDecoration(
               color: color.shade50,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.insights, size: 20, color: color.shade700),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.gapSm),
                 Expanded(
                   child: Text(
                     insightText,
-                    style: TextStyle(fontSize: 14, color: color.shade900, height: 1.3),
+                    style: AppTextStyles.caption.copyWith(
+                      color: color.shade900,
+                      height: 1.3,
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.sectionGapMd),
 
           // Legend (if multiple lines)
           if (legends.isNotEmpty) ...[
             Row(mainAxisAlignment: MainAxisAlignment.center, children: legends),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.gapMd),
           ],
 
           // The Chart itself
@@ -403,16 +417,16 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapMd, vertical: AppSpacing.gapSm),
       decoration: BoxDecoration(
-        color: isSelected ? Colors.blue.shade700 : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isSelected ? Colors.blue.shade700 : Colors.grey.shade300),
+        color: isSelected ? AppColors.brandPrimary : AppColors.bgSurface,
+        borderRadius: AppRadii.pillRadius,
+        border: Border.all(color: isSelected ? AppColors.brandPrimary : AppColors.strokeSoft),
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: isSelected ? Colors.white : Colors.grey.shade700,
+        style: AppTextStyles.caption.copyWith(
+          color: isSelected ? AppColors.bgSurface : AppColors.textSecondary,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
         ),
       ),
@@ -432,8 +446,8 @@ class _Legend extends StatelessWidget {
     return Row(
       children: [
         Container(width: 12, height: 4, color: color),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        const SizedBox(width: AppSpacing.gapXs),
+        Text(label, style: AppTextStyles.caption),
       ],
     );
   }

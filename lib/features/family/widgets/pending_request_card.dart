@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../models/linked_contact_model.dart';
 import '../providers/shared_family_mock_provider.dart';
@@ -54,9 +56,9 @@ class PendingRequestCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFFFF6E9), // bg.pending
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
         border: Border.all(
-          color: const Color(0xFFF2A93B).withValues(alpha: 0.3),
+          color: AppColors.warning.withValues(alpha: 0.3),
         ),
       ),
       padding: const EdgeInsets.all(16),
@@ -66,7 +68,7 @@ class PendingRequestCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor: const Color(0xFFF2A93B).withValues(alpha: 0.2),
+                backgroundColor: AppColors.warning.withValues(alpha: 0.2),
                 child: Text(
                   request.displayName.isNotEmpty
                       ? request.displayName[0].toUpperCase()
@@ -74,7 +76,7 @@ class PendingRequestCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFFF2A93B),
+                    color: AppColors.warning,
                   ),
                 ),
               ),
@@ -88,7 +90,7 @@ class PendingRequestCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF12304A),
+                        color: AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -98,7 +100,7 @@ class PendingRequestCard extends StatelessWidget {
                           : 'Đang chờ xác nhận...',
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF5B7288),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -113,11 +115,11 @@ class PendingRequestCard extends StatelessWidget {
                 child: OutlinedButton(
                   onPressed: () => _onReject(context),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF5B7288),
-                    side: const BorderSide(color: Color(0xFF5B7288)),
+                    foregroundColor: AppColors.textSecondary,
+                    side: const BorderSide(color: AppColors.textSecondary),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                     ),
                     minimumSize: const Size(0, 48), // Accessbility standard
                   ),
@@ -136,11 +138,11 @@ class PendingRequestCard extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: () => _onAccept(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2F80ED), // brand.primary
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.brandPrimary, // brand.primary
+                      foregroundColor: AppColors.bgSurface,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                       ),
                       elevation: 0,
                       minimumSize: const Size(0, 48),

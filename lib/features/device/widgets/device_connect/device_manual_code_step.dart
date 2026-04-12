@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../providers/device_connect_provider.dart';
 
 class DeviceManualCodeStep extends StatefulWidget {
@@ -24,25 +28,23 @@ class _DeviceManualCodeStepState extends State<DeviceManualCodeStep> {
     final isVerifying = provider.state == DeviceConnectState.verifying;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.sectionGapLg,
+        vertical: AppSpacing.sectionGapXl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Nhập mã thiết bị',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF12304A),
-            ),
+            style: AppTextStyles.sectionTitle.copyWith(fontSize: 24),
           ),
-          const SizedBox(height: 12),
-          const Text(
+          SizedBox(height: AppSpacing.gapMd),
+          Text(
             'Mã gồm 6-8 ký tự trên vỏ hộp hoặc trong phần cài đặt của đồng hồ.',
-            style: TextStyle(
-              fontSize: 16,
+            style: AppTextStyles.body.copyWith(
               height: 1.5,
-              color: Color(0xFF5B7288),
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 32),
@@ -53,41 +55,41 @@ class _DeviceManualCodeStepState extends State<DeviceManualCodeStep> {
             textAlign: TextAlign.center,
             decoration: InputDecoration(
               hintText: 'VD: A1B2C3',
-              hintStyle: TextStyle(color: Colors.grey.shade400, letterSpacing: 0),
+              hintStyle: TextStyle(color: AppColors.strokeSoft, letterSpacing: 0),
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+                borderSide: BorderSide(color: AppColors.strokeSoft),
               ),
               enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+                borderSide: BorderSide(color: AppColors.strokeSoft),
               ),
               focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: const BorderSide(color: Color(0xFF0F766E), width: 2),
+                borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+                borderSide: BorderSide(color: AppColors.brandPrimary, width: 2),
               ),
               contentPadding: const EdgeInsets.symmetric(vertical: 20),
             ),
           ),
           if (provider.errorMessage != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: AppSpacing.sectionGapMd),
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppSpacing.gapMd),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF2F2),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFFCA5A5)),
+                color: AppStateColors.criticalBg,
+                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+                border: Border.all(color: AppColors.critical.withValues(alpha: 0.4)),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: Color(0xFFDC2626), size: 20),
-                  const SizedBox(width: 8),
+                  Icon(Icons.error_outline, color: AppColors.critical, size: 20),
+                  SizedBox(width: AppSpacing.gapSm),
                   Expanded(
                     child: Text(
                       provider.errorMessage!,
-                      style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 14),
+                      style: AppTextStyles.caption.copyWith(color: AppColors.critical),
                     ),
                   ),
                 ],
@@ -100,17 +102,19 @@ class _DeviceManualCodeStepState extends State<DeviceManualCodeStep> {
               provider.verifyCode(_controller.text.trim());
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF0F766E),
+              backgroundColor: AppColors.brandPrimary,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 18),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+              ),
               elevation: 0,
             ),
-            child: isVerifying 
+            child: isVerifying
                 ? const SizedBox(
-                    height: 24, 
-                    width: 24, 
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
                 : const Text(
                     'Kiểm tra mã',

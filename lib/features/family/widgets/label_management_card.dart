@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 class LabelManagementCard extends StatelessWidget {
   final String title;
@@ -19,8 +21,8 @@ class LabelManagementCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -31,10 +33,10 @@ class LabelManagementCard extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         child: InkWell(
           onTap: isUpdating ? null : onTapChange,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadii.radiusLg),
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Row(
@@ -45,7 +47,7 @@ class LabelManagementCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF12304A),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -56,7 +58,7 @@ class LabelManagementCard extends StatelessWidget {
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Color(0xFF5B7288),
+                        AppColors.textSecondary,
                       ),
                     ),
                   )
@@ -65,7 +67,7 @@ class LabelManagementCard extends StatelessWidget {
                     currentLabel,
                     style: const TextStyle(
                       fontSize: 16,
-                      color: Color(0xFF5B7288),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -74,7 +76,7 @@ class LabelManagementCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF2F80ED),
+                      color: AppColors.brandPrimary,
                     ),
                   ),
                 ],
