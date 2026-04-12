@@ -162,17 +162,30 @@ class MonitoringService:
             )
         )
 
+        sleep_minutes = phases.get("light", 0) + phases.get("deep", 0) + phases.get("rem", 0)
+        awake_minutes = phases.get("awake", 0)
+        efficiency_ratio = sleep_minutes / in_bed_minutes if in_bed_minutes > 0 else 0.0
+        
+        quality_score = int(row.get("sleep_score") or 0)
+        if quality_score >= 80:
+            quality_label = "GOOD"
+        elif quality_score >= 60:
+            quality_label = "AVERAGE"
+        else:
+            quality_label = "POOR"
+
         return SleepSessionResponse(
+            session_id=str(start_time.timestamp()),
             quality_score=quality_score,
+            quality_label=quality_label,
             in_bed_minutes=in_bed_minutes,
+            sleep_minutes=sleep_minutes,
+            awake_minutes=awake_minutes,
+            efficiency_ratio=efficiency_ratio,
             wake_count=int(row.get("wake_count") or 0),
             phases=phases,
             start_time=start_time,
             end_time=end_time,
-            sleep_minutes=sleep_minutes,
-            awake_minutes=awake_minutes,
-            efficiency_ratio=efficiency_ratio,
-            quality_label=quality_label,
         )
 
     @staticmethod
@@ -270,18 +283,31 @@ class MonitoringService:
                 )
             )
 
+            sleep_minutes = phases.get("light", 0) + phases.get("deep", 0) + phases.get("rem", 0)
+            awake_minutes = phases.get("awake", 0)
+            efficiency_ratio = sleep_minutes / in_bed_minutes if in_bed_minutes > 0 else 0.0
+            
+            quality_score = int(row.get("sleep_score") or 0)
+            if quality_score >= 80:
+                quality_label = "GOOD"
+            elif quality_score >= 60:
+                quality_label = "AVERAGE"
+            else:
+                quality_label = "POOR"
+
             results.append(
                 SleepSessionResponse(
+                    session_id=str(start_time.timestamp()),
                     quality_score=quality_score,
+                    quality_label=quality_label,
                     in_bed_minutes=in_bed_minutes,
+                    sleep_minutes=sleep_minutes,
+                    awake_minutes=awake_minutes,
+                    efficiency_ratio=efficiency_ratio,
                     wake_count=int(row.get("wake_count") or 0),
                     phases=phases,
                     start_time=start_time,
                     end_time=end_time,
-                    sleep_minutes=sleep_minutes,
-                    awake_minutes=awake_minutes,
-                    efficiency_ratio=efficiency_ratio,
-                    quality_label=quality_label,
                 )
             )
 

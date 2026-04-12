@@ -63,3 +63,9 @@ out*.txt
 
 # AI Code Assistant Folders
 .codex_appdata/
+
+# RooCode settings (local only)
+.roo
+.rooignore
+.roomodes
+roo-code-settings-optimized.json

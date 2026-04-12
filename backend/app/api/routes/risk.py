@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -14,6 +15,14 @@ from app.core.dependencies import get_current_user, get_optional_current_user
 from app.db.database import get_db
 from app.models.user_model import User
 from app.services.risk_inference_service import describe_feature_vector, infer_risk
+
+
+
+class _DecimalEncoder(json.JSONEncoder):
+    def default(self, o):
+        if isinstance(o, Decimal):
+            return float(o)
+        return super().default(o)
 
 router = APIRouter(tags=["mobile-risk"])
 
@@ -341,7 +350,7 @@ def calculate_risk(
             "device_id": int(payload.device_id),
             "score": round(float(inference_result.score), 2),
             "risk_level": risk_level.lower(),
-            "features": json.dumps(features_json),
+            "features": json.dumps(features_json, cls=_DecimalEncoder),
             "model_version": f"{inference_result.backend}-v1.0",
             "algorithm": inference_result.backend,
         },
@@ -376,8 +385,8 @@ def calculate_risk(
         {
             "risk_score_id": int(inserted_row["id"]),
             "explanation_text": explanation_text,
-            "feature_importance": json.dumps(feature_importance),
-            "xai_method": "rule_based" if inference_result.backend == "rule_based" else "model_inference",
+            "feature_importance": json.dumps(feature_importance, cls=_DecimalEncoder),
+            "xai_method": "rule_based" if inference_result.backend == "rule_based" else "shap",
             "recommendations": [
                 "Review recent vitals and repeat the measurement if symptoms persist.",
                 "Escalate to medical review for CRITICAL results.",

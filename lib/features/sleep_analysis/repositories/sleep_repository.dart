@@ -33,6 +33,7 @@ class SleepRepositoryImpl implements SleepRepository {
     try {
       final path = _buildPath(ApiEndpoints.latestSleep, patientId: patientId);
       final json = await _client.get(path);
+      if (json == null) return null;
       return SleepSession.fromJson(json);
     } catch (e) {
       final msg = e.toString();
@@ -61,7 +62,13 @@ class SleepRepositoryImpl implements SleepRepository {
       final response = await _client.get(fullPath);
 
       // Response can be a Map with a list field, or directly a List
-      final rawList = response['data'] ?? response['items'] ?? response['sessions'];
+      dynamic rawList;
+      if (response is List) {
+        rawList = response;
+      } else if (response is Map) {
+        rawList = response['data'] ?? response['items'] ?? response['sessions'];
+      }
+      
       if (rawList is List) {
         return rawList
             .whereType<Map<String, dynamic>>()
