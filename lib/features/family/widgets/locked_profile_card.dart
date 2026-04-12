@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/features/family/models/family_profile_snapshot.dart';
 
 class LockedProfileCard extends StatelessWidget {
@@ -17,8 +19,8 @@ class LockedProfileCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -34,13 +36,13 @@ class LockedProfileCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: const Color(0xFFE2E8F0),
+                backgroundColor: AppColors.strokeSoft,
                 child: Text(
                   profile.name.isNotEmpty ? profile.name[0].toUpperCase() : '?',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF5B7288),
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ),
@@ -51,7 +53,7 @@ class LockedProfileCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF12304A),
+                    color: AppColors.textPrimary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -63,21 +65,21 @@ class LockedProfileCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF4F7FB),
-              borderRadius: BorderRadius.circular(8),
+              color: AppColors.bgPrimary,
+              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
             ),
             child: Row(
               children: [
                 const Icon(
                   Icons.lock_outline,
-                  color: Color(0xFF5B7288),
+                  color: AppColors.textSecondary,
                   size: 18,
                 ),
                 const SizedBox(width: 8),
                 const Expanded(
                   child: Text(
                     'Bạn chưa được cấp quyền xem dữ liệu sức khoẻ.',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF5B7288)),
+                    style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
                 ),
               ],
@@ -89,7 +91,7 @@ class LockedProfileCard extends StatelessWidget {
             child: TextButton(
               onPressed: onManageRoles,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF2F80ED),
+                foregroundColor: AppColors.brandPrimary,
                 textStyle: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,

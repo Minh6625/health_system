@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/features/family/models/linked_contact_model.dart';
 
 class LinkedContactHeroCard extends StatelessWidget {
@@ -10,12 +12,12 @@ class LinkedContactHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      decoration: BoxDecoration(color: const Color(0xFFF4F7FB)),
+      decoration: BoxDecoration(color: AppColors.bgPrimary),
       child: Column(
         children: [
           CircleAvatar(
             radius: 40,
-            backgroundColor: const Color(0xFFE2E8F0),
+            backgroundColor: AppColors.strokeSoft,
             backgroundImage: contact.avatarUrl.isNotEmpty
                 ? NetworkImage(contact.avatarUrl)
                 : null,
@@ -27,7 +29,7 @@ class LinkedContactHeroCard extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF5B7288),
+                      color: AppColors.textSecondary,
                     ),
                   )
                 : null,
@@ -38,7 +40,7 @@ class LinkedContactHeroCard extends StatelessWidget {
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF12304A),
+              color: AppColors.textPrimary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -46,10 +48,10 @@ class LinkedContactHeroCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFEEF4FF),
-              borderRadius: BorderRadius.circular(16),
+              color: AppColors.brandPrimaryLight,
+              borderRadius: BorderRadius.circular(AppRadii.radiusLg),
               border: Border.all(
-                color: const Color(0xFF2F80ED).withValues(alpha: 0.2),
+                color: AppColors.brandPrimary.withValues(alpha: 0.2),
               ),
             ),
             child: Row(
@@ -58,14 +60,14 @@ class LinkedContactHeroCard extends StatelessWidget {
                 const Icon(
                   Icons.label_outline,
                   size: 14,
-                  color: Color(0xFF2F80ED),
+                  color: AppColors.brandPrimary,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   'Nhãn: ${contact.role.label}',
                   style: const TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF2F80ED),
+                    color: AppColors.brandPrimary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

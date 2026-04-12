@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 
 /// A row of quick-access action buttons (History & Stats) at the bottom of
 /// the Health Monitoring dashboard. Each button has a min-height of 56dp
@@ -20,13 +24,12 @@ class QuickActionsPanel extends StatelessWidget {
       children: [
         Text(
           'Hành động nhanh',
-          style: TextStyle(
-            fontSize: 16,
+          style: AppTextStyles.body.copyWith(
             fontWeight: FontWeight.bold,
-            color: Colors.grey.shade800,
+            color: AppColors.textPrimary,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: AppSpacing.gapMd),
         Row(
           children: [
             Expanded(
@@ -36,7 +39,7 @@ class QuickActionsPanel extends StatelessWidget {
                 onTap: onHistoryTap,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: AppSpacing.gapMd),
             Expanded(
               child: _ActionButton(
                 icon: Icons.analytics,
@@ -65,29 +68,29 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      color: AppColors.bgSurface,
+      borderRadius: BorderRadius.circular(AppRadii.radiusMd),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
         child: Container(
           constraints: const BoxConstraints(minHeight: 56),
-          padding: const EdgeInsets.symmetric(vertical: 16),
+          padding: EdgeInsets.symmetric(vertical: AppSpacing.gapLg),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+            border: Border.all(color: AppColors.strokeSoft),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: Colors.blue.shade700, size: 28),
-              const SizedBox(height: 8),
+              Icon(icon, color: AppColors.brandPrimary, size: 28),
+              SizedBox(height: AppSpacing.gapSm),
               Text(
                 label,
-                style: TextStyle(
+                style: AppTextStyles.caption.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Colors.grey.shade800,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ],

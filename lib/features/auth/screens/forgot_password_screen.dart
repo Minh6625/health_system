@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:healthguard/core/constants/app_sizes.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
@@ -56,7 +58,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(response.message),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.critical,
           ),
         );
       }
@@ -89,11 +91,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.bgSurface,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          iconTheme: const IconThemeData(color: AppColors.primary),
+          iconTheme: const IconThemeData(color: AppColors.brandPrimary),
         ),
         body: SafeArea(
           child: LayoutBuilder(
@@ -117,13 +119,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           Container(
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryLight.withAlpha(25),
+                              color: AppColors.brandPrimaryLight.withAlpha(25),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.lock_reset_rounded,
                               size: 72,
-                              color: AppColors.primary,
+                              color: AppColors.brandPrimary,
                             ),
                           )
                               .animate(onPlay: (controller) => controller.repeat(reverse: true))
@@ -133,12 +135,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           const SizedBox(height: 32),
 
                           // Title
-                          const Text(
+                          Text(
                             'Quên Mật Khẩu',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+                            style: AppTextStyles.displayCompact.copyWith(
+                              color: AppColors.textPrimary,
                             ),
                             textAlign: TextAlign.center,
                           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
@@ -146,12 +146,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           const SizedBox(height: 16),
 
                           // Subtitle
-                          const Text(
+                          Text(
                             'Nhập email của bạn để nhận liên kết\nđặt lại mật khẩu',
                             textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.grey,
+                            style: AppTextStyles.body.copyWith(
+                              color: AppColors.textSecondary,
                               height: 1.5,
                             ),
                           ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
@@ -190,10 +189,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : handleForgotPassword,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
+                                backgroundColor: AppColors.brandPrimary,
+                                foregroundColor: AppColors.bgSurface,
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(AppRadii.radiusLg),
                                 ),
                                 elevation: 0,
                               ),
@@ -202,7 +201,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                       width: 24,
                                       height: 24,
                                       child: CircularProgressIndicator(
-                                        color: Colors.white,
+                                        color: AppColors.bgSurface,
                                         strokeWidth: 2.5,
                                       ),
                                     )
@@ -229,7 +228,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               child: const Text(
                                 'Quay lại đăng nhập',
                                 style: TextStyle(
-                                  color: AppColors.primary,
+                                  color: AppColors.brandPrimary,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),

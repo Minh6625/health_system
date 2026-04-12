@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class NoDataTonightView extends StatelessWidget {
   const NoDataTonightView({super.key});
@@ -28,7 +29,7 @@ class NoDataTonightView extends StatelessWidget {
                 size: 64,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.sectionGapXl),
             const Text(
               'Dữ liệu đêm nay chưa sẵn sàng',
               style: TextStyle(
@@ -38,7 +39,7 @@ class NoDataTonightView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.gapMd),
             const Text(
               'Các chỉ số chi tiết về giấc ngủ sẽ được tổng hợp và hiển thị sau 6:00 sáng mai. Chúc bạn ngủ ngon!',
               style: TextStyle(

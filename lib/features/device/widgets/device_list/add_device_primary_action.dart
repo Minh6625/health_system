@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class AddDevicePrimaryAction extends StatelessWidget {
   final VoidCallback onPressed;
@@ -8,11 +12,14 @@ class AddDevicePrimaryAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.sectionGapMd,
+        vertical: AppSpacing.sectionGapMd,
+      ),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(
-          top: BorderSide(color: Colors.grey.shade200),
+          top: BorderSide(color: AppColors.strokeSoft),
         ),
       ),
       child: SafeArea(
@@ -20,24 +27,24 @@ class AddDevicePrimaryAction extends StatelessWidget {
         child: ElevatedButton(
           onPressed: onPressed,
           style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0F766E), // brand.primary
+            backgroundColor: AppColors.brandPrimary,
             foregroundColor: Colors.white,
             minimumSize: const Size.fromHeight(56),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(AppRadii.radiusLg),
             ),
             elevation: 0,
           ),
-          child: const Row(
+          child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.add_circle_outline_rounded, size: 24),
-              SizedBox(width: 8),
+              const Icon(Icons.add_circle_outline_rounded, size: 24),
+              SizedBox(width: AppSpacing.gapSm),
               Text(
                 'Kết nối thiết bị mới',
-                style: TextStyle(
-                  fontSize: 17,
+                style: AppTextStyles.bodyLarge.copyWith(
                   fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
             ],

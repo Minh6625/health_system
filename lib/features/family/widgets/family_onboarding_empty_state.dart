@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class FamilyOnboardingEmptyState extends StatelessWidget {
   final VoidCallback onAddContact;
@@ -15,14 +18,14 @@ class FamilyOnboardingEmptyState extends StatelessWidget {
           Container(
             width: 120,
             height: 120,
-            decoration: BoxDecoration(
-              color: const Color(0xFFEEF4FF),
+            decoration: const BoxDecoration(
+              color: AppColors.brandPrimaryLight,
               shape: BoxShape.circle,
             ),
             child: const Icon(
               Icons.family_restroom_rounded,
               size: 64,
-              color: Color(0xFF2F80ED),
+              color: AppColors.brandPrimary,
             ),
           ),
           const SizedBox(height: 32),
@@ -32,16 +35,16 @@ class FamilyOnboardingEmptyState extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF12304A),
+              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.gapLg),
           const Text(
             'Hãy thêm người thân vào danh sách theo dõi để giúp bạn chăm sóc sức khoẻ của họ tốt hơn.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 16,
-              color: Color(0xFF5B7288),
+              color: AppColors.textSecondary,
               height: 1.5,
             ),
           ),
@@ -49,10 +52,10 @@ class FamilyOnboardingEmptyState extends StatelessWidget {
           ElevatedButton(
             onPressed: onAddContact,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2F80ED),
+              backgroundColor: AppColors.brandPrimary,
               minimumSize: const Size(double.infinity, 56),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(AppRadii.radiusLg),
               ),
               elevation: 0,
             ),
@@ -61,7 +64,7 @@ class FamilyOnboardingEmptyState extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: AppColors.bgSurface,
               ),
             ),
           ),

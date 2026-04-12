@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 class QRScannerViewport extends StatelessWidget {
   final VoidCallback onSimulateScanSuccess;
@@ -16,7 +18,7 @@ class QRScannerViewport extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: const Color(0xFF1A1A1A), // Dark grey for camera feel
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
       ),
       child: Stack(
         alignment: Alignment.center,
@@ -26,8 +28,8 @@ class QRScannerViewport extends StatelessWidget {
             width: 240,
             height: 240,
             decoration: BoxDecoration(
-              border: Border.all(color: const Color(0xFF2F80ED), width: 3),
-              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.brandPrimary, width: 3),
+              borderRadius: BorderRadius.circular(AppRadii.radiusXl),
             ),
           ),
           // Scanning Line (Fake animation effect)
@@ -39,12 +41,12 @@ class QRScannerViewport extends StatelessWidget {
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF2F80ED).withValues(alpha: 0.8),
+                    color: AppColors.brandPrimary.withValues(alpha: 0.8),
                     blurRadius: 8,
                     spreadRadius: 2,
                   ),
                 ],
-                color: const Color(0xFF2F80ED),
+                color: AppColors.brandPrimary,
               ),
             ),
           ),
@@ -54,7 +56,7 @@ class QRScannerViewport extends StatelessWidget {
             child: Text(
               'Đưa mã QR vào giữa khung để quét',
               style: TextStyle(
-                color: Colors.white,
+                color: AppColors.bgSurface,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -72,7 +74,7 @@ class QRScannerViewport extends StatelessWidget {
               child: IconButton(
                 icon: const Icon(
                   Icons.flash_off,
-                  color: Colors.white,
+                  color: AppColors.bgSurface,
                   size: 24,
                 ),
                 onPressed: () {},
@@ -88,9 +90,9 @@ class QRScannerViewport extends StatelessWidget {
                   onPressed: onSimulateScanSuccess,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.bgSurface,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                     ),
                   ),
                   child: const Text('Sim: OK'),
@@ -100,9 +102,9 @@ class QRScannerViewport extends StatelessWidget {
                   onPressed: onSimulateScanError,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red.shade600,
-                    foregroundColor: Colors.white,
+                    foregroundColor: AppColors.bgSurface,
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                     ),
                   ),
                   child: const Text('Sim: Error'),

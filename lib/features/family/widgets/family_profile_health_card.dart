@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/features/family/models/family_profile_snapshot.dart';
 
 class FamilyProfileHealthCard extends StatelessWidget {
@@ -20,25 +22,25 @@ class FamilyProfileHealthCard extends StatelessWidget {
     Color iconColor;
 
     if (isNoData) {
-      cardColor = const Color(0xFFF8FAFC);
-      iconBgColor = const Color(0xFFE2E8F0);
-      iconColor = const Color(0xFF5B7288);
+      cardColor = AppColors.bgPrimary;
+      iconBgColor = AppColors.strokeSoft;
+      iconColor = AppColors.textSecondary;
     } else if (profile.isSosActive) {
-      cardColor = const Color(0xFFFDEEEE);
-      iconBgColor = const Color(0xFFD95C5C);
+      cardColor = AppStateColors.criticalBg;
+      iconBgColor = AppColors.critical;
       iconColor = Colors.white;
     } else if (profile.riskLevel == 'high') {
-      cardColor = const Color(0xFFFDEEEE);
-      iconBgColor = const Color(0xFFFDEEEE);
-      iconColor = const Color(0xFFD95C5C);
+      cardColor = AppStateColors.criticalBg;
+      iconBgColor = AppStateColors.criticalBg;
+      iconColor = AppColors.critical;
     } else if (profile.riskLevel == 'medium') {
-      cardColor = const Color(0xFFFDF4E5);
-      iconBgColor = const Color(0xFFFDF4E5);
-      iconColor = const Color(0xFFF2A93B);
+      cardColor = AppStateColors.warningBg;
+      iconBgColor = AppStateColors.warningBg;
+      iconColor = AppColors.warning;
     } else {
       cardColor = Colors.white;
-      iconBgColor = const Color(0xFFF4F7FB);
-      iconColor = const Color(0xFF2F80ED);
+      iconBgColor = AppColors.bgPrimary;
+      iconColor = AppColors.brandPrimary;
     }
 
     final diffSecondsRaw = DateTime.now()
@@ -57,12 +59,12 @@ class FamilyProfileHealthCard extends StatelessWidget {
         final remainSeconds = snappedDiffSeconds % 60;
 
         if (diffMinutes == 0) {
-          updatedText = 'Vừa cập nhật ${remainSeconds} giây trước';
+          updatedText = 'Vừa cập nhật $remainSeconds giây trước';
         } else if (remainSeconds == 0) {
-          updatedText = 'Vừa cập nhật ${diffMinutes} phút trước';
+          updatedText = 'Vừa cập nhật $diffMinutes phút trước';
         } else {
           updatedText =
-              'Vừa cập nhật ${diffMinutes}p${remainSeconds} giây trước';
+              'Vừa cập nhật ${diffMinutes}p$remainSeconds giây trước';
         }
       }
     }
@@ -71,7 +73,7 @@ class FamilyProfileHealthCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: cardColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -80,15 +82,15 @@ class FamilyProfileHealthCard extends StatelessWidget {
           ),
         ],
         border: profile.isSosActive
-            ? Border.all(color: const Color(0xFFD95C5C), width: 1.5)
+            ? Border.all(color: AppColors.critical, width: 1.5)
             : null,
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadii.radiusLg),
           child: Padding(
             padding: const EdgeInsets.all(18),
             child: Column(
@@ -123,7 +125,7 @@ class FamilyProfileHealthCard extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF12304A),
+                                  color: AppColors.textPrimary,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -133,7 +135,7 @@ class FamilyProfileHealthCard extends StatelessWidget {
                                 const SizedBox(width: 6),
                                 const Icon(
                                   Icons.warning_amber_rounded,
-                                  color: Color(0xFFD95C5C),
+                                  color: AppColors.critical,
                                   size: 18,
                                 ),
                               ],
@@ -150,11 +152,11 @@ class FamilyProfileHealthCard extends StatelessWidget {
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
                                 color: isNoData
-                                    ? const Color(0xFF5B7288)
+                                    ? AppColors.textSecondary
                                     : (profile.isSosActive ||
                                               profile.riskLevel == 'high'
-                                          ? const Color(0xFFD95C5C)
-                                          : const Color(0xFFF2A93B)),
+                                          ? AppColors.critical
+                                          : AppColors.warning),
                               ),
                             ),
                         ],
@@ -171,8 +173,8 @@ class FamilyProfileHealthCard extends StatelessWidget {
                       isNoData ? '--' : '${profile.heartRate}',
                       'bpm',
                       isNoData
-                          ? const Color(0xFF5B7288)
-                          : const Color(0xFFD95C5C),
+                          ? AppColors.textSecondary
+                          : AppColors.critical,
                     ),
                     const SizedBox(width: 16),
                     _buildVitalItem(
@@ -180,8 +182,8 @@ class FamilyProfileHealthCard extends StatelessWidget {
                       isNoData ? '--' : '${profile.spo2}',
                       '%',
                       isNoData
-                          ? const Color(0xFF5B7288)
-                          : const Color(0xFF2F80ED),
+                          ? AppColors.textSecondary
+                          : AppColors.brandPrimary,
                     ),
                   ],
                 ),
@@ -196,8 +198,8 @@ class FamilyProfileHealthCard extends StatelessWidget {
                           : (profile.bloodPressureDisplay ?? '--/--'),
                       'mmHg',
                       isNoData
-                          ? const Color(0xFF5B7288)
-                          : const Color(0xFF2E9B6F),
+                          ? AppColors.textSecondary
+                          : AppColors.success,
                     ),
                     const SizedBox(width: 16),
                     _buildVitalItem(
@@ -207,8 +209,8 @@ class FamilyProfileHealthCard extends StatelessWidget {
                           : (profile.bodyTemperatureDisplay ?? '--'),
                       '°C',
                       isNoData
-                          ? const Color(0xFF5B7288)
-                          : const Color(0xFFF2A93B),
+                          ? AppColors.textSecondary
+                          : AppColors.warning,
                     ),
                   ],
                 ),
@@ -220,7 +222,7 @@ class FamilyProfileHealthCard extends StatelessWidget {
                       updatedText,
                       style: const TextStyle(
                         fontSize: 13,
-                        color: Color(0xFF5B7288),
+                        color: AppColors.textSecondary,
                       ),
                     ),
                     Row(
@@ -230,14 +232,14 @@ class FamilyProfileHealthCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF2F80ED),
+                            color: AppColors.brandPrimary,
                           ),
                         ),
                         SizedBox(width: 4),
                         Icon(
                           Icons.arrow_forward,
                           size: 16,
-                          color: Color(0xFF2F80ED),
+                          color: AppColors.brandPrimary,
                         ),
                       ],
                     ),
@@ -268,14 +270,14 @@ class FamilyProfileHealthCard extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF12304A),
+                color: AppColors.textPrimary,
               ),
               overflow: TextOverflow.ellipsis,
             ),
           ),
           Text(
             unit,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF5B7288)),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),

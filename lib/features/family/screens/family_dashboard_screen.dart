@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:healthguard/core/routes/app_router.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/family/widgets/family_health_hero_card.dart';
 import 'package:healthguard/features/family/widgets/family_onboarding_empty_state.dart';
@@ -160,7 +164,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     final provider = context.watch<FamilyDashboardProvider>();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: AppColors.bgPrimary,
       body: _buildBody(context, provider),
     );
   }
@@ -169,7 +173,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
     if (provider.isLoading) {
       return const Center(
         child: CircularProgressIndicator(
-          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2F80ED)),
+          valueColor: AlwaysStoppedAnimation<Color>(AppColors.brandPrimary),
         ),
       );
     }
@@ -179,17 +183,15 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Color(0xFFC94A4A)),
-            const SizedBox(height: 16),
-            const Text(
+            const Icon(Icons.error_outline, size: 48, color: AppColors.critical),
+            SizedBox(height: AppSpacing.gapLg),
+            Text(
               'Có lỗi xảy ra khi tải dữ liệu',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF12304A),
+              style: AppTextStyles.sectionTitle.copyWith(
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: AppSpacing.gapSm),
             ElevatedButton(
               onPressed: () {
                 final auth = context.read<AuthProvider>();
@@ -232,7 +234,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
       },
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: EdgeInsets.only(bottom: AppSpacing.sectionGapXl),
         // 4 fixed slots (Hero, [sos removed], [attention removed], Filter) + list + footer
         itemCount: 3 + provider.displayList.length + 1,
         itemBuilder: (context, index) {
@@ -244,7 +246,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
                   stableCount: provider.stableCount,
                   attentionCount: provider.attentionCount,
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppSpacing.gapSm),
               ],
             );
           }
@@ -252,7 +254,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
             return _buildFilterChips(context, provider);
           }
           if (index == 2) {
-            return const SizedBox(height: 8);
+            return SizedBox(height: AppSpacing.gapSm);
           }
 
           final listIndex = index - 3;
@@ -286,22 +288,20 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
 
           // Footer
           return Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: EdgeInsets.all(AppSpacing.sectionGapXl),
             child: OutlinedButton(
               onPressed: () => _onManageContactsTapped(context),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 56),
-                side: const BorderSide(color: Color(0xFF2F80ED)),
+                side: const BorderSide(color: AppColors.brandPrimary),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: AppRadii.cardRadius,
                 ),
               ),
-              child: const Text(
+              child: Text(
                 'Quản lý liên hệ & quyền xem',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF2F80ED),
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.brandPrimary,
                 ),
               ),
             ),
@@ -317,7 +317,7 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
   ) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.gapLg, vertical: 6),
       child: Row(
         children: [
           _buildChip(provider, 'Tất cả', FamilyFilter.all),
@@ -336,27 +336,27 @@ class _FamilyDashboardContentState extends State<_FamilyDashboardContent> {
   ) {
     final isSelected = provider.currentFilter == filter;
     return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
+      padding: EdgeInsets.only(right: AppSpacing.gapSm),
       child: FilterChip(
         label: Text(label),
         selected: isSelected,
         onSelected: (selected) {
           provider.setFilter(filter);
         },
-        selectedColor: const Color(0xFFE8EEF6),
-        backgroundColor: const Color(0xFFF8FAFC),
+        selectedColor: AppColors.bgElevated,
+        backgroundColor: AppColors.bgPrimary,
         showCheckmark: false,
         labelStyle: TextStyle(
-          color: isSelected ? const Color(0xFF12304A) : const Color(0xFF5B7288),
+          color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           fontSize: 13,
         ),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.radiusXl),
           side: BorderSide(
             color: isSelected
-                ? const Color(0xFFB8CAE0)
-                : const Color(0xFFD8E3EE),
+                ? AppColors.strokeSoft
+                : AppColors.strokeSoft,
           ),
         ),
       ),

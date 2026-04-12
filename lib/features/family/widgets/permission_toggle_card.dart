@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 class PermissionToggleCard extends StatelessWidget {
   final String title;
@@ -21,8 +23,8 @@ class PermissionToggleCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -33,9 +35,9 @@ class PermissionToggleCard extends StatelessWidget {
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadii.radiusLg),
           onTap: isSaving ? null : () => onChanged(!value),
           child: Padding(
             padding: const EdgeInsets.all(18),
@@ -51,7 +53,7 @@ class PermissionToggleCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF12304A),
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -59,7 +61,7 @@ class PermissionToggleCard extends StatelessWidget {
                         description,
                         style: const TextStyle(
                           fontSize: 14,
-                          color: Color(0xFF5B7288),
+                          color: AppColors.textSecondary,
                           height: 1.4,
                         ),
                       ),
@@ -76,7 +78,7 @@ class PermissionToggleCard extends StatelessWidget {
                       child: CircularProgressIndicator(
                         strokeWidth: 2.5,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          Color(0xFF2F80ED),
+                          AppColors.brandPrimary,
                         ),
                       ),
                     ),
@@ -85,7 +87,7 @@ class PermissionToggleCard extends StatelessWidget {
                   Switch(
                     value: value,
                     onChanged: (val) => onChanged(val),
-                    activeThumbColor: const Color(0xFF2F80ED),
+                    activeThumbColor: AppColors.brandPrimary,
                   ),
               ],
             ),

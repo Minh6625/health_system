@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../domain/entities/risk_report_entity.dart';
@@ -22,14 +23,13 @@ class TopFactorChipsSection extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.gapMd),
         Wrap(
-          spacing: 8,
-          runSpacing: 8,
+          spacing: AppSpacing.gapSm,
+          runSpacing: AppSpacing.gapSm,
           children: factors.map((f) {
             return Chip(
               label: Text(
                 f.label,
-                style: const TextStyle(
-                  fontSize: 14,
+                style: AppTextStyles.caption.copyWith(
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary,
                 ),
@@ -37,7 +37,7 @@ class TopFactorChipsSection extends StatelessWidget {
               backgroundColor: AppColors.bgSurface,
               side: const BorderSide(color: AppColors.strokeSoft),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadii.radiusSm),
               ),
             );
           }).toList(),

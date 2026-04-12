@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
 
 /// A shimmer skeleton that mimics the layout of the Health Monitoring dashboard
 /// (2-column vital card grid + wide blood pressure card) shown during initial load.
@@ -55,6 +57,7 @@ class _VitalGridSkeletonState extends State<VitalGridSkeleton>
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
               stops: const [0.0, 0.5, 1.0],
+              // Shimmer gradient — decorative skeleton colors, not semantic
               colors: const [
                 Color(0xFFE8ECF0),
                 Color(0xFFF5F7FA),
@@ -74,30 +77,30 @@ class _VitalGridSkeletonState extends State<VitalGridSkeleton>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // TimestampBadge skeleton
-        _skeletonBox(height: 44, radius: 12),
-        const SizedBox(height: 16),
-        // 2×2 card grid — use explicit Row+Column to avoid shrinkWrap sliver assertion
+        _skeletonBox(height: 44, radius: AppRadii.radiusMd),
+        SizedBox(height: AppSpacing.gapLg),
+        // 2×2 card grid
         Row(
           children: [
-            Expanded(child: _skeletonBox(height: 140)),
-            const SizedBox(width: 12),
-            Expanded(child: _skeletonBox(height: 140)),
+            Expanded(child: _skeletonBox(height: 140, radius: AppRadii.radiusLg)),
+            SizedBox(width: AppSpacing.gapMd),
+            Expanded(child: _skeletonBox(height: 140, radius: AppRadii.radiusLg)),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: AppSpacing.gapMd),
         Row(
           children: [
-            Expanded(child: _skeletonBox(height: 140)),
-            const SizedBox(width: 12),
-            Expanded(child: _skeletonBox(height: 140)),
+            Expanded(child: _skeletonBox(height: 140, radius: AppRadii.radiusLg)),
+            SizedBox(width: AppSpacing.gapMd),
+            Expanded(child: _skeletonBox(height: 140, radius: AppRadii.radiusLg)),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: AppSpacing.gapMd),
         // Blood pressure card (wide)
-        _skeletonBox(height: 100, radius: 16),
-        const SizedBox(height: 24),
+        _skeletonBox(height: 100, radius: AppRadii.radiusLg),
+        SizedBox(height: AppSpacing.sectionGapXl.toDouble()),
         // Quick actions
-        _skeletonBox(height: 76, radius: 12),
+        _skeletonBox(height: 76, radius: AppRadii.radiusMd),
       ],
     );
   }

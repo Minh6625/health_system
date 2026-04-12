@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class FamilyAttentionSummaryBanner extends StatelessWidget {
   final int count;
@@ -10,24 +13,30 @@ class FamilyAttentionSummaryBanner extends StatelessWidget {
     if (count == 0) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapLg,
+        vertical: AppSpacing.gapSm,
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapLg,
+        vertical: AppSpacing.sectionGapSm,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFFFDF4E5),
-        borderRadius: BorderRadius.circular(12),
+        color: AppStateColors.warningBg,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
         border: Border.all(
-          color: const Color(0xFFF2A93B).withValues(alpha: 0.3),
+          color: AppColors.warning.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline, color: Color(0xFFF2A93B), size: 24),
-          const SizedBox(width: 12),
+          const Icon(Icons.info_outline, color: AppColors.warning, size: 24),
+          const SizedBox(width: AppSpacing.sectionGapSm),
           Expanded(
             child: Text(
               'Có $count người đang cần cần bạn chú ý theo dõi.',
               style: const TextStyle(
-                color: Color(0xFF12304A),
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),

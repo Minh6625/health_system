@@ -53,7 +53,7 @@ class SupportingMetricsSnapshotCard extends StatelessWidget {
           label,
           style: AppTextStyles.caption,
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.gapXs),
         Text(
           value,
           style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),

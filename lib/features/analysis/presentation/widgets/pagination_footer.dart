@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../shared/presentation/theme/app_colors.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class PaginationFooter extends StatelessWidget {
   final bool isLoadingMore;
@@ -29,10 +30,7 @@ class PaginationFooter extends StatelessWidget {
         child: Center(
           child: Text(
             'Bạn đã xem hết dữ liệu',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textSecondary,
-            ),
+            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
           ),
         ),
       );

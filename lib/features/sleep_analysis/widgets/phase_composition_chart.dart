@@ -1,6 +1,7 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 /// Donut chart hiển thị tỉ lệ các giai đoạn giấc ngủ: Light / Deep / REM.
 /// Ẩn hoàn toàn khi [session.phases] == null.
@@ -85,7 +86,7 @@ class _PhaseCompositionChartState extends State<PhaseCompositionChart> {
                   ),
                 ],
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.gapSm),
             ],
           ),
         ),

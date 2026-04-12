@@ -13,6 +13,8 @@ import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/shared/presentation/shell/app_shell_bottom_nav.dart';
 import 'package:healthguard/shared/presentation/shell/main_scaffold_shell.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class FamilyShellScreen extends StatefulWidget {
   /// 0 = Theo dõi, 1 = Liên hệ, 2 = SOS
@@ -169,7 +171,7 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
   Widget _buildTabLabelWithBadge({
     required String label,
     required int count,
-    Color badgeColor = const Color(0xFFD95C5C),
+    Color badgeColor = AppColors.critical,
   }) {
     if (count <= 0) {
       return Text(label);
@@ -228,16 +230,16 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
           },
         ),
         child: Scaffold(
-          backgroundColor: const Color(0xFFF4F7FB),
+          backgroundColor: AppColors.bgPrimary,
           appBar: AppBar(
-            title: const Text(
+            title: Text(
               'Gia đình',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF12304A),
+                color: AppColors.textPrimary,
               ),
             ),
-            backgroundColor: const Color(0xFFF4F7FB),
+            backgroundColor: AppColors.bgPrimary,
             elevation: 0,
             centerTitle: true,
             automaticallyImplyLeading: false,
@@ -250,7 +252,7 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
                     return IconButton(
                       icon: const Icon(
                         Icons.person_add,
-                        color: Color(0xFF12304A),
+                        color: AppColors.textPrimary,
                       ),
                       tooltip: 'Thêm liên hệ',
                       onPressed: _navigateToAddContact,
@@ -265,15 +267,15 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
             children: [
               // Segmented Control Tab Bar
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 8.0,
+                padding: EdgeInsets.symmetric(
+                  horizontal: AppSpacing.gapLg,
+                  vertical: AppSpacing.gapSm,
                 ),
                 child: Container(
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
+                    color: AppColors.bgSurface,
+                    borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(alpha: 0.05),
@@ -287,15 +289,15 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
                     indicatorSize: TabBarIndicatorSize.tab,
                     dividerColor: Colors.transparent,
                     indicator: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      color: const Color(0xFF2F80ED),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
+                      color: AppColors.brandPrimary,
                     ),
-                    labelColor: Colors.white,
+                    labelColor: AppColors.bgSurface,
                     labelStyle: const TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 15,
                     ),
-                    unselectedLabelColor: const Color(0xFF5B7288),
+                    unselectedLabelColor: AppColors.textSecondary,
                     unselectedLabelStyle: const TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 15,
@@ -309,7 +311,7 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
                             return _buildTabLabelWithBadge(
                               label: 'Theo dõi',
                               count: trackingCount,
-                              badgeColor: const Color(0xFFEF6C00),
+                              badgeColor: AppColors.warning,
                             );
                           },
                         ),

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:healthguard/features/emergency/models/sos_event_model.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:intl/intl.dart';
 
 class SOSCard extends StatelessWidget {
@@ -19,19 +23,26 @@ class SOSCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Khẩn cấp = red theme, Đã xử lý = neutral white
     final bool isUrgent = sos.isActive;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      margin: EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapLg,
+        vertical: AppSpacing.gapSm,
+      ),
       decoration: BoxDecoration(
-        color: isUrgent ? const Color(0xFFFFABAF) : Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.1), width: 1),
+        color: isUrgent
+            ? AppColors.critical.withValues(alpha: 0.15)
+            : AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+        border: Border.all(
+          color: AppColors.strokeSoft.withValues(alpha: 0.1),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: isUrgent
-                ? const Color(0xFFE53935).withValues(alpha: 0.25)
+                ? AppColors.critical.withValues(alpha: 0.25)
                 : Colors.black.withValues(alpha: 0.05),
             blurRadius: 20,
             offset: const Offset(0, 6),
@@ -43,77 +54,65 @@ class SOSCard extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadii.radiusMd),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(AppSpacing.gapLg),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Patient Avatar
                 _buildAvatar(),
-                const SizedBox(width: 14),
-
-                // Main Info
+                SizedBox(width: AppSpacing.sectionGapSm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Patient Name + Badge
                       Row(
                         children: [
                           Expanded(
                             child: Text(
                               sos.patient.name,
-                              style: const TextStyle(
-                                fontSize: 16,
+                              style: AppTextStyles.bodyMedium.copyWith(
+                                color: AppColors.textPrimary,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFF1A1A1A),
                                 letterSpacing: -0.3,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: AppSpacing.gapSm),
                           _buildActionButton(isUrgent),
                         ],
                       ),
-                      const SizedBox(height: 5),
-
-                      // Trigger Chip
+                      SizedBox(height: AppSpacing.gapXs + 1),
                       _buildTriggerChip(),
-                      const SizedBox(height: 6),
-
-                      // Time
+                      SizedBox(height: AppSpacing.gapXs + 2),
                       Row(
                         children: [
                           Icon(
                             Icons.access_time,
                             size: 14,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                           ),
-                          const SizedBox(width: 4),
+                          SizedBox(width: AppSpacing.gapXs),
                           Text(
                             _formatTimeAgo(sos.triggerTime),
-                            style: TextStyle(
+                            style: AppTextStyles.caption.copyWith(
                               fontSize: 13,
-                              color: Colors.grey[700],
-                              fontWeight: FontWeight.w500,
+                              color: AppColors.textSecondary,
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 3),
-
-                      // Location
+                      SizedBox(height: AppSpacing.gapXs - 1),
                       Row(
                         children: [
                           Icon(
                             Icons.location_on,
                             size: 14,
-                            color: Colors.grey[600],
+                            color: AppColors.textSecondary,
                           ),
-                          const SizedBox(width: 4),
+                          SizedBox(width: AppSpacing.gapXs),
                           Expanded(
                             child: Text(
                               sos.location.address ??
@@ -121,9 +120,9 @@ class SOSCard extends StatelessWidget {
                                           sos.location.longitude != null
                                       ? '${sos.location.latitude!.toStringAsFixed(4)}, ${sos.location.longitude!.toStringAsFixed(4)}'
                                       : 'Vị trí không xác định'),
-                              style: TextStyle(
+                              style: AppTextStyles.caption.copyWith(
                                 fontSize: 13,
-                                color: Colors.grey[600],
+                                color: AppColors.textSecondary,
                                 height: 1.2,
                               ),
                               maxLines: 1,
@@ -150,7 +149,7 @@ class SOSCard extends StatelessWidget {
       height: 70,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.grey[200],
+        color: AppColors.strokeSoft,
       ),
       child: ClipOval(
         child: sos.patient.photoUrl != null
@@ -160,7 +159,7 @@ class SOSCard extends StatelessWidget {
                 placeholder: (context, url) => Center(
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.grey[400],
+                    color: AppColors.textSecondary,
                   ),
                 ),
                 errorWidget: (context, url, error) => _buildDefaultAvatar(),
@@ -172,8 +171,8 @@ class SOSCard extends StatelessWidget {
 
   Widget _buildDefaultAvatar() {
     return Container(
-      color: const Color(0xFFF5F5F5),
-      child: Icon(Icons.person, size: 35, color: Colors.grey[400]),
+      color: AppColors.bgPrimary,
+      child: Icon(Icons.person, size: 35, color: AppColors.textSecondary),
     );
   }
 
@@ -185,31 +184,34 @@ class SOSCard extends StatelessWidget {
 
     switch (sos.triggerType) {
       case 'fall_detected':
-        bgColor = const Color(0xFFFFEBEE);
-        textColor = const Color(0xFFD32F2F);
+        bgColor = AppStateColors.criticalBg;
+        textColor = AppColors.critical;
         label = 'Té ngã';
         break;
       case 'manual':
-        bgColor = const Color(0xFFFFF3E0);
-        textColor = const Color(0xFFE65100);
+        bgColor = AppStateColors.warningBg;
+        textColor = AppColors.warning;
         label = 'Thủ công';
         break;
       case 'vital_critical':
-        bgColor = const Color(0xFFFCE4EC);
-        textColor = const Color(0xFFC2185B);
+        bgColor = AppStateColors.criticalBg;
+        textColor = AppColors.critical;
         label = 'Chỉ số nguy hiểm';
         break;
       default:
-        bgColor = const Color(0xFFEDE7F6);
-        textColor = const Color(0xFF5E35B1);
+        bgColor = AppStateColors.infoBg;
+        textColor = AppColors.info;
         label = 'SOS';
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapSm,
+        vertical: 3,
+      ),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
       ),
       child: Text(
         label,
@@ -225,31 +227,37 @@ class SOSCard extends StatelessWidget {
   /// Action button - compact badge
   Widget _buildActionButton(bool isUrgent) {
     if (isUrgent) {
-      // Urgent badge - modern minimal
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.gapSm + 2,
+          vertical: AppSpacing.gapXs + 1,
+        ),
         decoration: BoxDecoration(
-          color: const Color(0xFFE53935),
-          borderRadius: BorderRadius.circular(5),
+          color: AppColors.critical,
+          borderRadius: BorderRadius.circular(AppRadii.radiusSm),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFE53935).withValues(alpha: 0.4),
+              color: AppColors.critical.withValues(alpha: 0.4),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.white, size: 13),
-            SizedBox(width: 5),
+            Icon(
+              Icons.warning_amber_rounded,
+              color: AppColors.bgSurface,
+              size: 13,
+            ),
+            SizedBox(width: AppSpacing.gapXs + 1),
             Text(
               'KHẨN',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: AppColors.bgSurface,
                 letterSpacing: 0.5,
               ),
             ),
@@ -257,31 +265,37 @@ class SOSCard extends StatelessWidget {
         ),
       );
     } else {
-      // Resolved badge - modern minimal
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpacing.gapSm + 2,
+          vertical: AppSpacing.gapXs + 1,
+        ),
         decoration: BoxDecoration(
-          color: const Color(0xFF43A047),
-          borderRadius: BorderRadius.circular(5),
+          color: AppColors.success,
+          borderRadius: BorderRadius.circular(AppRadii.radiusSm),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF43A047).withValues(alpha: 0.35),
+              color: AppColors.success.withValues(alpha: 0.35),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.check_circle_outline, color: Colors.white, size: 13),
-            SizedBox(width: 5),
+            Icon(
+              Icons.check_circle_outline,
+              color: AppColors.bgSurface,
+              size: 13,
+            ),
+            SizedBox(width: AppSpacing.gapXs + 1),
             Text(
               'Hoàn tất',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Colors.white,
+                color: AppColors.bgSurface,
                 letterSpacing: 0.5,
               ),
             ),

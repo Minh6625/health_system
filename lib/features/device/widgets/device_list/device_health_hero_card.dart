@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class DeviceHealthHeroCard extends StatelessWidget {
   const DeviceHealthHeroCard({super.key});
@@ -13,49 +17,47 @@ class DeviceHealthHeroCard extends StatelessWidget {
     final healthy = total - attention;
 
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(AppSpacing.sectionGapLg),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F766E), // brand.primary
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        color: AppColors.brandPrimary,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x330F766E),
+            color: AppColors.brandPrimary.withValues(alpha: 0.2),
             blurRadius: 20,
-            offset: Offset(0, 8),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Thiết bị của bạn',
-            style: TextStyle(
+            style: AppTextStyles.sectionTitle.copyWith(
               color: Colors.white,
               fontSize: 24,
-              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 6),
           Text(
-            total == 0 
+            total == 0
                 ? 'Hãy kết nối thiết bị để theo dõi'
-                : (healthy == total 
-                    ? 'Tất cả thiết bị đang hoạt động tốt' 
+                : (healthy == total
+                    ? 'Tất cả thiết bị đang hoạt động tốt'
                     : '$healthy thiết bị đang hoạt động tốt'),
-            style: const TextStyle(
-              color: Color(0xFFE6FFFB), // brand.soft
-              fontSize: 16,
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.bgElevated,
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: AppSpacing.sectionGapXl),
           Row(
             children: [
               Expanded(child: _buildMetricTile('Tổng', total.toString())),
-              const SizedBox(width: 12),
+              SizedBox(width: AppSpacing.gapMd),
               Expanded(child: _buildMetricTile('Ổn định', healthy.toString())),
-              const SizedBox(width: 12),
+              SizedBox(width: AppSpacing.gapMd),
               Expanded(child: _buildMetricTile('Cần chú ý', attention.toString())),
             ],
           ),
@@ -69,25 +71,23 @@ class DeviceHealthHeroCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
       decoration: BoxDecoration(
         color: const Color(0x1FFFFFFF),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
       ),
       child: Column(
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: AppTextStyles.vitalValue.copyWith(
               color: Colors.white,
               fontSize: 24,
-              fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: AppSpacing.gapXs),
           Text(
-            label, 
-            style: const TextStyle(
-              color: Color(0xFFE6FFFB),
+            label,
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.bgElevated,
               fontSize: 13,
-              fontWeight: FontWeight.w500,
             ),
             textAlign: TextAlign.center,
           ),

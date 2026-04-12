@@ -3,6 +3,9 @@ import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/family/models/family_profile_snapshot.dart';
 import 'package:healthguard/features/home/presentation/widgets/vital_metric_card.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:provider/provider.dart';
 
 class PersonDetailScreen extends StatelessWidget {
@@ -50,15 +53,15 @@ class PersonDetailScreen extends StatelessWidget {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Chi tiết thông tin',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
+          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
         ),
         centerTitle: true,
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
+        backgroundColor: AppColors.bgSurface,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
       ),
       body: SingleChildScrollView(
@@ -80,31 +83,31 @@ class PersonDetailScreen extends StatelessWidget {
   Widget _buildSosBanner(BuildContext context) {
     return Container(
       width: double.infinity,
-      color: const Color(0xFFE53935),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: AppColors.emergency,
+      padding: EdgeInsets.symmetric(horizontal: AppSpacing.gapLg, vertical: AppSpacing.sectionGapSm),
       child: Row(
         children: [
-          const Icon(
+          Icon(
             Icons.warning_amber_rounded,
-            color: Colors.white,
+            color: AppColors.bgSurface,
             size: 26,
           ),
-          const SizedBox(width: 12),
-          const Expanded(
+          SizedBox(width: AppSpacing.sectionGapSm),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Đang có yêu cầu SOS!',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppColors.bgSurface,
                     fontWeight: FontWeight.bold,
                     fontSize: 15,
                   ),
                 ),
                 Text(
                   'Vui lòng kiểm tra ngay',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                  style: TextStyle(color: AppColors.bgSurface.withValues(alpha: 0.7), fontSize: 13),
                 ),
               ],
             ),
@@ -116,13 +119,13 @@ class PersonDetailScreen extends StatelessWidget {
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: const Color(0xFFE53935),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              backgroundColor: AppColors.bgSurface,
+              foregroundColor: AppColors.emergency,
+              padding: EdgeInsets.symmetric(horizontal: 14, vertical: AppSpacing.gapSm),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadii.radiusSm),
               ),
             ),
             child: const Text(
@@ -142,31 +145,31 @@ class PersonDetailScreen extends StatelessWidget {
               ? 'Chưa có dữ liệu'
               : (profile.riskLevel != 'low' ? 'Cần theo dõi' : 'Đang ổn định'));
     final statusColor = profile.isSosActive
-        ? const Color(0xFFE53935)
+        ? AppColors.emergency
         : (!profile.hasVitalsData
-              ? const Color(0xFF5B7288)
+              ? AppColors.textSecondary
               : (profile.riskLevel != 'low'
-                    ? const Color(0xFFF2A93B)
-                    : const Color(0xFF2E9B6F)));
+                    ? AppColors.warning
+                    : AppColors.success));
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.all(24),
+      color: AppColors.bgSurface,
+      padding: EdgeInsets.all(AppSpacing.sectionGapXl),
       child: Row(
         children: [
           CircleAvatar(
             radius: 36,
-            backgroundColor: const Color(0xFFEEF4FF),
+            backgroundColor: AppColors.brandPrimaryLight,
             child: Text(
               profile.name.isNotEmpty ? profile.name[0].toUpperCase() : 'U',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF2F80ED),
+                color: AppColors.brandPrimary,
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: AppSpacing.gapLg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,39 +179,39 @@ class PersonDetailScreen extends StatelessWidget {
                     Flexible(
                       child: Text(
                         profile.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF12304A),
+                          color: AppColors.textPrimary,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: AppSpacing.gapSm),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppSpacing.gapSm,
+                        vertical: AppSpacing.gapXs,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEEF4FF),
-                        borderRadius: BorderRadius.circular(12),
+                        color: AppColors.brandPrimaryLight,
+                        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                       ),
                       child: Text(
                         profile.relation,
                         style: const TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF2F80ED),
+                          color: AppColors.brandPrimary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppSpacing.gapSm),
                 Wrap(
-                  spacing: 8,
-                  runSpacing: 4,
+                  spacing: AppSpacing.gapSm,
+                  runSpacing: AppSpacing.gapXs,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Row(
@@ -236,7 +239,7 @@ class PersonDetailScreen extends StatelessWidget {
                     Text(
                       '• ${_buildUpdatedText(profile.lastUpdated)}',
                       style: TextStyle(
-                        color: Colors.grey.shade500,
+                        color: AppColors.textSecondary,
                         fontSize: 13,
                       ),
                     ),
@@ -256,24 +259,24 @@ class PersonDetailScreen extends StatelessWidget {
         'Người dùng chưa có dữ liệu sức khỏe để hiển thị.';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.sectionGapSm, AppSpacing.gapLg, 0),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: EdgeInsets.all(AppSpacing.sectionGapSm),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF7ED),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFF2A93B)),
+          color: AppStateColors.warningBg,
+          borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+          border: Border.all(color: AppColors.warning),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(
+            Icon(
               Icons.info_outline_rounded,
-              color: Color(0xFFF2A93B),
+              color: AppColors.warning,
               size: 20,
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: AppSpacing.gapSm),
             Expanded(
               child: Text(
                 message,
@@ -293,31 +296,31 @@ class PersonDetailScreen extends StatelessWidget {
   Widget _buildLiveVitals(BuildContext context, FamilyProfileSnapshot profile) {
     final items = _buildVitalItems(context, profile);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapLg, AppSpacing.gapLg, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Chỉ số gần nhất',
             style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF12304A),
+              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppSpacing.sectionGapSm),
           Row(
             children: [
               Expanded(child: VitalMetricCard(item: items[0])),
-              const SizedBox(width: 12),
+              SizedBox(width: AppSpacing.sectionGapSm),
               Expanded(child: VitalMetricCard(item: items[1])),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppSpacing.sectionGapSm),
           Row(
             children: [
               Expanded(child: VitalMetricCard(item: items[2])),
-              const SizedBox(width: 12),
+              SizedBox(width: AppSpacing.sectionGapSm),
               Expanded(child: VitalMetricCard(item: items[3])),
             ],
           ),
@@ -517,24 +520,24 @@ class PersonDetailScreen extends StatelessWidget {
 
     Color scoreColor;
     if (profile.healthScoreLevel == 'Cao') {
-      scoreColor = const Color(0xFF2E9B6F);
+      scoreColor = AppColors.success;
     } else if (profile.healthScoreLevel == 'Thấp') {
-      scoreColor = const Color(0xFFE53935);
+      scoreColor = AppColors.emergency;
     } else {
-      scoreColor = Colors.orange;
+      scoreColor = AppColors.warning;
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapLg, AppSpacing.gapLg, 0),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(AppSpacing.gapLg),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF0D253F), Color(0xFF163E57)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadii.radiusLg),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF0D253F).withValues(alpha: 0.15),
@@ -547,10 +550,10 @@ class PersonDetailScreen extends StatelessWidget {
           children: [
             // Icon trái
             Container(
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.all(AppSpacing.sectionGapSm),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
               ),
               child: const Icon(
                 Icons.favorite_rounded,
@@ -558,7 +561,7 @@ class PersonDetailScreen extends StatelessWidget {
                 size: 28,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: AppSpacing.gapLg),
             // Điểm số lớn
             Text(
               '${profile.healthScore7Days}',
@@ -568,7 +571,7 @@ class PersonDetailScreen extends StatelessWidget {
                 color: scoreColor,
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: AppSpacing.gapLg),
             // Nhãn
             Expanded(
               child: Column(
@@ -609,15 +612,15 @@ class PersonDetailScreen extends StatelessWidget {
 
     Color qualityColor;
     if (profile.sleepQuality == 'Tốt') {
-      qualityColor = const Color(0xFF2E9B6F);
+      qualityColor = AppColors.success;
     } else if (profile.sleepQuality == 'Kém') {
-      qualityColor = const Color(0xFFE53935);
+      qualityColor = AppColors.emergency;
     } else {
-      qualityColor = Colors.orange;
+      qualityColor = AppColors.warning;
     }
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapLg, AppSpacing.gapLg, 0),
       child: Container(
         decoration: BoxDecoration(
           gradient: const LinearGradient(
@@ -625,7 +628,7 @@ class PersonDetailScreen extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(AppRadii.radiusLg),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF131A2F).withValues(alpha: 0.15),
@@ -642,17 +645,17 @@ class PersonDetailScreen extends StatelessWidget {
               AppRouter.sleepReport,
               arguments: {'profileId': profile.id},
             ),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadii.radiusLg),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(AppSpacing.gapLg),
               child: Row(
                 children: [
                   // Icon tĩnh
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(AppSpacing.sectionGapSm),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                     ),
                     child: const Icon(
                       Icons.bed_rounded,
@@ -660,7 +663,7 @@ class PersonDetailScreen extends StatelessWidget {
                       size: 28,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: AppSpacing.gapLg),
                   // Nội dung
                   Expanded(
                     child: Column(
@@ -711,28 +714,28 @@ class PersonDetailScreen extends StatelessWidget {
 
   Widget _buildAlertHistory() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapLg, AppSpacing.gapLg, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Cảnh báo gần đây',
             style: TextStyle(
               fontSize: 19,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF12304A),
+              color: AppColors.textPrimary,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: AppSpacing.sectionGapSm),
           _buildAlertItem(
             'Nhịp tim cao (112 bpm)',
             'Hôm nay, 14:30',
-            const Color(0xFFF2A93B),
+            AppColors.warning,
           ),
           _buildAlertItem(
             'Đã nhấn nút SOS',
             'Hôm qua, 09:15',
-            const Color(0xFFE53935),
+            AppColors.emergency,
           ),
           const SizedBox(height: 32),
         ],
@@ -742,12 +745,12 @@ class PersonDetailScreen extends StatelessWidget {
 
   Widget _buildAlertItem(String title, String time, Color color) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
+      margin: EdgeInsets.only(bottom: AppSpacing.gapSm),
+      padding: EdgeInsets.all(AppSpacing.sectionGapSm),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+        border: Border.all(color: AppColors.strokeSoft),
       ),
       child: Row(
         children: [
@@ -756,20 +759,20 @@ class PersonDetailScreen extends StatelessWidget {
             height: 10,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: AppSpacing.sectionGapSm),
           Expanded(
             child: Text(
               title,
               style: const TextStyle(
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF12304A),
+                color: AppColors.textPrimary,
                 fontSize: 14,
               ),
             ),
           ),
           Text(
             time,
-            style: const TextStyle(fontSize: 12, color: Color(0xFF5B7288)),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         ],
       ),

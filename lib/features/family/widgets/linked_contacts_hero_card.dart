@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 class LinkedContactsHeroCard extends StatelessWidget {
   final int totalContacts;
@@ -17,8 +19,8 @@ class LinkedContactsHeroCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFEEF4FF), // bg.elevated
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.brandPrimaryLight, // bg.elevated
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
         boxShadow: [
           BoxShadow(
             color: Colors.blue.withValues(alpha: 0.05),
@@ -50,7 +52,7 @@ class LinkedContactsHeroCard extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF12304A), // text.primary
+                        color: AppColors.textPrimary, // text.primary
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -58,7 +60,7 @@ class LinkedContactsHeroCard extends StatelessWidget {
                       '$totalContacts liên hệ${pendingCount > 0 ? ' • $pendingCount yêu cầu chờ xử lý' : ''}',
                       style: const TextStyle(
                         fontSize: 14,
-                        color: Color(0xFF5B7288), // text.secondary
+                        color: AppColors.textSecondary, // text.secondary
                       ),
                     ),
                   ],
@@ -72,11 +74,11 @@ class LinkedContactsHeroCard extends StatelessWidget {
             child: ElevatedButton.icon(
               onPressed: onAddPressed,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2F80ED), // brand.primary
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.brandPrimary, // brand.primary
+                foregroundColor: AppColors.bgSurface,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                 ),
                 elevation: 0,
               ),

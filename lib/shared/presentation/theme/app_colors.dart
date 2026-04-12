@@ -24,6 +24,9 @@ class AppColors {
   // Active state, CTA phụ
   static const Color brandPrimary = Color(0xFF2F80ED);
 
+  // Brand primary light (gradient, tint backgrounds)
+  static const Color brandPrimaryLight = Color(0xFF56CCF2);
+
   // Semantic Colors
   // Bình thường
   static const Color success = Color(0xFF2E9B6F);

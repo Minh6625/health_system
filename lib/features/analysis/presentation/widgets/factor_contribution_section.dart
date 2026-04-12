@@ -97,7 +97,7 @@ class _FactorContributionCard extends StatelessWidget {
                 const Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.gapMd),
             Row(
               children: [
                 Text(
@@ -107,13 +107,13 @@ class _FactorContributionCard extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSpacing.gapSm),
                 Expanded(
                   child: Container(
-                    height: 8,
+                    height: AppSpacing.gapSm,
                     decoration: BoxDecoration(
                       color: AppColors.bgPrimary,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusSm / 2),
                     ),
                     child: FractionallySizedBox(
                       alignment: Alignment.centerLeft,
@@ -121,7 +121,7 @@ class _FactorContributionCard extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           color: impactColor,
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(AppRadii.radiusSm / 2),
                         ),
                       ),
                     ),

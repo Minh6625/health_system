@@ -63,10 +63,10 @@ class RiskTrendPreviewCard extends StatelessWidget {
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: AppSpacing.gapXs),
         Text(
           label,
-          style: AppTextStyles.caption.copyWith(fontSize: 12),
+          style: AppTextStyles.navLabel,
         ),
       ],
     );

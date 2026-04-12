@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class DirtyFooterBar extends StatelessWidget {
   final bool isVisible;
@@ -17,15 +21,16 @@ class DirtyFooterBar extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
-      height: isVisible ? 100 : 0, // 100 ensures enough space for SafeArea + padding
-      child: isVisible 
+      height: isVisible ? 100 : 0,
+      child: isVisible
           ? Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              decoration: const BoxDecoration(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.sectionGapLg,
+                vertical: AppSpacing.sectionGapMd,
+              ),
+              decoration: BoxDecoration(
                 color: Colors.white,
-                boxShadow: [
-                  BoxShadow(color: Color(0x0F000000), blurRadius: 10, offset: Offset(0, -4)),
-                ],
+                boxShadow: AppShadows.elevatedShadow,
               ),
               child: SafeArea(
                 child: Row(
@@ -34,25 +39,36 @@ class DirtyFooterBar extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text('Có thay đổi chưa lưu', style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF12304A))),
-                          Text('Nhớ biểu quyết trước khi thoát', style: TextStyle(fontSize: 13, color: Color(0xFF5B7288))),
+                        children: [
+                          Text(
+                            'Có thay đổi chưa lưu',
+                            style: AppTextStyles.bodyMedium,
+                          ),
+                          Text(
+                            'Nhớ biểu quyết trước khi thoát',
+                            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: AppSpacing.sectionGapMd),
                     ElevatedButton(
                       onPressed: isSaving ? null : onSave,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF0F766E),
+                        backgroundColor: AppColors.brandPrimary,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sectionGapXl,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+                        ),
                       ),
                       child: isSaving
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                          : const Text('Lưu thay đổi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          : Text('Lưu thay đổi', style: AppTextStyles.bodyMedium.copyWith(color: Colors.white)),
                     ),
                   ],
                 ),

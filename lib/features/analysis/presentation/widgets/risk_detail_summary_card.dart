@@ -54,7 +54,7 @@ class RiskDetailSummaryCard extends StatelessWidget {
                       'Hoàn thành lúc $timeStr',
                       style: AppTextStyles.caption,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.gapSm),
                     RiskLevelPill(level: detail.level),
                   ],
                 ),

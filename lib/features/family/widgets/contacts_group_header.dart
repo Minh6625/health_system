@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class ContactsGroupHeader extends StatelessWidget {
   final String title;
@@ -7,13 +9,13 @@ class ContactsGroupHeader extends StatelessWidget {
   const ContactsGroupHeader({
     super.key,
     required this.title,
-    this.color = const Color(0xFF12304A),
+    this.color = AppColors.textPrimary,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      padding: const EdgeInsets.only(top: AppSpacing.gapLg, bottom: AppSpacing.gapSm),
       child: Row(
         children: [
           Container(
@@ -24,7 +26,7 @@ class ContactsGroupHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.gapSm),
           Text(
             title,
             semanticsLabel: 'Nhóm: $title',

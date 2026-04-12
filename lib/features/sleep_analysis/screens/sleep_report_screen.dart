@@ -7,6 +7,8 @@ import 'package:healthguard/features/sleep_analysis/widgets/shimmer_sleep_loadin
 import 'package:healthguard/features/sleep_analysis/widgets/sleep_hero_card.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/sleep_timeline_bar.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/starry_background.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:provider/provider.dart';
 
 class SleepReportScreen extends StatefulWidget {
@@ -141,7 +143,7 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
     final session = provider.selectedSession;
 
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapSm, AppSpacing.gapLg, 32),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
           if (provider.dateLoading)
@@ -153,14 +155,14 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
               onDateSelected: (day) => provider.selectDate(day),
               onCalendarTap: () => _onOpenFullCalendar(context, provider),
             ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.sectionGapXl),
           
           if (session != null) ...[
             // Preview of timeline & phases
             const Text('Dữ liệu đêm', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.gapMd),
             SleepTimelineBar(session: session),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.sectionGapLg),
             PhaseCompositionChart(session: session),
             const SizedBox(height: 32),
             
@@ -179,13 +181,13 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF48D6FF),
                   foregroundColor: const Color(0xFF07162B),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
                 ),
                 child: const Text('Xem chi tiết', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.gapLg),
           SizedBox(
             width: double.infinity,
             height: 52,
@@ -200,7 +202,7 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: Color(0xFF48D6FF)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
               ),
               child: const Text('Lịch sử giấc ngủ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
@@ -218,7 +220,7 @@ class _DateLoadingShimmer extends StatelessWidget {
       height: 200,
       decoration: BoxDecoration(
         color: const Color(0xFF0D1E38),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
         border: Border.all(color: const Color(0x332C4367), width: 1),
       ),
       child: const Center(
@@ -241,9 +243,9 @@ class _ErrorView extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.cloud_off_rounded, color: Color(0xFF5B7FA6), size: 64),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.sectionGapLg),
           Text(message, style: const TextStyle(color: Color(0xFF90A6C3))),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.sectionGapXl),
           ElevatedButton(onPressed: onRetry, child: const Text('Thử lại')),
         ],
       ),

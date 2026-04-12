@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import '../models/linked_contact_model.dart';
 import 'pending_request_card.dart';
 
@@ -20,7 +21,7 @@ class PendingRequestsSection extends StatelessWidget {
           children: [
             Icon(
               Icons.info_outline,
-              color: hasIncoming ? const Color(0xFFF2A93B) : Colors.blueGrey,
+              color: hasIncoming ? AppColors.warning : Colors.blueGrey,
             ), // warning color
             const SizedBox(width: 8),
             Text(
@@ -28,20 +29,20 @@ class PendingRequestsSection extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF12304A),
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: hasIncoming ? const Color(0xFFF2A93B) : Colors.blueGrey,
+                color: hasIncoming ? AppColors.warning : Colors.blueGrey,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 '${requests.length}',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.bgSurface,
                   fontWeight: FontWeight.bold,
                   fontSize: 12,
                 ),

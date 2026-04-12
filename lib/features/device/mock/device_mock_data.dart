@@ -15,7 +15,6 @@
 //   This is NOT a real BLE integration. Device data continues to come
 //   from the Python IoT simulator via MQTT/HTTP.
 
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
 
 

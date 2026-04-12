@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
+import '../../../shared/presentation/theme/app_spacing.dart';
+import '../../../shared/presentation/theme/app_text_styles.dart';
 import '../models/vital_signs.dart';
 import '../providers/vital_signs_provider.dart';
 import '../widgets/animated_vital_value.dart';
@@ -41,10 +45,10 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
   }
 
   Color _getStatusColor(VitalStatus status) => switch (status) {
-        VitalStatus.normal => Colors.green.shade700,
-        VitalStatus.warning => Colors.orange.shade700,
-        VitalStatus.critical => Colors.red.shade700,
-        VitalStatus.unknown => Colors.grey.shade700,
+        VitalStatus.normal => AppColors.success,
+        VitalStatus.warning => AppColors.warning,
+        VitalStatus.critical => AppColors.critical,
+        VitalStatus.unknown => AppColors.textSecondary,
       };
 
   String _getStatusText(VitalStatus status) => switch (status) {
@@ -60,7 +64,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
       listenable: _vitalsProvider,
       builder: (context, _) {
         return Scaffold(
-          backgroundColor: Colors.grey.shade50,
+          backgroundColor: AppColors.bgPrimary,
           appBar: _buildAppBar(_vitalsProvider),
           body: SafeArea(
             child: _buildBody(_vitalsProvider),
@@ -76,17 +80,17 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
         children: [
           Text(
             provider.title.isNotEmpty ? provider.title : 'Chi tiết chỉ số',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: AppTextStyles.sectionTitle,
           ),
           if (provider.linkedProfileName.isNotEmpty)
             Text(
               provider.linkedProfileName,
-              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+              style: AppTextStyles.caption,
             ),
         ],
       ),
-      backgroundColor: Colors.white,
-      foregroundColor: Colors.black87,
+      backgroundColor: AppColors.bgSurface,
+      foregroundColor: AppColors.textPrimary,
       elevation: 0,
       centerTitle: true,
     );
@@ -126,7 +130,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                 // 1. Nổi bật hiện tại (Huge latest value)
                 _buildVitalValueCard(provider, statusColor),
                 
-                const SizedBox(height: 24),
+                SizedBox(height: AppSpacing.sectionGapXl),
 
                 // 2. Biểu đồ chuyên biệt (Mini chart - 24h trend)
                 Row(
@@ -134,35 +138,33 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                   children: [
                     Text(
                       'Biến động 24h qua',
-                      style: TextStyle(
+                      style: AppTextStyles.sectionTitle.copyWith(
                         fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
                       ),
                     ),
                     TextButton(
                       onPressed: () {
                          // TODO: navigate to history
                       },
-                      child: const Text(
+                      child: Text(
                         'Xem xu hướng',
-                        style: TextStyle(fontSize: 16),
+                        style: AppTextStyles.body,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: AppSpacing.gapSm),
 
                 if (isEmpty || provider.chartData.isEmpty)
                   const EmptyChartPlaceholder(message: 'Chưa có dữ liệu xu hướng')
                 else
                   Container(
                     height: 180,
-                    padding: const EdgeInsets.all(16),
+                    padding: AppSpacing.cardPadding,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.grey.shade200),
+                      color: AppColors.bgSurface,
+                      borderRadius: AppRadii.cardRadius,
+                      border: Border.all(color: AppColors.strokeSoft),
                     ),
                     child: MiniLineChart(
                       linesData: provider.chartData,
@@ -172,28 +174,27 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                     ),
                   ),
 
-                const SizedBox(height: 24),
+                SizedBox(height: AppSpacing.sectionGapXl),
 
                 // 3. Kiến thức y khoa (Education Text)
                 Container(
-                  padding: const EdgeInsets.all(16),
+                  padding: AppSpacing.cardPadding,
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.blue.shade100),
+                    color: AppStateColors.infoBg,
+                    borderRadius: AppRadii.cardRadius,
+                    border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.info_outline, color: Colors.blue.shade700),
-                      const SizedBox(width: 12),
+                      Icon(Icons.info_outline, color: AppColors.info),
+                      SizedBox(width: AppSpacing.gapMd),
                       Expanded(
                         child: Text(
                           provider.educationText,
-                          style: TextStyle(
-                            fontSize: 16, // Increase to 16sp per accessibility spec
+                          style: AppTextStyles.body.copyWith(
                             height: 1.4,
-                            color: Colors.blue.shade900,
+                            color: AppColors.info,
                           ),
                         ),
                       ),
@@ -218,8 +219,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -234,18 +235,18 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: statusColor.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: AppRadii.pillRadius,
             ),
             child: Text(
               _getStatusText(provider.vitalStatus),
-              style: TextStyle(
+              style: AppTextStyles.bodyMedium.copyWith(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: statusColor,
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: AppSpacing.sectionGapXl),
           FittedBox(
             fit: BoxFit.scaleDown,
             child: Row(
@@ -258,26 +259,22 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                   fontSize: 84, // 84sp for elderly view
                   color: statusColor,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: AppSpacing.gapSm),
                 Text(
                   provider.unit,
-                  style: TextStyle(
-                    fontSize: 28, // 28sp unit
-                    fontWeight: FontWeight.w500,
-                    color: Colors.grey.shade600,
+                  style: AppTextStyles.displayCompact.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
             ),
           ),
           if (updatedAt != null) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: AppSpacing.gapLg),
             Text(
               'Cập nhật lúc ${DateFormat('HH:mm:ss').format(updatedAt.toLocal())}',
-              style: TextStyle(
-                fontSize: 14,
+              style: AppTextStyles.caption.copyWith(
                 fontWeight: FontWeight.w600,
-                color: Colors.grey.shade600,
               ),
             ),
           ],
@@ -292,10 +289,10 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.bgSurface,
           boxShadow: [
             BoxShadow(
-              color: Colors.red.withValues(alpha: 0.1),
+              color: AppColors.critical.withValues(alpha: 0.1),
               blurRadius: 10,
               offset: const Offset(0, -4),
             ),
@@ -309,16 +306,18 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                // navigate to SOS trigger (left as TODO pending exact route)
             },
             icon: const Icon(Icons.emergency, size: 28),
-            label: const Text(
+            label: Text(
               'GỌI CẤP CỨU',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              style: AppTextStyles.sectionTitle.copyWith(
+                color: AppColors.bgSurface,
+              ),
             ),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 64), // Increased from 48 to 64
+              backgroundColor: AppColors.critical,
+              foregroundColor: AppColors.bgSurface,
+              minimumSize: const Size(double.infinity, 64),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: AppRadii.cardRadius,
               ),
               elevation: 4,
             ),
@@ -330,18 +329,17 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        color: Colors.red.shade50,
+        color: AppStateColors.criticalBg,
         child: Row(
           children: [
-            Icon(Icons.warning_rounded, color: Colors.red.shade700, size: 28),
-            const SizedBox(width: 12),
+            Icon(Icons.warning_rounded, color: AppColors.critical, size: 28),
+            SizedBox(width: AppSpacing.gapMd),
             Expanded(
               child: Text(
                 'Chỉ số nguy hiểm! Vui lòng liên hệ ${provider.linkedProfileName.isNotEmpty ? provider.linkedProfileName : 'người thân'} ngay.',
-                style: TextStyle(
-                  fontSize: 16,
+                style: AppTextStyles.body.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Colors.red.shade900,
+                  color: AppColors.critical,
                 ),
               ),
             ),

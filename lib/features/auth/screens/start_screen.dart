@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:healthguard/core/constants/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/widgets/start/start_screen_content.dart';
 import 'package:healthguard/features/auth/widgets/start/start_screen_footer.dart';
@@ -27,7 +28,7 @@ class StartScreen extends StatelessWidget {
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppColors.primaryLight, Colors.white],
+            colors: [AppColors.brandPrimaryLight, AppColors.bgSurface],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -40,7 +41,7 @@ class StartScreen extends StatelessWidget {
                 child: SingleChildScrollView(
                   physics: const ClampingScrollPhysics(),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: AppSpacing.screenHorizontalPadding,
                     child: Column(
                       children: [
                         SizedBox(height: spacing1),

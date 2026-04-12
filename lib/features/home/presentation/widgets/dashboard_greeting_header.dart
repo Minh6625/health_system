@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 
@@ -187,7 +188,7 @@ class _DashboardGreetingHeaderState extends State<DashboardGreetingHeader>
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.emergency,
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: AppRadii.pillRadius,
                       border: Border.all(color: AppColors.bgPrimary, width: 2),
                     ),
                     child: showUnreadNumber

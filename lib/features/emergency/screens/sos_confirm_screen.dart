@@ -48,8 +48,9 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
       ),
     );
 
-    // Start animation on next frame
-    Future.microtask(() => _scaleController.forward());
+    Future.microtask(() {
+      _scaleController.forward();
+    });
   }
 
   @override
@@ -69,7 +70,7 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
+      backgroundColor: AppColors.textPrimary.withValues(alpha: 0.5),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(
@@ -80,14 +81,8 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
               const Spacer(flex: 2),
 
               // Animated check icon
-              AnimatedBuilder(
-                animation: _scaleAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _scaleAnimation.value,
-                    child: child,
-                  );
-                },
+              ScaleTransition(
+                scale: _scaleAnimation,
                 child: Container(
                   width: 100,
                   height: 100,
@@ -143,7 +138,9 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const TextSpan(text: '.\nHọ đang được kết nối để hỗ trợ bạn.'),
+                          const TextSpan(
+                              text:
+                                  '.\nHọ đang được kết nối để hỗ trợ bạn.'),
                         ],
                       ),
                     ),

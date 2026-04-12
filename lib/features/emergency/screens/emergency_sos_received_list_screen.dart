@@ -5,6 +5,10 @@ import 'package:provider/provider.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 import 'package:healthguard/features/emergency/widgets/sos_card.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 /// SOS Received List screen for Caregiver
 class EmergencySOSReceivedListScreen extends StatefulWidget {
@@ -29,9 +33,7 @@ class _EmergencySOSReceivedListScreenState
   bool _pendingRefresh = false;
 
   Future<void> _refreshCurrentStatus({bool silent = true}) async {
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     if (_isAutoRefreshing) {
       _pendingRefresh = true;
@@ -41,9 +43,9 @@ class _EmergencySOSReceivedListScreenState
     _isAutoRefreshing = true;
     try {
       await context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(
-        _selectedStatus,
-        silent: silent,
-      );
+            _selectedStatus,
+            silent: silent,
+          );
     } finally {
       _isAutoRefreshing = false;
       if (_pendingRefresh && mounted) {
@@ -81,7 +83,6 @@ class _EmergencySOSReceivedListScreenState
     super.didChangeDependencies();
     if (!_isInitialized) {
       _isInitialized = true;
-      // Fetch initial data immediately after build
       Future.microtask(() {
         if (mounted) {
           context.read<EmergencyCaregiverProvider>().fetchSOSAlerts('all');
@@ -124,25 +125,34 @@ class _EmergencySOSReceivedListScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFEBEBEB),
+      backgroundColor: AppColors.bgPrimary,
+      resizeToAvoidBottomInset: false,
       body: Column(
         children: [
           // Search Bar
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.gapLg,
+              AppSpacing.gapLg,
+              AppSpacing.gapLg,
+              AppSpacing.gapMd,
+            ),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.bgSurface,
+                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
               ),
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Tìm kiếm theo tên bệnh nhân...',
-                  hintStyle: TextStyle(color: Colors.grey[400], fontSize: 15),
+                  hintStyle: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontSize: 15,
+                  ),
                   prefixIcon: Icon(
                     Icons.search,
-                    color: Colors.grey[600],
+                    color: AppColors.textSecondary,
                     size: 22,
                   ),
                   suffixIcon: _searchQuery.isNotEmpty
@@ -150,7 +160,7 @@ class _EmergencySOSReceivedListScreenState
                           icon: Icon(
                             Icons.cancel,
                             size: 20,
-                            color: Colors.grey[500],
+                            color: AppColors.textSecondary,
                           ),
                           onPressed: () {
                             _searchController.clear();
@@ -159,7 +169,7 @@ class _EmergencySOSReceivedListScreenState
                       : null,
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: AppSpacing.gapLg,
                     vertical: 14,
                   ),
                 ),
@@ -169,16 +179,22 @@ class _EmergencySOSReceivedListScreenState
 
           // Filter Chips
           Padding(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+            padding: const EdgeInsets.only(
+              left: AppSpacing.gapLg,
+              right: AppSpacing.gapLg,
+              bottom: AppSpacing.gapMd,
+            ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
                   _buildFilterChip('all', 'Tất cả', Icons.medication),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('active', 'Khẩn cấp', Icons.warning_rounded),
-                  const SizedBox(width: 8),
-                  _buildFilterChip('resolved', 'Đã xử lý', Icons.check_circle),
+                  const SizedBox(width: AppSpacing.gapSm),
+                  _buildFilterChip(
+                      'active', 'Khẩn cấp', Icons.warning_rounded),
+                  const SizedBox(width: AppSpacing.gapSm),
+                  _buildFilterChip(
+                      'resolved', 'Đã xử lý', Icons.check_circle),
                 ],
               ),
             ),
@@ -195,14 +211,14 @@ class _EmergencySOSReceivedListScreenState
     final bool isSelected = _selectedStatus == value;
 
     Color getChipColor() {
-      if (!isSelected) return Colors.white;
+      if (!isSelected) return AppColors.bgSurface;
       switch (value) {
         case 'active':
-          return const Color(0xFFE53935); // Red for active
+          return AppColors.critical;
         case 'resolved':
-          return const Color(0xFF43A047); // Green for resolved
+          return AppColors.success;
         default:
-          return const Color(0xFF1976D2); // Blue for all
+          return AppColors.brandPrimary;
       }
     }
 
@@ -214,26 +230,27 @@ class _EmergencySOSReceivedListScreenState
           Icon(
             icon,
             size: 16,
-            color: isSelected ? Colors.white : Colors.grey[700],
+            color: isSelected ? AppColors.bgSurface : AppColors.textSecondary,
           ),
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 14,
+            style: AppTextStyles.caption.copyWith(
               fontWeight: FontWeight.w600,
-              color: isSelected ? Colors.white : Colors.grey[700],
+              color: isSelected
+                  ? AppColors.bgSurface
+                  : AppColors.textSecondary,
             ),
           ),
         ],
       ),
       onSelected: (selected) => _onStatusChanged(value),
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.bgSurface,
       selectedColor: getChipColor(),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
         side: BorderSide(
-          color: isSelected ? getChipColor() : Colors.grey.shade300,
+          color: isSelected ? getChipColor() : AppColors.strokeSoft,
           width: isSelected ? 0 : 1,
         ),
       ),
@@ -245,24 +262,20 @@ class _EmergencySOSReceivedListScreenState
   Widget _buildSOSList() {
     return Consumer<EmergencyCaregiverProvider>(
       builder: (context, provider, child) {
-        // Filter list based on status and search query
         final filteredList = _filterList(
           provider.sosList,
           _selectedStatus,
           _searchQuery,
         );
 
-        // Loading state
         if (provider.isLoadingList && filteredList.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        // Error state
         if (provider.listErrorMessage != null && filteredList.isEmpty) {
           return _buildErrorState(provider.listErrorMessage!);
         }
 
-        // Empty state
         if (filteredList.isEmpty) {
           return _buildEmptyState();
         }
@@ -271,7 +284,8 @@ class _EmergencySOSReceivedListScreenState
           onRefresh: () => provider.refreshSOSAlerts(_selectedStatus),
           child: ListView.builder(
             itemCount: filteredList.length,
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding:
+                const EdgeInsets.symmetric(vertical: AppSpacing.gapMd),
             itemBuilder: (context, index) {
               final sos = filteredList[index];
               return SOSCard(
@@ -282,12 +296,11 @@ class _EmergencySOSReceivedListScreenState
                     AppRouter.emergencySosDetail,
                     arguments: {'sosId': sos.id},
                   );
-                  if (!mounted) {
-                    return;
-                  }
+                  if (!mounted) return;
                   await _refreshCurrentStatus(silent: false);
                 },
-                onCallPressed: () => provider.makePhoneCall(sos.patient.phone),
+                onCallPressed: () =>
+                    provider.makePhoneCall(sos.patient.phone),
                 onMapPressed: () => provider.openMapNavigation(
                   sos.location.latitude,
                   sos.location.longitude,
@@ -297,7 +310,6 @@ class _EmergencySOSReceivedListScreenState
           ),
         );
 
-        // Keep showing existing list while refreshing in background.
         if (!provider.isLoadingList) {
           return listView;
         }
@@ -318,7 +330,6 @@ class _EmergencySOSReceivedListScreenState
   }
 
   List _filterList(List sosList, String status, String searchQuery) {
-    // Filter by status
     List filtered;
     if (status == 'all') {
       filtered = sosList;
@@ -326,7 +337,6 @@ class _EmergencySOSReceivedListScreenState
       filtered = sosList.where((sos) => sos.status == status).toList();
     }
 
-    // Filter by search query
     if (searchQuery.isNotEmpty) {
       filtered = filtered.where((sos) {
         final patientName = sos.patient.name.toLowerCase();
@@ -336,12 +346,9 @@ class _EmergencySOSReceivedListScreenState
       }).toList();
     }
 
-    // Sort: Active SOS first, then by trigger time (newest first)
     filtered.sort((a, b) {
-      // Priority 1: Active status first
       if (a.isActive && !b.isActive) return -1;
       if (!a.isActive && b.isActive) return 1;
-      // Priority 2: Newest first
       return b.triggerTime.compareTo(a.triggerTime);
     });
 
@@ -349,45 +356,67 @@ class _EmergencySOSReceivedListScreenState
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inbox_outlined, size: 64, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'Không có SOS nào trong 30 ngày qua',
-            style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.inbox_outlined, size: 64, color: AppColors.textSecondary),
+                  const SizedBox(height: AppSpacing.gapLg),
+                  Text(
+                    'Không có SOS nào trong 30 ngày qua',
+                    style: AppTextStyles.body.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   Widget _buildErrorState(String message) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-          const SizedBox(height: 16),
-          Text(
-            message,
-            style: const TextStyle(fontSize: 16, color: Colors.red),
-            textAlign: TextAlign.center,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.error_outline, size: 64, color: AppColors.critical),
+                  const SizedBox(height: AppSpacing.gapLg),
+                  Text(
+                    message,
+                    style: AppTextStyles.body.copyWith(color: AppColors.critical),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSpacing.gapLg),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      context
+                          .read<EmergencyCaregiverProvider>()
+                          .fetchSOSAlerts(_selectedStatus);
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Thử lại'),
+                  ),
+                ],
+              ),
+            ),
           ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () {
-              context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(
-                _selectedStatus,
-              );
-            },
-            icon: const Icon(Icons.refresh),
-            label: const Text('Thử lại'),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

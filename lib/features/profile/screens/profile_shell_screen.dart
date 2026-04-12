@@ -8,7 +8,6 @@ import 'package:healthguard/shared/presentation/shell/app_shell_bottom_nav.dart'
 import 'package:healthguard/shared/presentation/emergency/emergency_sticky_bar.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
-const _kTeal = Color(0xFF0F766E);
 
 /// Shell wrapper for the Profile tab.
 /// Owns the Scaffold (AppBar + BottomNav) – ProfileScreen is a bare content widget.
@@ -29,8 +28,8 @@ class ProfileShellScreen extends StatelessWidget {
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
         title: const Text('Hồ sơ'),
-        backgroundColor: _kTeal,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.brandPrimary,
+        foregroundColor: AppColors.bgSurface,
         elevation: 0,
         automaticallyImplyLeading: false,
         // Reload button removed – user pulls down to refresh instead
@@ -59,7 +58,7 @@ class ProfileShellScreen extends StatelessWidget {
         children: [
           Expanded(
             child: RefreshIndicator(
-              color: _kTeal,
+              color: AppColors.brandPrimary,
               onRefresh: () => _onRefresh(context),
               child: const ProfileScreen(),
             ),

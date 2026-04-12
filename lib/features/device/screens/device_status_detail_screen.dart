@@ -7,6 +7,10 @@ import 'package:healthguard/features/device/widgets/device_status/device_status_
 import 'package:healthguard/features/device/widgets/device_status/device_info_section.dart';
 import 'package:healthguard/features/device/widgets/device_status/primary_action_card.dart';
 import 'package:healthguard/features/device/widgets/device_status/info_row.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 import 'package:provider/provider.dart';
 
 class DeviceStatusDetailScreen extends StatelessWidget {
@@ -40,21 +44,21 @@ class _DeviceStatusDetailView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Trạng thái thiết bị',
-          style: TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF12304A)),
+          style: AppTextStyles.sectionTitle,
         ),
         backgroundColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: Color(0xFF12304A)),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         elevation: 0,
         centerTitle: true,
       ),
       body: Consumer<DeviceStatusDetailProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading && provider.device == null) {
-            return const Center(child: CircularProgressIndicator(color: Color(0xFF0F766E)));
+            return const Center(child: CircularProgressIndicator(color: AppColors.brandPrimary));
           }
 
           if (provider.errorMessage != null && provider.device == null) {
@@ -68,13 +72,13 @@ class _DeviceStatusDetailView extends StatelessWidget {
 
           return RefreshIndicator(
             onRefresh: () => provider.fetchDeviceDetail(),
-            color: const Color(0xFF0F766E),
+            color: AppColors.brandPrimary,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapMd, vertical: AppSpacing.sectionGapLg),
               children: [
                 DeviceStatusHeroCard(device: device),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.sectionGapXl),
                 
                 StatusInsightBanner(
                   isOnline: device.isOnline,
@@ -126,32 +130,32 @@ class _DeviceStatusDetailView extends StatelessWidget {
   Widget _buildNotFoundState(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.sectionGapXl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.do_not_disturb_alt_rounded, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            const Text(
+            Icon(Icons.do_not_disturb_alt_rounded, size: 64, color: AppColors.textSecondary),
+            const SizedBox(height: AppSpacing.sectionGapMd),
+            Text(
               'Thiết bị không còn tồn tại',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF12304A)),
+              style: AppTextStyles.sectionTitle,
             ),
-            const SizedBox(height: 8),
-            const Text(
+            const SizedBox(height: AppSpacing.gapSm),
+            Text(
               'Có thể thiết bị đã bị xóa hoặc hủy kết nối.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF5B7288)),
+              style: AppTextStyles.caption,
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: AppSpacing.sectionGapXl),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pop(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0F766E),
+                backgroundColor: AppColors.brandPrimary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapXl, vertical: AppSpacing.gapMd),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
               ),
-              child: const Text('Quay lại danh sách', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('Quay lại danh sách', style: AppTextStyles.bodyMedium.copyWith(color: Colors.white)),
             ),
           ],
         ),
@@ -162,39 +166,39 @@ class _DeviceStatusDetailView extends StatelessWidget {
   Widget _buildErrorState(BuildContext context, DeviceStatusDetailProvider provider) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.sectionGapXl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 64, color: Color(0xFFDC2626)),
-            const SizedBox(height: 16),
+            const Icon(Icons.error_outline_rounded, size: 64, color: AppColors.critical),
+            const SizedBox(height: AppSpacing.sectionGapMd),
             Text(
               provider.errorMessage!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, color: Color(0xFF5B7288)),
+              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: AppSpacing.sectionGapXl),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF5B7288),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    foregroundColor: AppColors.textSecondary,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapXl, vertical: AppSpacing.gapMd),
                   ),
                   child: const Text('Quay lại', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: AppSpacing.sectionGapMd),
                 ElevatedButton.icon(
                   onPressed: () => provider.fetchDeviceDetail(),
                   icon: const Icon(Icons.refresh),
                   label: const Text('Thử lại', style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F766E),
+                    backgroundColor: AppColors.brandPrimary,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapXl, vertical: AppSpacing.gapMd),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
                   ),
                 ),
               ],

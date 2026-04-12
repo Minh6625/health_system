@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/sleep_trend_chart.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/starry_background.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:provider/provider.dart';
 
 class SleepHistoryScreen extends StatefulWidget {
@@ -49,7 +51,7 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
               return Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gapLg, vertical: AppSpacing.sectionGapXl),
                     child: SleepTrendChart(
                       historyList: history,
                       highlightedDate: provider.selectedSession?.endTime,
@@ -62,9 +64,9 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                   const Divider(color: Color(0x3348D6FF), height: 1),
                   Expanded(
                     child: ListView.separated(
-                      padding: const EdgeInsets.all(16),
+                      padding: AppSpacing.cardPadding,
                       itemCount: history.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 12),
+                      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.gapMd),
                       itemBuilder: (context, index) {
                         final session = history[history.length - 1 - index]; // Newest first
                         return InkWell(
@@ -72,12 +74,12 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                             provider.selectHistorySession(session);
                             Navigator.pop(context);
                           },
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: AppRadii.cardRadius,
                           child: Container(
-                            padding: const EdgeInsets.all(16),
+                            padding: AppSpacing.cardPadding,
                             decoration: BoxDecoration(
                               color: const Color(0xFF0D1E38),
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: AppRadii.cardRadius,
                               border: Border.all(color: const Color(0x332C4367)),
                             ),
                             child: Row(
@@ -90,7 +92,7 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                                       '${session.startTime.day.toString().padLeft(2, '0')}/${session.startTime.month.toString().padLeft(2, '0')}',
                                       style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: AppSpacing.gapXs),
                                     Text(
                                       session.qualityLabel,
                                       style: TextStyle(
@@ -107,7 +109,7 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                                       session.sleepText,
                                       style: const TextStyle(color: Color(0xFF48D6FF), fontSize: 18, fontWeight: FontWeight.bold),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: AppSpacing.gapSm),
                                     const Icon(Icons.chevron_right, color: Color(0xFF5B7FA6)),
                                   ],
                                 ),

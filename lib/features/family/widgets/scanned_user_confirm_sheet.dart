@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/features/family/models/contact_tag.dart';
 
 class ScannedUserConfirmSheet extends StatefulWidget {
@@ -69,7 +71,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
             bottom: 32,
           ),
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: AppColors.bgSurface,
             borderRadius: BorderRadius.only(
               topLeft: Radius.circular(24),
               topRight: Radius.circular(24),
@@ -83,7 +85,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: AppColors.strokeSoft,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -91,7 +93,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
               // User info
               CircleAvatar(
                 radius: 36,
-                backgroundColor: const Color(0xFFEEF4FF),
+                backgroundColor: AppColors.brandPrimaryLight,
                 backgroundImage: widget.avatarUrl != null
                     ? NetworkImage(widget.avatarUrl!)
                     : null,
@@ -102,7 +104,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                             : 'A',
                         style: const TextStyle(
                           fontSize: 28,
-                          color: Color(0xFF2F80ED),
+                          color: AppColors.brandPrimary,
                           fontWeight: FontWeight.bold,
                         ),
                       )
@@ -114,14 +116,14 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF12304A),
+                  color: AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 4),
               if (widget.email != null || widget.phone != null)
                 Text(
                   widget.email ?? widget.phone ?? '',
-                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                 ),
               if (widget.statusMessage != null) ...[
                 const SizedBox(height: 10),
@@ -132,7 +134,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEEF4FF),
+                    color: AppColors.brandPrimaryLight,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFD5E3F5)),
                   ),
@@ -157,7 +159,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF12304A),
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -188,19 +190,19 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                         });
                       },
                       selectedColor: tag.color.withValues(alpha: 0.12),
-                      backgroundColor: Colors.white,
+                      backgroundColor: AppColors.bgSurface,
                       checkmarkColor: tag.color,
                       showCheckmark: false,
                       labelStyle: TextStyle(
-                        color: isSelected ? tag.color : const Color(0xFF5B7288),
+                        color: isSelected ? tag.color : AppColors.textSecondary,
                         fontWeight: isSelected
                             ? FontWeight.bold
                             : FontWeight.normal,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
                         side: BorderSide(
-                          color: isSelected ? tag.color : Colors.grey.shade300,
+                          color: isSelected ? tag.color : AppColors.strokeSoft,
                         ),
                       ),
                     );
@@ -211,7 +213,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     'Mặc định có tag "Gia đình". Bạn có thể thêm tag khác.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ),
                 const SizedBox(height: 28),
@@ -223,11 +225,11 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                       child: OutlinedButton(
                         onPressed: _isLoading ? null : widget.onCancel,
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF5B7288),
-                          side: const BorderSide(color: Color(0xFF5B7288)),
+                          foregroundColor: AppColors.textSecondary,
+                          side: const BorderSide(color: AppColors.textSecondary),
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                           ),
                         ),
                         child: Text(
@@ -272,11 +274,11 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                                   widget.isUnlink ||
                                   widget.isReject)
                               ? Colors.red
-                              : const Color(0xFF2F80ED),
-                          foregroundColor: Colors.white,
+                              : AppColors.brandPrimary,
+                          foregroundColor: AppColors.bgSurface,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                           ),
                           elevation: 0,
                         ),
@@ -285,7 +287,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                                 height: 24,
                                 width: 24,
                                 child: CircularProgressIndicator(
-                                  color: Colors.white,
+                                  color: AppColors.bgSurface,
                                   strokeWidth: 2,
                                 ),
                               )
@@ -323,7 +325,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                 ),
               ),
               child: const Center(
-                child: CircularProgressIndicator(color: Color(0xFF2F80ED)),
+                child: CircularProgressIndicator(color: AppColors.brandPrimary),
               ),
             ),
           ),

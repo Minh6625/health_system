@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 /// Reusable row widget: [icon] + [label] + [value].
 /// Font tối thiểu 16sp cho body text, đảm bảo Accessibility.
@@ -34,7 +35,7 @@ class MetricTile extends StatelessWidget {
             ),
             child: Icon(icon, color: iconColor, size: 24),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.gapMd),
           // Label
           Expanded(
             child: Text(

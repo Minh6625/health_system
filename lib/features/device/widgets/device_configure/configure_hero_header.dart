@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class ConfigureHeroHeader extends StatelessWidget {
   final DeviceModel device;
@@ -8,40 +12,36 @@ class ConfigureHeroHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = device.isOnline ? const Color(0xFF0F9D7A) : const Color(0xFF94A3B8);
+    final statusColor = device.isOnline ? AppColors.success : AppColors.textSecondary;
     final statusText = device.isOnline ? 'Online' : 'Offline';
 
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+        border: Border.all(color: AppColors.strokeSoft),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
-            decoration: const BoxDecoration(
-              color: Color(0xFFE6FFFB), // brand.soft
+            padding: EdgeInsets.all(AppSpacing.gapMd),
+            decoration: BoxDecoration(
+              color: AppColors.bgElevated,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.watch_rounded, size: 28, color: Color(0xFF0F766E)),
+            child: Icon(Icons.watch_rounded, size: 28, color: AppColors.brandPrimary),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: AppSpacing.sectionGapMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   device.displayName,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF12304A),
-                  ),
+                  style: AppTextStyles.sectionTitle,
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: AppSpacing.gapXs),
                 Row(
                   children: [
                     Container(
@@ -52,10 +52,7 @@ class ConfigureHeroHeader extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       '$statusText • ${_timeText(device.lastSyncAt)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF5B7288),
-                      ),
+                      style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),

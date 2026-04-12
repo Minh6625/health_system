@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 enum AddContactMode { scan, myCode, searchPhone }
 
@@ -18,7 +20,7 @@ class ModeSegmentedControl extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
       ),
       child: Row(
         children: [
@@ -65,7 +67,7 @@ class ModeSegmentedControl extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadii.radiusSm),
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -83,8 +85,8 @@ class ModeSegmentedControl extends StatelessWidget {
               icon,
               size: 18,
               color: isSelected
-                  ? const Color(0xFF12304A)
-                  : const Color(0xFF5B7288),
+                  ? AppColors.textPrimary
+                  : AppColors.textSecondary,
             ),
             const SizedBox(width: 8),
             Text(
@@ -93,8 +95,8 @@ class ModeSegmentedControl extends StatelessWidget {
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 color: isSelected
-                    ? const Color(0xFF12304A)
-                    : const Color(0xFF5B7288),
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
               ),
             ),
           ],

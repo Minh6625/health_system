@@ -4,6 +4,7 @@ import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 
 class DeleteAccountScreen extends StatefulWidget {
   const DeleteAccountScreen({super.key});
@@ -77,7 +78,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
           appBar: AppBar(
             title: const Text('Xóa tài khoản'),
             backgroundColor: AppColors.critical,
-            foregroundColor: Colors.white,
+            foregroundColor: AppColors.bgSurface,
             elevation: 0,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -192,13 +193,13 @@ class _Dot extends StatelessWidget {
             ),
             child: Center(
               child: isDone
-                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                  ? Icon(Icons.check, size: 14, color: AppColors.bgSurface)
                   : Text(
                       '$step',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isActive ? Colors.white : AppColors.textSecondary,
+                        color: isActive ? AppColors.bgSurface : AppColors.textSecondary,
                       ),
                     ),
             ),
@@ -298,9 +299,9 @@ class _Step1 extends StatelessWidget {
             onPressed: onContinue,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.critical,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.bgSurface,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
             ),
             child: const Text('Tôi hiểu, tiếp tục',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -315,10 +316,10 @@ class _Step1 extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: AppColors.strokeSoft),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
             ),
             child: const Text('Hủy, giữ tài khoản',
-                style: TextStyle(fontSize: 16, color: Color(0xFF5B7288))),
+                style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
           ),
         ),
       ],
@@ -337,7 +338,7 @@ class _WarningItem extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppStateColors.criticalBg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
         border:
             Border.all(color: AppColors.critical.withValues(alpha: 0.2)),
       ),
@@ -349,7 +350,7 @@ class _WarningItem extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(fontSize: 14, color: Color(0xFF5B1A1A)),
+              style: TextStyle(fontSize: 14, color: AppColors.critical),
             ),
           ),
         ],
@@ -401,13 +402,13 @@ class _Step2 extends StatelessWidget {
         const Text(
           'Nhập mật khẩu để xác minh',
           style: TextStyle(
-              fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF12304A)),
+              fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         const Text(
           'Chúng tôi cần xác minh danh tính của bạn trước khi xóa tài khoản.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF5B7288)),
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 28),
@@ -424,9 +425,9 @@ class _Step2 extends StatelessWidget {
               onPressed: onToggleObscure,
             ),
             border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.radiusSm)),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
               borderSide: BorderSide(color: AppColors.critical, width: 2),
             ),
             errorText: errorText,
@@ -440,9 +441,9 @@ class _Step2 extends StatelessWidget {
             onPressed: onContinue,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.critical,
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.bgSurface,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
             ),
             child: const Text('Tiếp tục',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -494,13 +495,13 @@ class _Step3 extends StatelessWidget {
         const Text(
           'Xác nhận lần cuối',
           style: TextStyle(
-              fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF12304A)),
+              fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 8),
         const Text(
           'Đánh dấu vào ô bên dưới để xác nhận bạn đã hiểu rõ hậu quả.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF5B7288)),
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 24),
@@ -508,7 +509,7 @@ class _Step3 extends StatelessWidget {
         Container(
           decoration: BoxDecoration(
             color: AppStateColors.criticalBg,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadii.radiusMd),
             border: Border.all(
                 color: AppColors.critical.withValues(alpha: checked ? 0.5 : 0.2)),
           ),
@@ -521,7 +522,7 @@ class _Step3 extends StatelessWidget {
               'Tôi hiểu rằng toàn bộ dữ liệu sức khoẻ, lịch sử đo và thông tin gia đình của tôi sẽ bị xóa vĩnh viễn sau 30 ngày.',
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
             ),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
           ),
         ),
         const SizedBox(height: 28),
@@ -533,16 +534,16 @@ class _Step3 extends StatelessWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor:
                   checked ? AppColors.critical : AppColors.critical.withValues(alpha: 0.4),
-              foregroundColor: Colors.white,
+              foregroundColor: AppColors.bgSurface,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
             ),
             child: isDeleting
                 ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2, color: AppColors.bgSurface),
                   )
                 : const Text(
                     'Xóa tài khoản vĩnh viễn',

@@ -5,6 +5,8 @@ import 'package:healthguard/features/sleep_analysis/widgets/metric_tile.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/phase_composition_chart.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/sleep_timeline_bar.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/starry_background.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:provider/provider.dart';
 
 class SleepDetailScreen extends StatefulWidget {
@@ -57,26 +59,26 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
               }
 
               return SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SectionHeader(title: 'Thời gian phân bổ'),
-                    const SizedBox(height: 16),
-                    SleepTimelineBar(session: session),
-                    const SizedBox(height: 32),
-                    
-                    _SectionHeader(title: 'Cơ cấu giấc ngủ'),
-                    const SizedBox(height: 16),
-                    PhaseCompositionChart(session: session),
-                    const SizedBox(height: 32),
-                    
-                    _SectionHeader(title: 'Chi tiết chỉ số'),
-                    const SizedBox(height: 16),
-                    _buildMetrics(session),
-                  ],
-                ),
-              );
+              padding: AppSpacing.cardPadding,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _SectionHeader(title: 'Thời gian phân bổ'),
+                  const SizedBox(height: AppSpacing.gapLg),
+                  SleepTimelineBar(session: session),
+                  const SizedBox(height: 32),
+                  
+                  _SectionHeader(title: 'Cơ cấu giấc ngủ'),
+                  const SizedBox(height: AppSpacing.gapLg),
+                  PhaseCompositionChart(session: session),
+                  const SizedBox(height: 32),
+                  
+                  _SectionHeader(title: 'Chi tiết chỉ số'),
+                  const SizedBox(height: AppSpacing.gapLg),
+                  _buildMetrics(session),
+                ],
+              ),
+            );
             },
           ),
         ),
@@ -88,7 +90,7 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF0D1E38),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadii.cardRadius,
         border: Border.all(color: const Color(0x264B5E82)),
       ),
       child: Column(
@@ -113,8 +115,8 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 3, height: 16, decoration: BoxDecoration(color: const Color(0xFF48D6FF), borderRadius: BorderRadius.circular(2))),
-        const SizedBox(width: 8),
+        Container(width: 3, height: AppSpacing.gapLg, decoration: BoxDecoration(color: const Color(0xFF48D6FF), borderRadius: BorderRadius.circular(2))),
+        const SizedBox(width: AppSpacing.gapSm),
         Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
       ],
     );

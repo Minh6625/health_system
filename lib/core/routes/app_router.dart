@@ -8,7 +8,6 @@ import 'package:healthguard/features/auth/screens/reset_otp_verification_screen.
 import 'package:healthguard/features/auth/screens/reset_password_screen.dart';
 import 'package:healthguard/features/auth/screens/email_verification_screen.dart';
 import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
-import 'package:healthguard/features/home/providers/home_dashboard_provider.dart';
 import 'package:healthguard/features/profile/screens/edit_profile_screen.dart';
 import 'package:healthguard/features/profile/screens/medical_info_screen.dart';
 import 'package:healthguard/features/profile/screens/delete_account_screen.dart';
@@ -122,11 +121,10 @@ class AppRouter {
 
     switch (routePath) {
       case dashboard:
+        // HomeDashboardProvider is already provided in app.dart MultiProvider.
+        // Using the existing ancestor provider avoids state reset on navigation.
         return MaterialPageRoute(
-          builder: (_) => ChangeNotifierProvider(
-            create: (_) => HomeDashboardProvider(),
-            child: const HomeDashboardScreen(),
-          ),
+          builder: (_) => const HomeDashboardScreen(),
         );
       case register:
         return MaterialPageRoute(builder: (_) => const RegisterScreen());

@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class DeviceQrScanStep extends StatelessWidget {
   const DeviceQrScanStep({super.key});
@@ -6,26 +10,19 @@ class DeviceQrScanStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(AppSpacing.sectionGapLg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
+          Text(
             'Quét mã QR',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF12304A),
-            ),
+            style: AppTextStyles.sectionTitle.copyWith(fontSize: 24),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: AppSpacing.gapSm),
+          Text(
             'Hướng camera vào mã QR trên màn hình đồng hồ đang bật.',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF5B7288),
-            ),
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 40),
@@ -35,8 +32,8 @@ class DeviceQrScanStep extends StatelessWidget {
               height: 250,
               decoration: BoxDecoration(
                 color: Colors.black12,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF0F766E), width: 3), // brand.primary
+                borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
+                border: Border.all(color: AppColors.brandPrimary, width: 3),
               ),
               child: Stack(
                 alignment: Alignment.center,
@@ -46,17 +43,22 @@ class DeviceQrScanStep extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(height: 120),
-                      const CircularProgressIndicator(color: Color(0xFF0F766E)),
-                      const SizedBox(height: 16),
+                      CircularProgressIndicator(color: AppColors.brandPrimary),
+                      SizedBox(height: AppSpacing.sectionGapMd),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sectionGapMd,
+                          vertical: AppSpacing.gapSm,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(AppRadii.radiusXl),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Đang tìm mã...',
-                          style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.brandPrimary,
+                          ),
                         ),
                       ),
                     ],

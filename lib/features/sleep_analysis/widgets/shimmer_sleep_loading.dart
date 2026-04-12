@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 /// Shimmer placeholder hiển thị khi đang fetch dữ liệu.
 /// Dùng flutter_animate (đã có trong pubspec) thay vì thêm lib riêng.
@@ -11,7 +12,7 @@ class ShimmerSleepLoading extends StatelessWidget {
     return SingleChildScrollView(
       physics: const NeverScrollableScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapSm, AppSpacing.gapLg, AppSpacing.sectionGapLg),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -23,7 +24,7 @@ class ShimmerSleepLoading extends StatelessWidget {
                 color: const Color(0x33FFFFFF),
               ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.sectionGapLg),
 
           // Section title placeholder
           _ShimmerBox(height: 16, width: 140, radius: 6)
@@ -34,7 +35,7 @@ class ShimmerSleepLoading extends StatelessWidget {
                 color: const Color(0x33FFFFFF),
               ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.gapMd),
 
           // Donut chart placeholder
           Center(
@@ -47,10 +48,10 @@ class ShimmerSleepLoading extends StatelessWidget {
                 ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.sectionGapLg),
 
           // Section title placeholder
-          _ShimmerBox(height: 16, width: 120, radius: 6)
+          _ShimmerBox(height: AppSpacing.gapLg, width: 120, radius: 6)
               .animate(onPlay: (c) => c.repeat())
               .shimmer(
                 delay: 150.ms,
@@ -58,7 +59,7 @@ class ShimmerSleepLoading extends StatelessWidget {
                 color: const Color(0x33FFFFFF),
               ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSpacing.gapMd),
 
           // MetricTile x3 placeholders
           for (int i = 0; i < 3; i++) ...[
@@ -71,7 +72,7 @@ class ShimmerSleepLoading extends StatelessWidget {
                       duration: 1200.ms,
                       color: const Color(0x33FFFFFF),
                     ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.gapMd),
                 Expanded(
                   child: _ShimmerBox(height: 16, radius: 6)
                       .animate(onPlay: (c) => c.repeat())
@@ -81,7 +82,7 @@ class ShimmerSleepLoading extends StatelessWidget {
                         color: const Color(0x33FFFFFF),
                       ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: AppSpacing.gapLg),
                 _ShimmerBox(height: 16, width: 60, radius: 6)
                     .animate(onPlay: (c) => c.repeat())
                     .shimmer(
@@ -91,10 +92,10 @@ class ShimmerSleepLoading extends StatelessWidget {
                     ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: AppSpacing.gapMd),
           ],
 
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.gapSm),
 
           // Bar chart placeholder
           _ShimmerBox(height: 120, radius: 14)

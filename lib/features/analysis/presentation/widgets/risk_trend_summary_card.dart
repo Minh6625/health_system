@@ -40,7 +40,7 @@ class RiskTrendSummaryCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text('Cao nhất: \${summary.highestScore}', style: AppTextStyles.bodyMedium),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: AppSpacing.gapXs),
                   Text('Thấp nhất: \${summary.lowestScore}', style: AppTextStyles.bodyMedium),
                 ],
               ),

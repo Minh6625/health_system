@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class ConfigSectionCard extends StatelessWidget {
   final String title;
@@ -16,29 +20,19 @@ class ConfigSectionCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
+          padding: EdgeInsets.only(left: 4, bottom: AppSpacing.gapMd),
           child: Text(
             title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF12304A),
-            ),
+            style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w700),
           ),
         ),
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x02000000),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
+            borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+            border: Border.all(color: AppColors.strokeSoft),
+            boxShadow: AppShadows.softShadow,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../shared/presentation/theme/app_colors.dart';
+import '../../../../shared/presentation/theme/app_radii.dart';
+import '../../../../shared/presentation/theme/app_spacing.dart';
+import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../domain/entities/risk_report_entity.dart';
 
 class RiskLevelPill extends StatelessWidget {
@@ -31,22 +34,24 @@ class RiskLevelPill extends StatelessWidget {
         break;
       case RiskLevel.critical:
         bgColor = AppColors.emergency;
-        textColor = Colors.white;
+        textColor = AppColors.bgSurface;
         label = "Nguy hiểm";
         break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapMd,
+        vertical: AppSpacing.gapXs,
+      ),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: AppRadii.pillRadius,
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style: AppTextStyles.caption.copyWith(
           color: textColor,
-          fontSize: 14,
           fontWeight: FontWeight.bold,
         ),
       ),

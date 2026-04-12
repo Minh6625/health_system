@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ProfileSectionCard
@@ -22,7 +23,7 @@ class ProfileSectionCard extends StatelessWidget {
       padding: padding,
       decoration: BoxDecoration(
         color: AppColors.bgSurface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -64,11 +65,11 @@ class ProfileMenuTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveIconColor = iconColor ?? const Color(0xFF0F766E);
+    final effectiveIconColor = iconColor ?? AppColors.brandPrimary;
     return ClipRRect(
       borderRadius: BorderRadius.vertical(
-        top: isFirst ? const Radius.circular(16) : Radius.zero,
-        bottom: isLast ? const Radius.circular(16) : Radius.zero,
+        top: isFirst ? Radius.circular(AppRadii.radiusLg) : Radius.zero,
+        bottom: isLast ? Radius.circular(AppRadii.radiusLg) : Radius.zero,
       ),
       child: Material(
         color: Colors.transparent,
@@ -83,7 +84,7 @@ class ProfileMenuTile extends StatelessWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     color: effectiveIconColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                   ),
                   child: Icon(icon, size: 20, color: effectiveIconColor),
                 ),
@@ -97,7 +98,7 @@ class ProfileMenuTile extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF12304A),
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       if (subtitle != null) ...[
@@ -106,7 +107,7 @@ class ProfileMenuTile extends StatelessWidget {
                           subtitle!,
                           style: const TextStyle(
                             fontSize: 13,
-                            color: Color(0xFF5B7288),
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -165,7 +166,7 @@ class ProfileSectionLabel extends StatelessWidget {
           fontSize: 12,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.6,
-          color: Color(0xFF5B7288),
+          color: AppColors.textSecondary,
         ),
       ),
     );
@@ -187,7 +188,7 @@ class DangerZoneCard extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppStateColors.criticalBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
         border: Border.all(color: AppColors.critical.withValues(alpha: 0.25)),
       ),
       child: Column(children: children),
@@ -221,8 +222,8 @@ class DangerMenuTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.vertical(
-        top: isFirst ? const Radius.circular(16) : Radius.zero,
-        bottom: isLast ? const Radius.circular(16) : Radius.zero,
+        top: isFirst ? Radius.circular(AppRadii.radiusLg) : Radius.zero,
+        bottom: isLast ? Radius.circular(AppRadii.radiusLg) : Radius.zero,
       ),
       child: Material(
         color: Colors.transparent,
@@ -238,7 +239,7 @@ class DangerMenuTile extends StatelessWidget {
                   height: 40,
                   decoration: BoxDecoration(
                     color: AppColors.critical.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(AppRadii.radiusSm),
                   ),
                   child: Icon(icon, size: 20, color: AppColors.critical),
                 ),
@@ -369,8 +370,8 @@ class ProfileHeroSkeleton extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusXl),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -452,8 +453,8 @@ class ProfileMenuSkeleton extends StatelessWidget {
         ),
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(AppRadii.radiusLg),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
