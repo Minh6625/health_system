@@ -34,6 +34,8 @@ class _AddContactScreenState extends State<AddContactScreen> {
   AddContactMode _currentMode = AddContactMode.scan;
   final FamilyRepository _repository = FamilyRepository();
   final ImagePicker _imagePicker = ImagePicker();
+  final GlobalKey<QRScannerViewportState> _scannerKey =
+      GlobalKey<QRScannerViewportState>();
 
   String _buildMyQrPayload() {
     final currentUser = context.read<AuthProvider>().currentUser;
@@ -225,6 +227,32 @@ class _AddContactScreenState extends State<AddContactScreen> {
     }
 
     return success;
+  }
+
+  Future<void> _onLiveBarcodeDetected(String rawValue) async {
+    final payload = _parseAddContactQrPayload(rawValue);
+    if (payload == null) {
+      _scannerKey.currentState?.resetDetection();
+      _simulateScanError();
+      return;
+    }
+
+    try {
+      final user = await _resolveUserFromQrPayload(payload);
+      if (user == null) {
+        _scannerKey.currentState?.resetDetection();
+        _simulateScanError();
+        return;
+      }
+
+      await _openQrResultSheet(user);
+      // Sheet dismissed — allow the scanner to detect again.
+      _scannerKey.currentState?.resetDetection();
+    } catch (_) {
+      if (!mounted) return;
+      _scannerKey.currentState?.resetDetection();
+      _simulateScanError();
+    }
   }
 
   void _simulateScanError() {
@@ -625,8 +653,9 @@ class _AddContactScreenState extends State<AddContactScreen> {
             children: [
               Expanded(
                 child: QRScannerViewport(
-                  onSimulateScanSuccess: () => _simulateScanSuccess(null),
-                  onSimulateScanError: _simulateScanError,
+                  key: _scannerKey,
+                  onBarcodeDetected: _onLiveBarcodeDetected,
+                  onScanError: _simulateScanError,
                 ),
               ),
               _buildUploadQrCard(),
@@ -634,7 +663,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
           ),
         );
       case AddContactMode.myCode:
-        return Padding(
+        return SingleChildScrollView(
           key: const ValueKey('my_code_mode'),
           padding: EdgeInsets.all(AppSpacing.gapLg),
           child: MyCodeHeroCard(
