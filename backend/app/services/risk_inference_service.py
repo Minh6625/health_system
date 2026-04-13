@@ -47,9 +47,9 @@ FEATURE_ORDER = (
 )
 
 LABEL_MAP = {
-    0: "Normal",
-    1: "EMERGENCY",
-    2: "Warning",
+    0: "low",
+    1: "critical",
+    2: "medium",
 }
 
 DEFAULT_HRV = 50.0
@@ -390,7 +390,7 @@ def _predict_with_onnx(feature_vector: Sequence[float], bundle: ModelBundle) -> 
             model_input = [list(feature_vector)]
         outputs = session.run(None, {input_name: model_input})
         label_id, confidence = _extract_label_and_confidence(outputs)
-        label = LABEL_MAP.get(label_id, "Warning")
+        label = LABEL_MAP.get(label_id, "medium")
         score = round(confidence * 100.0, 2)
         return RiskInferenceResult(
             label_id=label_id,
@@ -452,7 +452,7 @@ def _predict_with_lightgbm(feature_vector: Sequence[float], bundle: ModelBundle)
                 label_id = int(max(range(len(probabilities)), key=probabilities.__getitem__))
                 confidence = float(probabilities[label_id])
 
-        label = LABEL_MAP.get(label_id, "Warning")
+        label = LABEL_MAP.get(label_id, "medium")
         score = round(confidence * 100.0, 2)
         return RiskInferenceResult(
             label_id=label_id,
