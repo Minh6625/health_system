@@ -11,7 +11,10 @@ class RiskTrendSummaryCard extends StatelessWidget {
   const RiskTrendSummaryCard({super.key, required this.summary});
 
   String _formatScore(num value) {
-    return value.toString();
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toStringAsFixed(1);
   }
 
   Widget _buildStatsHeader(bool compact) {

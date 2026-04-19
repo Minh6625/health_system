@@ -15,10 +15,7 @@ class RelatedDrilldownSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Truy cập nhanh',
-          style: AppTextStyles.sectionTitle,
-        ),
+        const Text('Truy cập nhanh', style: AppTextStyles.sectionTitle),
         const SizedBox(height: AppSpacing.gapMd),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -44,7 +41,11 @@ class RelatedDrilldownSection extends StatelessWidget {
     );
   }
 
-  Widget _buildDrilldownButton({required IconData icon, required String label, VoidCallback? onTap}) {
+  Widget _buildDrilldownButton({
+    required IconData icon,
+    required String label,
+    VoidCallback? onTap,
+  }) {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(

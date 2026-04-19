@@ -5,20 +5,20 @@ import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 class CompareInsightCard extends StatelessWidget {
-  final int delta;
+  final double delta;
 
   const CompareInsightCard({super.key, required this.delta});
 
   @override
   Widget build(BuildContext context) {
-    final bool isImprovement = delta <= 0; // assuming lower is better or just 'giam'
+    final bool isNotWorsening = delta <= 0;
     final Color bgColor = AppStateColors.infoBg;
     final Color iconColor = AppColors.info;
     final String text = delta < 0
-        ? 'Điểm rủi ro giảm ${delta.abs()} điểm so với chu kỳ trước.'
+        ? 'Điểm rủi ro giảm ${_format(delta.abs())} điểm so với chu kỳ trước.'
         : delta > 0
-            ? 'Điểm rủi ro tăng $delta điểm so với chu kỳ trước.'
-            : 'Điểm rủi ro giữ nguyên so với chu kỳ trước.';
+        ? 'Điểm rủi ro tăng ${_format(delta)} điểm so với chu kỳ trước.'
+        : 'Điểm rủi ro giữ nguyên so với chu kỳ trước.';
 
     return Container(
       width: double.infinity,
@@ -32,7 +32,7 @@ class CompareInsightCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            isImprovement ? Icons.trending_down : Icons.trending_up,
+            isNotWorsening ? Icons.trending_down : Icons.trending_up,
             color: iconColor,
             size: 20,
           ),
@@ -46,5 +46,12 @@ class CompareInsightCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _format(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toInt().toString();
+    }
+    return value.toStringAsFixed(1);
   }
 }

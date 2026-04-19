@@ -29,26 +29,23 @@ class RecommendationChecklistCard extends StatelessWidget {
             style: AppTextStyles.sectionTitle,
           ),
           const SizedBox(height: AppSpacing.gapMd),
-          ...recommendations.map((rec) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.gapSm),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline_rounded,
-                      color: AppColors.success,
-                      size: 24,
-                    ),
-                    const SizedBox(width: AppSpacing.gapMd),
-                    Expanded(
-                      child: Text(
-                        rec,
-                        style: AppTextStyles.bodyMedium,
-                      ),
-                    ),
-                  ],
-                ),
-              )),
+          ...recommendations.map(
+            (rec) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.gapSm),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.check_circle_outline_rounded,
+                    color: AppColors.success,
+                    size: 24,
+                  ),
+                  const SizedBox(width: AppSpacing.gapMd),
+                  Expanded(child: Text(rec, style: AppTextStyles.bodyMedium)),
+                ],
+              ),
+            ),
+          ),
         ],
       ),
     );

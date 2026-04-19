@@ -55,6 +55,13 @@ class RiskDetailSummaryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.gapSm),
                     RiskLevelPill(level: detail.level),
+                    const SizedBox(height: AppSpacing.gapSm),
+                    Text(
+                      detail.displayStatus,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -70,6 +77,13 @@ class RiskDetailSummaryCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.gapMd),
           Divider(color: AppColors.strokeSoft.withValues(alpha: 0.5)),
+          const SizedBox(height: AppSpacing.gapMd),
+          Text(
+            detail.previousScore == null
+                ? 'Chưa có mốc so sánh trước đó'
+                : '${detail.score - detail.previousScore! >= 0 ? '+' : ''}${detail.score - detail.previousScore!} so với lần trước',
+            style: AppTextStyles.caption,
+          ),
           const SizedBox(height: AppSpacing.gapMd),
           Text(detail.summary, style: AppTextStyles.bodyMedium),
         ],

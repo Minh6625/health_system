@@ -6,6 +6,7 @@ import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../../../shared/presentation/feedback/inline_error_block.dart';
+import '../../../../shared/presentation/feedback/inline_status_banner.dart';
 import '../../providers/risk_report_provider.dart';
 import '../widgets/medical_disclaimer_card.dart';
 import '../widgets/recommendation_preview_card.dart';
@@ -50,10 +51,8 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              isLinkedProfile
-                  ? 'Báo cáo rủi ro sức khỏe'
-                  : 'Báo cáo rủi ro sức khỏe',
+            const Text(
+              'Báo cáo rủi ro sức khỏe',
               style: AppTextStyles.sectionTitle,
             ),
             if (isLinkedProfile)
@@ -74,7 +73,9 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
   }
 
   Widget _buildBody(RiskReportProvider provider) {
-    if (provider.isLoading && provider.report == null) {
+    if (provider.isInitialLoading &&
+        provider.report == null &&
+        !provider.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -86,8 +87,14 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
     }
 
     final report = provider.report;
+    if (provider.isEmpty) {
+      return Center(
+        child: Text(provider.emptyMessage ?? 'Chưa có dữ liệu đánh giá'),
+      );
+    }
+
     if (report == null) {
-      return const Center(child: Text('Chưa có dữ liệu đánh giá'));
+      return const SizedBox.shrink();
     }
 
     return RefreshIndicator(
@@ -99,6 +106,17 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
             padding: const EdgeInsets.all(AppSpacing.gapLg),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                if (provider.hasStaleContent) ...[
+                  InlineStatusBanner.warning(
+                    message:
+                        'Báo cáo này được tạo từ dữ liệu cũ. Hãy kiểm tra lại chỉ số gần nhất.',
+                  ),
+                  const SizedBox(height: AppSpacing.gapLg),
+                ],
+                if (provider.isRefreshing) ...[
+                  const LinearProgressIndicator(minHeight: 2),
+                  const SizedBox(height: AppSpacing.gapLg),
+                ],
                 RiskScoreHeroCard(report: report),
                 const SizedBox(height: AppSpacing.gapLg),
                 RiskQuickExplanationCard(summary: report.summary),
@@ -111,8 +129,6 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                   recommendations: report.recommendationPreview,
                 ),
                 const SizedBox(height: AppSpacing.gapLg),
-
-                // Risk Action Panel (chiều dọc hoặc ngang tuỳ ý)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -174,7 +190,7 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
 
                 const SizedBox(height: AppSpacing.gapLg),
                 const MedicalDisclaimerCard(),
-                const SizedBox(height: 40), // Safe padding bottom
+                const SizedBox(height: 40),
               ]),
             ),
           ),

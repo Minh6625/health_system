@@ -31,11 +31,7 @@ class _XaiNarrativeCardState extends State<XaiNarrativeCard> {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.auto_awesome,
-                color: AppColors.info,
-                size: 20,
-              ),
+              const Icon(Icons.auto_awesome, color: AppColors.info, size: 20),
               const SizedBox(width: AppSpacing.gapSm),
               Text(
                 'AI Giải thích',
@@ -58,7 +54,9 @@ class _XaiNarrativeCardState extends State<XaiNarrativeCard> {
               widget.explanation,
               style: AppTextStyles.body.copyWith(height: 1.5),
             ),
-            crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+            crossFadeState: _isExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
             duration: const Duration(milliseconds: 180),
           ),
           if (widget.explanation.length > 80) ...[
@@ -72,7 +70,7 @@ class _XaiNarrativeCardState extends State<XaiNarrativeCard> {
                 ),
               ),
             ),
-          ]
+          ],
         ],
       ),
     );

@@ -31,9 +31,7 @@ class RiskQuickExplanationCard extends StatelessWidget {
           Expanded(
             child: Text(
               summary,
-              style: AppTextStyles.body.copyWith(
-                color: AppColors.textPrimary,
-              ),
+              style: AppTextStyles.body.copyWith(color: AppColors.textPrimary),
             ),
           ),
         ],

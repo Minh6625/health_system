@@ -34,7 +34,10 @@ class SupportingMetricsSnapshotCard extends StatelessWidget {
             children: [
               _buildMetric('Nhịp tim', '${snapshot.heartRate} bpm'),
               _buildMetric('SpO2', '${snapshot.spO2}%'),
-              _buildMetric('Huyết áp', '${snapshot.sysBp}/${snapshot.diaBp} mmHg'),
+              _buildMetric(
+                'Huyết áp',
+                '${snapshot.sysBp}/${snapshot.diaBp} mmHg',
+              ),
               _buildMetric('Nhiệt độ', '${snapshot.bodyTemp}°C'),
               _buildMetric('HRV', '${snapshot.hrv} ms'),
               _buildMetric('MAP', '${snapshot.mapVal}'),
@@ -49,10 +52,7 @@ class SupportingMetricsSnapshotCard extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: AppTextStyles.caption,
-        ),
+        Text(label, style: AppTextStyles.caption),
         const SizedBox(height: AppSpacing.gapXs),
         Text(
           value,

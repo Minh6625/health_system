@@ -52,7 +52,6 @@ class RiskScoreHeroCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Score Capsule
               Container(
                 width: 80,
                 height: 80,

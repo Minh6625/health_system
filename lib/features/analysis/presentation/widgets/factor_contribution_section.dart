@@ -27,13 +27,15 @@ class FactorContributionSection extends StatelessWidget {
           style: AppTextStyles.sectionTitle,
         ),
         const SizedBox(height: AppSpacing.gapMd),
-        ...breakdown.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.gapMd),
-              child: _FactorContributionCard(
-                item: item,
-                onTap: () => onFactorTap?.call(item.routeTarget),
-              ),
-            )),
+        ...breakdown.map(
+          (item) => Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.gapMd),
+            child: _FactorContributionCard(
+              item: item,
+              onTap: () => onFactorTap?.call(item.routeTarget),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -44,6 +46,13 @@ class _FactorContributionCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _FactorContributionCard({required this.item, required this.onTap});
+
+  String _formatContribution(double value) {
+    if (value == value.roundToDouble()) {
+      return '+${value.toInt()}';
+    }
+    return '+${value.toStringAsFixed(2)}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,24 +93,32 @@ class _FactorContributionCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     item.label,
-                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Text(
                   '${item.value} ${item.unit}',
-                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(width: AppSpacing.gapSm),
-                const Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 20),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.textSecondary,
+                  size: 20,
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.gapMd),
             Row(
               children: [
                 Text(
-                  '+${item.contributionScore}',
+                  _formatContribution(item.contributionScore),
                   style: AppTextStyles.caption.copyWith(
                     color: impactColor,
                     fontWeight: FontWeight.bold,
@@ -113,7 +130,9 @@ class _FactorContributionCard extends StatelessWidget {
                     height: AppSpacing.gapSm,
                     decoration: BoxDecoration(
                       color: AppColors.bgPrimary,
-                      borderRadius: BorderRadius.circular(AppRadii.radiusSm / 2),
+                      borderRadius: BorderRadius.circular(
+                        AppRadii.radiusSm / 2,
+                      ),
                     ),
                     child: FractionallySizedBox(
                       alignment: Alignment.centerLeft,
@@ -121,7 +140,9 @@ class _FactorContributionCard extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           color: impactColor,
-                          borderRadius: BorderRadius.circular(AppRadii.radiusSm / 2),
+                          borderRadius: BorderRadius.circular(
+                            AppRadii.radiusSm / 2,
+                          ),
                         ),
                       ),
                     ),

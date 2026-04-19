@@ -6,6 +6,7 @@ import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/services/auth_session_service.dart';
 import 'package:healthguard/features/family/repositories/family_repository.dart';
 import 'package:healthguard/features/home/presentation/widgets/risk_insight_card.dart';
+import 'package:healthguard/features/analysis/presentation/widgets/risk_history_item_card.dart';
 import 'package:integration_test/integration_test.dart';
 
 const _patientEmail = 'e2e.dashboard.patient@example.com';
@@ -72,6 +73,14 @@ Future<void> _pageBack(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 350));
 }
 
+Future<void> _activateButton<T extends ButtonStyleButton>(
+  WidgetTester tester,
+  Finder finder,
+) async {
+  tester.widget<T>(finder).onPressed!.call();
+  await tester.pump(const Duration(milliseconds: 300));
+}
+
 Future<void> _openRiskFlowFromDashboard(WidgetTester tester) async {
   final riskCard = find.byType(RiskInsightCard);
   await _pumpUntilVisible(tester, riskCard);
@@ -112,8 +121,30 @@ Future<void> _assertRiskDetailAndDrilldowns(WidgetTester tester) async {
 Future<void> _assertRiskHistory(WidgetTester tester) async {
   await _pageBack(tester);
   await _pumpUntilVisible(tester, find.text('Báo cáo rủi ro sức khỏe'));
-  await _pushNamed(tester, AppRouter.riskHistory);
+  final historyButton = find.widgetWithText(OutlinedButton, 'Xem lịch sử');
+  await tester.scrollUntilVisible(
+    historyButton,
+    250,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.ensureVisible(historyButton);
+  await _activateButton<OutlinedButton>(tester, historyButton);
   await _pumpUntilVisible(tester, find.text('Lịch sử đánh giá rủi ro'));
+
+  await tester.tap(find.text('30 ngày'));
+  await tester.pump(const Duration(milliseconds: 350));
+  await _pumpUntilVisible(tester, find.text('Lịch sử đánh giá rủi ro'));
+
+  await tester.tap(find.text('90 ngày'));
+  await tester.pump(const Duration(milliseconds: 350));
+  await _pumpUntilVisible(tester, find.text('Lịch sử đánh giá rủi ro'));
+
+  final historyCard = find.byType(RiskHistoryItemCard);
+  if (historyCard.evaluate().isNotEmpty) {
+    await tester.tap(historyCard.first);
+    await tester.pump(const Duration(milliseconds: 300));
+    await _pumpUntilVisible(tester, find.text('Giải thích báo cáo rủi ro'));
+  }
 }
 
 Future<String> _loadFirstLinkedProfileId(WidgetTester tester) async {
@@ -155,7 +186,7 @@ void main() {
     );
 
     testWidgets(
-      'caregiver linked profile flow reaches linked dashboard and drilldowns',
+      'caregiver linked profile flow reaches linked dashboard detail and history',
       (WidgetTester tester) async {
         await _launchApp(tester);
         await _login(
@@ -175,6 +206,7 @@ void main() {
         await _openRiskFlowFromDashboard(tester);
         await _pumpUntilVisible(tester, find.text('Hồ sơ người thân'));
         await _assertRiskDetailAndDrilldowns(tester);
+        await _assertRiskHistory(tester);
       },
     );
   });

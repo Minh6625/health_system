@@ -9,33 +9,54 @@ class RiskReportProvider extends ChangeNotifier {
 
   final RiskAnalysisRepository _repository;
 
-  bool _isLoading = false;
+  bool _isInitialLoading = false;
+  bool _isRefreshing = false;
   RiskReportEntity? _report;
   RiskReportDetailEntity? _reportDetail;
   String? _error;
+  String? _emptyMessage;
 
-  bool get isLoading => _isLoading;
+  bool get isLoading => _isInitialLoading || _isRefreshing;
+  bool get isInitialLoading => _isInitialLoading;
+  bool get isRefreshing => _isRefreshing;
   RiskReportEntity? get report => _report;
   RiskReportDetailEntity? get reportDetail => _reportDetail;
   String? get error => _error;
+  String? get emptyMessage => _emptyMessage;
+  bool get isEmpty => _emptyMessage != null;
+  bool get isForbidden =>
+      (_error ?? '').toLowerCase().contains('không có quyền');
+  bool get hasStaleContent =>
+      (_report?.isStale ?? false) || (_reportDetail?.isStale ?? false);
 
   Future<void> fetchLatestReport(String? profileId) async {
-    _isLoading = true;
+    final hasExistingContent = _report != null;
+    _isInitialLoading = !hasExistingContent;
+    _isRefreshing = hasExistingContent;
     _error = null;
+    _emptyMessage = null;
     notifyListeners();
 
     try {
       _report = await _repository.fetchLatestReport(profileId);
     } catch (e) {
-      _error = 'Không thể tải dữ liệu: $e';
+      if (e.toString().contains('Chưa có dữ liệu đánh giá')) {
+        _report = null;
+        _emptyMessage = 'Chưa có dữ liệu đánh giá';
+      } else {
+        _error = 'Không thể tải dữ liệu: $e';
+      }
     } finally {
-      _isLoading = false;
+      _isInitialLoading = false;
+      _isRefreshing = false;
       notifyListeners();
     }
   }
 
   Future<void> fetchReportDetail(int reportId, String? profileId) async {
-    _isLoading = true;
+    final hasExistingContent = _reportDetail != null;
+    _isInitialLoading = !hasExistingContent;
+    _isRefreshing = hasExistingContent;
     _error = null;
     notifyListeners();
 
@@ -44,7 +65,8 @@ class RiskReportProvider extends ChangeNotifier {
     } catch (e) {
       _error = 'Không thể tải chi tiết: $e';
     } finally {
-      _isLoading = false;
+      _isInitialLoading = false;
+      _isRefreshing = false;
       notifyListeners();
     }
   }

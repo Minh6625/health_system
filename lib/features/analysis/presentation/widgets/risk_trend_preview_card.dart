@@ -24,17 +24,12 @@ class RiskTrendPreviewCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Xu hướng 7 ngày',
-            style: AppTextStyles.sectionTitle,
-          ),
+          const Text('Xu hướng 7 ngày', style: AppTextStyles.sectionTitle),
           const SizedBox(height: AppSpacing.gapMd),
           SizedBox(
             height: 100,
             width: double.infinity,
-            child: CustomPaint(
-              painter: _TrendChartPainter(data: trend7d),
-            ),
+            child: CustomPaint(painter: _TrendChartPainter(data: trend7d)),
           ),
           const SizedBox(height: AppSpacing.gapMd),
           Row(
@@ -46,7 +41,7 @@ class RiskTrendPreviewCard extends StatelessWidget {
               const SizedBox(width: AppSpacing.gapMd),
               _buildLegend(AppColors.critical, 'Nguy hiểm'),
             ],
-          )
+          ),
         ],
       ),
     );
@@ -58,16 +53,10 @@ class RiskTrendPreviewCard extends StatelessWidget {
         Container(
           width: 8,
           height: 8,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: AppSpacing.gapXs),
-        Text(
-          label,
-          style: AppTextStyles.navLabel,
-        ),
+        Text(label, style: AppTextStyles.navLabel),
       ],
     );
   }
@@ -104,7 +93,8 @@ class _TrendChartPainter extends CustomPainter {
       final double x = i * stepX;
       // y is inverted (0 is top)
       final double normalizedY = (data[i] - minVal) / range;
-      final double y = size.height - (normalizedY * size.height * 0.8) - (size.height * 0.1); 
+      final double y =
+          size.height - (normalizedY * size.height * 0.8) - (size.height * 0.1);
 
       if (i == 0) {
         path.moveTo(x, y);
