@@ -24,47 +24,42 @@ logger = logging.getLogger(__name__)
 
 class AuthService:
     email_pattern = re.compile(r"^[^@]+@[^@]+\.[^@]+$")
-    
+
     @staticmethod
     def _generate_pin_code() -> str:
         """Generate cryptographically secure 6-digit PIN (100000-999999)."""
         return str(secrets.randbelow(900000) + 100000)
-    
+
     @staticmethod
     def validate_age(date_of_birth: Optional[date]) -> tuple[bool, str]:
         """
         Validate age from date of birth.
-        
+
         Requirements:
-        - Age >= 18 (must be adult)
+        - Age >= 16
         - Age <= 150 (reasonable upper limit)
-        
+
         Returns:
             (is_valid, message) tuple
         """
         if date_of_birth is None:
             return True, "OK"  # Optional field
-        
+
         today = date.today()
-        
+
         # Check if date is in future
         if date_of_birth > today:
             return False, "Ngày sinh không hợp lệ (trong tương lai)"
-        
+
         # Calculate age in days for more accurate boundary checking
         days_old = (today - date_of_birth).days
-        
-        # 18*365 - 1 days = just turned 18 (valid)
-        # 18*365 days = exactly 18 years (valid)
-        # 18*365 + 1 days = just before 18 (invalid - younger)
-        # Note: More days ago = older person
-        
+
         if days_old < 16 * 365:
             return False, "Bạn phải đủ 16 tuổi để đăng ký"
-        
+
         if days_old > 150 * 365:
             return False, "Ngày sinh không hợp lệ (tuổi quá cao)"
-        
+
         return True, "OK"
 
     @classmethod
@@ -97,11 +92,11 @@ class AuthService:
         
         Returns:
             (success, message, token_data) tuple
-            where token_data = {"verification_token": str, "user": User} or None on failure
+            where token_data = {"verification_code": str, "user": User} or None on failure
         """
         email = email.strip()
         full_name = full_name.strip()
-        
+
         # Validate email format
         if not cls.email_pattern.match(email):
             AuditLogRepository.log_action(
@@ -181,20 +176,20 @@ class AuthService:
                     existing_user.date_of_birth = date_of_birth
                     existing_user.phone = phone
                     existing_user.updated_at = get_current_time()
-                    
+
                     # Generate email verification PIN code
                     verification_code = cls._generate_pin_code()
                     existing_user.verification_code = verification_code
                     existing_user.verification_code_expires_at = get_current_time() + timedelta(hours=24)
                     db.commit()
-                    
+
                     # Send verification email
                     if background_tasks:
                         background_tasks.add_task(EmailService.send_verification_email, email, verification_code)
                         email_sent = True
                     else:
                         email_sent = EmailService.send_verification_email(email, verification_code)
-                    
+
                     AuditLogRepository.log_action(
                         db,
                         action="user.register",
@@ -206,7 +201,7 @@ class AuthService:
                         user_agent=user_agent,
                         details={"email": email, "role": role, "email_sent": email_sent, "note": "Re-registration of unverified account"},
                     )
-                    
+
                     return True, "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã xác thực.", {
                         "verification_code": verification_code,  # ONLY FOR DEV/TESTING
                         "user": existing_user,
@@ -226,20 +221,20 @@ class AuthService:
                 date_of_birth=date_of_birth,
                 phone=phone,
             )
-            
+
             # Generate email verification PIN code
             verification_code = cls._generate_pin_code()
             user.verification_code = verification_code
             user.verification_code_expires_at = get_current_time() + timedelta(hours=24)
             db.commit()
-            
+
             # Send verification email
             if background_tasks:
                 background_tasks.add_task(EmailService.send_verification_email, email, verification_code)
                 email_sent = True
             else:
                 email_sent = EmailService.send_verification_email(email, verification_code)
-            
+
             AuditLogRepository.log_action(
                 db,
                 action="user.register",
@@ -251,7 +246,7 @@ class AuthService:
                 user_agent=user_agent,
                 details={"email": email, "role": role, "email_sent": email_sent},
             )
-            
+
             return True, "Đăng ký thành công. Vui lòng kiểm tra email để lấy mã xác thực.", {
                 "verification_code": verification_code,  # ONLY FOR DEV/TESTING
                 "user": user,
@@ -867,8 +862,9 @@ class AuthService:
         Returns:
             (success, message)
         """
-        if len(new_password) < 6:
-            return False, "Mật khẩu phải có ít nhất 6 ký tự"
+        is_strong, strength_message = validate_password_strength(new_password)
+        if not is_strong:
+            return False, strength_message
         
         email = email.strip().lower()
         user = UserRepository.get_by_email(db, email)
@@ -980,8 +976,9 @@ class AuthService:
         Returns:
             (success, message)
         """
-        if len(new_password) < 6:
-            return False, "Mật khẩu mới phải có ít nhất 6 ký tự"
+        is_strong, strength_message = validate_password_strength(new_password)
+        if not is_strong:
+            return False, strength_message
         
         user = UserRepository.get_by_id(db, user_id)
         

@@ -45,10 +45,10 @@ def get_user_agent(request: Request) -> str:
 
 @router.post("/register", response_model=AuthResponse)
 def register(
-    payload: RegisterRequest, 
-    request: Request, 
+    payload: RegisterRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> AuthResponse:
     """Register a new user account with role support."""
     ip_address = get_client_ip(request)
@@ -74,9 +74,8 @@ def register(
         background_tasks=background_tasks,
     )
     
-    # Record attempt for rate limiting
     register_rate_limiter.record_attempt(ip_address)
-    
+
     if success and token_data:
         user_obj = token_data.get("user")
         user_data = UserData(
@@ -85,11 +84,11 @@ def register(
             full_name=user_obj.full_name,
             role=user_obj.role,
         ) if user_obj else None
-        
+
         return AuthResponse(
             success=True,
             message=message,
-            verification_token=token_data.get("verification_token"),
+            verification_code=token_data.get("verification_code"),
             user=user_data,
         )
     else:
@@ -100,7 +99,7 @@ def register(
 def verify_email(
     payload: VerifyEmailRequest, request: Request, db: Session = Depends(get_db)
 ) -> AuthResponse:
-    """Verify user email using verification token."""
+    """Verify user email using the verification code."""
     ip_address = get_client_ip(request)
     user_agent = get_user_agent(request)
 
@@ -113,12 +112,12 @@ def verify_email(
 
 @router.post("/resend-verification", response_model=AuthResponse)
 def resend_verification(
-    payload: ResendVerificationRequest, 
-    request: Request, 
+    payload: ResendVerificationRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> AuthResponse:
-    """Resend email verification token to user."""
+    """Resend the email verification code to the user."""
     ip_address = get_client_ip(request)
     user_agent = get_user_agent(request)
 
@@ -141,7 +140,7 @@ def resend_verification(
         return AuthResponse(
             success=True,
             message=message,
-            verification_token=token_data.get("verification_token") if token_data else None
+            verification_code=token_data.get("verification_code") if token_data else None,
         )
     else:
         return AuthResponse(success=False, message=message)
@@ -167,11 +166,9 @@ def login(
         db, payload.email.strip(), payload.password, ip_address, user_agent
     )
 
-    # Record attempt chỉ sau khi login thất bại
     if not success:
         login_rate_limiter.record_attempt(ip_address)
     else:
-        # Login thành công → reset rate limiter
         login_rate_limiter.reset(ip_address)
 
     if success and token_data:
@@ -211,12 +208,12 @@ def refresh_token(
 
 @router.post("/forgot-password", response_model=AuthResponse)
 def forgot_password(
-    payload: ForgotPasswordRequest, 
-    request: Request, 
+    payload: ForgotPasswordRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> AuthResponse:
-    """Request password reset token."""
+    """Request a password reset code."""
     ip_address = get_client_ip(request)
     user_agent = get_user_agent(request)
 
@@ -231,10 +228,8 @@ def forgot_password(
         db, payload.email.strip(), ip_address, user_agent, background_tasks
     )
 
-    # Always record attempt for rate limiting
     forgot_password_rate_limiter.record_attempt(ip_address)
 
-    # Return success response even if email doesn't exist (prevent enumeration)
     if success:
         return AuthResponse(
             success=True,

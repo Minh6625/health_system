@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform.dart';
 // ignore: depend_on_referenced_packages
@@ -7,20 +9,33 @@ import 'package:healthguard/features/auth/models/auth_response_model.dart';
 import 'package:healthguard/features/auth/models/user_model.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
+import 'package:healthguard/features/auth/services/auth_session_service.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 
 import 'auth_provider_test.mocks.dart';
 
+String _buildJwtWithExp(DateTime expiresAt) {
+  String encodeSegment(Map<String, Object> value) {
+    return base64Url.encode(utf8.encode(jsonEncode(value))).replaceAll('=', '');
+  }
+
+  return '${encodeSegment({'alg': 'HS256', 'typ': 'JWT'})}.${encodeSegment({'exp': expiresAt.toUtc().millisecondsSinceEpoch ~/ 1000})}.signature';
+}
+
 @GenerateMocks([AuthRepository])
 void main() {
   late AuthProvider authProvider;
   late MockAuthRepository mockRepository;
+  late AuthSessionService sessionService;
 
   setUp(() {
-    FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({});
+    FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform(
+      {},
+    );
+    sessionService = AuthSessionService();
     mockRepository = MockAuthRepository();
-    authProvider = AuthProvider(mockRepository);
+    authProvider = AuthProvider(mockRepository, sessionService: sessionService);
   });
 
   group('AuthProvider.register', () {
@@ -33,7 +48,7 @@ void main() {
         role: 'user',
         dateOfBirth: DateTime(1990, 1, 1),
       );
-      
+
       final response = AuthResponse(
         success: true,
         message: 'Đăng ký thành công',
@@ -117,7 +132,7 @@ void main() {
         role: 'user',
         dateOfBirth: DateTime(1990, 1, 1),
       );
-      
+
       final response = AuthResponse(
         success: true,
         message: 'Đăng ký thành công',
@@ -161,7 +176,7 @@ void main() {
         password: 'Pass1!',
         role: 'user',
       );
-      
+
       final response = AuthResponse(
         success: false,
         message: 'Mật khẩu phải có ít nhất 8 ký tự',
@@ -187,7 +202,7 @@ void main() {
         role: 'user',
         dateOfBirth: DateTime(1990, 1, 1),
       );
-      
+
       final response = AuthResponse(
         success: false,
         message: 'Email đã tồn tại',
@@ -234,7 +249,7 @@ void main() {
         role: 'user',
         dateOfBirth: DateTime(1990, 1, 1),
       );
-      
+
       final response = AuthResponse(
         success: true,
         message: 'Đăng ký thành công',
@@ -256,30 +271,86 @@ void main() {
   });
 
   group('AuthProvider.bootstrapSession', () {
-    test('restores session from secure storage when user snapshot exists', () async {
-      FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({
-        'access_token': 'stored-access-token',
-        'refresh_token': 'stored-refresh-token',
-        'user_session':
-            '{"user_id":1,"email":"elder@example.com","full_name":"Nguyen Van A","role":"patient"}',
-      });
-      authProvider = AuthProvider(mockRepository);
+    test(
+      'restores session from secure storage when user snapshot exists',
+      () async {
+        final accessToken = _buildJwtWithExp(
+          DateTime.now().toUtc().add(const Duration(hours: 1)),
+        );
+        FlutterSecureStoragePlatform
+            .instance = TestFlutterSecureStoragePlatform({
+          'access_token': accessToken,
+          'refresh_token': 'stored-refresh-token',
+          'user_session':
+              '{"user_id":1,"email":"elder@example.com","full_name":"Nguyen Van A","role":"patient"}',
+        });
+        authProvider = AuthProvider(
+          mockRepository,
+          sessionService: AuthSessionService(),
+        );
 
-      final result = await authProvider.bootstrapSession();
+        final result = await authProvider.bootstrapSession();
 
-      expect(result, true);
-      expect(authProvider.isAuthenticated, true);
-      expect(authProvider.accessToken, 'stored-access-token');
-      expect(authProvider.refreshToken, 'stored-refresh-token');
-      expect(authProvider.currentUser?.email, 'elder@example.com');
-      verifyNever(mockRepository.refreshToken('stored-refresh-token'));
-    });
+        expect(result, true);
+        expect(authProvider.isAuthenticated, true);
+        expect(authProvider.accessToken, accessToken);
+        expect(authProvider.refreshToken, 'stored-refresh-token');
+        expect(authProvider.currentUser?.email, 'elder@example.com');
+        verifyNever(mockRepository.refreshToken('stored-refresh-token'));
+      },
+    );
+
+    test(
+      'refreshes expired access token when a refresh token is available',
+      () async {
+        final expiredAccessToken = _buildJwtWithExp(
+          DateTime.now().toUtc().subtract(const Duration(minutes: 5)),
+        );
+        FlutterSecureStoragePlatform
+            .instance = TestFlutterSecureStoragePlatform({
+          'access_token': expiredAccessToken,
+          'refresh_token': 'stored-refresh-token',
+          'user_session':
+              '{"user_id":1,"email":"elder@example.com","full_name":"Nguyen Van A","role":"patient"}',
+        });
+        authProvider = AuthProvider(
+          mockRepository,
+          sessionService: AuthSessionService(),
+        );
+
+        when(mockRepository.refreshToken('stored-refresh-token')).thenAnswer(
+          (_) async => AuthResponse(
+            success: true,
+            message: 'Token đã được làm mới',
+            accessToken: 'new-access-token',
+            user: UserData(
+              userId: 3,
+              email: 'fresh@example.com',
+              fullName: 'Pham Thi C',
+              role: 'patient',
+            ),
+          ),
+        );
+
+        final result = await authProvider.bootstrapSession();
+
+        expect(result, true);
+        expect(authProvider.isAuthenticated, true);
+        expect(authProvider.accessToken, 'new-access-token');
+        expect(authProvider.refreshToken, 'stored-refresh-token');
+        expect(authProvider.currentUser?.email, 'fresh@example.com');
+        verify(mockRepository.refreshToken('stored-refresh-token')).called(1);
+      },
+    );
 
     test('refreshes session when stored user snapshot is missing', () async {
       FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({
         'refresh_token': 'stored-refresh-token',
       });
-      authProvider = AuthProvider(mockRepository);
+      authProvider = AuthProvider(
+        mockRepository,
+        sessionService: AuthSessionService(),
+      );
 
       when(mockRepository.refreshToken('stored-refresh-token')).thenAnswer(
         (_) async => AuthResponse(
@@ -309,7 +380,10 @@ void main() {
       FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({
         'refresh_token': 'expired-refresh-token',
       });
-      authProvider = AuthProvider(mockRepository);
+      authProvider = AuthProvider(
+        mockRepository,
+        sessionService: AuthSessionService(),
+      );
 
       when(mockRepository.refreshToken('expired-refresh-token')).thenAnswer(
         (_) async => AuthResponse(
@@ -338,7 +412,10 @@ void main() {
         'user_session':
             '{"user_id":1,"email":"elder@example.com","full_name":"Nguyen Van A","role":"patient"}',
       });
-      authProvider = AuthProvider(mockRepository);
+      authProvider = AuthProvider(
+        mockRepository,
+        sessionService: AuthSessionService(),
+      );
 
       await authProvider.bootstrapSession();
       await authProvider.logout();
@@ -370,5 +447,46 @@ void main() {
       // Assert
       expect(authProvider.message, null);
     });
+  });
+
+  group('AuthProvider session events', () {
+    test(
+      'reacts to session expiration emitted by the shared session service',
+      () async {
+        await sessionService.applyAuthenticatedResponse(
+          AuthResponse(
+            success: true,
+            message: 'Đăng nhập thành công',
+            accessToken: _buildJwtWithExp(
+              DateTime.now().toUtc().add(const Duration(hours: 1)),
+            ),
+            refreshToken: 'refresh-token',
+            user: UserData(
+              userId: 9,
+              email: 'elder@example.com',
+              fullName: 'Nguyen Van A',
+              role: 'patient',
+            ),
+          ),
+          fallbackRefreshToken: 'refresh-token',
+        );
+
+        await Future<void>.delayed(Duration.zero);
+        expect(authProvider.isAuthenticated, true);
+
+        await sessionService.clearSession(
+          message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        expect(authProvider.isAuthenticated, false);
+        expect(authProvider.accessToken, null);
+        expect(authProvider.currentUser, null);
+        expect(
+          authProvider.message,
+          'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        );
+      },
+    );
   });
 }

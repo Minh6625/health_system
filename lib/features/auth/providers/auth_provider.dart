@@ -1,15 +1,23 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:healthguard/core/utils/validators.dart';
-import 'package:healthguard/features/auth/models/auth_response_model.dart';
 import 'package:healthguard/features/auth/models/user_model.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
-import 'package:healthguard/features/auth/services/token_storage_service.dart';
+import 'package:healthguard/features/auth/models/auth_response_model.dart';
+import 'package:healthguard/features/auth/services/auth_session_service.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final AuthRepository repository;
-  final TokenStorageService _tokenStorageService = TokenStorageService();
+  static const _bootstrapErrorMessage = 'Không thể khôi phục phiên đăng nhập.';
 
-  AuthProvider(this.repository);
+  final AuthRepository repository;
+  final AuthSessionService _sessionService;
+  late final StreamSubscription<AuthSessionUpdate> _sessionSubscription;
+
+  AuthProvider(this.repository, {AuthSessionService? sessionService})
+    : _sessionService = sessionService ?? AuthSessionService.shared {
+    _sessionSubscription = _sessionService.updates.listen(_handleSessionUpdate);
+  }
 
   bool isLoading = false;
   bool isBootstrapping = false;
@@ -43,7 +51,7 @@ class AuthProvider extends ChangeNotifier {
       isLoading = false;
 
       if (response.success) {
-        await _applyAuthenticatedSession(
+        await _sessionService.applyAuthenticatedResponse(
           response,
           fallbackRefreshToken: response.refreshToken,
         );
@@ -72,51 +80,19 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final storedAccessToken = await _tokenStorageService.readAccessToken();
-      final storedRefreshToken = await _tokenStorageService.readRefreshToken();
-      final storedUser = await _tokenStorageService.readUser();
-
-      if (!_hasValidSessionSnapshot(storedAccessToken, storedRefreshToken)) {
-        await _clearSessionState(notify: false);
-        sessionResolved = true;
-        return false;
-      }
-
-      accessToken = storedAccessToken;
-      refreshToken = storedRefreshToken;
-      currentUser = storedUser;
-
-      if (_canRestoreStoredSession(storedAccessToken, storedUser)) {
-        message = null;
-        sessionResolved = true;
-        return true;
-      }
-
-      if (!_hasRefreshToken(storedRefreshToken)) {
-        await _clearSessionState(notify: false);
-        sessionResolved = true;
-        return false;
-      }
-
-      final response = await repository.refreshToken(storedRefreshToken!);
-      if (!_canApplyAuthenticatedResponse(response)) {
-        await _clearSessionState(notify: false);
-        message = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-        sessionResolved = true;
-        return false;
-      }
-
-      await _applyAuthenticatedSession(
-        response,
-        fallbackRefreshToken: storedRefreshToken,
+      final result = await _sessionService.restoreSession(
+        refreshTokenHandler: repository.refreshToken,
       );
-      message = null;
-      sessionResolved = true;
-      return true;
+      _applySessionSnapshot(
+        result.snapshot,
+        nextMessage: result.success ? null : result.message,
+        notify: false,
+      );
+      return result.success;
     } catch (error) {
-      await _clearSessionState(notify: false);
-      message = _buildBootstrapErrorMessage(error);
-      sessionResolved = true;
+      await _sessionService.clearSession(
+        message: _buildBootstrapErrorMessage(error),
+      );
       return false;
     } finally {
       isBootstrapping = false;
@@ -131,7 +107,6 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // Validate full_name: only letters, Vietnamese diacritics, and spaces
     if (user.fullName?.trim().isEmpty ?? true) {
       message = 'Vui lòng nhập họ tên';
       notifyListeners();
@@ -150,7 +125,6 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // Only letters, Unicode characters (for all VN diacritics), and spaces allowed
     final namePattern = RegExp(r'^[\p{L}\s]+$', unicode: true);
     if (!namePattern.hasMatch(user.fullName?.trim() ?? '')) {
       message =
@@ -165,7 +139,6 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // Validate date of birth if provided
     if (user.dateOfBirth != null) {
       final age =
           DateTime.now().year -
@@ -193,7 +166,6 @@ class AuthProvider extends ChangeNotifier {
       return false;
     }
 
-    // Validate phone if provided
     if (user.phone != null && user.phone!.trim().isNotEmpty) {
       final phone = user.phone!.trim();
       if (!RegExp(r'^\d+$').hasMatch(phone)) {
@@ -271,9 +243,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    await _clearSessionState(notify: false);
-    message = 'Đã đăng xuất';
-    notifyListeners();
+    await _sessionService.clearSession(message: 'Đã đăng xuất');
   }
 
   void clearMessage() {
@@ -281,65 +251,44 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _applyAuthenticatedSession(
-    AuthResponse response, {
-    String? fallbackRefreshToken,
-  }) async {
-    final nextAccessToken = response.accessToken;
-    final nextUser = response.user;
-    if (nextAccessToken == null || nextAccessToken.isEmpty || nextUser == null) {
-      return;
+  String _buildBootstrapErrorMessage(Object error) {
+    if (error is Error) {
+      return 'Đã xảy ra lỗi khi khôi phục phiên đăng nhập.';
     }
+    return _bootstrapErrorMessage;
+  }
 
-    accessToken = nextAccessToken;
-    refreshToken = response.refreshToken ?? fallbackRefreshToken;
-    currentUser = nextUser;
-    sessionResolved = true;
-
-    await _tokenStorageService.saveSession(
-      accessToken: nextAccessToken,
-      refreshToken: refreshToken,
-      user: nextUser,
+  void _handleSessionUpdate(AuthSessionUpdate update) {
+    _applySessionSnapshot(
+      update.snapshot,
+      nextMessage: update.message,
+      sessionResolvedOverride: update.sessionResolved,
     );
   }
 
-  bool _hasValidSessionSnapshot(String? storedAccessToken, String? storedRefreshToken) {
-    final hasAccessToken = storedAccessToken != null && storedAccessToken.isNotEmpty;
-    final hasRefreshToken = storedRefreshToken != null && storedRefreshToken.isNotEmpty;
-    return hasAccessToken || hasRefreshToken;
-  }
+  void _applySessionSnapshot(
+    AuthSessionSnapshot snapshot, {
+    String? nextMessage,
+    bool notify = true,
+    bool sessionResolvedOverride = true,
+  }) {
+    accessToken = snapshot.accessToken;
+    refreshToken = snapshot.refreshToken;
+    currentUser = snapshot.user;
+    sessionResolved = sessionResolvedOverride;
 
-  bool _canRestoreStoredSession(String? storedAccessToken, UserData? storedUser) {
-    return storedAccessToken != null && storedAccessToken.isNotEmpty && storedUser != null;
-  }
-
-  bool _hasRefreshToken(String? storedRefreshToken) {
-    return storedRefreshToken != null && storedRefreshToken.isNotEmpty;
-  }
-
-  bool _canApplyAuthenticatedResponse(AuthResponse response) {
-    final nextAccessToken = response.accessToken;
-    return response.success &&
-        nextAccessToken != null &&
-        nextAccessToken.isNotEmpty &&
-        response.user != null;
-  }
-
-  String _buildBootstrapErrorMessage(Object error) {
-    if (error is Exception) {
-      return 'Không thể khôi phục phiên đăng nhập.';
+    if (nextMessage != null) {
+      message = nextMessage;
     }
 
-    return 'Đã xảy ra lỗi khi khôi phục phiên đăng nhập.';
-  }
-
-  Future<void> _clearSessionState({required bool notify}) async {
-    accessToken = null;
-    refreshToken = null;
-    currentUser = null;
-    await _tokenStorageService.clearTokens();
     if (notify) {
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    _sessionSubscription.cancel();
+    super.dispose();
   }
 }

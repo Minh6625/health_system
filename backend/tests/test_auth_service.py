@@ -529,13 +529,27 @@ class TestAuthService:
                 mock_db,
                 user_id=1,
                 current_password="wrongpassword",
-                new_password="newpassword123",
+                new_password="NewStrongPass1!",
                 ip_address="127.0.0.1",
                 user_agent="test"
             )
             
             assert success is False
             assert "không đúng" in message.lower()
+
+    def test_change_password_rejects_weak_new_password(self, mock_db):
+        """Test change password rejects weak new passwords before touching the repository."""
+        success, message = AuthService.change_password(
+            mock_db,
+            user_id=1,
+            current_password="password123",
+            new_password="weakpass",
+            ip_address="127.0.0.1",
+            user_agent="test"
+        )
+
+        assert success is False
+        assert "mật khẩu" in message.lower()
 
     def test_change_password_success(self, mock_db, mock_user):
         """Test successful password change."""
@@ -552,7 +566,7 @@ class TestAuthService:
                 mock_db,
                 user_id=1,
                 current_password="password123",
-                new_password="newpassword456",
+                new_password="NewStrongPass1!",
                 ip_address="127.0.0.1",
                 user_agent="test"
             )
@@ -707,3 +721,15 @@ class TestAuthService:
             assert "thành công" in message.lower()
             assert mock_user.reset_code is None
             mock_repo.update_password.assert_called_once()
+
+    def test_reset_password_rejects_weak_new_password(self, mock_db):
+        """Test password reset rejects weak passwords before checking the reset code."""
+        success, message = AuthService.reset_password(
+            mock_db,
+            email="test@example.com",
+            code="654321",
+            new_password="weakpass"
+        )
+
+        assert success is False
+        assert "mật khẩu" in message.lower()

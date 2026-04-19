@@ -1,21 +1,64 @@
 import 'dart:async';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
-import 'package:healthguard/features/auth/services/token_storage_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:healthguard/features/auth/models/auth_response_model.dart';
+import 'package:healthguard/features/auth/services/auth_session_service.dart';
+import 'package:http/http.dart' as http;
 
 class ApiRequestException implements Exception {
+  const ApiRequestException(this.message);
+
   final String message;
 
-  const ApiRequestException(this.message);
+  @override
+  String toString() => message;
+}
+
+class SessionExpiredException implements Exception {
+  const SessionExpiredException(this.message);
+
+  final String message;
 
   @override
   String toString() => message;
 }
 
 class ApiClient {
+  ApiClient._internal({
+    http.Client? httpClient,
+    AuthSessionService? sessionService,
+    String? baseUrlOverride,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _sessionService = sessionService ?? AuthSessionService.shared,
+       _baseUrlOverride = baseUrlOverride;
+
+  @visibleForTesting
+  ApiClient.test({
+    http.Client? httpClient,
+    AuthSessionService? sessionService,
+    String? baseUrlOverride,
+  }) : _httpClient = httpClient ?? http.Client(),
+       _sessionService = sessionService ?? AuthSessionService(),
+       _baseUrlOverride = baseUrlOverride;
+
+  static final ApiClient _instance = ApiClient._internal();
+
+  factory ApiClient() => _instance;
+
+  final http.Client _httpClient;
+  final AuthSessionService _sessionService;
+  final String? _baseUrlOverride;
+
+  int? targetProfileId;
+
   String get baseUrl {
+    final overrideUrl = _baseUrlOverride;
+    if (overrideUrl != null && overrideUrl.isNotEmpty) {
+      return overrideUrl;
+    }
+
     String url = dotenv.env['API_URL'] ?? 'http://10.0.2.2:8000/api/v1/mobile';
     if (kIsWeb) {
       url = url.replaceFirst('10.0.2.2', '127.0.0.1');
@@ -23,29 +66,18 @@ class ApiClient {
     return url;
   }
 
-  static final ApiClient _instance = ApiClient._internal();
-
-  factory ApiClient() {
-    return _instance;
-  }
-
-  ApiClient._internal();
-
-  final TokenStorageService _tokenStorageService = TokenStorageService();
-
-  int? targetProfileId;
-
   Future<Map<String, String>> _buildHeaders({
     bool requiresAuth = true,
     int? requestTargetProfileId,
   }) async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (requiresAuth) {
-      final token = await _tokenStorageService.readAccessToken();
+      final token = (await _sessionService.readStoredSession()).accessToken;
       if (token != null && token.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
       }
     }
+
     final resolvedTargetProfileId = requestTargetProfileId ?? targetProfileId;
     if (resolvedTargetProfileId != null) {
       headers['X-Target-Profile-Id'] = resolvedTargetProfileId.toString();
@@ -58,25 +90,17 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
     int? targetProfileId,
-  }) async {
-    try {
-      final url = Uri.parse('$baseUrl$path');
-      final headers = await _buildHeaders(
-        requiresAuth: requiresAuth,
-        requestTargetProfileId: targetProfileId,
-      );
-      final response = await http
+  }) {
+    final url = Uri.parse('$baseUrl$path');
+    return _sendJsonRequest(
+      requiresAuth: requiresAuth,
+      requestTargetProfileId: targetProfileId,
+      isSuccess: (response) =>
+          response.statusCode == 200 || response.statusCode == 201,
+      send: (headers) => _httpClient
           .post(url, headers: headers, body: jsonEncode(body ?? {}))
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return _decodeResponseBody(response);
-      }
-
-      throw ApiRequestException(_extractServerErrorMessage(response));
-    } catch (e) {
-      throw _mapException(e);
-    }
+          .timeout(const Duration(seconds: 10)),
+    );
   }
 
   Future<dynamic> get(
@@ -84,28 +108,20 @@ class ApiClient {
     bool requiresAuth = true,
     Map<String, dynamic>? queryParams,
     int? targetProfileId,
-  }) async {
-    try {
-      Uri url = Uri.parse('$baseUrl$path');
-      if (queryParams != null && queryParams.isNotEmpty) {
-        url = url.replace(queryParameters: _normalizeQueryParams(queryParams));
-      }
-      final headers = await _buildHeaders(
-        requiresAuth: requiresAuth,
-        requestTargetProfileId: targetProfileId,
-      );
-      final response = await http
-          .get(url, headers: headers)
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return _decodeResponseBody(response);
-      }
-
-      throw ApiRequestException(_extractServerErrorMessage(response));
-    } catch (e) {
-      throw _mapException(e);
+  }) {
+    Uri url = Uri.parse('$baseUrl$path');
+    if (queryParams != null && queryParams.isNotEmpty) {
+      url = url.replace(queryParameters: _normalizeQueryParams(queryParams));
     }
+
+    return _sendJsonRequest(
+      requiresAuth: requiresAuth,
+      requestTargetProfileId: targetProfileId,
+      isSuccess: (response) => response.statusCode == 200,
+      send: (headers) => _httpClient
+          .get(url, headers: headers)
+          .timeout(const Duration(seconds: 10)),
+    );
   }
 
   Future<dynamic> patch(
@@ -113,25 +129,16 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
     int? targetProfileId,
-  }) async {
-    try {
-      final url = Uri.parse('$baseUrl$path');
-      final headers = await _buildHeaders(
-        requiresAuth: requiresAuth,
-        requestTargetProfileId: targetProfileId,
-      );
-      final response = await http
+  }) {
+    final url = Uri.parse('$baseUrl$path');
+    return _sendJsonRequest(
+      requiresAuth: requiresAuth,
+      requestTargetProfileId: targetProfileId,
+      isSuccess: (response) => response.statusCode == 200,
+      send: (headers) => _httpClient
           .patch(url, headers: headers, body: jsonEncode(body ?? {}))
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return _decodeResponseBody(response);
-      }
-
-      throw ApiRequestException(_extractServerErrorMessage(response));
-    } catch (e) {
-      throw _mapException(e);
-    }
+          .timeout(const Duration(seconds: 10)),
+    );
   }
 
   Future<dynamic> put(
@@ -139,25 +146,16 @@ class ApiClient {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
     int? targetProfileId,
-  }) async {
-    try {
-      final url = Uri.parse('$baseUrl$path');
-      final headers = await _buildHeaders(
-        requiresAuth: requiresAuth,
-        requestTargetProfileId: targetProfileId,
-      );
-      final response = await http
+  }) {
+    final url = Uri.parse('$baseUrl$path');
+    return _sendJsonRequest(
+      requiresAuth: requiresAuth,
+      requestTargetProfileId: targetProfileId,
+      isSuccess: (response) => response.statusCode == 200,
+      send: (headers) => _httpClient
           .put(url, headers: headers, body: jsonEncode(body ?? {}))
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return _decodeResponseBody(response);
-      }
-
-      throw ApiRequestException(_extractServerErrorMessage(response));
-    } catch (e) {
-      throw _mapException(e);
-    }
+          .timeout(const Duration(seconds: 10)),
+    );
   }
 
   Future<dynamic> delete(
@@ -165,32 +163,111 @@ class ApiClient {
     bool requiresAuth = true,
     Map<String, dynamic>? body,
     int? targetProfileId,
-  }) async {
-    try {
-      final url = Uri.parse('$baseUrl$path');
-      final headers = await _buildHeaders(
-        requiresAuth: requiresAuth,
-        requestTargetProfileId: targetProfileId,
-      );
-      final response = await http
+  }) {
+    final url = Uri.parse('$baseUrl$path');
+    return _sendJsonRequest(
+      requiresAuth: requiresAuth,
+      requestTargetProfileId: targetProfileId,
+      isSuccess: (response) =>
+          response.statusCode == 200 || response.statusCode == 204,
+      send: (headers) => _httpClient
           .delete(
             url,
             headers: headers,
             body: body != null ? jsonEncode(body) : null,
           )
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 10)),
+    );
+  }
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+  Future<dynamic> _sendJsonRequest({
+    required Future<http.Response> Function(Map<String, String> headers) send,
+    required bool Function(http.Response response) isSuccess,
+    required bool requiresAuth,
+    required int? requestTargetProfileId,
+    bool allowRetry = true,
+  }) async {
+    try {
+      final headers = await _buildHeaders(
+        requiresAuth: requiresAuth,
+        requestTargetProfileId: requestTargetProfileId,
+      );
+      final response = await send(headers);
+
+      if (isSuccess(response)) {
         if (response.body.isEmpty) {
           return <String, dynamic>{};
         }
         return _decodeResponseBody(response);
       }
 
+      if (requiresAuth && response.statusCode == 401) {
+        return _retryAuthorizedRequest(
+          allowRetry: allowRetry,
+          send: send,
+          isSuccess: isSuccess,
+          requestTargetProfileId: requestTargetProfileId,
+        );
+      }
+
       throw ApiRequestException(_extractServerErrorMessage(response));
-    } catch (e) {
-      throw _mapException(e);
+    } catch (error) {
+      throw _mapException(error);
     }
+  }
+
+  Future<dynamic> _retryAuthorizedRequest({
+    required bool allowRetry,
+    required Future<http.Response> Function(Map<String, String> headers) send,
+    required bool Function(http.Response response) isSuccess,
+    required int? requestTargetProfileId,
+  }) async {
+    const failureMessage =
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+
+    if (!allowRetry) {
+      await _sessionService.clearSession(message: failureMessage);
+      throw const SessionExpiredException(failureMessage);
+    }
+
+    final refreshResult = await _sessionService.refreshSession(
+      refreshTokenHandler: _refreshWithRawRequest,
+      failureMessage: failureMessage,
+    );
+    if (!refreshResult.success) {
+      throw SessionExpiredException(refreshResult.message ?? failureMessage);
+    }
+
+    return _sendJsonRequest(
+      send: send,
+      isSuccess: isSuccess,
+      requiresAuth: true,
+      requestTargetProfileId: requestTargetProfileId,
+      allowRetry: false,
+    );
+  }
+
+  Future<AuthResponse> _refreshWithRawRequest(String refreshToken) async {
+    final url = Uri.parse('$baseUrl/auth/refresh');
+    final response = await _httpClient
+        .post(
+          url,
+          headers: const {'Content-Type': 'application/json'},
+          body: jsonEncode({'refresh_token': refreshToken}),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final decodedBody = _decodeResponseBody(response);
+      if (decodedBody is Map) {
+        return AuthResponse.fromJson(Map<String, dynamic>.from(decodedBody));
+      }
+    }
+
+    return AuthResponse(
+      success: false,
+      message: _extractServerErrorMessage(response),
+    );
   }
 
   dynamic _decodeResponseBody(http.Response response) {
@@ -261,6 +338,10 @@ class ApiClient {
   }
 
   Exception _mapException(Object error) {
+    if (error is SessionExpiredException) {
+      return error;
+    }
+
     if (error is ApiRequestException) {
       return Exception(error.message);
     }
@@ -280,7 +361,6 @@ class ApiClient {
     return Exception(raw.replaceFirst('Exception: ', ''));
   }
 
-  // Helper method to get error message from status code
   static String _getErrorMessage(int statusCode) {
     switch (statusCode) {
       case 400:

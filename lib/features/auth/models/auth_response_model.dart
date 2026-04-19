@@ -21,7 +21,9 @@ class AuthResponse {
       message: json['message'] as String,
       accessToken: json['access_token'] as String?,
       refreshToken: json['refresh_token'] as String?,
-      verificationToken: json['verification_token'] as String?,
+      verificationToken:
+          json['verification_token'] as String? ??
+          json['verification_code'] as String?,
       user: json['user'] != null ? UserData.fromJson(json['user']) : null,
     );
   }

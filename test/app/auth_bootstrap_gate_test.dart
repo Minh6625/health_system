@@ -6,6 +6,7 @@ import 'package:healthguard/app.dart';
 import 'package:healthguard/features/auth/models/auth_response_model.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
+import 'package:healthguard/features/auth/services/auth_session_service.dart';
 import 'package:provider/provider.dart';
 
 Widget _buildHarness({
@@ -18,7 +19,8 @@ Widget _buildHarness({
       home: AuthBootstrapGate(
         bootstrapFuture: bootstrapFuture,
         loadingBuilder: (_) => const Scaffold(body: Text('loading-auth')),
-        authenticatedBuilder: (_) => const Scaffold(body: Text('authenticated-home')),
+        authenticatedBuilder: (_) =>
+            const Scaffold(body: Text('authenticated-home')),
         unauthenticatedBuilder: (_) => const Scaffold(body: Text('auth-pages')),
       ),
     ),
@@ -30,7 +32,10 @@ void main() {
     testWidgets('shows loading while auth session is resolving', (
       WidgetTester tester,
     ) async {
-      final authProvider = AuthProvider(AuthRepository());
+      final authProvider = AuthProvider(
+        AuthRepository(),
+        sessionService: AuthSessionService(),
+      );
       final completer = Completer<bool>();
 
       await tester.pumpWidget(
@@ -48,15 +53,16 @@ void main() {
     testWidgets('shows authenticated builder when session is restored', (
       WidgetTester tester,
     ) async {
-      final authProvider = AuthProvider(AuthRepository())
-        ..sessionResolved = true
-        ..accessToken = 'stored-access-token'
-        ..currentUser = UserData(
-          userId: 1,
-          email: 'elder@example.com',
-          fullName: 'Nguyen Van A',
-          role: 'patient',
-        );
+      final authProvider =
+          AuthProvider(AuthRepository(), sessionService: AuthSessionService())
+            ..sessionResolved = true
+            ..accessToken = 'stored-access-token'
+            ..currentUser = UserData(
+              userId: 1,
+              email: 'elder@example.com',
+              fullName: 'Nguyen Van A',
+              role: 'patient',
+            );
 
       await tester.pumpWidget(
         _buildHarness(
@@ -74,7 +80,10 @@ void main() {
     testWidgets('shows unauthenticated builder when no session is available', (
       WidgetTester tester,
     ) async {
-      final authProvider = AuthProvider(AuthRepository())..sessionResolved = true;
+      final authProvider = AuthProvider(
+        AuthRepository(),
+        sessionService: AuthSessionService(),
+      )..sessionResolved = true;
 
       await tester.pumpWidget(
         _buildHarness(
