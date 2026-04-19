@@ -10,6 +10,46 @@ import '../../../shared/presentation/theme/app_radii.dart';
 
 enum _NotificationFilter { all, unread, read }
 
+String? normalizeNotificationSeverityLabel(String? severity) {
+  switch (severity?.trim().toLowerCase()) {
+    case 'low':
+      return 'low';
+    case 'medium':
+    case 'moderate':
+    case 'high':
+      return 'medium';
+    case 'critical':
+      return 'critical';
+    default:
+      return null;
+  }
+}
+
+Color notificationSeverityColor(String? severity) {
+  switch (normalizeNotificationSeverityLabel(severity)) {
+    case 'critical':
+      return AppColors.critical;
+    case 'medium':
+      return AppColors.warning;
+    case 'low':
+    default:
+      return AppColors.success;
+  }
+}
+
+String notificationSeverityLabel(String? severity) {
+  switch (normalizeNotificationSeverityLabel(severity)) {
+    case 'critical':
+      return 'critical';
+    case 'medium':
+      return 'medium';
+    case 'low':
+      return 'low';
+    default:
+      return 'low';
+  }
+}
+
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -85,6 +125,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title.contains('sos');
   }
 
+  bool _isRiskNotification(Map<String, dynamic> item) {
+    final alertType = (item['alert_type'] as String?)?.toLowerCase() ?? '';
+    return alertType.startsWith('risk_');
+  }
+
+  /// Priority score for sort order: lower = higher priority.
+  int _notificationPriority(Map<String, dynamic> item) {
+    if (_isSosNotification(item)) return 0;
+    if (_isRiskNotification(item)) return 1;
+    return 2;
+  }
+
   List<Map<String, dynamic>> _sortNotifications(
     List<Map<String, dynamic>> source,
   ) {
@@ -98,10 +150,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return aIsRead ? 1 : -1;
       }
 
-      final aIsSos = _isSosNotification(a);
-      final bIsSos = _isSosNotification(b);
-      if (aIsSos != bIsSos) {
-        return aIsSos ? -1 : 1;
+      // SOS first, then risk, then others.
+      final aPriority = _notificationPriority(a);
+      final bPriority = _notificationPriority(b);
+      if (aPriority != bPriority) {
+        return aPriority.compareTo(bPriority);
       }
 
       final aCreated = _parseCreatedAt(a);
@@ -210,8 +263,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (!mounted) return;
 
     final effectiveTotal = totalCount ?? allItems.length;
-    final totalPages =
-        math.max(1, (effectiveTotal + _pageSize - 1) ~/ _pageSize);
+    final totalPages = math.max(
+      1,
+      (effectiveTotal + _pageSize - 1) ~/ _pageSize,
+    );
 
     setState(() {
       _items = _sortNotifications(allItems);
@@ -246,10 +301,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         .toList();
     final totalCount =
         (result['total_count'] as num?)?.toInt() ?? fetched.length;
-    final totalPages =
-        math.max(1, (totalCount + _pageSize - 1) ~/ _pageSize);
-    final clampedPage =
-        normalizedPage > totalPages ? totalPages : normalizedPage;
+    final totalPages = math.max(1, (totalCount + _pageSize - 1) ~/ _pageSize);
+    final clampedPage = normalizedPage > totalPages
+        ? totalPages
+        : normalizedPage;
     final unreadCount = (result['unread_count'] as num?)?.toInt() ?? 0;
 
     if (!mounted) return;
@@ -376,33 +431,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Color _severityColor(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'critical':
-      case 'high':
-        return AppColors.critical;
-      case 'moderate':
-      case 'medium':
-        return AppColors.warning;
-      case 'low':
-      case 'normal':
-      default:
-        return AppColors.success;
-    }
+    return notificationSeverityColor(severity);
   }
 
   String _severityLabel(String severity) {
-    switch (severity.toLowerCase()) {
-      case 'critical':
-      case 'high':
-        return 'Nguy cấp';
-      case 'moderate':
-      case 'medium':
-        return 'Cần chú ý';
-      case 'low':
-      case 'normal':
-      default:
-        return 'Bình thường';
-    }
+    return notificationSeverityLabel(severity);
   }
 
   String _alertTypeLabel(String alertType) {
@@ -413,6 +446,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case 'manual':
       case 'sos':
         return 'Khẩn cấp';
+      case 'risk_critical':
+        return 'Nguy cơ nghiêm trọng';
+      case 'risk_high':
+        return 'Cảnh báo nguy cơ';
       case 'medication_missed':
         return 'Quên thuốc';
       case 'heart_rate_critical':
@@ -432,6 +469,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return AppStateColors.criticalBg;
       case 'manual':
       case 'sos':
+        return AppStateColors.warningBg;
+      case 'risk_critical':
+        return AppStateColors.criticalBg;
+      case 'risk_high':
         return AppStateColors.warningBg;
       case 'medication_missed':
         return AppStateColors.successBg;
@@ -980,7 +1021,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
                   hintText: 'Tìm theo tiêu đề hoặc nội dung...',
-                  hintStyle: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  hintStyle: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
                   prefixIcon: Icon(
                     Icons.search,
                     size: 20,
@@ -1054,7 +1098,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     };
 
     return Material(
-      color: isSelected ? selectedColor.withValues(alpha: 0.12) : AppColors.bgSurface,
+      color: isSelected
+          ? selectedColor.withValues(alpha: 0.12)
+          : AppColors.bgSurface,
       borderRadius: BorderRadius.circular(AppRadii.radiusSm),
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadii.radiusSm),
@@ -1455,7 +1501,11 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 28, color: AppColors.critical),
+            const Icon(
+              Icons.error_outline,
+              size: 28,
+              color: AppColors.critical,
+            ),
             const SizedBox(height: 10),
             const Text(
               'Không thể tải chi tiết thông báo',
@@ -1466,7 +1516,10 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
             Text(
               _error ?? 'Đã xảy ra lỗi không xác định',
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 14),
             FilledButton(onPressed: _loadDetail, child: const Text('Thử lại')),
@@ -1498,8 +1551,8 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: AppColors.bgSurface,
-             borderRadius: BorderRadius.circular(AppRadii.radiusMd),
-             border: Border.all(color: AppColors.strokeSoft),
+              borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+              border: Border.all(color: AppColors.strokeSoft),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1801,7 +1854,9 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.bgPrimary,
-                          borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                          borderRadius: BorderRadius.circular(
+                            AppRadii.radiusSm,
+                          ),
                           border: Border.all(color: AppColors.strokeSoft),
                         ),
                         child: Text(
@@ -1858,10 +1913,7 @@ class _NotificationDetailScreenState extends State<_NotificationDetailScreen> {
                     value: createdAgoText,
                   ),
                   if (readAtText != null)
-                    _NotificationDetailRow(
-                      label: 'Đọc lúc',
-                      value: readAtText,
-                    ),
+                    _NotificationDetailRow(label: 'Đọc lúc', value: readAtText),
                 ],
               ),
             ),

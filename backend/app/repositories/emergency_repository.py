@@ -4,13 +4,29 @@ from datetime import datetime, timezone
 from sqlalchemy import and_, or_, func, exists
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.sos_event_model import SOSEvent, FallEvent
+from app.models.risk_alert_response_model import RiskAlertResponse
+from app.models.sos_event_model import Alert, SOSEvent, FallEvent
 from app.models.user_model import User
 from app.models.relationship_model import UserRelationship
 
 
 class EmergencyRepository:
     """Repository for emergency/SOS event database operations."""
+
+    @staticmethod
+    def get_alert_by_id(db: Session, alert_id: int) -> Optional[Alert]:
+        return db.query(Alert).filter(Alert.id == alert_id).first()
+
+    @staticmethod
+    def get_risk_alert_response(
+        db: Session,
+        notification_id: int,
+    ) -> Optional[RiskAlertResponse]:
+        return (
+            db.query(RiskAlertResponse)
+            .filter(RiskAlertResponse.notification_id == notification_id)
+            .first()
+        )
 
     @staticmethod
     def check_user_has_access(db: Session, viewer_id: int, target_user_id: int) -> bool:
@@ -145,7 +161,9 @@ class EmergencyRepository:
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
         address: Optional[str] = None,
-        fall_event_id: Optional[int] = None
+        fall_event_id: Optional[int] = None,
+        *,
+        commit: bool = True,
     ) -> SOSEvent:
         """Create a new SOS event."""
         sos = SOSEvent(
@@ -161,10 +179,41 @@ class EmergencyRepository:
         )
         
         db.add(sos)
-        db.commit()
-        db.refresh(sos)
+        db.flush()
+        if commit:
+            db.commit()
+            db.refresh(sos)
         
         return sos
+
+    @staticmethod
+    def create_risk_alert_response(
+        db: Session,
+        *,
+        notification_id: int,
+        response_action: str,
+        source: str,
+        risk_score_id: Optional[int] = None,
+        device_id: Optional[int] = None,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        address: Optional[str] = None,
+        sos_event_id: Optional[int] = None,
+    ) -> RiskAlertResponse:
+        response = RiskAlertResponse(
+            notification_id=notification_id,
+            response_action=response_action,
+            risk_score_id=risk_score_id,
+            source=source,
+            device_id=device_id,
+            latitude=latitude,
+            longitude=longitude,
+            address=address,
+            sos_event_id=sos_event_id,
+        )
+        db.add(response)
+        db.flush()
+        return response
 
     @staticmethod
     def get_alert_recipient_user_ids(

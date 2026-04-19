@@ -33,6 +33,7 @@ import 'package:healthguard/features/analysis/presentation/screens/risk_report_d
 import 'package:healthguard/features/analysis/presentation/screens/risk_history_screen.dart';
 import 'package:healthguard/features/analysis/providers/risk_report_provider.dart';
 import 'package:healthguard/features/analysis/providers/risk_history_provider.dart';
+import 'package:healthguard/features/analysis/repositories/risk_analysis_repository.dart';
 import 'package:healthguard/features/notifications/screens/notifications_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -123,9 +124,7 @@ class AppRouter {
       case dashboard:
         // HomeDashboardProvider is already provided in app.dart MultiProvider.
         // Using the existing ancestor provider avoids state reset on navigation.
-        return MaterialPageRoute(
-          builder: (_) => const HomeDashboardScreen(),
-        );
+        return MaterialPageRoute(builder: (_) => const HomeDashboardScreen());
       case register:
         return MaterialPageRoute(builder: (_) => const RegisterScreen());
       case verifyEmail:
@@ -255,7 +254,8 @@ class AppRouter {
         return MaterialPageRoute(
           settings: RouteSettings(name: riskReport, arguments: routeArgs),
           builder: (_) => ChangeNotifierProvider(
-            create: (_) => RiskReportProvider(),
+            create: (_) =>
+                RiskReportProvider(repository: RiskAnalysisRepository()),
             child: RiskReportScreen(
               profileId: routeArgs['profileId'] as String?,
             ),
@@ -265,9 +265,11 @@ class AppRouter {
         return MaterialPageRoute(
           settings: RouteSettings(name: riskReportDetail, arguments: routeArgs),
           builder: (_) => ChangeNotifierProvider(
-            create: (_) => RiskReportProvider(),
+            create: (_) =>
+                RiskReportProvider(repository: RiskAnalysisRepository()),
             child: RiskReportDetailScreen(
-              reportId: routeArgs['reportId'] as String? ?? '',
+              reportId:
+                  int.tryParse(routeArgs['reportId']?.toString() ?? '') ?? 0,
               profileId: routeArgs['profileId'] as String?,
             ),
           ),
@@ -276,7 +278,8 @@ class AppRouter {
         return MaterialPageRoute(
           settings: RouteSettings(name: riskHistory, arguments: routeArgs),
           builder: (_) => ChangeNotifierProvider(
-            create: (_) => RiskHistoryProvider(),
+            create: (_) =>
+                RiskHistoryProvider(repository: RiskAnalysisRepository()),
             child: RiskHistoryScreen(
               profileId: routeArgs['profileId'] as String?,
             ),

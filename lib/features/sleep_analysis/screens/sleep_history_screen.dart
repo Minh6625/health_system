@@ -40,24 +40,36 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
           child: Consumer<SleepProvider>(
             builder: (context, provider, _) {
               if (provider.isLoading) {
-                return const Center(child: CircularProgressIndicator(color: Color(0xFF48D6FF)));
+                return const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF48D6FF)),
+                );
               }
 
               final history = provider.historyList;
               if (history.isEmpty) {
-                return const Center(child: Text('Chưa có dữ liệu lịch sử.', style: TextStyle(color: Colors.white)));
+                return const Center(
+                  child: Text(
+                    'Chưa có dữ liệu lịch sử.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                );
               }
 
               return Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gapLg, vertical: AppSpacing.sectionGapXl),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.gapLg,
+                      vertical: AppSpacing.sectionGapXl,
+                    ),
                     child: SleepTrendChart(
                       historyList: history,
-                      highlightedDate: provider.selectedSession?.endTime,
+                      highlightedDate: provider.selectedSession?.sleepDate,
                       onSessionTapped: (session) {
                         provider.selectHistorySession(session);
-                        Navigator.pop(context); // Return to report with new date selected
+                        Navigator.pop(
+                          context,
+                        ); // Return to report with new date selected
                       },
                     ),
                   ),
@@ -66,9 +78,10 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                     child: ListView.separated(
                       padding: AppSpacing.cardPadding,
                       itemCount: history.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.gapMd),
+                      separatorBuilder: (_, _) =>
+                          const SizedBox(height: AppSpacing.gapMd),
                       itemBuilder: (context, index) {
-                        final session = history[history.length - 1 - index]; // Newest first
+                        final session = history[index];
                         return InkWell(
                           onTap: () {
                             provider.selectHistorySession(session);
@@ -80,7 +93,9 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFF0D1E38),
                               borderRadius: AppRadii.cardRadius,
-                              border: Border.all(color: const Color(0x332C4367)),
+                              border: Border.all(
+                                color: const Color(0x332C4367),
+                              ),
                             ),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -89,14 +104,22 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '${session.startTime.day.toString().padLeft(2, '0')}/${session.startTime.month.toString().padLeft(2, '0')}',
-                                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                      '${session.sleepDate.day.toString().padLeft(2, '0')}/${session.sleepDate.month.toString().padLeft(2, '0')}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     const SizedBox(height: AppSpacing.gapXs),
                                     Text(
                                       session.qualityLabel,
                                       style: TextStyle(
-                                        color: session.qualityScore >= 70 ? Colors.greenAccent : (session.qualityScore >= 50 ? Colors.orangeAccent : Colors.redAccent),
+                                        color: session.qualityScore >= 70
+                                            ? Colors.greenAccent
+                                            : (session.qualityScore >= 50
+                                                  ? Colors.orangeAccent
+                                                  : Colors.redAccent),
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -107,10 +130,17 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                                   children: [
                                     Text(
                                       session.sleepText,
-                                      style: const TextStyle(color: Color(0xFF48D6FF), fontSize: 18, fontWeight: FontWeight.bold),
+                                      style: const TextStyle(
+                                        color: Color(0xFF48D6FF),
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     const SizedBox(width: AppSpacing.gapSm),
-                                    const Icon(Icons.chevron_right, color: Color(0xFF5B7FA6)),
+                                    const Icon(
+                                      Icons.chevron_right,
+                                      color: Color(0xFF5B7FA6),
+                                    ),
                                   ],
                                 ),
                               ],

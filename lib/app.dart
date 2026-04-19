@@ -10,7 +10,9 @@ import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/core/theme/app_theme.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
+import 'package:healthguard/features/auth/screens/auth_pages_screen.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
+import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 // ignore: unused_import — giữ để dễ switch sang real backend
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
@@ -32,6 +34,8 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final SOSRealtimeAlertService _sosRealtimeAlertService =
       SOSRealtimeAlertService.instance;
+  final AuthProvider _authProvider = AuthProvider(AuthRepository());
+  late final Future<bool> _bootstrapAuthFuture;
   late AppLinks _appLinks;
   StreamSubscription? _linkSubscription;
 
@@ -46,6 +50,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
   void initState() {
     super.initState();
     _appLinks = AppLinks();
+    _bootstrapAuthFuture = _authProvider.bootstrapSession();
     unawaited(_sosRealtimeAlertService.initialize(navigatorKey: _navigatorKey));
     _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -180,7 +185,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider(AuthRepository())),
+        ChangeNotifierProvider<AuthProvider>.value(value: _authProvider),
         ChangeNotifierProvider(create: (_) => SleepProvider()),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
         ChangeNotifierProvider(create: (_) => HomeDashboardProvider()),
@@ -200,10 +205,50 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
           debugShowCheckedModeBanner: false,
           title: AppStrings.appName,
           theme: AppTheme.lightTheme,
-          initialRoute: AppRouter.start,
+          home: AuthBootstrapGate(bootstrapFuture: _bootstrapAuthFuture),
           onGenerateRoute: AppRouter.onGenerateRoute,
         ),
       ),
+    );
+  }
+}
+
+class AuthBootstrapGate extends StatelessWidget {
+  const AuthBootstrapGate({
+    super.key,
+    required this.bootstrapFuture,
+    this.authenticatedBuilder,
+    this.unauthenticatedBuilder,
+    this.loadingBuilder,
+  });
+
+  final Future<bool> bootstrapFuture;
+  final WidgetBuilder? authenticatedBuilder;
+  final WidgetBuilder? unauthenticatedBuilder;
+  final WidgetBuilder? loadingBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: bootstrapFuture,
+      builder: (context, snapshot) {
+        final authProvider = context.watch<AuthProvider>();
+        if (!authProvider.sessionResolved ||
+            snapshot.connectionState == ConnectionState.waiting) {
+          return loadingBuilder?.call(context) ??
+              const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+        }
+
+        if (authProvider.isAuthenticated) {
+          return authenticatedBuilder?.call(context) ??
+              const HomeDashboardScreen();
+        }
+
+        return unauthenticatedBuilder?.call(context) ??
+            const AuthPagesScreen();
+      },
     );
   }
 }
@@ -243,7 +288,8 @@ class _SOSAlertAuthBridgeState extends State<_SOSAlertAuthBridge> {
 
     unawaited(
       widget.service.onAuthStateChanged(
-        isAuthenticated: authProvider.isAuthenticated,
+        isAuthenticated:
+            authProvider.sessionResolved && authProvider.isAuthenticated,
       ),
     );
   }

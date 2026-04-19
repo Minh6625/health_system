@@ -1,7 +1,7 @@
 import '../../domain/entities/risk_report_entity.dart';
 
 class RiskHistoryItemEntity {
-  final String reportId;
+  final int reportId;
   final int score;
   final RiskLevel level;
   final DateTime analyzedAt;

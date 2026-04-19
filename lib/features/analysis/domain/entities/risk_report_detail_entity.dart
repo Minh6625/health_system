@@ -41,7 +41,7 @@ class SnapshotMetrics {
 }
 
 class RiskReportDetailEntity {
-  final String reportId;
+  final int reportId;
   final String profileId;
   final int score;
   final RiskLevel level;

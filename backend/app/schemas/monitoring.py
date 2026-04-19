@@ -1,5 +1,6 @@
-from datetime import datetime
-from pydantic import BaseModel
+from datetime import date, datetime
+
+from pydantic import BaseModel, Field
 
 
 class VitalSignsResponse(BaseModel):
@@ -15,6 +16,7 @@ class VitalSignsResponse(BaseModel):
 
 class SleepSessionResponse(BaseModel):
     session_id: str = ""
+    sleep_date: date
     quality_score: int
     quality_label: str = "AVERAGE"
     in_bed_minutes: int
@@ -27,45 +29,120 @@ class SleepSessionResponse(BaseModel):
     end_time: datetime
 
 
+class SleepHistoryResponse(BaseModel):
+    data: list[SleepSessionResponse] = Field(default_factory=list)
+
+
 class HealthReportResponse(BaseModel):
-    """Comprehensive health report with vitals 24h stats and risk assessment."""
-    vitals_24h_avg: dict = {}
+    vitals_24h_avg: dict[str, float | int | None] = Field(default_factory=dict)
     latest_risk_score: float | None = None
     risk_level: str | None = None
     risk_type: str | None = None
     last_updated: datetime | None = None
+    health_score: float | None = None
+    health_level: str | None = None
+    health_summary: str | None = None
+    confidence: float | None = None
+    is_stale: bool = True
+
+
+class TopFactorResponse(BaseModel):
+    key: str
+    label: str
+
+
+class FactorBreakdownResponse(BaseModel):
+    key: str
+    label: str
+    contribution_score: float
+    impact_level: str
+    value: str
+    unit: str
+    route_target: str
+
+
+class SnapshotMetricsResponse(BaseModel):
+    heart_rate: int = 0
+    spo2: int = 0
+    sys_bp: int = 0
+    dia_bp: int = 0
+    body_temp: float = 0.0
+    hrv: int = 0
+    map_val: int = 0
 
 
 class RiskReportResponse(BaseModel):
-    """Risk report summary for listing."""
     id: int
     risk_type: str
+    risk_score: float
     score: float
+    health_score: float
     risk_level: str
+    health_level: str | None = None
+    display_status: str
+    summary: str
     timestamp: datetime
-    key_features: list[str] = []
+    previous_score: float | None = None
+    trend_7d: list[int] = Field(default_factory=list)
+    key_features: list[str] = Field(default_factory=list)
+    top_factors: list[TopFactorResponse] = Field(default_factory=list)
+    recommendation_preview: list[str] = Field(default_factory=list)
+    confidence: float = 0.0
+    is_stale: bool = True
 
 
 class RiskReportDetailResponse(BaseModel):
-    """Detailed risk report with explanation and recommendations."""
     id: int
     risk_type: str
+    risk_score: float
     score: float
+    health_score: float
     risk_level: str
+    health_level: str | None = None
+    display_status: str
+    summary: str
     timestamp: datetime
+    previous_score: float | None = None
+    trend_7d: list[int] = Field(default_factory=list)
     explanation: str = ""
-    features: dict = {}
-    feature_importance: dict = {}
-    recommendations: list[str] = []
+    xai_explanation: str = ""
+    features: dict[str, object] = Field(default_factory=dict)
+    feature_importance: dict[str, float] = Field(default_factory=dict)
+    breakdown: list[FactorBreakdownResponse] = Field(default_factory=list)
+    recommendations: list[str] = Field(default_factory=list)
+    recommendation_preview: list[str] = Field(default_factory=list)
+    top_factors: list[TopFactorResponse] = Field(default_factory=list)
+    snapshot: SnapshotMetricsResponse = Field(default_factory=SnapshotMetricsResponse)
     model_version: str = "1.0"
     algorithm: str = "unknown"
+    confidence: float = 0.0
+    is_stale: bool = True
+
+
+class RiskHistorySummaryResponse(BaseModel):
+    average_score: float = 0.0
+    highest_score: float = 0.0
+    lowest_score: float = 0.0
+    delta_vs_previous_period: float = 0.0
+    trend_points: list[int] = Field(default_factory=list)
+
+
+class RiskHistoryItemResponse(BaseModel):
+    report_id: int
+    risk_score: float
+    score: float
+    health_score: float
+    risk_level: str
+    display_status: str
+    analyzed_at: datetime
+    reason_preview: str
+    is_stale: bool = True
 
 
 class RiskHistoryResponse(BaseModel):
-    """Risk history statistics aggregated by date."""
-    risk_type: str
-    date: str
-    avg_score: float
-    max_score: float
-    min_score: float
-    measurements: int
+    range: str
+    summary: RiskHistorySummaryResponse
+    items: list[RiskHistoryItemResponse] = Field(default_factory=list)
+    page: int = 1
+    limit: int = 20
+    has_more: bool = False

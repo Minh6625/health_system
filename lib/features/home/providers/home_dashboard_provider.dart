@@ -20,9 +20,14 @@ class HomeDashboardProvider extends ChangeNotifier {
   // Health report data
   Map<String, dynamic> _vitals24hAvg = {};
   double? _latestRiskScore;
+  double? _healthScore;
+  String? _healthLevel;
+  String? _healthSummary;
   String? _riskLevel;
   String? _riskType;
   DateTime? _lastUpdated;
+  double? _riskConfidence;
+  bool _reportStale = true;
 
   // Sleep data
   Map<String, dynamic>? _sleepData;
@@ -42,9 +47,21 @@ class HomeDashboardProvider extends ChangeNotifier {
 
   Map<String, dynamic> get vitals24hAvg => _vitals24hAvg;
   double? get latestRiskScore => _latestRiskScore;
+  double? get healthScore => _healthScore;
+  String? get healthLevel => _healthLevel;
+  String? get healthSummary => _healthSummary;
   String? get riskLevel => _riskLevel;
   String? get riskType => _riskType;
   DateTime? get lastUpdated => _lastUpdated;
+  double? get riskConfidence => _riskConfidence;
+  bool get reportStale => _reportStale;
+  DateTime? get latestDashboardTimestamp {
+    if (_vitalsTimestamp == null) return _lastUpdated;
+    if (_lastUpdated == null) return _vitalsTimestamp;
+    return _vitalsTimestamp!.isAfter(_lastUpdated!)
+        ? _vitalsTimestamp
+        : _lastUpdated;
+  }
 
   Map<String, dynamic>? get sleepData => _sleepData;
 
@@ -92,11 +109,20 @@ class HomeDashboardProvider extends ChangeNotifier {
   Future<void> _fetchHealthReport() async {
     try {
       final report = await _repository.getHealthReport();
+      final latestRiskScore = report.latestRiskScore;
+      final fallbackHealthScore = latestRiskScore != null
+          ? (100 - latestRiskScore).clamp(0, 100).toDouble()
+          : null;
       _vitals24hAvg = report.vitals24hAvg;
-      _latestRiskScore = report.latestRiskScore;
+      _latestRiskScore = latestRiskScore;
+      _healthScore = report.healthScore ?? fallbackHealthScore;
+      _healthLevel = report.healthLevel;
+      _healthSummary = report.healthSummary;
       _riskLevel = report.riskLevel;
       _riskType = report.riskType;
       _lastUpdated = report.lastUpdated;
+      _riskConfidence = report.confidence;
+      _reportStale = report.isStale;
     } catch (e) {
       debugPrint('Error fetching health report: $e');
     }

@@ -1,10 +1,12 @@
-from typing import Optional, List
+from typing import Any, Optional, List
 from datetime import datetime, timedelta, timezone
 
+from fastapi import HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.repositories.emergency_repository import EmergencyRepository
-from app.models.sos_event_model import Alert
+from app.models.sos_event_model import Alert, SOSEvent
 from app.services.push_notification_service import PushNotificationService
 from app.schemas.emergency import (
     SOSAlertsResponse,
@@ -26,29 +28,45 @@ class EmergencyService:
         db: Session,
         user_id: int,
         trigger_type: str = "manual",
+        device_id: Optional[int] = None,
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
         address: Optional[str] = None,
         fall_event_id: Optional[int] = None,
-    ) -> bool:
-        """Trigger a new SOS event."""
+        *,
+        commit: bool = True,
+        send_push: bool = True,
+    ) -> tuple[SOSEvent, dict[str, Any]]:
+        """Trigger a new SOS event and fan out alerts."""
 
         sos_event = EmergencyRepository.create_sos_event(
             db=db,
             user_id=user_id,
-            device_id=None,  # Manual SOS is sent from the phone directly, not a wearable
+            device_id=device_id,
             trigger_type=trigger_type,
             latitude=latitude,
             longitude=longitude,
             address=address,
             fall_event_id=fall_event_id,
+            commit=commit,
         )
 
-        EmergencyService._create_alerts_for_sos_event(db, sos_event)
-        return True
+        dispatch_info = EmergencyService._create_alerts_for_sos_event(
+            db,
+            sos_event,
+            commit=commit,
+            send_push=send_push,
+        )
+        return sos_event, dispatch_info
 
     @staticmethod
-    def _create_alerts_for_sos_event(db: Session, sos_event) -> None:
+    def _create_alerts_for_sos_event(
+        db: Session,
+        sos_event: SOSEvent,
+        *,
+        commit: bool = True,
+        send_push: bool = True,
+    ) -> dict[str, Any]:
         """Fan out SOS/fall alerts to patient and linked caregivers."""
         patient = EmergencyRepository.get_user_by_id(db, sos_event.user_id)
         patient_name = patient.full_name if patient else f"User #{sos_event.user_id}"
@@ -110,18 +128,173 @@ class EmergencyService:
             for alert in created_alerts
             if alert.user_id is not None and alert.id is not None
         }
-        db.commit()
 
-        PushNotificationService.send_sos_push_alerts(
+        if commit:
+            db.commit()
+        if send_push:
+            PushNotificationService.send_sos_push_alerts(
+                db,
+                recipient_user_ids=recipient_user_ids,
+                title=title,
+                body=message,
+                sos_id=int(sos_event.id),
+                alert_type=alert_type,
+                trigger_type=sos_event.trigger_type,
+                notification_id_by_user=notification_id_by_user,
+            )
+
+        return {
+            "recipient_user_ids": recipient_user_ids,
+            "title": title,
+            "body": message,
+            "alert_type": alert_type,
+            "trigger_type": sos_event.trigger_type,
+            "notification_id_by_user": notification_id_by_user,
+        }
+
+    @staticmethod
+    def respond_to_risk_alert(
+        db: Session,
+        *,
+        current_user_id: int,
+        notification_id: int,
+        response_action: str,
+        risk_score_id: Optional[int] = None,
+        source: str,
+        device_id: Optional[int] = None,
+        latitude: Optional[float] = None,
+        longitude: Optional[float] = None,
+        address: Optional[str] = None,
+        notes: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Handle a terminal response for an initial risk alert."""
+        alert = EmergencyRepository.get_alert_by_id(db, notification_id)
+        if alert is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Không tìm thấy cảnh báo rủi ro",
+            )
+
+        if alert.user_id is None or int(alert.user_id) != int(current_user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Không có quyền phản hồi cảnh báo này",
+            )
+
+        if alert.alert_type not in {"risk_high", "risk_critical"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cảnh báo này không hỗ trợ phản hồi rủi ro",
+            )
+
+        existing_response = EmergencyRepository.get_risk_alert_response(db, notification_id)
+        if existing_response is not None:
+            return {
+                "success": True,
+                "status": "duplicate",
+                "acknowledged_at": existing_response.responded_at,
+                "sos_event_id": existing_response.sos_event_id,
+            }
+
+        normalized_action = response_action.strip().lower()
+        if normalized_action not in {"safe", "help_requested", "timeout_escalated"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Hành động phản hồi không hợp lệ",
+            )
+
+        if source not in {"overlay", "push_tap"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Nguồn phản hồi không hợp lệ",
+            )
+
+        alert_details = alert.details if isinstance(alert.details, dict) else {}
+        expected_risk_score_id = alert_details.get("risk_score_id")
+        if risk_score_id is not None and expected_risk_score_id is not None:
+            try:
+                if int(risk_score_id) != int(expected_risk_score_id):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Risk score không khớp với cảnh báo",
+                    )
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Risk score không hợp lệ",
+                )
+
+        response_row = EmergencyRepository.create_risk_alert_response(
             db,
-            recipient_user_ids=recipient_user_ids,
-            title=title,
-            body=message,
-            sos_id=int(sos_event.id),
-            alert_type=alert_type,
-            trigger_type=sos_event.trigger_type,
-            notification_id_by_user=notification_id_by_user,
+            notification_id=notification_id,
+            response_action=normalized_action,
+            source=source,
+            risk_score_id=risk_score_id,
+            device_id=device_id,
+            latitude=latitude,
+            longitude=longitude,
+            address=address,
         )
+
+        try:
+            if normalized_action == "safe":
+                db.commit()
+                return {
+                    "success": True,
+                    "status": "acknowledged",
+                    "acknowledged_at": response_row.responded_at,
+                    "sos_event_id": None,
+                }
+
+            trigger_type = "manual" if normalized_action == "help_requested" else "auto"
+            sos_event, dispatch_info = EmergencyService.trigger_sos(
+                db,
+                user_id=int(current_user_id),
+                trigger_type=trigger_type,
+                device_id=device_id or alert.device_id,
+                latitude=latitude,
+                longitude=longitude,
+                address=address,
+                commit=False,
+                send_push=False,
+            )
+            response_row.sos_event_id = int(sos_event.id)
+            db.commit()
+
+            PushNotificationService.send_sos_push_alerts(
+                db,
+                recipient_user_ids=dispatch_info["recipient_user_ids"],
+                title=dispatch_info["title"],
+                body=dispatch_info["body"],
+                sos_id=int(sos_event.id),
+                alert_type=dispatch_info["alert_type"],
+                trigger_type=dispatch_info["trigger_type"],
+                notification_id_by_user=dispatch_info["notification_id_by_user"],
+            )
+
+            return {
+                "success": True,
+                "status": "escalated",
+                "acknowledged_at": response_row.responded_at,
+                "sos_event_id": response_row.sos_event_id,
+            }
+        except IntegrityError:
+            db.rollback()
+            existing_response = EmergencyRepository.get_risk_alert_response(db, notification_id)
+            if existing_response is None:
+                raise
+            return {
+                "success": True,
+                "status": "duplicate",
+                "acknowledged_at": existing_response.responded_at,
+                "sos_event_id": existing_response.sos_event_id,
+            }
+        except Exception:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Không thể xử lý phản hồi cảnh báo rủi ro",
+            )
 
     @staticmethod
     def get_sos_alerts_for_caregiver(

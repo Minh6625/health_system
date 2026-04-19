@@ -1,4 +1,4 @@
-enum RiskLevel { low, moderate, high, critical }
+enum RiskLevel { low, medium, critical }
 
 class TopFactor {
   final String key;
@@ -8,7 +8,7 @@ class TopFactor {
 }
 
 class RiskReportEntity {
-  final String reportId;
+  final int reportId;
   final String profileId;
   final int score;
   final RiskLevel level;

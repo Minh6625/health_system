@@ -46,15 +46,16 @@ class HealthStatusHeroCard extends StatelessWidget {
       case DashboardOverallStatus.warning:
         bgColor = AppStateColors.warningBg;
         chipColor = AppColors.warning;
-        chipTextColor = AppColors.textPrimary; // Keeping text dark on yellow for contrast
-        chipLabel = 'Cần chú ý';
+        chipTextColor =
+            AppColors.textPrimary; // Keeping text dark on yellow for contrast
+        chipLabel = 'Cảnh báo';
         chipIcon = Icons.warning_rounded;
         break;
       case DashboardOverallStatus.critical:
         bgColor = AppStateColors.criticalBg;
         chipColor = AppColors.emergency;
         chipTextColor = AppColors.bgSurface;
-        chipLabel = 'Nguy cơ cao';
+        chipLabel = 'Nguy hiểm';
         chipIcon = Icons.error_rounded;
         break;
       case DashboardOverallStatus.noDevice:
@@ -118,7 +119,12 @@ class HealthStatusHeroCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.gapMd),
-          Text(title, style: AppTextStyles.displayCompact.copyWith(fontWeight: FontWeight.w800)),
+          Text(
+            title,
+            style: AppTextStyles.displayCompact.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
           const SizedBox(height: AppSpacing.gapXs),
           Text(
             summary,

@@ -20,10 +20,9 @@ class RiskDetailSummaryCard extends StatelessWidget {
       case RiskLevel.low:
         scoreColor = AppColors.success;
         break;
-      case RiskLevel.moderate:
+      case RiskLevel.medium:
         scoreColor = AppColors.warning;
         break;
-      case RiskLevel.high:
       case RiskLevel.critical:
         scoreColor = AppColors.critical;
         break;
@@ -72,10 +71,7 @@ class RiskDetailSummaryCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.gapMd),
           Divider(color: AppColors.strokeSoft.withValues(alpha: 0.5)),
           const SizedBox(height: AppSpacing.gapMd),
-          Text(
-            detail.summary,
-            style: AppTextStyles.bodyMedium,
-          ),
+          Text(detail.summary, style: AppTextStyles.bodyMedium),
         ],
       ),
     );

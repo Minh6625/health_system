@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime, timedelta
 from functools import lru_cache
 from math import exp
 from pathlib import Path
@@ -47,9 +47,9 @@ FEATURE_ORDER = (
 )
 
 LABEL_MAP = {
-    0: "Normal",
-    1: "EMERGENCY",
-    2: "Warning",
+    0: "low",
+    1: "critical",
+    2: "medium",
 }
 
 DEFAULT_HRV = 50.0
@@ -60,6 +60,33 @@ MODEL_DIR_ENV = "HEALTHGUARD_MODEL_DIR"
 ONNX_MODEL_FILENAME = "healthguard.onnx"
 LIGHTGBM_MODEL_FILENAME = "healthguard_lightgbm.pkl"
 MODEL_BACKENDS = ("onnx", "lightgbm", "rule_based")
+MODEL_INFERENCE_BACKENDS = ("onnx", "lightgbm")
+RISK_SCORE_BANDS = {
+    "low": (0.0, 33.0),
+    "medium": (34.0, 66.0),
+    "critical": (67.0, 100.0),
+}
+HEALTH_LEVEL_BY_RISK = {
+    "low": "stable",
+    "medium": "watch",
+    "critical": "critical",
+}
+DISPLAY_STATUS_BY_RISK = {
+    "low": "Ổn định",
+    "medium": "Cần theo dõi",
+    "critical": "Nguy hiểm",
+}
+RISK_SUMMARY_BY_LEVEL = {
+    "low": "Sức khỏe hiện tại đang ở mức ổn định.",
+    "medium": "Một vài chỉ số cần theo dõi thêm trong ngày hôm nay.",
+    "critical": "Một vài chỉ số đang ở mức nguy hiểm, cần theo dõi sát hơn.",
+}
+HEALTH_SUMMARY_BY_LEVEL = {
+    "low": "Sức khỏe hôm nay đang ổn định.",
+    "medium": "Sức khỏe hôm nay cần được theo dõi thêm.",
+    "critical": "Sức khỏe hôm nay đang ở mức cần cảnh báo cao.",
+}
+RISK_REPORT_STALE_AFTER = timedelta(hours=6)
 
 
 @dataclass(frozen=True)
@@ -113,6 +140,90 @@ class ModelBundle:
 
 
 _MODEL_LOCK = threading.Lock()
+
+
+def clamp_risk_score(score: float | int | None) -> float:
+    if score is None:
+        return 0.0
+    return round(max(0.0, min(100.0, float(score))), 2)
+
+
+def canonicalize_risk_level(level: str | None) -> str | None:
+    if level is None:
+        return None
+    normalized = str(level).strip().lower()
+    if normalized in {"moderate", "high"}:
+        return "medium"
+    if normalized in {"low", "medium", "critical"}:
+        return normalized
+    return None
+
+
+def _score_from_model_confidence(level: str, confidence: float) -> float:
+    bounded_confidence = max(0.0, min(1.0, float(confidence)))
+    band_start, band_end = RISK_SCORE_BANDS[level]
+    span = band_end - band_start
+    if level == "low":
+        return round(band_end - (bounded_confidence * span), 2)
+    return round(band_start + (bounded_confidence * span), 2)
+
+
+def normalize_risk_score(
+    *,
+    level: str | None,
+    confidence: float | None = None,
+    raw_score: float | int | None = None,
+    backend: str | None = None,
+) -> float:
+    canonical_level = canonicalize_risk_level(level)
+    if canonical_level is None:
+        return clamp_risk_score(raw_score)
+
+    if backend in MODEL_INFERENCE_BACKENDS or raw_score is None:
+        return _score_from_model_confidence(canonical_level, confidence or 0.0)
+
+    band_start, band_end = RISK_SCORE_BANDS[canonical_level]
+    clamped_raw = clamp_risk_score(raw_score)
+    return round(max(band_start, min(band_end, clamped_raw)), 2)
+
+
+def derive_health_score(risk_score: float | int | None) -> float:
+    return round(100.0 - clamp_risk_score(risk_score), 2)
+
+
+def derive_health_level(risk_level: str | None) -> str | None:
+    canonical_level = canonicalize_risk_level(risk_level)
+    if canonical_level is None:
+        return None
+    return HEALTH_LEVEL_BY_RISK[canonical_level]
+
+
+def derive_display_status(risk_level: str | None) -> str:
+    canonical_level = canonicalize_risk_level(risk_level)
+    return DISPLAY_STATUS_BY_RISK.get(canonical_level or "", "Không xác định")
+
+
+def derive_risk_summary(risk_level: str | None) -> str:
+    canonical_level = canonicalize_risk_level(risk_level)
+    return RISK_SUMMARY_BY_LEVEL.get(canonical_level or "", "Chưa có dữ liệu đánh giá.")
+
+
+def derive_health_summary(risk_level: str | None) -> str:
+    canonical_level = canonicalize_risk_level(risk_level)
+    return HEALTH_SUMMARY_BY_LEVEL.get(canonical_level or "", "Chưa có dữ liệu sức khỏe.")
+
+
+def is_risk_report_stale(
+    timestamp: datetime | None,
+    *,
+    now: datetime | None = None,
+    stale_after: timedelta = RISK_REPORT_STALE_AFTER,
+) -> bool:
+    if timestamp is None:
+        return True
+    reference = now or datetime.now(UTC)
+    timestamp_utc = timestamp if timestamp.tzinfo is not None else timestamp.replace(tzinfo=UTC)
+    return reference - timestamp_utc > stale_after
 
 
 def _resolve_model_dir() -> Path:
@@ -390,8 +501,12 @@ def _predict_with_onnx(feature_vector: Sequence[float], bundle: ModelBundle) -> 
             model_input = [list(feature_vector)]
         outputs = session.run(None, {input_name: model_input})
         label_id, confidence = _extract_label_and_confidence(outputs)
-        label = LABEL_MAP.get(label_id, "Warning")
-        score = round(confidence * 100.0, 2)
+        label = LABEL_MAP.get(label_id, "medium")
+        score = normalize_risk_score(
+            level=label,
+            confidence=confidence,
+            backend="onnx",
+        )
         return RiskInferenceResult(
             label_id=label_id,
             label=label,
@@ -452,8 +567,12 @@ def _predict_with_lightgbm(feature_vector: Sequence[float], bundle: ModelBundle)
                 label_id = int(max(range(len(probabilities)), key=probabilities.__getitem__))
                 confidence = float(probabilities[label_id])
 
-        label = LABEL_MAP.get(label_id, "Warning")
-        score = round(confidence * 100.0, 2)
+        label = LABEL_MAP.get(label_id, "medium")
+        score = normalize_risk_score(
+            level=label,
+            confidence=confidence,
+            backend="lightgbm",
+        )
         return RiskInferenceResult(
             label_id=label_id,
             label=label,
@@ -555,7 +674,12 @@ def _fallback_risk_result(feature_vector: Sequence[float], reason: str) -> RiskI
     return RiskInferenceResult(
         label_id=label_id,
         label=LABEL_MAP[label_id],
-        score=round(score, 2),
+        score=normalize_risk_score(
+            level=LABEL_MAP[label_id],
+            confidence=confidence,
+            raw_score=score,
+            backend="rule_based",
+        ),
         confidence=round(confidence, 4),
         backend="rule_based",
         feature_vector=tuple(float(value) for value in feature_vector),
@@ -616,15 +740,30 @@ def describe_feature_vector(data: RiskInferenceInput | Mapping[str, Any]) -> dic
 
 __all__ = [
     "FEATURE_ORDER",
+    "DISPLAY_STATUS_BY_RISK",
+    "HEALTH_LEVEL_BY_RISK",
+    "HEALTH_SUMMARY_BY_LEVEL",
     "LABEL_MAP",
     "MODEL_BACKENDS",
+    "MODEL_INFERENCE_BACKENDS",
+    "RISK_REPORT_STALE_AFTER",
+    "RISK_SCORE_BANDS",
     "RiskInferenceInput",
     "RiskInferenceResult",
     "build_feature_vector",
+    "canonicalize_risk_level",
+    "clamp_risk_score",
     "clear_model_cache",
     "coerce_risk_input",
+    "derive_display_status",
+    "derive_health_level",
+    "derive_health_score",
+    "derive_health_summary",
+    "derive_risk_summary",
     "describe_feature_vector",
     "get_model_status",
     "infer_risk",
+    "is_risk_report_stale",
     "load_model_bundle",
+    "normalize_risk_score",
 ]

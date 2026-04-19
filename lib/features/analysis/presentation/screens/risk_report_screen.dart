@@ -33,12 +33,15 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
   }
 
   Future<void> _onRefresh() async {
-    await context.read<RiskReportProvider>().fetchLatestReport(widget.profileId);
+    await context.read<RiskReportProvider>().fetchLatestReport(
+      widget.profileId,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isLinkedProfile = widget.profileId != null && widget.profileId != "self";
+    final isLinkedProfile =
+        widget.profileId != null && widget.profileId != "self";
     final provider = context.watch<RiskReportProvider>();
 
     return Scaffold(
@@ -48,13 +51,17 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              isLinkedProfile ? 'Đánh giá sức khoẻ của Bố/Má' : 'Đánh giá sức khoẻ của bạn',
+              isLinkedProfile
+                  ? 'Báo cáo rủi ro sức khỏe'
+                  : 'Báo cáo rủi ro sức khỏe',
               style: AppTextStyles.sectionTitle,
             ),
             if (isLinkedProfile)
               Text(
-                'Lê Văn A - Bố',
-                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                'Hồ sơ người thân',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
           ],
         ),
@@ -74,10 +81,7 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
     if (provider.error != null && provider.report == null) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.gapLg),
-        child: InlineErrorBlock(
-          message: provider.error!,
-          onRetry: _onRefresh,
-        ),
+        child: InlineErrorBlock(message: provider.error!, onRetry: _onRefresh),
       );
     }
 
@@ -103,29 +107,37 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                 const SizedBox(height: AppSpacing.gapLg),
                 RiskTrendPreviewCard(trend7d: report.trend7d),
                 const SizedBox(height: AppSpacing.gapLg),
-                RecommendationPreviewCard(recommendations: report.recommendationPreview),
+                RecommendationPreviewCard(
+                  recommendations: report.recommendationPreview,
+                ),
                 const SizedBox(height: AppSpacing.gapLg),
-                
+
                 // Risk Action Panel (chiều dọc hoặc ngang tuỳ ý)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     ElevatedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, AppRouter.riskReportDetail, arguments: {
-                          'reportId': report.reportId,
-                          'profileId': widget.profileId,
-                        });
+                        Navigator.pushNamed(
+                          context,
+                          AppRouter.riskReportDetail,
+                          arguments: {
+                            'reportId': report.reportId,
+                            'profileId': widget.profileId,
+                          },
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.brandPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.gapLg),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.gapLg,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadii.cardRadius,
                         ),
                       ),
                       child: Text(
-                        'Xem mô hình AI (xAI)',
+                        'Xem giải thích AI',
                         style: AppTextStyles.bodyMedium.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppColors.bgSurface,
@@ -135,12 +147,16 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                     const SizedBox(height: AppSpacing.gapMd),
                     OutlinedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, AppRouter.riskHistory, arguments: {
-                          'profileId': widget.profileId,
-                        });
+                        Navigator.pushNamed(
+                          context,
+                          AppRouter.riskHistory,
+                          arguments: {'profileId': widget.profileId},
+                        );
                       },
                       style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: AppSpacing.gapLg),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.gapLg,
+                        ),
                         side: const BorderSide(color: AppColors.brandPrimary),
                         shape: RoundedRectangleBorder(
                           borderRadius: AppRadii.cardRadius,
@@ -155,7 +171,7 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: AppSpacing.gapLg),
                 const MedicalDisclaimerCard(),
                 const SizedBox(height: 40), // Safe padding bottom

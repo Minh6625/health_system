@@ -14,6 +14,7 @@ from app.db.database import get_db
 from app.models.device_model import Device
 from app.models.sos_event_model import Alert, FallEvent
 from app.services.emergency_service import EmergencyService
+from app.services.risk_alert_service import calculate_device_risk, dispatch_risk_alerts
 from app.services.settings_service import SettingsService
 
 router = APIRouter(prefix="/telemetry", tags=["mobile-telemetry"])
@@ -136,6 +137,15 @@ def _map_alert_type(event_type: str) -> str:
     return normalized or "generic_alert"
 
 
+def _map_telemetry_risk_level(severity: str) -> str | None:
+    normalized = (severity or "").strip().lower()
+    if normalized in {"warning", "high", "medium"}:
+        return "medium"
+    if normalized == "critical":
+        return "critical"
+    return None
+
+
 def _build_alert_title(event_type: str, severity: str) -> str:
     normalized = (event_type or "").strip().lower()
     if normalized == "fall_detected":
@@ -234,6 +244,36 @@ def ingest_vitals(
             except Exception as sync_exc:
                 db.rollback()
                 errors.append(f"last_sync_update_failed: {sync_exc}")
+
+            for device_id in pushed_device_ids:
+                try:
+                    resolved_user_id = _resolve_alert_user_id(
+                        db,
+                        db_device_id=device_id,
+                        explicit_user_id=None,
+                    )
+                    if resolved_user_id is None:
+                        logger.warning(
+                            "Telemetry risk evaluation skipped: device=%s has no assigned user",
+                            device_id,
+                        )
+                        continue
+
+                    calculate_device_risk(
+                        db,
+                        device_id=int(device_id),
+                        user_id=int(resolved_user_id),
+                        allow_cached=False,
+                        dispatch_alerts=True,
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "Telemetry risk evaluation failed after ingest for device %s",
+                        device_id,
+                    )
+                    errors.append(
+                        f"risk_eval_failed device_id={device_id}: {exc}"
+                    )
     except Exception as exc:
         db.rollback()
         ingested = 0
@@ -296,6 +336,47 @@ def ingest_alert(
                 )
                 ingested += 1
                 return IngestResponse(ingested=ingested, errors=errors)
+
+        telemetry_risk_level = _map_telemetry_risk_level(payload.severity)
+        if payload.event_type == "vitals_out_of_range" and telemetry_risk_level:
+            if resolved_user_id is None:
+                raise ValueError(
+                    f"risk telemetry alert missing user binding for device {payload.db_device_id}"
+                )
+
+            risk_result = None
+            try:
+                risk_result = calculate_device_risk(
+                    db,
+                    device_id=int(payload.db_device_id),
+                    user_id=int(resolved_user_id),
+                    allow_cached=False,
+                    dispatch_alerts=False,
+                )
+            except Exception:
+                logger.exception(
+                    "Telemetry alert could not create linked risk score for device %s",
+                    payload.db_device_id,
+                )
+
+            dispatch_risk_alerts(
+                db,
+                device_id=int(payload.db_device_id),
+                user_id=int(resolved_user_id),
+                risk_level=telemetry_risk_level,
+                score=(
+                    risk_result.score
+                    if risk_result is not None
+                    else (_pick_float(metadata, "risk_score", "score", "confidence") or 0.0)
+                ),
+                risk_score_id=(
+                    risk_result.risk_score_id
+                    if risk_result is not None
+                    else _pick_int(metadata, "risk_score_id")
+                ),
+            )
+            ingested += 1
+            return IngestResponse(ingested=ingested, errors=errors)
 
         mapped_severity = _map_alert_severity(payload.severity)
         alert_type = _map_alert_type(payload.event_type)

@@ -94,4 +94,39 @@ class EmergencyCaregiverRepository {
       throw Exception('Không thể xác nhận xử lý SOS: ${e.toString()}');
     }
   }
+
+  /// Submit a risk response for a notification.
+  ///
+  /// The backend uses this to record the user's outcome for the alert.
+  Future<Map<String, dynamic>> respondToRiskNotification({
+    required String notificationId,
+    required String responseType,
+    required String source,
+    int? riskScoreId,
+  }) async {
+    try {
+      final result = await _apiClient.post(
+        '/risk/alerts/$notificationId/respond',
+        body: {
+          if (riskScoreId != null) 'risk_score_id': riskScoreId,
+          'action': responseType,
+          'source': source,
+        },
+      );
+
+      if (result is Map<String, dynamic>) {
+        return result;
+      }
+
+      if (result is Map) {
+        return result.map(
+          (dynamic key, dynamic value) => MapEntry(key.toString(), value),
+        );
+      }
+
+      return <String, dynamic>{};
+    } catch (e) {
+      throw Exception('Không thể gửi phản hồi rủi ro: ${e.toString()}');
+    }
+  }
 }

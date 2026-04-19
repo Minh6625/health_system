@@ -3,7 +3,13 @@ import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 class SleepSettingsScreen extends StatefulWidget {
-  const SleepSettingsScreen({super.key});
+  const SleepSettingsScreen({super.key, this.timePicker});
+
+  final Future<TimeOfDay?> Function(
+    BuildContext context,
+    TimeOfDay initialTime,
+  )?
+  timePicker;
 
   @override
   State<SleepSettingsScreen> createState() => _SleepSettingsScreenState();
@@ -15,9 +21,22 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
   TimeOfDay _targetBedtime = const TimeOfDay(hour: 22, minute: 30);
 
   Future<void> _selectTime(BuildContext context) async {
-    final TimeOfDay? picked = await showTimePicker(
+    final picker = widget.timePicker ?? _defaultTimePicker;
+    final TimeOfDay? picked = await picker(context, _targetBedtime);
+    if (picked != null && picked != _targetBedtime) {
+      setState(() {
+        _targetBedtime = picked;
+      });
+    }
+  }
+
+  Future<TimeOfDay?> _defaultTimePicker(
+    BuildContext context,
+    TimeOfDay initialTime,
+  ) {
+    return showTimePicker(
       context: context,
-      initialTime: _targetBedtime,
+      initialTime: initialTime,
       builder: (context, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
@@ -31,11 +50,6 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
         );
       },
     );
-    if (picked != null && picked != _targetBedtime) {
-      setState(() {
-        _targetBedtime = picked;
-      });
-    }
   }
 
   @override
@@ -53,34 +67,60 @@ class _SleepSettingsScreenState extends State<SleepSettingsScreen> {
         children: [
           _buildCard(
             child: SwitchListTile(
-              title: const Text('Theo dõi tự động', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              subtitle: const Text('Tự động ghi nhận giấc ngủ qua VSmartwatch', style: TextStyle(color: Color(0xFF90A6C3))),
+              title: const Text(
+                'Theo dõi tự động',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              subtitle: const Text(
+                'Tự động ghi nhận giấc ngủ qua VSmartwatch',
+                style: TextStyle(color: Color(0xFF90A6C3)),
+              ),
               value: _isTrackingEnabled,
               activeThumbColor: const Color(0xFF48D6FF),
               onChanged: (val) => setState(() => _isTrackingEnabled = val),
             ),
           ),
           const SizedBox(height: AppSpacing.gapLg),
-          
+
           if (_isTrackingEnabled) ...[
             _buildCard(
               child: Column(
                 children: [
                   ListTile(
-                    title: const Text('Mục tiêu đi ngủ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    title: const Text(
+                      'Mục tiêu đi ngủ',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     trailing: Text(
                       _targetBedtime.format(context),
-                      style: const TextStyle(color: Color(0xFF48D6FF), fontSize: 16, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Color(0xFF48D6FF),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     onTap: () => _selectTime(context),
                   ),
                   const Divider(color: Color(0x3348D6FF), height: 1),
                   SwitchListTile(
-                    title: const Text('Nhắc nhở giờ ngủ', style: TextStyle(color: Colors.white)),
-                    subtitle: const Text('Gửi thông báo trước 30 phút', style: TextStyle(color: Color(0xFF90A6C3), fontSize: 13)),
+                    title: const Text(
+                      'Nhắc nhở giờ ngủ',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    subtitle: const Text(
+                      'Gửi thông báo trước 30 phút',
+                      style: TextStyle(color: Color(0xFF90A6C3), fontSize: 13),
+                    ),
                     value: _isReminderEnabled,
                     activeThumbColor: const Color(0xFF48D6FF),
-                    onChanged: (val) => setState(() => _isReminderEnabled = val),
+                    onChanged: (val) =>
+                        setState(() => _isReminderEnabled = val),
                   ),
                 ],
               ),

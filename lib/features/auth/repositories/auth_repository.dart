@@ -21,6 +21,22 @@ class AuthRepository {
     }
   }
 
+  Future<AuthResponse> refreshToken(String refreshToken) async {
+    try {
+      final result = await _apiClient.post(
+        '/auth/refresh',
+        body: {'refresh_token': refreshToken},
+        requiresAuth: false,
+      );
+      return AuthResponse.fromJson(result);
+    } catch (e) {
+      return AuthResponse(
+        success: false,
+        message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      );
+    }
+  }
+
   Future<AuthResponse> register(UserModel user) async {
     try {
       final result = await _apiClient.post(

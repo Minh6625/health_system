@@ -69,3 +69,13 @@ out*.txt
 .rooignore
 .roomodes
 roo-code-settings-optimized.json
+.gitnexus
+
+# GitNexus code graph index
+.gitnexus/
+
+.claude/
+
+plans
+
+claude.md

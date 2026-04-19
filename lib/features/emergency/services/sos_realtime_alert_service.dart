@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show DartPluginRegistrant;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,13 +14,312 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/routes/app_router.dart';
 import '../../auth/services/token_storage_service.dart';
+import '../repositories/emergency_caregiver_repository.dart';
+import '../screens/sos_confirm_screen.dart';
 import '../../family/models/family_profile_snapshot.dart';
 import '../../family/widgets/family_sos_full_screen_overlay.dart';
+import '../widgets/risk_alert_full_screen_overlay.dart';
+
+const String _androidCriticalAlertChannel =
+    'healthguard/emergency/critical_alert';
+const String _androidOnCriticalAlertLaunchMethod = 'onCriticalAlertLaunch';
+const String _androidConsumePendingCriticalAlertLaunchMethod =
+    'consumePendingCriticalAlertLaunch';
+const String _androidDefaultNotificationIcon = '@mipmap/ic_launcher';
+const String _backgroundRiskCriticalChannelId = 'risk_critical_alerts';
+const String _backgroundRiskCriticalChannelName = 'Risk Critical Alerts';
+
+final FlutterLocalNotificationsPlugin _backgroundNotifications =
+    FlutterLocalNotificationsPlugin();
+bool _backgroundNotificationsInitialized = false;
+
+Map<String, dynamic>? buildAndroidCriticalRiskLaunchPayload(
+  Map<String, dynamic> rawData, {
+  String? fallbackTitle,
+  String? fallbackBody,
+}) {
+  final target = parseRealtimeNotificationOpenTarget(rawData);
+  final notificationId = target?.notificationId?.trim();
+  if (target == null ||
+      target.type != 'risk' ||
+      target.riskLevel != 'critical' ||
+      notificationId == null ||
+      notificationId.isEmpty) {
+    return null;
+  }
+
+  final title = (target.title?.trim().isNotEmpty ?? false)
+      ? target.title!.trim()
+      : (fallbackTitle?.trim().isNotEmpty ?? false)
+      ? fallbackTitle!.trim()
+      : '🚨 Cảnh báo sức khỏe khẩn cấp';
+  final body = (target.message?.trim().isNotEmpty ?? false)
+      ? target.message!.trim()
+      : (fallbackBody?.trim().isNotEmpty ?? false)
+      ? fallbackBody!.trim()
+      : 'Phát hiện chỉ số sức khỏe nguy hiểm. Cần kiểm tra ngay.';
+
+  return <String, dynamic>{
+    'type': 'risk',
+    'notificationId': notificationId,
+    'notification_id': notificationId,
+    'alertType': target.alertType ?? 'risk_critical',
+    'alert_type': target.alertType ?? 'risk_critical',
+    'riskLevel': 'critical',
+    'risk_level': 'critical',
+    if (target.riskScoreId != null) 'riskScoreId': target.riskScoreId,
+    if (target.riskScoreId != null) 'risk_score_id': target.riskScoreId,
+    'title': title,
+    'body': body,
+    'message': body,
+  };
+}
+
+RealtimeNotificationOpenTarget? parseAndroidCriticalRiskLaunchPayload(
+  dynamic rawPayload,
+) {
+  Map<String, dynamic>? decoded;
+
+  if (rawPayload is String) {
+    final normalized = rawPayload.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+
+    try {
+      final value = jsonDecode(normalized);
+      if (value is Map) {
+        decoded = value.map(
+          (dynamic key, dynamic value) => MapEntry(key.toString(), value),
+        );
+      }
+    } catch (_) {
+      return null;
+    }
+  } else if (rawPayload is Map) {
+    decoded = rawPayload.map(
+      (dynamic key, dynamic value) => MapEntry(key.toString(), value),
+    );
+  }
+
+  if (decoded == null) {
+    return null;
+  }
+
+  final target = parseRealtimeNotificationOpenTarget(decoded);
+  final notificationId = target?.notificationId?.trim();
+  if (target == null ||
+      target.type != 'risk' ||
+      target.riskLevel != 'critical' ||
+      notificationId == null ||
+      notificationId.isEmpty) {
+    return null;
+  }
+
+  return target;
+}
+
+int _deriveCriticalRiskNotificationId(String notificationId) {
+  return 300000 + (notificationId.hashCode.abs() % 600000);
+}
+
+Future<void> _initializeBackgroundNotifications() async {
+  if (_backgroundNotificationsInitialized) {
+    return;
+  }
+
+  const initSettings = InitializationSettings(
+    android: AndroidInitializationSettings(_androidDefaultNotificationIcon),
+  );
+  await _backgroundNotifications.initialize(initSettings);
+
+  final androidPlugin = _backgroundNotifications
+      .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin
+      >();
+  await androidPlugin?.createNotificationChannel(
+    const AndroidNotificationChannel(
+      _backgroundRiskCriticalChannelId,
+      _backgroundRiskCriticalChannelName,
+      description: 'Cảnh báo chỉ số sức khỏe nguy hiểm',
+      importance: Importance.max,
+    ),
+  );
+
+  _backgroundNotificationsInitialized = true;
+}
+
+Future<void> _showBackgroundCriticalRiskNotification(
+  RemoteMessage message,
+) async {
+  final payload = buildAndroidCriticalRiskLaunchPayload(
+    message.data,
+    fallbackTitle: message.notification?.title,
+    fallbackBody: message.notification?.body,
+  );
+  if (payload == null) {
+    return;
+  }
+
+  await _initializeBackgroundNotifications();
+
+  final notificationId = _deriveCriticalRiskNotificationId(
+    payload['notificationId'].toString(),
+  );
+  final details = NotificationDetails(
+    android: AndroidNotificationDetails(
+      _backgroundRiskCriticalChannelId,
+      _backgroundRiskCriticalChannelName,
+      channelDescription: 'Cảnh báo chỉ số sức khỏe nguy hiểm',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.call,
+      fullScreenIntent: true,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 900, 400, 900, 400, 1400]),
+      visibility: NotificationVisibility.public,
+      autoCancel: true,
+      ongoing: true,
+    ),
+  );
+
+  await _backgroundNotifications.show(
+    notificationId,
+    payload['title']?.toString(),
+    payload['body']?.toString(),
+    details,
+    payload: jsonEncode(payload),
+  );
+}
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Keep isolate alive and let system notification deliver when app is background/terminated.
+  WidgetsFlutterBinding.ensureInitialized();
+  DartPluginRegistrant.ensureInitialized();
   await Firebase.initializeApp();
+  await _showBackgroundCriticalRiskNotification(message);
+}
+
+String? normalizeRealtimeRiskLevel(String? level) {
+  switch (level?.trim().toLowerCase()) {
+    case 'low':
+      return 'low';
+    case 'medium':
+    case 'moderate':
+    case 'high':
+      return 'medium';
+    case 'critical':
+      return 'critical';
+    default:
+      return null;
+  }
+}
+
+String resolveRealtimeRiskLevel(String? rawLevel, {required String alertType}) {
+  final normalized = normalizeRealtimeRiskLevel(rawLevel);
+  if (normalized != null) {
+    return normalized;
+  }
+
+  switch (alertType.trim().toLowerCase()) {
+    case 'risk_critical':
+      return 'critical';
+    case 'risk_low':
+      return 'low';
+    case 'risk_medium':
+    case 'risk_high':
+    default:
+      return 'medium';
+  }
+}
+
+@immutable
+class RealtimeNotificationOpenTarget {
+  const RealtimeNotificationOpenTarget({
+    required this.type,
+    this.sosId,
+    this.notificationId,
+    this.alertType,
+    this.riskLevel,
+    this.riskScoreId,
+    this.title,
+    this.message,
+  });
+
+  final String type;
+  final String? sosId;
+  final String? notificationId;
+  final String? alertType;
+  final String? riskLevel;
+  final int? riskScoreId;
+  final String? title;
+  final String? message;
+}
+
+RealtimeNotificationOpenTarget? parseRealtimeNotificationOpenTarget(
+  Map<String, dynamic> rawData,
+) {
+  if (rawData.isEmpty) {
+    return null;
+  }
+
+  final data = rawData.map(
+    (String key, dynamic value) => MapEntry(key.toString(), value),
+  );
+  final rawType = (data['type'] ?? '').toString().trim().toLowerCase();
+  final alertType = (data['alert_type'] ?? data['alertType'] ?? '')
+      .toString()
+      .trim()
+      .toLowerCase();
+
+  final isRisk =
+      rawType == 'risk' ||
+      rawType == 'risk_alert' ||
+      alertType.startsWith('risk_');
+
+  if (isRisk) {
+    final notificationId =
+        (data['notification_id'] ?? data['notificationId'] ?? data['id'])
+            ?.toString()
+            .trim();
+    if (notificationId == null || notificationId.isEmpty) {
+      return null;
+    }
+
+    return RealtimeNotificationOpenTarget(
+      type: 'risk',
+      notificationId: notificationId,
+      alertType: alertType.isEmpty ? 'risk_high' : alertType,
+      riskLevel: resolveRealtimeRiskLevel(
+        (data['risk_level'] ?? data['riskLevel'])?.toString(),
+        alertType: alertType.isEmpty ? 'risk_high' : alertType,
+      ),
+      riskScoreId: int.tryParse(
+        (data['risk_score_id'] ?? data['riskScoreId'] ?? '').toString(),
+      ),
+      title: data['title']?.toString(),
+      message: (data['body'] ?? data['message'])?.toString(),
+    );
+  }
+
+  final sosId =
+      (data['sos_id'] ??
+              data['sos_event_id'] ??
+              data['event_id'] ??
+              data['sosId'])
+          ?.toString()
+          .trim();
+  if (sosId == null || sosId.isEmpty) {
+    return null;
+  }
+
+  return RealtimeNotificationOpenTarget(
+    type: 'sos',
+    sosId: sosId,
+    title: data['title']?.toString(),
+    message: (data['body'] ?? data['message'])?.toString(),
+  );
 }
 
 class SOSRealtimeAlertService {
@@ -32,6 +332,12 @@ class SOSRealtimeAlertService {
   static const String _missedChannelId = 'sos_missed_alerts';
   static const String _missedChannelName = 'SOS Missed Alerts';
 
+  // Risk alert notification channels (A7)
+  static const String _riskChannelId = 'risk_alerts';
+  static const String _riskChannelName = 'Risk Alerts';
+  static const String _riskCriticalChannelId = 'risk_critical_alerts';
+  static const String _riskCriticalChannelName = 'Risk Critical Alerts';
+
   static const String _lastSeenAtKey = 'sos_last_seen_alert_created_at';
   static const String _lastPresentedIdKey =
       'sos_last_presented_notification_id';
@@ -41,9 +347,14 @@ class SOSRealtimeAlertService {
 
   final ApiClient _apiClient = ApiClient();
   final TokenStorageService _tokenStorageService = TokenStorageService();
+  final EmergencyCaregiverRepository _emergencyCaregiverRepository =
+      EmergencyCaregiverRepository();
   final FlutterSecureStorage _storage = const FlutterSecureStorage();
   final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
+  final MethodChannel _androidCriticalAlertBridge = const MethodChannel(
+    _androidCriticalAlertChannel,
+  );
 
   FirebaseMessaging? _messaging;
   WebSocketChannel? _wsChannel;
@@ -63,6 +374,7 @@ class SOSRealtimeAlertService {
   bool _isConnecting = false;
   bool _isSyncingPushToken = false;
   bool _pendingPushTokenSync = false;
+  bool _androidCriticalAlertBridgeInitialized = false;
   int _pushTokenRetryAttempt = 0;
   String? _lastPresentedNotificationId;
   String? _currentFcmToken;
@@ -74,6 +386,7 @@ class SOSRealtimeAlertService {
   String? _lastOpenedAlertSosId;
   DateTime? _lastOpenedAlertAt;
   bool _isAlertOverlayVisible = false;
+  RealtimeNotificationOpenTarget? _pendingCriticalAlertAfterAuth;
 
   Future<void> initialize({
     required GlobalKey<NavigatorState> navigatorKey,
@@ -100,7 +413,7 @@ class SOSRealtimeAlertService {
           AndroidFlutterLocalNotificationsPlugin
         >();
 
-    await _ensureAndroidAlertPermissions(requestFullScreenIntent: false);
+    await _ensureAndroidAlertPermissions(requestFullScreenIntent: true);
 
     await androidPlugin?.createNotificationChannel(
       const AndroidNotificationChannel(
@@ -120,8 +433,28 @@ class SOSRealtimeAlertService {
       ),
     );
 
+    // Risk alert channels (A7)
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _riskChannelId,
+        _riskChannelName,
+        description: 'Cảnh báo chỉ số sức khỏe bất thường',
+        importance: Importance.high,
+      ),
+    );
+
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _riskCriticalChannelId,
+        _riskCriticalChannelName,
+        description: 'Cảnh báo chỉ số sức khỏe nguy hiểm',
+        importance: Importance.max,
+      ),
+    );
+
     _lastPresentedNotificationId = null;
 
+    await _initializeAndroidCriticalAlertBridge();
     await _initializeFcm();
     _isInitialized = true;
   }
@@ -141,9 +474,11 @@ class SOSRealtimeAlertService {
         sound: true,
       );
       _currentFcmToken = await _messaging!.getToken();
+      debugPrint('FCM initialized: token=${_describeToken(_currentFcmToken)}');
 
       _fcmTokenRefreshSubscription = _messaging!.onTokenRefresh.listen((token) {
         _currentFcmToken = token;
+        debugPrint('FCM token refreshed: token=${_describeToken(token)}');
         if (_isRealtimeEnabled) {
           unawaited(_requestPushTokenSync(immediate: true));
         }
@@ -158,18 +493,57 @@ class SOSRealtimeAlertService {
       _fcmOpenedAppSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
         message,
       ) {
-        unawaited(_openSosDetailFromRemoteData(message.data));
+        unawaited(_handleRemoteMessageOpen(message.data));
       });
 
       final initialMessage = await _messaging!.getInitialMessage();
       if (initialMessage != null) {
-        unawaited(_openSosDetailFromRemoteData(initialMessage.data));
+        unawaited(_handleRemoteMessageOpen(initialMessage.data));
       }
 
       _isFcmInitialized = true;
     } catch (e) {
       debugPrint('FCM init skipped: $e');
     }
+  }
+
+  Future<void> _initializeAndroidCriticalAlertBridge() async {
+    if (_androidCriticalAlertBridgeInitialized ||
+        kIsWeb ||
+        defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+
+    _androidCriticalAlertBridge.setMethodCallHandler((call) async {
+      if (call.method != _androidOnCriticalAlertLaunchMethod) {
+        return;
+      }
+
+      await _handleAndroidCriticalAlertLaunch(call.arguments);
+    });
+
+    try {
+      final pendingPayload = await _androidCriticalAlertBridge
+          .invokeMethod<String>(
+            _androidConsumePendingCriticalAlertLaunchMethod,
+          );
+      if (pendingPayload != null && pendingPayload.trim().isNotEmpty) {
+        await _handleAndroidCriticalAlertLaunch(pendingPayload);
+      }
+    } catch (e) {
+      debugPrint('Android critical alert bridge init skipped: $e');
+    }
+
+    _androidCriticalAlertBridgeInitialized = true;
+  }
+
+  Future<void> _handleAndroidCriticalAlertLaunch(dynamic rawPayload) async {
+    final target = parseAndroidCriticalRiskLaunchPayload(rawPayload);
+    if (target == null) {
+      return;
+    }
+
+    await _presentCriticalRiskTarget(target);
   }
 
   Future<void> onAuthStateChanged({required bool isAuthenticated}) async {
@@ -198,6 +572,7 @@ class SOSRealtimeAlertService {
     await _requestPushTokenSync(immediate: true);
     await _dispatchMissedAlertsOnReLogin();
     await _connectWebSocket();
+    await _restorePendingCriticalAlertAfterAuth();
   }
 
   Future<void> _ensureAndroidAlertPermissions({
@@ -297,6 +672,17 @@ class SOSRealtimeAlertService {
     return value;
   }
 
+  String _describeToken(String? token) {
+    final normalized = token?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return '<empty>';
+    }
+    if (normalized.length <= 24) {
+      return normalized;
+    }
+    return '${normalized.substring(0, 24)}...';
+  }
+
   Future<void> _requestPushTokenSync({bool immediate = false}) async {
     if (kIsWeb) {
       return;
@@ -342,6 +728,7 @@ class SOSRealtimeAlertService {
       _currentFcmToken ??= await _messaging?.getToken();
       final token = _currentFcmToken;
       if (token == null || token.trim().isEmpty) {
+        debugPrint('FCM token sync skipped: token is empty');
         return false;
       }
 
@@ -356,8 +743,14 @@ class SOSRealtimeAlertService {
           },
         );
         await _storage.write(key: _registeredPushTokenKey, value: token);
+        debugPrint(
+          'FCM token synced to backend: token=${_describeToken(token)}',
+        );
         return true;
-      } catch (_) {
+      } catch (e) {
+        debugPrint(
+          'FCM token sync failed: token=${_describeToken(token)} error=$e',
+        );
         return false;
       }
     }
@@ -374,8 +767,14 @@ class SOSRealtimeAlertService {
         requiresAuth: false,
       );
       await _storage.delete(key: _registeredPushTokenKey);
+      debugPrint(
+        'FCM token unregistered from backend: token=${_describeToken(token)}',
+      );
       return true;
-    } catch (_) {
+    } catch (e) {
+      debugPrint(
+        'FCM token unregister failed: token=${_describeToken(token)} error=$e',
+      );
       return false;
     }
   }
@@ -441,53 +840,137 @@ class SOSRealtimeAlertService {
       return null;
     }
 
+    final isRisk = _isRiskAlertType(alertType);
+    final riskLevel = isRisk
+        ? _resolveRiskLevel(
+            data['risk_level']?.toString(),
+            alertType: alertType,
+          )
+        : null;
+
+    // SOS alerts require sosId; risk alerts use notification_id as identifier.
     final sosId = (data['sos_id'] ?? data['sos_event_id'] ?? data['event_id'])
         ?.toString();
-    if (sosId == null || sosId.isEmpty) {
+    final notificationId = data['notification_id']?.toString();
+
+    // For SOS: sosId is mandatory. For risk: notification_id suffices.
+    final effectiveId = sosId?.isNotEmpty == true
+        ? sosId!
+        : (notificationId?.isNotEmpty == true ? notificationId! : null);
+    if (effectiveId == null) {
       return null;
     }
 
     final createdAt =
         data['created_at']?.toString() ??
         DateTime.now().toUtc().toIso8601String();
+
+    final String defaultTitle;
+    final String defaultMessage;
+    if (isRisk) {
+      defaultTitle = riskLevel == 'critical'
+          ? '🚨 Cảnh báo sức khỏe khẩn cấp'
+          : '⚠️ Cảnh báo sức khỏe';
+      defaultMessage = 'Phát hiện chỉ số sức khỏe bất thường. Nhấn để xem.';
+    } else {
+      defaultTitle = 'Cảnh báo SOS';
+      defaultMessage = 'Có cảnh báo khẩn cấp mới';
+    }
+
     final resolvedTitle =
         message?.notification?.title ??
         data['title']?.toString() ??
-        'Cảnh báo SOS';
+        defaultTitle;
     final resolvedMessage =
         message?.notification?.body ??
         data['body']?.toString() ??
         data['message']?.toString() ??
-        'Có cảnh báo khẩn cấp mới';
+        defaultMessage;
 
     return {
-      'id': (data['notification_id'] ?? '$alertType-$sosId').toString(),
+      'id': (notificationId ?? '$alertType-$effectiveId').toString(),
       'alert_type': alertType,
-      'severity': 'critical',
+      'severity': isRisk ? (riskLevel ?? 'medium') : 'critical',
       'title': resolvedTitle,
       'message': resolvedMessage,
       'data': {
-        'sos_id': sosId,
-        'sos_event_id': sosId,
+        if (sosId != null && sosId.isNotEmpty) 'sos_id': sosId,
+        if (sosId != null && sosId.isNotEmpty) 'sos_event_id': sosId,
         'trigger_type': data['trigger_type']?.toString(),
+        if (isRisk) 'risk_level': riskLevel ?? 'medium',
+        if (isRisk) 'notification_id': notificationId,
+        if (isRisk) 'risk_score_id': data['risk_score_id'],
       },
       'created_at': createdAt,
       'is_read': false,
     };
   }
 
-  Future<void> _openSosDetailFromRemoteData(Map<String, dynamic> data) async {
-    if (data.isEmpty) {
+  Future<void> _handleRemoteMessageOpen(Map<String, dynamic> data) async {
+    final target = parseRealtimeNotificationOpenTarget(data);
+    if (target == null) {
       return;
     }
 
-    final sosId = (data['sos_id'] ?? data['sos_event_id'] ?? data['event_id'])
-        ?.toString();
-    if (sosId == null || sosId.isEmpty) {
+    if (target.type == 'risk') {
+      final riskLevel = target.riskLevel ?? 'medium';
+      if (riskLevel == 'critical') {
+        await _presentCriticalRiskTarget(target);
+      } else {
+        await _navigateToNotificationsScreen();
+      }
       return;
     }
 
-    await _navigateToSosDetail(sosId);
+    if (target.sosId == null || target.sosId!.isEmpty) {
+      return;
+    }
+    await _navigateToSosDetail(target.sosId!);
+  }
+
+  String _buildCriticalRiskLaunchDedupeKey(String notificationId) {
+    return 'critical-launch:$notificationId';
+  }
+
+  Future<void> _presentCriticalRiskTarget(
+    RealtimeNotificationOpenTarget target,
+  ) async {
+    final notificationId = target.notificationId?.trim();
+    if (notificationId == null || notificationId.isEmpty) {
+      return;
+    }
+
+    final dedupeKey = _buildCriticalRiskLaunchDedupeKey(notificationId);
+    if (_wasAlertPresentedRecently(dedupeKey)) {
+      return;
+    }
+
+    _rememberPresentedAlert(dedupeKey);
+
+    await _navigateToRiskAlertScreen(
+      notificationId: notificationId,
+      alertType: target.alertType ?? 'risk_critical',
+      riskLevel: target.riskLevel ?? 'critical',
+      title: target.title ?? '🚨 Cảnh báo sức khỏe khẩn cấp',
+      message:
+          target.message ??
+          'Phát hiện chỉ số sức khỏe bất thường. Nhấn để xem.',
+      riskScoreId: target.riskScoreId,
+    );
+  }
+
+  Future<void> _restorePendingCriticalAlertAfterAuth() async {
+    if (!_isRealtimeEnabled) {
+      return;
+    }
+
+    final target = _pendingCriticalAlertAfterAuth;
+    if (target == null) {
+      return;
+    }
+
+    _pendingCriticalAlertAfterAuth = null;
+    await _presentCriticalRiskTarget(target);
   }
 
   Future<void> _navigateToSosDetail(String sosId) async {
@@ -510,6 +993,15 @@ class SOSRealtimeAlertService {
       AppRouter.emergencySosDetail,
       arguments: {'sosId': sosId},
     );
+  }
+
+  Future<void> _navigateToNotificationsScreen() async {
+    final navigatorState = _navigatorKey?.currentState;
+    if (navigatorState == null) {
+      return;
+    }
+
+    navigatorState.pushNamed(AppRouter.notifications);
   }
 
   Future<void> _navigateToEmergencyAlertScreen({
@@ -576,6 +1068,284 @@ class SOSRealtimeAlertService {
       _stopOverlayVibrationPulse();
       _isAlertOverlayVisible = false;
     }
+  }
+
+  /// Navigate to the risk alert fullscreen overlay (A7).
+  Future<void> _navigateToRiskAlertScreen({
+    required String notificationId,
+    required String alertType,
+    required String riskLevel,
+    required String title,
+    required String message,
+    int? riskScoreId,
+  }) async {
+    final now = DateTime.now().toUtc();
+    if (_lastOpenedAlertSosId == notificationId &&
+        _lastOpenedAlertAt != null &&
+        now.difference(_lastOpenedAlertAt!).inSeconds < 2) {
+      return;
+    }
+
+    if (_isAlertOverlayVisible) {
+      return;
+    }
+
+    final navigatorState = _navigatorKey?.currentState;
+    if (navigatorState == null) {
+      return;
+    }
+
+    final overlayContext = navigatorState.overlay?.context;
+    if (overlayContext == null) {
+      return;
+    }
+
+    _lastOpenedAlertSosId = notificationId;
+    _lastOpenedAlertAt = now;
+    _isAlertOverlayVisible = true;
+    final alertTarget = RealtimeNotificationOpenTarget(
+      type: 'risk',
+      notificationId: notificationId,
+      alertType: alertType,
+      riskLevel: riskLevel,
+      riskScoreId: riskScoreId,
+      title: title,
+      message: message,
+    );
+
+    try {
+      _startOverlayVibrationPulse();
+      await showGeneralDialog<void>(
+        context: overlayContext,
+        barrierDismissible: false,
+        barrierLabel: 'Risk Alert',
+        barrierColor: Colors.transparent,
+        pageBuilder: (dialogContext, _, _) {
+          return RiskAlertFullScreenOverlay(
+            title: title,
+            message: message,
+            riskLevel: riskLevel,
+            alertType: alertType,
+            notificationId: notificationId,
+            onConfirmOk: () async {
+              await _handleRiskSafeAcknowledgement(
+                dialogContext: dialogContext,
+                target: alertTarget,
+              );
+            },
+            onRequestHelp: () async {
+              await _handleRiskEscalationAcknowledgement(
+                dialogContext: dialogContext,
+                target: alertTarget,
+                responseType: 'help_requested',
+              );
+            },
+            onTimeoutEscalated: () async {
+              await _handleRiskEscalationAcknowledgement(
+                dialogContext: dialogContext,
+                target: alertTarget,
+                responseType: 'timeout_escalated',
+              );
+            },
+            onDismiss: () async {
+              await _dismissRiskAlert(dialogContext);
+            },
+          );
+        },
+      );
+    } finally {
+      _stopOverlayVibrationPulse();
+      _isAlertOverlayVisible = false;
+    }
+  }
+
+  Future<void> _handleRiskSafeAcknowledgement({
+    required BuildContext dialogContext,
+    required RealtimeNotificationOpenTarget target,
+  }) async {
+    if (!await _canSubmitCriticalRiskResponse()) {
+      await _closeDialogAndRedirectCriticalAlertToAuth(
+        dialogContext: dialogContext,
+        target: target,
+      );
+      return;
+    }
+
+    try {
+      await _submitRiskResponse(
+        notificationId: target.notificationId ?? '',
+        responseType: 'safe',
+        source: 'overlay',
+        riskScoreId: target.riskScoreId,
+      );
+    } catch (e) {
+      if (_handleRiskResponseAuthFailure(e)) {
+        await _closeDialogAndRedirectCriticalAlertToAuth(
+          dialogContext: dialogContext,
+          target: target,
+        );
+        return;
+      }
+      rethrow;
+    }
+
+    if (!dialogContext.mounted) {
+      return;
+    }
+
+    Navigator.of(dialogContext, rootNavigator: true).pop();
+  }
+
+  Future<void> _handleRiskEscalationAcknowledgement({
+    required BuildContext dialogContext,
+    required RealtimeNotificationOpenTarget target,
+    required String responseType,
+  }) async {
+    if (!await _canSubmitCriticalRiskResponse()) {
+      await _closeDialogAndRedirectCriticalAlertToAuth(
+        dialogContext: dialogContext,
+        target: target,
+      );
+      return;
+    }
+
+    late final Map<String, dynamic> response;
+    try {
+      response = await _submitRiskResponse(
+        notificationId: target.notificationId ?? '',
+        responseType: responseType,
+        source: 'overlay',
+        riskScoreId: target.riskScoreId,
+      );
+    } catch (e) {
+      if (_handleRiskResponseAuthFailure(e)) {
+        await _closeDialogAndRedirectCriticalAlertToAuth(
+          dialogContext: dialogContext,
+          target: target,
+        );
+        return;
+      }
+      rethrow;
+    }
+
+    if (!dialogContext.mounted) {
+      return;
+    }
+
+    Navigator.of(dialogContext, rootNavigator: true).pop();
+
+    final recipientCount = _extractRecipientCount(response);
+    await _openRiskEscalationConfirmScreen(recipientCount: recipientCount);
+  }
+
+  Future<void> _dismissRiskAlert(BuildContext dialogContext) async {
+    if (!dialogContext.mounted) {
+      return;
+    }
+
+    Navigator.of(dialogContext, rootNavigator: true).pop();
+  }
+
+  Future<Map<String, dynamic>> _submitRiskResponse({
+    required String notificationId,
+    required String responseType,
+    required String source,
+    int? riskScoreId,
+  }) async {
+    try {
+      return await _emergencyCaregiverRepository.respondToRiskNotification(
+        notificationId: notificationId,
+        responseType: responseType,
+        source: source,
+        riskScoreId: riskScoreId,
+      );
+    } catch (e) {
+      debugPrint('Failed to submit risk response: $e');
+      rethrow;
+    }
+  }
+
+  Future<bool> _canSubmitCriticalRiskResponse() async {
+    final token = await _tokenStorageService.readAccessToken();
+    return token != null && token.trim().isNotEmpty;
+  }
+
+  bool _looksLikeAuthFailure(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('401') ||
+        message.contains('403') ||
+        message.contains('unauthorized') ||
+        message.contains('forbidden') ||
+        message.contains('not authenticated') ||
+        message.contains('đăng nhập') ||
+        message.contains('login');
+  }
+
+  bool _handleRiskResponseAuthFailure(Object error) {
+    return _looksLikeAuthFailure(error);
+  }
+
+  Future<void> _redirectCriticalAlertToAuth(
+    RealtimeNotificationOpenTarget target,
+  ) async {
+    _pendingCriticalAlertAfterAuth = target;
+
+    final navigatorState = _navigatorKey?.currentState;
+    if (navigatorState == null) {
+      return;
+    }
+
+    navigatorState.pushNamedAndRemoveUntil(AppRouter.start, (_) => false);
+  }
+
+  Future<void> _closeDialogAndRedirectCriticalAlertToAuth({
+    required BuildContext dialogContext,
+    required RealtimeNotificationOpenTarget target,
+  }) async {
+    if (dialogContext.mounted) {
+      Navigator.of(dialogContext, rootNavigator: true).pop();
+    }
+    await _redirectCriticalAlertToAuth(target);
+  }
+
+  int _extractRecipientCount(Map<String, dynamic> response) {
+    final candidates = <Object?>[
+      response['recipient_count'],
+      response['recipients_count'],
+      response['recipientCount'],
+      response['escalated_count'],
+      response['helper_count'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate == null) {
+        continue;
+      }
+      final parsed = int.tryParse(candidate.toString());
+      if (parsed != null && parsed > 0) {
+        return parsed;
+      }
+    }
+
+    return 1;
+  }
+
+  Future<void> _openRiskEscalationConfirmScreen({
+    required int recipientCount,
+  }) async {
+    final navigatorState = _navigatorKey?.currentState;
+    if (navigatorState == null) {
+      return;
+    }
+
+    navigatorState.push(
+      MaterialPageRoute(
+        builder: (_) => SosConfirmScreen(
+          recipientCount: recipientCount,
+          mode: SosConfirmMode.riskEscalation,
+        ),
+      ),
+    );
   }
 
   void _startOverlayVibrationPulse() {
@@ -737,15 +1507,48 @@ class SOSRealtimeAlertService {
       await _ensureAndroidAlertPermissions(requestFullScreenIntent: true);
     }
 
+    final alertType =
+        (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
+    final isRisk = _isRiskAlertType(alertType);
+    final riskLevel = isRisk
+        ? _resolveRiskLevel(
+            _toMap(item['data'])['risk_level']?.toString(),
+            alertType: alertType,
+          )
+        : null;
+
     if (preferFullscreen) {
-      await _showFullScreenAlert(item, sosId: sosId);
-      await _navigateToEmergencyAlertScreen(
-        sosId: sosId,
-        title: (item['title'] as String?) ?? 'Canh bao khan cap',
-        message:
-            (item['message'] as String?) ??
-            'Phat hien tinh huong khan cap. Nhan de xem chi tiet.',
-      );
+      final shouldShowFullscreenRisk = !isRisk || riskLevel == 'critical';
+      if (shouldShowFullscreenRisk) {
+        await _showFullScreenAlert(item, sosId: sosId);
+        if (isRisk) {
+          await _presentCriticalRiskTarget(
+            RealtimeNotificationOpenTarget(
+              type: 'risk',
+              notificationId: notificationId,
+              alertType: alertType,
+              riskLevel: riskLevel ?? 'critical',
+              title: (item['title'] as String?) ?? 'Cảnh báo sức khỏe',
+              message:
+                  (item['message'] as String?) ??
+                  'Phát hiện chỉ số sức khỏe bất thường.',
+              riskScoreId: int.tryParse(
+                _toMap(item['data'])['risk_score_id']?.toString() ?? '',
+              ),
+            ),
+          );
+        } else {
+          await _navigateToEmergencyAlertScreen(
+            sosId: sosId,
+            title: (item['title'] as String?) ?? 'Canh bao khan cap',
+            message:
+                (item['message'] as String?) ??
+                'Phat hien tinh huong khan cap. Nhan de xem chi tiet.',
+          );
+        }
+      } else {
+        await _showMissedAlert(item, sosId: sosId);
+      }
     } else {
       await _showMissedAlert(item, sosId: sosId);
     }
@@ -762,6 +1565,12 @@ class SOSRealtimeAlertService {
     await _saveLastSeenAt(createdAt ?? fallbackSeenAt);
   }
 
+  /// Returns true for any risk_* alert types.
+  bool _isRiskAlertType(String alertType) {
+    return alertType.startsWith('risk_');
+  }
+
+  /// Returns true for any actionable alert (SOS, fall, or risk).
   bool _isEmergencyAlert(Map<String, dynamic> item) {
     final alertType =
         (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
@@ -769,7 +1578,16 @@ class SOSRealtimeAlertService {
         alertType == 'manual' ||
         alertType.contains('sos') ||
         alertType == 'fall_detected' ||
-        alertType == 'fall_detection';
+        alertType == 'fall_detection' ||
+        _isRiskAlertType(alertType);
+  }
+
+  String? _normalizeRiskLevel(String? level) {
+    return normalizeRealtimeRiskLevel(level);
+  }
+
+  String _resolveRiskLevel(String? rawLevel, {required String alertType}) {
+    return resolveRealtimeRiskLevel(rawLevel, alertType: alertType);
   }
 
   String _buildAlertDedupeKey(
@@ -813,6 +1631,7 @@ class SOSRealtimeAlertService {
     return DateTime.tryParse(raw.toString())?.toUtc();
   }
 
+  /// Extract SOS ID or, for risk alerts, fall back to notification_id / item id.
   String? _extractSosId(Map<String, dynamic> item) {
     final data = _toMap(item['data']);
     final candidates = <Object?>[
@@ -834,6 +1653,16 @@ class SOSRealtimeAlertService {
         return value;
       }
     }
+
+    // Risk alerts may not have sosId — use notification_id or item id.
+    final alertType =
+        (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
+    if (_isRiskAlertType(alertType)) {
+      final fallbackId = (data['notification_id'] ?? item['id'])?.toString();
+      if (fallbackId != null && fallbackId.isNotEmpty) {
+        return fallbackId;
+      }
+    }
     return null;
   }
 
@@ -853,21 +1682,57 @@ class SOSRealtimeAlertService {
     Map<String, dynamic> item, {
     required String sosId,
   }) async {
+    final alertType =
+        (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
+    final isRisk = _isRiskAlertType(alertType);
+    final riskLevel = isRisk
+        ? _resolveRiskLevel(
+            _toMap(item['data'])['risk_level']?.toString(),
+            alertType: alertType,
+          )
+        : null;
+
     final title = (item['title'] as String?) ?? 'Cảnh báo khẩn cấp';
     final body =
         (item['message'] as String?) ??
         'Phát hiện tình huống khẩn cấp. Nhấn để xem chi tiết.';
+
     final payload = jsonEncode({
-      'type': 'sos',
-      'sosId': sosId,
+      'type': isRisk ? 'risk' : 'sos',
+      if (!isRisk) 'sosId': sosId,
+      if (isRisk) 'alertType': alertType,
+      if (isRisk) 'alert_type': alertType,
+      if (isRisk) 'riskLevel': riskLevel ?? 'medium',
+      if (isRisk) 'risk_level': riskLevel ?? 'medium',
+      if (isRisk)
+        'riskScoreId': _toMap(item['data'])['risk_score_id']?.toString(),
+      if (isRisk)
+        'risk_score_id': _toMap(item['data'])['risk_score_id']?.toString(),
       'notificationId': item['id']?.toString(),
+      'notification_id': item['id']?.toString(),
+      'title': title,
+      'body': body,
+      'message': body,
     });
+
+    // Use risk-specific channel for risk alerts.
+    final channelId = isRisk
+        ? (riskLevel == 'critical' ? _riskCriticalChannelId : _riskChannelId)
+        : _fullScreenChannelId;
+    final channelName = isRisk
+        ? (riskLevel == 'critical'
+              ? _riskCriticalChannelName
+              : _riskChannelName)
+        : _fullScreenChannelName;
+    final channelDesc = isRisk
+        ? 'Cảnh báo chỉ số sức khỏe bất thường'
+        : 'Cảnh báo SOS và té ngã toàn màn hình';
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
-        _fullScreenChannelId,
-        _fullScreenChannelName,
-        channelDescription: 'Cảnh báo SOS và té ngã toàn màn hình',
+        channelId,
+        channelName,
+        channelDescription: channelDesc,
         importance: Importance.max,
         priority: Priority.max,
         category: AndroidNotificationCategory.call,
@@ -898,22 +1763,45 @@ class SOSRealtimeAlertService {
     Map<String, dynamic> item, {
     required String sosId,
   }) async {
-    final title = (item['title'] as String?) ?? 'Cảnh báo SOS bỏ lỡ';
+    final alertType =
+        (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
+    final isRisk = _isRiskAlertType(alertType);
+    final riskLevel = isRisk
+        ? _resolveRiskLevel(
+            _toMap(item['data'])['risk_level']?.toString(),
+            alertType: alertType,
+          )
+        : null;
+
+    final title =
+        (item['title'] as String?) ??
+        (isRisk ? 'Cảnh báo sức khỏe bỏ lỡ' : 'Cảnh báo SOS bỏ lỡ');
     final body =
         (item['message'] as String?) ??
-        'Bạn có một cảnh báo SOS khi chưa hoạt động trong ứng dụng.';
+        (isRisk
+            ? 'Bạn có cảnh báo sức khỏe khi chưa hoạt động trong ứng dụng.'
+            : 'Bạn có một cảnh báo SOS khi chưa hoạt động trong ứng dụng.');
 
     final payload = jsonEncode({
-      'type': 'sos',
-      'sosId': sosId,
+      'type': isRisk ? 'risk' : 'sos',
+      if (!isRisk) 'sosId': sosId,
+      if (isRisk) 'alertType': alertType,
+      if (isRisk) 'riskLevel': riskLevel ?? 'medium',
+      if (isRisk)
+        'riskScoreId': _toMap(item['data'])['risk_score_id']?.toString(),
       'notificationId': item['id']?.toString(),
     });
 
-    const details = NotificationDetails(
+    final missedChannelId = isRisk ? _riskChannelId : _missedChannelId;
+    final missedChannelName = isRisk ? _riskChannelName : _missedChannelName;
+
+    final details = NotificationDetails(
       android: AndroidNotificationDetails(
-        _missedChannelId,
-        _missedChannelName,
-        channelDescription: 'Thông báo SOS bị bỏ lỡ khi không online',
+        missedChannelId,
+        missedChannelName,
+        channelDescription: isRisk
+            ? 'Cảnh báo sức khỏe bỏ lỡ'
+            : 'Thông báo SOS bị bỏ lỡ khi không online',
         importance: Importance.high,
         priority: Priority.high,
         category: AndroidNotificationCategory.message,
@@ -1054,12 +1942,7 @@ class SOSRealtimeAlertService {
       final map = decoded.map(
         (dynamic key, dynamic value) => MapEntry(key.toString(), value),
       );
-      final sosId = map['sosId']?.toString();
-      if (sosId == null || sosId.isEmpty) {
-        return;
-      }
-
-      await _navigateToSosDetail(sosId);
+      await _handleRemoteMessageOpen(map);
     } catch (_) {
       // Ignore tap payload errors.
     }
