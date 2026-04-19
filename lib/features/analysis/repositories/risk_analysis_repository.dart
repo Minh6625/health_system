@@ -38,6 +38,13 @@ class RiskAnalysisRepository {
     return 0;
   }
 
+  double _parseDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    return 0;
+  }
+
   int? _parseNullableScore(dynamic value) {
     if (value is num) {
       return value.round();
@@ -70,7 +77,7 @@ class RiskAnalysisRepository {
     return FactorBreakdown(
       key: json['key'] as String? ?? '',
       label: json['label'] as String? ?? '',
-      contributionScore: _parseScore(json['contribution_score']),
+      contributionScore: _parseDouble(json['contribution_score']),
       impactLevel: json['impact_level'] as String? ?? 'low',
       value: json['value'] as String? ?? '--',
       unit: json['unit'] as String? ?? '',
@@ -93,9 +100,12 @@ class RiskAnalysisRepository {
       queryParams: {'limit': 1},
       targetProfileId: targetProfileId,
     );
-    final data = result is List
-        ? result
-        : (result['data'] as List? ?? const []);
+    if (result is! List) {
+      throw const FormatException(
+        'Unexpected /analysis/risk-reports response shape.',
+      );
+    }
+    final data = result;
     if (data.isEmpty) {
       throw Exception('Chưa có dữ liệu đánh giá');
     }
@@ -137,14 +147,21 @@ class RiskAnalysisRepository {
       targetProfileId: targetProfileId,
     );
     final json = Map<String, dynamic>.from(result as Map);
+    final topFactors = (json['top_factors'] as List? ?? const [])
+        .map((item) => _parseTopFactor(Map<String, dynamic>.from(item as Map)))
+        .toList();
 
     return RiskReportDetailEntity(
       reportId: json['id'] as int? ?? reportId,
       profileId: profileId ?? 'self',
       score: _parseScore(json['risk_score'] ?? json['score']),
+      healthScore: _parseDouble(json['health_score']),
       level: _parseRiskLevel(json['risk_level'] as String?),
+      displayStatus: json['display_status'] as String? ?? 'Không xác định',
       summary: json['summary'] as String? ?? '',
       analyzedAt: DateTime.parse(json['timestamp'] as String),
+      previousScore: _parseNullableScore(json['previous_score']),
+      trend7d: _parseTrend(json['trend_7d']),
       breakdown: (json['breakdown'] as List? ?? const [])
           .map(
             (item) =>
@@ -158,9 +175,15 @@ class RiskAnalysisRepository {
       recommendations: List<String>.from(
         json['recommendations'] as List? ?? const [],
       ),
+      recommendationPreview: List<String>.from(
+        json['recommendation_preview'] as List? ?? const [],
+      ),
+      topFactors: topFactors,
       snapshot: _parseSnapshot(
         Map<String, dynamic>.from(json['snapshot'] as Map? ?? const {}),
       ),
+      confidence: _parseDouble(json['confidence']),
+      isStale: json['is_stale'] as bool? ?? true,
     );
   }
 
@@ -185,10 +208,10 @@ class RiskAnalysisRepository {
     return RiskHistoryEntity(
       range: json['range'] as String? ?? range,
       summary: RiskHistorySummary(
-        averageScore: _parseScore(summaryJson['average_score']),
-        highestScore: _parseScore(summaryJson['highest_score']),
-        lowestScore: _parseScore(summaryJson['lowest_score']),
-        deltaVsPreviousPeriod: _parseScore(
+        averageScore: _parseDouble(summaryJson['average_score']),
+        highestScore: _parseDouble(summaryJson['highest_score']),
+        lowestScore: _parseDouble(summaryJson['lowest_score']),
+        deltaVsPreviousPeriod: _parseDouble(
           summaryJson['delta_vs_previous_period'],
         ),
         trendPoints: _parseTrend(summaryJson['trend_points']),
@@ -199,9 +222,13 @@ class RiskAnalysisRepository {
             (item) => RiskHistoryItemEntity(
               reportId: item['report_id'] as int? ?? 0,
               score: _parseScore(item['risk_score'] ?? item['score']),
+              healthScore: _parseDouble(item['health_score']),
               level: _parseRiskLevel(item['risk_level'] as String?),
+              displayStatus:
+                  item['display_status'] as String? ?? 'Không xác định',
               analyzedAt: DateTime.parse(item['analyzed_at'] as String),
               reasonPreview: item['reason_preview'] as String? ?? '',
+              isStale: item['is_stale'] as bool? ?? true,
             ),
           )
           .toList(),

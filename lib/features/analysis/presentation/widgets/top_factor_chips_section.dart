@@ -17,10 +17,7 @@ class TopFactorChipsSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Yếu tố chính',
-          style: AppTextStyles.sectionTitle,
-        ),
+        const Text('Yếu tố chính', style: AppTextStyles.sectionTitle),
         const SizedBox(height: AppSpacing.gapMd),
         Wrap(
           spacing: AppSpacing.gapSm,

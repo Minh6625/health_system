@@ -71,13 +71,28 @@ class RiskHistoryItemCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(
-                    item.reasonPreview.isNotEmpty
-                        ? item.reasonPreview
-                        : 'Không có tóm tắt',
-                    style: AppTextStyles.bodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.reasonPreview.isNotEmpty
+                            ? item.reasonPreview
+                            : 'Không có tóm tắt',
+                        style: AppTextStyles.bodyMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (item.isStale) ...[
+                        const SizedBox(height: AppSpacing.gapXs),
+                        Text(
+                          'Dữ liệu cũ',
+                          style: AppTextStyles.caption.copyWith(
+                            color: AppColors.warning,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(width: AppSpacing.gapSm),

@@ -3,24 +3,30 @@ import '../../domain/entities/risk_report_entity.dart';
 class RiskHistoryItemEntity {
   final int reportId;
   final int score;
+  final double healthScore;
   final RiskLevel level;
+  final String displayStatus;
   final DateTime analyzedAt;
   final String reasonPreview;
+  final bool isStale;
 
   RiskHistoryItemEntity({
     required this.reportId,
     required this.score,
+    required this.healthScore,
     required this.level,
+    required this.displayStatus,
     required this.analyzedAt,
     required this.reasonPreview,
+    required this.isStale,
   });
 }
 
 class RiskHistorySummary {
-  final int averageScore;
-  final int highestScore;
-  final int lowestScore;
-  final int deltaVsPreviousPeriod;
+  final double averageScore;
+  final double highestScore;
+  final double lowestScore;
+  final double deltaVsPreviousPeriod;
   final List<int> trendPoints;
 
   RiskHistorySummary({

@@ -27,10 +27,7 @@ class RecommendationPreviewCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Khuyến nghị',
-                style: AppTextStyles.sectionTitle,
-              ),
+              const Text('Khuyến nghị', style: AppTextStyles.sectionTitle),
               Text(
                 'Xem đầy đủ',
                 style: AppTextStyles.bodyMedium.copyWith(
@@ -40,26 +37,25 @@ class RecommendationPreviewCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.gapMd),
-          ...recommendations.take(2).map((rec) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.gapMd),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_rounded,
-                      color: AppColors.success,
-                      size: 20,
-                    ),
-                    const SizedBox(width: AppSpacing.gapMd),
-                    Expanded(
-                      child: Text(
-                        rec,
-                        style: AppTextStyles.body,
+          ...recommendations
+              .take(2)
+              .map(
+                (rec) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.gapMd),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.success,
+                        size: 20,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: AppSpacing.gapMd),
+                      Expanded(child: Text(rec, style: AppTextStyles.body)),
+                    ],
+                  ),
                 ),
-              )),
+              ),
         ],
       ),
     );

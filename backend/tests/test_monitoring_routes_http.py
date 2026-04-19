@@ -233,9 +233,25 @@ def test_mobile_monitoring_routes_use_canonical_shape_and_target_profile(
     for response in [*self_responses, *linked_responses]:
         assert response.status_code == 200
 
-    assert isinstance(self_responses[3].json(), list)
-    assert self_responses[5].json()["summary"]["trend_points"] == [24, 21, 19, 18]
-    assert linked_responses[3].json()[0]["previous_score"] is None
+    latest_payload = self_responses[3].json()
+    detail_payload = self_responses[4].json()
+    history_payload = self_responses[5].json()
+    linked_latest_payload = linked_responses[3].json()
+
+    assert isinstance(latest_payload, list)
+    assert latest_payload[0]["display_status"] == "Ổn định"
+    assert latest_payload[0]["health_score"] == 82.0
+    assert latest_payload[0]["is_stale"] is False
+    assert detail_payload["display_status"] == "Ổn định"
+    assert detail_payload["health_score"] == 82.0
+    assert detail_payload["snapshot"]["heart_rate"] == 71
+    assert detail_payload["is_stale"] is False
+    assert history_payload["range"] == "7d"
+    assert history_payload["page"] == 1
+    assert history_payload["limit"] == 5
+    assert history_payload["has_more"] is False
+    assert history_payload["summary"]["trend_points"] == [24, 21, 19, 18]
+    assert linked_latest_payload[0]["previous_score"] is None
 
     assert calls == [
         ("vitals", 7, None),
@@ -257,7 +273,7 @@ def test_mobile_monitoring_routes_reject_unauthorized_linked_profile() -> None:
     client = _build_test_client()
 
     response = client.get(
-        "/mobile/metrics/vital-signs/latest",
+        "/mobile/analysis/risk-history",
         headers={"X-Target-Profile-Id": "999"},
     )
 

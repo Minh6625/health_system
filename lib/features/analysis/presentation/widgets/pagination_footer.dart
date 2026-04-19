@@ -6,11 +6,15 @@ import '../../../../shared/presentation/theme/app_text_styles.dart';
 class PaginationFooter extends StatelessWidget {
   final bool isLoadingMore;
   final bool hasMore;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
 
   const PaginationFooter({
     super.key,
     required this.isLoadingMore,
     required this.hasMore,
+    this.errorMessage,
+    this.onRetry,
   });
 
   @override
@@ -18,8 +22,23 @@ class PaginationFooter extends StatelessWidget {
     if (isLoadingMore) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: AppSpacing.gapLg),
-        child: Center(
-          child: CircularProgressIndicator(strokeWidth: 2),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    if (errorMessage != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.gapLg),
+        child: Column(
+          children: [
+            Text(
+              errorMessage!,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption.copyWith(color: AppColors.critical),
+            ),
+            const SizedBox(height: AppSpacing.gapSm),
+            TextButton(onPressed: onRetry, child: const Text('Thử lại')),
+          ],
         ),
       );
     }
@@ -30,7 +49,9 @@ class PaginationFooter extends StatelessWidget {
         child: Center(
           child: Text(
             'Bạn đã xem hết dữ liệu',
-            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
       );

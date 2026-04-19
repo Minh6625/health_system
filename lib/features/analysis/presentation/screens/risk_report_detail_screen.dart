@@ -5,6 +5,7 @@ import '../../../../shared/presentation/theme/app_colors.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../../../shared/presentation/feedback/inline_error_block.dart';
+import '../../../../shared/presentation/feedback/inline_status_banner.dart';
 import '../../providers/risk_report_provider.dart';
 import '../widgets/factor_contribution_section.dart';
 import '../widgets/medical_disclaimer_card.dart';
@@ -81,7 +82,7 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
   }
 
   Widget _buildBody(RiskReportProvider provider) {
-    if (provider.isLoading && provider.reportDetail == null) {
+    if (provider.isInitialLoading && provider.reportDetail == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -106,6 +107,17 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
             padding: const EdgeInsets.all(AppSpacing.gapLg),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
+                if (provider.hasStaleContent) ...[
+                  InlineStatusBanner.warning(
+                    message:
+                        'Chi tiết này được tính từ dữ liệu cũ. Hãy đối chiếu với chỉ số hiện tại.',
+                  ),
+                  const SizedBox(height: AppSpacing.gapLg),
+                ],
+                if (provider.isRefreshing) ...[
+                  const LinearProgressIndicator(minHeight: 2),
+                  const SizedBox(height: AppSpacing.gapLg),
+                ],
                 RiskDetailSummaryCard(detail: detail),
                 const SizedBox(height: AppSpacing.gapLg),
                 XaiNarrativeCard(explanation: detail.xaiExplanation),
@@ -113,7 +125,6 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
                 FactorContributionSection(
                   breakdown: detail.breakdown,
                   onFactorTap: (routeTarget) {
-                    // Xử lý route tương ứng (vd vital_hr -> vitalDetail)
                     if (routeTarget.startsWith('vital_')) {
                       final type = routeTarget.split('_')[1];
                       Navigator.pushNamed(

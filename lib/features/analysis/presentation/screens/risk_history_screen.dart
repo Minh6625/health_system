@@ -31,7 +31,7 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RiskHistoryProvider>().fetchHistory(
-        profileId: widget.profileId ?? 'self',
+        profileId: widget.profileId,
         refresh: true,
       );
     });
@@ -39,9 +39,7 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
     _scrollController.addListener(() {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
-        context.read<RiskHistoryProvider>().loadMore(
-          widget.profileId ?? 'self',
-        );
+        context.read<RiskHistoryProvider>().loadMore(widget.profileId);
       }
     });
   }
@@ -54,17 +52,16 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
 
   Future<void> _onRefresh() async {
     await context.read<RiskHistoryProvider>().fetchHistory(
-      profileId: widget.profileId ?? 'self',
+      profileId: widget.profileId,
       refresh: true,
     );
   }
 
-  // Helper to group items by month and year
   Map<String, List<RiskHistoryItemEntity>> _groupItemsByMonth(
     List<RiskHistoryItemEntity> items,
   ) {
     final Map<String, List<RiskHistoryItemEntity>> grouped = {};
-    for (var item in items) {
+    for (final item in items) {
       final key = DateFormat('MM/yyyy').format(item.analyzedAt);
       if (!grouped.containsKey(key)) {
         grouped[key] = [];
@@ -108,7 +105,7 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
   }
 
   Widget _buildBody(RiskHistoryProvider provider) {
-    if (provider.isLoading && provider.items.isEmpty) {
+    if (provider.isInitialLoading && provider.items.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -137,7 +134,7 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
               child: RangeFilterChips(
                 currentRange: provider.currentRange,
                 onRangeSelected: (range) =>
-                    provider.changeRange(widget.profileId ?? 'self', range),
+                    provider.changeRange(widget.profileId, range),
               ),
             ),
           ),
@@ -145,7 +142,11 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
             padding: const EdgeInsets.all(AppSpacing.gapLg),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                if (provider.summary != null) ...[
+                if (provider.isRefreshing) ...[
+                  const LinearProgressIndicator(minHeight: 2),
+                  const SizedBox(height: AppSpacing.gapLg),
+                ],
+                if (provider.hasSummary) ...[
                   RiskTrendSummaryCard(summary: provider.summary!),
                   const SizedBox(height: AppSpacing.gapLg),
                   CompareInsightCard(
@@ -153,7 +154,7 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
                   ),
                   const SizedBox(height: AppSpacing.gapLg),
                 ],
-                if (provider.items.isEmpty && !provider.isLoading)
+                if (provider.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 40),
                     child: Center(child: Text('Chưa có lịch sử')),
@@ -200,6 +201,8 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
                 PaginationFooter(
                   isLoadingMore: provider.isLoadingMore,
                   hasMore: provider.hasMore,
+                  errorMessage: provider.paginationError,
+                  onRetry: () => provider.loadMore(widget.profileId),
                 ),
               ]),
             ),

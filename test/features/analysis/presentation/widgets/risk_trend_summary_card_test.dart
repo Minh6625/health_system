@@ -18,10 +18,10 @@ void main() {
             width: 320,
             child: RiskTrendSummaryCard(
               summary: RiskHistorySummary(
-                averageScore: 49,
-                highestScore: 61,
-                lowestScore: 23,
-                deltaVsPreviousPeriod: -4,
+                averageScore: 49.5,
+                highestScore: 61.0,
+                lowestScore: 23.0,
+                deltaVsPreviousPeriod: -4.5,
                 trendPoints: [61, 58, 55, 52, 47, 45, 43],
               ),
             ),
