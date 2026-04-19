@@ -110,58 +110,79 @@ class RiskReportResponse {
 }
 
 class HomeDashboardRepository {
-  final ApiClient _apiClient = ApiClient();
+  HomeDashboardRepository({ApiClient? apiClient})
+    : _apiClient = apiClient ?? ApiClient();
 
-  Future<VitalSignsResponse> getLatestVitalSigns() async {
-    try {
-      final result = await _apiClient.get(
-        '/metrics/vital-signs/latest',
-        requiresAuth: true,
-      );
-      return VitalSignsResponse.fromJson(result);
-    } catch (e) {
-      rethrow;
+  final ApiClient _apiClient;
+
+  int? _resolveTargetProfileId(String? profileId) {
+    if (profileId == null || profileId.isEmpty || profileId == 'self') {
+      return null;
     }
+    return int.tryParse(profileId);
   }
 
-  Future<HealthReportResponse> getHealthReport() async {
-    try {
-      final result = await _apiClient.get(
-        '/metrics/health-report',
-        requiresAuth: true,
-      );
-      return HealthReportResponse.fromJson(result);
-    } catch (e) {
-      rethrow;
-    }
+  Future<VitalSignsResponse> getLatestVitalSigns({String? profileId}) async {
+    final result = await _apiClient.get(
+      '/metrics/vital-signs/latest',
+      requiresAuth: true,
+      targetProfileId: _resolveTargetProfileId(profileId),
+    );
+    return VitalSignsResponse.fromJson(
+      Map<String, dynamic>.from(result as Map),
+    );
   }
 
-  Future<List<RiskReportResponse>> getRiskReports({int limit = 5}) async {
-    try {
-      final result = await _apiClient.get(
-        '/analysis/risk-reports?limit=$limit',
-        requiresAuth: true,
-      );
-      final List<dynamic> data = result is List ? result : result['data'] ?? [];
-      return data
-          .map(
-            (item) => RiskReportResponse.fromJson(item as Map<String, dynamic>),
-          )
-          .toList();
-    } catch (e) {
-      rethrow;
-    }
+  Future<HealthReportResponse> getHealthReport({String? profileId}) async {
+    final result = await _apiClient.get(
+      '/metrics/health-report',
+      requiresAuth: true,
+      targetProfileId: _resolveTargetProfileId(profileId),
+    );
+    return HealthReportResponse.fromJson(
+      Map<String, dynamic>.from(result as Map),
+    );
   }
 
-  Future<Map<String, dynamic>?> getLatestSleepSession() async {
-    try {
-      final result = await _apiClient.get(
-        '/metrics/sleep/latest',
-        requiresAuth: true,
+  Future<List<RiskReportResponse>> getRiskReports({
+    int limit = 5,
+    String? profileId,
+  }) async {
+    final result = await _apiClient.get(
+      '/analysis/risk-reports?limit=$limit',
+      requiresAuth: true,
+      targetProfileId: _resolveTargetProfileId(profileId),
+    );
+    if (result is! List) {
+      throw const FormatException(
+        'Unexpected /analysis/risk-reports response shape.',
       );
-      return result as Map<String, dynamic>?;
-    } catch (e) {
-      return null; // Sleep data is optional
     }
+    return result
+        .map(
+          (item) => RiskReportResponse.fromJson(
+            Map<String, dynamic>.from(item as Map),
+          ),
+        )
+        .toList();
+  }
+
+  Future<Map<String, dynamic>?> getLatestSleepSession({
+    String? profileId,
+  }) async {
+    final result = await _apiClient.get(
+      '/metrics/sleep/latest',
+      requiresAuth: true,
+      targetProfileId: _resolveTargetProfileId(profileId),
+    );
+    if (result == null) {
+      return null;
+    }
+    if (result is! Map) {
+      throw const FormatException(
+        'Unexpected /metrics/sleep/latest response shape.',
+      );
+    }
+    return Map<String, dynamic>.from(result);
   }
 }

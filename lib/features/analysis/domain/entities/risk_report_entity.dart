@@ -15,7 +15,7 @@ class RiskReportEntity {
   final String displayStatus;
   final String summary;
   final DateTime analyzedAt;
-  final int previousScore;
+  final int? previousScore;
   final List<int> trend7d;
   final List<TopFactor> topFactors;
   final List<String> recommendationPreview;

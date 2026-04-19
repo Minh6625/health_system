@@ -27,8 +27,6 @@ class RiskScoreHeroCard extends StatelessWidget {
         break;
     }
 
-    final int delta = report.score - report.previousScore;
-    final String deltaStr = delta >= 0 ? '+$delta' : '$delta';
     final String timeStr = DateFormat('HH:mm, dd/MM').format(report.analyzedAt);
 
     return Container(
@@ -90,7 +88,9 @@ class RiskScoreHeroCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.gapXs),
                     Text(
-                      '$deltaStr so với lần trước',
+                      report.previousScore == null
+                          ? 'Chưa có mốc so sánh trước đó'
+                          : '${report.score - report.previousScore! >= 0 ? '+' : ''}${report.score - report.previousScore!} so với lần trước',
                       style: AppTextStyles.caption,
                     ),
                   ],

@@ -24,7 +24,6 @@ import 'package:healthguard/features/sleep_analysis/screens/sleep_detail_screen.
 import 'package:healthguard/features/sleep_analysis/screens/sleep_history_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_settings_screen.dart';
 import 'package:healthguard/features/health_monitoring/screens/vital_detail_screen.dart';
-import 'package:healthguard/features/health_monitoring/providers/vital_detail_mock_provider.dart';
 import 'package:healthguard/features/emergency/screens/manual_sos_screen.dart';
 import 'package:healthguard/features/emergency/screens/sos_confirm_screen.dart';
 import 'package:healthguard/features/emergency/screens/emergency_sos_detail_screen.dart';
@@ -35,6 +34,7 @@ import 'package:healthguard/features/analysis/providers/risk_report_provider.dar
 import 'package:healthguard/features/analysis/providers/risk_history_provider.dart';
 import 'package:healthguard/features/analysis/repositories/risk_analysis_repository.dart';
 import 'package:healthguard/features/notifications/screens/notifications_screen.dart';
+import 'package:healthguard/features/home/providers/home_dashboard_provider.dart';
 import 'package:provider/provider.dart';
 
 class AppRouter {
@@ -122,9 +122,19 @@ class AppRouter {
 
     switch (routePath) {
       case dashboard:
-        // HomeDashboardProvider is already provided in app.dart MultiProvider.
-        // Using the existing ancestor provider avoids state reset on navigation.
-        return MaterialPageRoute(builder: (_) => const HomeDashboardScreen());
+        final profileId = routeArgs['profileId'] as String?;
+        final isSelfProfile =
+            profileId == null || profileId.isEmpty || profileId == 'self';
+        if (isSelfProfile) {
+          return MaterialPageRoute(builder: (_) => const HomeDashboardScreen());
+        }
+        return MaterialPageRoute(
+          settings: RouteSettings(name: dashboard, arguments: routeArgs),
+          builder: (_) => ChangeNotifierProvider(
+            create: (_) => HomeDashboardProvider(profileId: profileId),
+            child: HomeDashboardScreen(profileId: profileId),
+          ),
+        );
       case register:
         return MaterialPageRoute(builder: (_) => const RegisterScreen());
       case verifyEmail:
@@ -224,12 +234,9 @@ class AppRouter {
       case vitalDetail:
         return MaterialPageRoute(
           settings: RouteSettings(name: vitalDetail, arguments: routeArgs),
-          builder: (_) => ChangeNotifierProvider(
-            create: (_) => VitalDetailMockProvider(),
-            child: VitalDetailScreen(
-              vitalType: routeArgs['vitalType'] as String? ?? 'hr',
-              profileId: routeArgs['profileId'] as String?,
-            ),
+          builder: (_) => VitalDetailScreen(
+            vitalType: routeArgs['vitalType'] as String? ?? 'hr',
+            profileId: routeArgs['profileId'] as String?,
           ),
         );
       case manualSos:

@@ -13,9 +13,10 @@ import '../../providers/home_dashboard_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../../device/models/device_model.dart';
 import '../../../device/providers/device_provider.dart';
-import '../../../sleep_analysis/providers/sleep_provider.dart';
+import '../../../health_monitoring/models/vital_signs.dart';
 import '../models/home_dashboard_view_model.dart';
-import '../widgets/connection_status_strip.dart' show DeviceConnectionUiState;
+import '../widgets/connection_status_strip.dart'
+    show ConnectionStatusStrip, DeviceConnectionUiState;
 import '../widgets/dashboard_greeting_header.dart';
 import '../widgets/dashboard_secondary_links.dart';
 import '../widgets/dashboard_top_banner_area.dart';
@@ -151,10 +152,12 @@ DeviceConnectionUiState resolveDashboardConnectionState({
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({
     super.key,
+    this.profileId,
     this.unreadNotificationCountLoader,
     this.enableAutoRefresh = true,
   });
 
+  final String? profileId;
   final Future<int> Function()? unreadNotificationCountLoader;
   final bool enableAutoRefresh;
 
@@ -164,13 +167,12 @@ class HomeDashboardScreen extends StatefulWidget {
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     with WidgetsBindingObserver {
-  static const Duration _autoRefreshInterval = Duration(seconds: 1);
-  static const Duration _notificationRefreshInterval = Duration(seconds: 5);
+  static const Duration _autoRefreshInterval = Duration(seconds: 30);
+  static const Duration _notificationRefreshInterval = Duration(seconds: 30);
   static const Duration _utcPlus7Offset = Duration(hours: 7);
 
   final ApiClient _apiClient = ApiClient();
   late final HomeDashboardProvider _dashboardProvider;
-  late final SleepProvider _sleepProvider;
   late final DeviceProvider _deviceProvider;
   Timer? _autoRefreshTimer;
   Timer? _notificationRefreshTimer;
@@ -261,8 +263,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     WidgetsBinding.instance.addObserver(this);
 
     _dashboardProvider = context.read<HomeDashboardProvider>();
-    _sleepProvider = context.read<SleepProvider>();
     _deviceProvider = context.read<DeviceProvider>();
+    _dashboardProvider.configureProfile(widget.profileId);
 
     // Gọi sau khi build xong (an toàn context)
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -273,14 +275,21 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
         _startNotificationRefresh();
       }
 
-      if (_sleepProvider.loadState == SleepLoadState.initial) {
-        _sleepProvider.loadAll();
-      }
-
       if (_deviceProvider.devices.isEmpty && !_deviceProvider.isLoading) {
         _deviceProvider.fetchDevices();
       }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeDashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profileId != widget.profileId) {
+      _dashboardProvider.configureProfile(widget.profileId);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _refreshDashboard();
+      });
+    }
   }
 
   @override
@@ -380,11 +389,13 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     BuildContext context,
     HomeDashboardProvider provider,
   ) {
-    // Get current user from AuthProvider
     final authProvider = context.read<AuthProvider>();
-    final displayName = authProvider.currentUser?.fullName ?? 'Người dùng';
+    final isLinkedProfile =
+        widget.profileId != null && widget.profileId != 'self';
+    final displayName = isLinkedProfile
+        ? 'Hồ sơ người thân'
+        : authProvider.currentUser?.fullName ?? 'Người dùng';
 
-    // Format vital values
     final heartRateStr = provider.heartRate != null
         ? '${provider.heartRate!.toStringAsFixed(0)} BPM'
         : '--';
@@ -399,13 +410,21 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
         ? '${provider.temperature!.toStringAsFixed(1)}°C'
         : '--';
 
-    final hrState = _getHeartRateState(heartRate: provider.heartRate);
-    final spo2State = _getSpo2State(spo2: provider.spo2);
-    final bpState = _getBloodPressureState(
-      systolic: provider.bloodPressureSys,
-      diastolic: provider.bloodPressureDia,
+    final hrState = _visualStateFromVitalStatus(
+      classifyHeartRateStatus(provider.heartRate),
     );
-    final tempState = _getTemperatureState(temperature: provider.temperature);
+    final spo2State = _visualStateFromVitalStatus(
+      classifySpo2Status(provider.spo2),
+    );
+    final bpState = _visualStateFromVitalStatus(
+      classifyBloodPressureStatus(
+        systolic: provider.bloodPressureSys,
+        diastolic: provider.bloodPressureDia,
+      ),
+    );
+    final tempState = _visualStateFromVitalStatus(
+      classifyTemperatureStatus(provider.temperature),
+    );
 
     final activeDevices = _deviceProvider.devices
         .where((device) => device.isActive)
@@ -446,7 +465,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       hasWarningBanner:
           overallStatus == DashboardOverallStatus.warning ||
           overallStatus == DashboardOverallStatus.critical,
-      hasError: provider.error != null,
+      hasError: provider.error != null || provider.hasSectionErrors,
+      errorMessage: provider.error ?? provider.sectionErrorMessage,
       vitalItems: [
         VitalMetricItem(
           type: VitalMetricType.heartRate,
@@ -462,7 +482,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
             Navigator.pushNamed(
               context,
               '/vital-detail',
-              arguments: {'vitalType': 'hr'},
+              arguments: {'vitalType': 'hr', 'profileId': widget.profileId},
             );
           },
         ),
@@ -480,7 +500,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
             Navigator.pushNamed(
               context,
               '/vital-detail',
-              arguments: {'vitalType': 'spo2'},
+              arguments: {'vitalType': 'spo2', 'profileId': widget.profileId},
             );
           },
         ),
@@ -500,7 +520,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
             Navigator.pushNamed(
               context,
               '/vital-detail',
-              arguments: {'vitalType': 'bp'},
+              arguments: {'vitalType': 'bp', 'profileId': widget.profileId},
             );
           },
         ),
@@ -518,7 +538,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
             Navigator.pushNamed(
               context,
               '/vital-detail',
-              arguments: {'vitalType': 'temp'},
+              arguments: {'vitalType': 'temp', 'profileId': widget.profileId},
             );
           },
         ),
@@ -581,56 +601,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     };
   }
 
-  VitalMetricVisualState _getHeartRateState({required double? heartRate}) {
-    if (heartRate == null) return VitalMetricVisualState.empty;
-    if (heartRate < 50 || heartRate > 120) {
-      return VitalMetricVisualState.critical;
+  VitalMetricVisualState _visualStateFromVitalStatus(VitalStatus status) {
+    switch (status) {
+      case VitalStatus.normal:
+        return VitalMetricVisualState.normal;
+      case VitalStatus.warning:
+        return VitalMetricVisualState.warning;
+      case VitalStatus.critical:
+        return VitalMetricVisualState.critical;
+      case VitalStatus.unknown:
+        return VitalMetricVisualState.empty;
     }
-    if (heartRate < 60 || heartRate > 100) {
-      return VitalMetricVisualState.warning;
-    }
-    return VitalMetricVisualState.normal;
-  }
-
-  VitalMetricVisualState _getSpo2State({required double? spo2}) {
-    if (spo2 == null) return VitalMetricVisualState.empty;
-    if (spo2 < 90) {
-      return VitalMetricVisualState.critical;
-    }
-    if (spo2 < 95) {
-      return VitalMetricVisualState.warning;
-    }
-    return VitalMetricVisualState.normal;
-  }
-
-  VitalMetricVisualState _getBloodPressureState({
-    required double? systolic,
-    required double? diastolic,
-  }) {
-    if (systolic == null || diastolic == null) {
-      return VitalMetricVisualState.empty;
-    }
-    if (systolic >= 180 ||
-        diastolic >= 120 ||
-        systolic < 80 ||
-        diastolic < 50) {
-      return VitalMetricVisualState.critical;
-    }
-    if (systolic >= 140 || diastolic >= 90 || systolic < 90 || diastolic < 60) {
-      return VitalMetricVisualState.warning;
-    }
-    return VitalMetricVisualState.normal;
-  }
-
-  VitalMetricVisualState _getTemperatureState({required double? temperature}) {
-    if (temperature == null) return VitalMetricVisualState.empty;
-    if (temperature >= 39 || temperature < 35) {
-      return VitalMetricVisualState.critical;
-    }
-    if (temperature >= 37.5 || temperature < 36) {
-      return VitalMetricVisualState.warning;
-    }
-    return VitalMetricVisualState.normal;
   }
 
   String _statusLabelForState(
@@ -713,13 +694,26 @@ class _DashboardBody extends StatelessWidget {
                   summary: vm.heroSummary,
                 ),
                 const SizedBox(height: AppSpacing.gapMd),
+                ConnectionStatusStrip(
+                  deviceConnectionState: vm.deviceConnectionState,
+                  batteryPercent: vm.batteryPercent,
+                  lastUpdatedLabel: vm.latestUpdatedLabel,
+                  onTapDevice: () {
+                    Navigator.pushReplacementNamed(context, '/device');
+                  },
+                ),
+                const SizedBox(height: AppSpacing.gapMd),
                 RiskInsightCard(
                   scoreLabel: vm.riskScoreLabel,
                   levelLabel: vm.riskLevelLabel,
                   summary: vm.riskSummary,
                   riskVisualState: vm.riskVisualState,
                   onTap: () {
-                    Navigator.pushNamed(context, AppRouter.riskReport);
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.riskReport,
+                      arguments: {'profileId': provider.profileId},
+                    );
                   },
                 ),
                 DashboardTopBannerArea(vm: vm),
@@ -731,7 +725,11 @@ class _DashboardBody extends StatelessWidget {
                   durationLabel: vm.sleepDurationLabel,
                   insightSummary: vm.sleepInsightSummary,
                   onTap: () {
-                    Navigator.pushNamed(context, '/sleep-report');
+                    Navigator.pushNamed(
+                      context,
+                      '/sleep-report',
+                      arguments: {'profileId': provider.profileId},
+                    );
                   },
                 ),
                 const SizedBox(height: AppSpacing.sectionGapMd),

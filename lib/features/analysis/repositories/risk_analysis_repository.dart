@@ -38,6 +38,13 @@ class RiskAnalysisRepository {
     return 0;
   }
 
+  int? _parseNullableScore(dynamic value) {
+    if (value is num) {
+      return value.round();
+    }
+    return null;
+  }
+
   List<int> _parseTrend(dynamic value) {
     if (value is! List) {
       return const [];
@@ -106,7 +113,7 @@ class RiskAnalysisRepository {
       displayStatus: json['display_status'] as String? ?? 'Không xác định',
       summary: json['summary'] as String? ?? '',
       analyzedAt: DateTime.parse(json['timestamp'] as String),
-      previousScore: _parseScore(json['previous_score']),
+      previousScore: _parseNullableScore(json['previous_score']),
       trend7d: _parseTrend(json['trend_7d']),
       topFactors: topFactors,
       recommendationPreview: List<String>.from(

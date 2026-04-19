@@ -1,12 +1,118 @@
+enum VitalStatus { normal, warning, critical, unknown }
+
+VitalStatus classifyHeartRateStatus(double? heartRate) {
+  if (heartRate == null) {
+    return VitalStatus.unknown;
+  }
+  if (heartRate < 50 || heartRate > 120) {
+    return VitalStatus.critical;
+  }
+  if ((heartRate >= 50 && heartRate < 60) ||
+      (heartRate > 100 && heartRate <= 120)) {
+    return VitalStatus.warning;
+  }
+  return VitalStatus.normal;
+}
+
+VitalStatus classifySpo2Status(double? spo2) {
+  if (spo2 == null) {
+    return VitalStatus.unknown;
+  }
+  if (spo2 < 92) {
+    return VitalStatus.critical;
+  }
+  if (spo2 < 95) {
+    return VitalStatus.warning;
+  }
+  return VitalStatus.normal;
+}
+
+VitalStatus classifyTemperatureStatus(double? temperature) {
+  if (temperature == null) {
+    return VitalStatus.unknown;
+  }
+  if (temperature >= 37.8 || temperature < 35.5) {
+    return VitalStatus.critical;
+  }
+  if ((temperature >= 37.3 && temperature < 37.8) ||
+      (temperature >= 35.5 && temperature < 36.1)) {
+    return VitalStatus.warning;
+  }
+  return VitalStatus.normal;
+}
+
+VitalStatus classifyBloodPressureSystolicStatus(double? systolic) {
+  if (systolic == null) {
+    return VitalStatus.unknown;
+  }
+  if (systolic >= 140 || systolic < 70) {
+    return VitalStatus.critical;
+  }
+  if ((systolic >= 121 && systolic < 140) ||
+      (systolic >= 70 && systolic < 90)) {
+    return VitalStatus.warning;
+  }
+  return VitalStatus.normal;
+}
+
+VitalStatus classifyBloodPressureDiastolicStatus(double? diastolic) {
+  if (diastolic == null) {
+    return VitalStatus.unknown;
+  }
+  if (diastolic >= 90 || diastolic < 50) {
+    return VitalStatus.critical;
+  }
+  if ((diastolic >= 81 && diastolic < 90) ||
+      (diastolic >= 50 && diastolic < 60)) {
+    return VitalStatus.warning;
+  }
+  return VitalStatus.normal;
+}
+
+VitalStatus classifyBloodPressureStatus({
+  required double? systolic,
+  required double? diastolic,
+}) {
+  final systolicStatus = classifyBloodPressureSystolicStatus(systolic);
+  final diastolicStatus = classifyBloodPressureDiastolicStatus(diastolic);
+  if (systolicStatus == VitalStatus.critical ||
+      diastolicStatus == VitalStatus.critical) {
+    return VitalStatus.critical;
+  }
+  if (systolicStatus == VitalStatus.warning ||
+      diastolicStatus == VitalStatus.warning) {
+    return VitalStatus.warning;
+  }
+  if (systolicStatus == VitalStatus.unknown &&
+      diastolicStatus == VitalStatus.unknown) {
+    return VitalStatus.unknown;
+  }
+  return VitalStatus.normal;
+}
+
+VitalStatus classifyRespiratoryRateStatus(double? respiratoryRate) {
+  if (respiratoryRate == null) {
+    return VitalStatus.unknown;
+  }
+  if (respiratoryRate < 12 || respiratoryRate > 25) {
+    return VitalStatus.critical;
+  }
+  if ((respiratoryRate >= 12 && respiratoryRate < 14) ||
+      (respiratoryRate > 20 && respiratoryRate <= 25)) {
+    return VitalStatus.warning;
+  }
+  return VitalStatus.normal;
+}
+
 class VitalSigns {
-  final double? heartRate; // BPM
-  final double? spo2; // %
-  final double? temperature; // °C
-  final double? respiratoryRate; // breaths per minute
-  final double? bloodPressureSys; // mmHg (tâm thu)
-  final double? bloodPressureDia; // mmHg (tâm trương)
+  final double? heartRate;
+  final double? spo2;
+  final double? temperature;
+  final double? respiratoryRate;
+  final double? bloodPressureSys;
+  final double? bloodPressureDia;
   final DateTime timestamp;
-  final bool isStale; // Data older than the backend stale threshold
+  final bool isStale;
 
   VitalSigns({
     this.heartRate,
@@ -18,26 +124,31 @@ class VitalSigns {
     required this.timestamp,
     this.isStale = false,
   });
-  static DateTime _parseTimestamp(dynamic ts) {
-    if (ts == null) return DateTime.now();
-    String tsStr = ts.toString();
-    if (!tsStr.endsWith('Z') && !tsStr.contains('T') && tsStr.contains('-') && tsStr.split('-').length == 3) {
-       // if it's just a raw format '2024-03-15 14:30:00', Dart parse treats as local, let's assume UTC from backend
-       tsStr = '${tsStr.replaceAll(' ', 'T')}Z';
+
+  static DateTime _parseTimestamp(dynamic timestampValue) {
+    if (timestampValue == null) {
+      return DateTime.now();
     }
-    return DateTime.parse(tsStr).toLocal();
+    var timestampString = timestampValue.toString();
+    if (!timestampString.endsWith('Z') &&
+        !timestampString.contains('T') &&
+        timestampString.contains('-') &&
+        timestampString.split('-').length == 3) {
+      timestampString = '${timestampString.replaceAll(' ', 'T')}Z';
+    }
+    return DateTime.parse(timestampString).toLocal();
   }
 
   factory VitalSigns.fromJson(Map<String, dynamic> json) {
     return VitalSigns(
-      heartRate: json['heart_rate']?.toDouble(),
-      spo2: json['spo2']?.toDouble(),
-      temperature: json['temperature']?.toDouble(),
-      respiratoryRate: json['respiratory_rate']?.toDouble(),
-      bloodPressureSys: json['blood_pressure_sys']?.toDouble(),
-      bloodPressureDia: json['blood_pressure_dia']?.toDouble(),
+      heartRate: (json['heart_rate'] as num?)?.toDouble(),
+      spo2: (json['spo2'] as num?)?.toDouble(),
+      temperature: (json['temperature'] as num?)?.toDouble(),
+      respiratoryRate: (json['respiratory_rate'] as num?)?.toDouble(),
+      bloodPressureSys: (json['blood_pressure_sys'] as num?)?.toDouble(),
+      bloodPressureDia: (json['blood_pressure_dia'] as num?)?.toDouble(),
       timestamp: _parseTimestamp(json['timestamp']),
-      isStale: json['is_stale'] ?? false,
+      isStale: json['is_stale'] as bool? ?? false,
     );
   }
 
@@ -54,74 +165,18 @@ class VitalSigns {
     };
   }
 
-  // Color coding based on thresholds from UC006
-  VitalStatus getHeartRateStatus() {
-    if (heartRate == null) return VitalStatus.unknown;
-    if (heartRate! < 50 || heartRate! > 120) return VitalStatus.critical;
-    if ((heartRate! >= 50 && heartRate! < 60) ||
-        (heartRate! > 100 && heartRate! <= 120)) {
-      return VitalStatus.warning;
-    }
-    return VitalStatus.normal;
-  }
+  VitalStatus getHeartRateStatus() => classifyHeartRateStatus(heartRate);
 
-  VitalStatus getSpo2Status() {
-    if (spo2 == null) return VitalStatus.unknown;
-    if (spo2! < 92) return VitalStatus.critical;
-    if (spo2! >= 92 && spo2! < 95) return VitalStatus.warning;
-    return VitalStatus.normal;
-  }
+  VitalStatus getSpo2Status() => classifySpo2Status(spo2);
 
-  VitalStatus getTemperatureStatus() {
-    if (temperature == null) return VitalStatus.unknown;
-    if (temperature! >= 37.8 || temperature! < 35.5) return VitalStatus.critical;
-    if ((temperature! >= 37.3 && temperature! < 37.8) ||
-        (temperature! >= 35.5 && temperature! < 36.1)) {
-      return VitalStatus.warning;
-    }
-    return VitalStatus.normal;
-  }
+  VitalStatus getTemperatureStatus() => classifyTemperatureStatus(temperature);
 
-  VitalStatus getBloodPressureSysStatus() {
-    if (bloodPressureSys == null) return VitalStatus.unknown;
-    if (bloodPressureSys! >= 140 || bloodPressureSys! < 70) {
-      return VitalStatus.critical;
-    }
-    if ((bloodPressureSys! >= 121 && bloodPressureSys! < 140) ||
-        (bloodPressureSys! >= 70 && bloodPressureSys! < 90)) {
-      return VitalStatus.warning;
-    }
-    return VitalStatus.normal;
-  }
+  VitalStatus getBloodPressureSysStatus() =>
+      classifyBloodPressureSystolicStatus(bloodPressureSys);
 
-  VitalStatus getBloodPressureDiaStatus() {
-    if (bloodPressureDia == null) return VitalStatus.unknown;
-    if (bloodPressureDia! >= 90 || bloodPressureDia! < 50) {
-      return VitalStatus.critical;
-    }
-    if ((bloodPressureDia! >= 81 && bloodPressureDia! < 90) ||
-        (bloodPressureDia! >= 50 && bloodPressureDia! < 60)) {
-      return VitalStatus.warning;
-    }
-    return VitalStatus.normal;
-  }
+  VitalStatus getBloodPressureDiaStatus() =>
+      classifyBloodPressureDiastolicStatus(bloodPressureDia);
 
-  VitalStatus getRespiratoryRateStatus() {
-    if (respiratoryRate == null) return VitalStatus.unknown;
-    if (respiratoryRate! < 12 || respiratoryRate! > 25) {
-      return VitalStatus.critical;
-    }
-    if ((respiratoryRate! >= 12 && respiratoryRate! < 14) ||
-        (respiratoryRate! > 20 && respiratoryRate! <= 25)) {
-      return VitalStatus.warning;
-    }
-    return VitalStatus.normal;
-  }
-}
-
-enum VitalStatus {
-  normal, // Green
-  warning, // Yellow/Orange
-  critical, // Red
-  unknown, // Grey
+  VitalStatus getRespiratoryRateStatus() =>
+      classifyRespiratoryRateStatus(respiratoryRate);
 }

@@ -15,7 +15,7 @@ class DashboardTopBannerArea extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(bottom: AppSpacing.sectionGapMd),
         child: InlineErrorBlock(
-          message: 'Không thể tải dữ liệu sức khoẻ lúc này.',
+          message: vm.errorMessage ?? 'Không thể tải dữ liệu sức khoẻ lúc này.',
           onRetry: () {
             // Error handling usually invokes onRefresh or specific retry event
             vm.onRefresh();

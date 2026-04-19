@@ -45,10 +45,16 @@ class RiskInsightCard extends StatelessWidget {
         borderRadius: AppRadii.cardRadius,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gapLg, vertical: AppSpacing.gapMd),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.gapLg,
+            vertical: AppSpacing.gapMd,
+          ),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF0D253F), Color(0xFF163E57)], // Medical teal/dark blue tones
+              colors: [
+                Color(0xFF0D253F),
+                Color(0xFF163E57),
+              ], // Medical teal/dark blue tones
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -68,7 +74,11 @@ class RiskInsightCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  const Icon(Icons.favorite_rounded, color: Color(0xFF81E6D9), size: 24),
+                  const Icon(
+                    Icons.favorite_rounded,
+                    color: Color(0xFF81E6D9),
+                    size: 24,
+                  ),
                   const SizedBox(width: AppSpacing.gapSm),
                   Text(
                     'Sức khoẻ',
@@ -81,7 +91,7 @@ class RiskInsightCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: AppSpacing.gapLg),
-              
+
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -99,16 +109,16 @@ class RiskInsightCard extends StatelessWidget {
                         height: 100,
                         fit: BoxFit.contain,
                         repeat: true,
-                        errorBuilder: (context, error, stackTrace) => const Icon(
-                          Icons.medical_services_rounded,
-                          size: 64,
-                          color: Color(0xFF81E6D9),
-                        ),
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                              Icons.medical_services_rounded,
+                              size: 64,
+                              color: Color(0xFF81E6D9),
+                            ),
                       ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.gapSm), // Reduced from gapMd
-                  
                   // Right side: Info Section
                   Expanded(
                     flex: 3,
@@ -134,6 +144,28 @@ class RiskInsightCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: AppSpacing.gapSm),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: scoreColor.withValues(alpha: 0.12),
+                            borderRadius: AppRadii.pillRadius,
+                            border: Border.all(
+                              color: scoreColor.withValues(alpha: 0.24),
+                            ),
+                          ),
+                          child: Text(
+                            levelLabel,
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.bodyMedium.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.gapSm),
                         // Summary
                         Text(
                           summary,
@@ -148,8 +180,9 @@ class RiskInsightCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.gapLg), // Reduced from sectionGapMd to tighten space before divider
-
+              const SizedBox(
+                height: AppSpacing.gapLg,
+              ), // Reduced from sectionGapMd to tighten space before divider
               // Divider
               Divider(color: Colors.white.withValues(alpha: 0.1), height: 1),
               const SizedBox(height: AppSpacing.gapSm),

@@ -27,6 +27,7 @@ class HomeDashboardViewModel {
   final bool isOffline;
   final bool hasWarningBanner;
   final bool hasError;
+  final String? errorMessage;
 
   // Vitals
   final List<VitalMetricItem> vitalItems;
@@ -61,6 +62,7 @@ class HomeDashboardViewModel {
     this.isOffline = false,
     this.hasWarningBanner = false,
     this.hasError = false,
+    this.errorMessage,
     required this.vitalItems,
     required this.sleepDurationLabel,
     required this.sleepDurationMinutes,

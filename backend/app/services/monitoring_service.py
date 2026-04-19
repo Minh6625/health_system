@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 class MonitoringService:
     """Fetch mobile monitoring data using canonical risk/health semantics."""
 
-    VITALS_STALE_AFTER = timedelta(seconds=30)
+    VITALS_STALE_AFTER = timedelta(minutes=5)
     RISK_HISTORY_RANGE_DAYS = {
         "7d": 7,
         "30d": 30,
@@ -595,7 +595,7 @@ class MonitoringService:
             if row is None:
                 raise ValueError("No vital signs data found for this user")
 
-            is_stale = (datetime.now(UTC) - row["time"]).total_seconds() > 300
+            is_stale = datetime.now(UTC) - row["time"] > MonitoringService.VITALS_STALE_AFTER
             return VitalSignsResponse(
                 heart_rate=MonitoringService._safe_float(row["heart_rate"]) if row["heart_rate"] is not None else None,
                 spo2=MonitoringService._safe_float(row["spo2"]) if row["spo2"] is not None else None,

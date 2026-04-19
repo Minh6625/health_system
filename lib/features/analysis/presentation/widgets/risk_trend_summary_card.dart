@@ -10,54 +10,91 @@ class RiskTrendSummaryCard extends StatelessWidget {
 
   const RiskTrendSummaryCard({super.key, required this.summary});
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.gapLg),
-      decoration: BoxDecoration(
-        color: AppColors.bgSurface,
-        borderRadius: AppRadii.cardRadius,
-        border: Border.all(color: AppColors.strokeSoft),
-      ),
-      child: Column(
+  String _formatScore(num value) {
+    return value.toString();
+  }
+
+  Widget _buildStatsHeader(bool compact) {
+    final averageBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Điểm trung bình', style: AppTextStyles.caption),
+        Text(
+          _formatScore(summary.averageScore),
+          style: AppTextStyles.displayCompact.copyWith(fontSize: 32),
+        ),
+      ],
+    );
+
+    final highLowBlock = Column(
+      crossAxisAlignment: compact
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.end,
+      children: [
+        Text(
+          'Cao nhất: ${_formatScore(summary.highestScore)}',
+          style: AppTextStyles.bodyMedium,
+        ),
+        const SizedBox(height: AppSpacing.gapXs),
+        Text(
+          'Thấp nhất: ${_formatScore(summary.lowestScore)}',
+          style: AppTextStyles.bodyMedium,
+        ),
+      ],
+    );
+
+    if (compact) {
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          averageBlock,
+          const SizedBox(height: AppSpacing.gapMd),
+          highLowBlock,
+        ],
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: averageBlock),
+        const SizedBox(width: AppSpacing.gapMd),
+        Flexible(child: highLowBlock),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 360;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpacing.gapLg),
+          decoration: BoxDecoration(
+            color: AppColors.bgSurface,
+            borderRadius: AppRadii.cardRadius,
+            border: Border.all(color: AppColors.strokeSoft),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Điểm trung bình', style: AppTextStyles.caption),
-                  Text(
-                    summary.averageScore.toString(),
-                    style: AppTextStyles.displayCompact.copyWith(fontSize: 32),
+              _buildStatsHeader(compact),
+              const SizedBox(height: AppSpacing.gapLg),
+              if (summary.trendPoints.isNotEmpty) ...[
+                SizedBox(
+                  height: 80,
+                  width: double.infinity,
+                  child: CustomPaint(
+                    painter: _SimpleLinePainter(data: summary.trendPoints),
                   ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('Cao nhất: \${summary.highestScore}', style: AppTextStyles.bodyMedium),
-                  const SizedBox(height: AppSpacing.gapXs),
-                  Text('Thấp nhất: \${summary.lowestScore}', style: AppTextStyles.bodyMedium),
-                ],
-              ),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: AppSpacing.gapLg),
-          if (summary.trendPoints.isNotEmpty) ...[
-            SizedBox(
-              height: 80,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: _SimpleLinePainter(data: summary.trendPoints),
-              ),
-            ),
-          ]
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -88,7 +125,7 @@ class _SimpleLinePainter extends CustomPainter {
     for (int i = 0; i < data.length; i++) {
       final double x = i * stepX;
       final double normalizedY = (data[i] - minVal) / range;
-      final double y = size.height - (normalizedY * size.height * 0.9); 
+      final double y = size.height - (normalizedY * size.height * 0.9);
 
       if (i == 0) {
         path.moveTo(x, y);

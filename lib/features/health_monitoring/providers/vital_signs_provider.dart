@@ -32,28 +32,28 @@ class VitalSignsProvider extends ChangeNotifier {
     Duration pollInterval = const Duration(seconds: 5),
     required String vitalType,
     String? profileId,
-  })  : _repo = repo ?? MonitoringRepository(),
-        _pollInterval = pollInterval,
-        _vitalType = vitalType,
-        _profileId = profileId;
+  }) : _repo = repo ?? MonitoringRepository(),
+       _pollInterval = pollInterval,
+       _vitalType = vitalType,
+       _profileId = profileId;
 
   String get title => switch (_vitalType) {
-        'hr' => 'Nhịp tim',
-        'spo2' => 'SpO₂',
-        'bp' => 'Huyết áp',
-        'temp' => 'Nhiệt độ',
-        'rr' => 'Nhịp thở',
-        _ => 'Chi tiết chỉ số',
-      };
+    'hr' => 'Nhịp tim',
+    'spo2' => 'SpO₂',
+    'bp' => 'Huyết áp',
+    'temp' => 'Nhiệt độ',
+    'rr' => 'Nhịp thở',
+    _ => 'Chi tiết chỉ số',
+  };
 
   String get unit => switch (_vitalType) {
-        'hr' => 'BPM',
-        'spo2' => '%',
-        'bp' => 'mmHg',
-        'temp' => '°C',
-        'rr' => 'lần/phút',
-        _ => '',
-      };
+    'hr' => 'BPM',
+    'spo2' => '%',
+    'bp' => 'mmHg',
+    'temp' => '°C',
+    'rr' => 'lần/phút',
+    _ => '',
+  };
 
   String get value => extractValue(_vitalType);
 
@@ -62,27 +62,27 @@ class VitalSignsProvider extends ChangeNotifier {
   List<List<double>> get chartData => const [];
 
   List<Color> get chartColors => switch (_vitalType) {
-        'hr' => [Colors.red.shade700],
-        'spo2' => [Colors.blue.shade700],
-        'bp' => [Colors.purple.shade700, Colors.deepPurple.shade300],
-        'temp' => [Colors.orange.shade700],
-        'rr' => [Colors.teal.shade700],
-        _ => [Colors.grey.shade700],
-      };
+    'hr' => [Colors.red.shade700],
+    'spo2' => [Colors.blue.shade700],
+    'bp' => [Colors.purple.shade700, Colors.deepPurple.shade300],
+    'temp' => [Colors.orange.shade700],
+    'rr' => [Colors.teal.shade700],
+    _ => [Colors.grey.shade700],
+  };
 
   String get educationText => switch (_vitalType) {
-        'hr' =>
-          'Nhịp tim bình thường của người lớn lúc nghỉ ngơi là từ 60 đến 100 nhịp mỗi phút. Nhịp tim có thể thay đổi tùy thuộc vào hoạt động, cảm xúc và tình trạng sức khỏe.',
-        'spo2' =>
-          'Độ bão hòa oxy trong máu (SpO₂) bình thường là từ 95% đến 100%. Dưới 90% được xem là thấp và cần được theo dõi y tế.',
-        'bp' =>
-          'Huyết áp lý tưởng cho người lớn thường dưới 120/80 mmHg. Tăng huyết áp có thể làm tăng nguy cơ mắc bệnh tim mạch và đột quỵ.',
-        'temp' =>
-          'Nhiệt độ cơ thể bình thường dao động từ 36.1°C đến 37.2°C. Sốt nhẹ bắt đầu từ 37.8°C trở lên.',
-        'rr' =>
-          'Nhịp thở bình thường của người lớn thường nằm trong khoảng 12 đến 20 lần mỗi phút. Nhịp thở quá nhanh hoặc quá chậm cần được theo dõi thêm.',
-        _ => '--',
-      };
+    'hr' =>
+      'Nhịp tim bình thường của người lớn lúc nghỉ ngơi là từ 60 đến 100 nhịp mỗi phút. Nhịp tim có thể thay đổi tùy thuộc vào hoạt động, cảm xúc và tình trạng sức khỏe.',
+    'spo2' =>
+      'Độ bão hòa oxy trong máu (SpO₂) bình thường là từ 95% đến 100%. Dưới 90% được xem là thấp và cần được theo dõi y tế.',
+    'bp' =>
+      'Huyết áp lý tưởng cho người lớn thường dưới 120/80 mmHg. Tăng huyết áp có thể làm tăng nguy cơ mắc bệnh tim mạch và đột quỵ.',
+    'temp' =>
+      'Nhiệt độ cơ thể bình thường dao động từ 36.1°C đến 37.2°C. Sốt nhẹ bắt đầu từ 37.8°C trở lên.',
+    'rr' =>
+      'Nhịp thở bình thường của người lớn thường nằm trong khoảng 12 đến 20 lần mỗi phút. Nhịp thở quá nhanh hoặc quá chậm cần được theo dõi thêm.',
+    _ => '--',
+  };
 
   String get linkedProfileName => _profileId == null ? '' : 'Hồ sơ liên kết';
 
@@ -120,13 +120,15 @@ class VitalSignsProvider extends ChangeNotifier {
     }
 
     try {
-      final result = await _repo.getLatestVitals();
+      final result = await _repo.getLatestVitals(profileId: _profileId);
       if (_disposed) {
         return;
       }
       _vitals = result;
       _error = null;
-      _state = _isVitalsEmpty(result) ? VitalsUIState.empty : VitalsUIState.success;
+      _state = _isVitalsEmpty(result)
+          ? VitalsUIState.empty
+          : VitalsUIState.success;
     } catch (e) {
       if (_disposed) {
         return;
@@ -186,18 +188,10 @@ class VitalSignsProvider extends ChangeNotifier {
       case 'temp':
         return _vitals!.getTemperatureStatus();
       case 'bp':
-        final sysStatus = _vitals!.getBloodPressureSysStatus();
-        final diaStatus = _vitals!.getBloodPressureDiaStatus();
-        if (sysStatus == VitalStatus.critical || diaStatus == VitalStatus.critical) {
-          return VitalStatus.critical;
-        }
-        if (sysStatus == VitalStatus.warning || diaStatus == VitalStatus.warning) {
-          return VitalStatus.warning;
-        }
-        if (sysStatus == VitalStatus.unknown && diaStatus == VitalStatus.unknown) {
-          return VitalStatus.unknown;
-        }
-        return VitalStatus.normal;
+        return classifyBloodPressureStatus(
+          systolic: _vitals!.bloodPressureSys,
+          diastolic: _vitals!.bloodPressureDia,
+        );
       case 'rr':
         return _vitals!.getRespiratoryRateStatus();
       default:

@@ -26,6 +26,26 @@ class _FakeQueryResult:
 
 
 class TestMonitoringServiceContract:
+    def test_latest_vital_signs_uses_shared_five_minute_stale_threshold(self) -> None:
+        now = datetime.now(UTC)
+        db = MagicMock()
+        db.execute.return_value = _FakeQueryResult(
+            first={
+                "time": now - timedelta(minutes=6),
+                "heart_rate": 74.0,
+                "spo2": 98.0,
+                "temperature": 36.7,
+                "respiratory_rate": 17.0,
+                "blood_pressure_sys": 118.0,
+                "blood_pressure_dia": 76.0,
+            }
+        )
+
+        vitals = MonitoringService.get_latest_vital_signs(patient_id=7, db=db)
+
+        assert MonitoringService.VITALS_STALE_AFTER == timedelta(minutes=5)
+        assert vitals.is_stale is True
+
     def test_health_report_returns_risk_and_health_fields(self) -> None:
         now = datetime.now(UTC)
         db = MagicMock()
@@ -145,6 +165,22 @@ class TestMonitoringServiceContract:
         assert report.health_score == 40.4
         assert report.risk_level == "medium"
 
+    def test_health_report_returns_vitals_only_when_risk_row_missing(self, monkeypatch) -> None:
+        db = MagicMock()
+        db.execute.side_effect = [_FakeQueryResult(first={"avg_hr": 74.1, "avg_spo2": 98.0})]
+        monkeypatch.setattr(
+            MonitoringService,
+            "_refresh_latest_risk_row",
+            staticmethod(lambda patient_id, db_session: None),
+        )
+
+        report = MonitoringService.get_health_report(patient_id=7, db=db)
+
+        assert report.vitals_24h_avg == {"avg_hr": 74.1, "avg_spo2": 98.0}
+        assert report.latest_risk_score is None
+        assert report.health_score is None
+        assert report.risk_level is None
+
     def test_risk_report_detail_scopes_by_patient_id(self) -> None:
         now = datetime.now(UTC)
         db = MagicMock()
@@ -246,6 +282,42 @@ class TestMonitoringServiceContract:
         assert history.items[0].risk_level == "critical"
         assert history.items[0].display_status == "Nguy hiểm"
         assert history.summary.highest_score == 75.0
+
+    def test_risk_reports_keep_null_previous_score_for_first_report(self, monkeypatch) -> None:
+        now = datetime.now(UTC)
+        db = MagicMock()
+        db.execute.return_value = _FakeQueryResult(
+            all_rows=[
+                {
+                    "id": 101,
+                    "risk_type": "general",
+                    "score": 18,
+                    "risk_level": "low",
+                    "calculated_at": now,
+                    "features": {"confidence": 0.9, "backend": "rule_based"},
+                    "algorithm": "rule_based",
+                    "explanation_text": "On dinh.",
+                    "feature_importance": {"heart_rate": 0.18},
+                    "recommendations": ["Tiep tuc theo doi."],
+                }
+            ]
+        )
+
+        monkeypatch.setattr(
+            MonitoringService,
+            "_previous_risk_score",
+            staticmethod(lambda patient_id, risk_type, current_timestamp, db_session: None),
+        )
+        monkeypatch.setattr(
+            MonitoringService,
+            "_compute_trend_7d",
+            staticmethod(lambda patient_id, risk_type, current_timestamp, db_session: [24, 21, 18]),
+        )
+
+        reports = MonitoringService.get_risk_reports(patient_id=7, db=db, limit=1)
+
+        assert len(reports) == 1
+        assert reports[0].previous_score is None
 
     def test_sleep_latest_and_history_share_canonical_builder(self) -> None:
         report_day = date(2026, 4, 16)

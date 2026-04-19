@@ -600,17 +600,3 @@ def get_risk_history(
         "offset": offset,
     }
 
-
-# ---------------------------------------------------------------------------
-# Task 3.9 - GET /analysis/risk-reports (Flutter path alias for /risk/latest)
-# ---------------------------------------------------------------------------
-
-
-@router.get('/analysis/risk-reports', response_model=RiskScoreListResponse)
-def get_risk_reports_alias(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    limit: int = Query(default=5, ge=1, le=20),
-) -> RiskScoreListResponse:
-    """Alias for ``/risk/latest`` -- matches Flutter ``/analysis/risk-reports`` path."""
-    return get_latest_risk_scores(current_user=current_user, db=db, limit=limit)
