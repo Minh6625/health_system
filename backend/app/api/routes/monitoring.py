@@ -1,12 +1,11 @@
-from fastapi import APIRouter, HTTPException
-from fastapi import Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, get_target_profile_id
+from app.core.dependencies import get_target_profile_id
 from app.db.database import get_db
-from app.models.user_model import User
 from app.schemas.monitoring import (
     SleepSessionResponse,
+    SleepHistoryResponse,
     VitalSignsResponse,
     HealthReportResponse,
     RiskReportResponse,
@@ -58,7 +57,7 @@ def get_latest_sleep_session(
 
 @metrics_router.get(
     "/sleep/history",
-    response_model=dict,
+    response_model=SleepHistoryResponse,
 )
 def get_sleep_history(
     target_profile_id: int = Depends(get_target_profile_id),
@@ -66,7 +65,7 @@ def get_sleep_history(
     from_date: str | None = None,
     to_date: str | None = None,
     limit: int = 30,
-) -> dict:
+) -> SleepHistoryResponse:
     """Get sleep session history within a date range."""
     sessions = MonitoringService.get_sleep_history(
         patient_id=target_profile_id,
@@ -75,7 +74,7 @@ def get_sleep_history(
         to_date=to_date,
         limit=limit,
     )
-    return {"data": sessions}
+    return SleepHistoryResponse(data=sessions)
 
 
 @metrics_router.get(
@@ -121,6 +120,7 @@ def get_risk_report_detail(
 ) -> RiskReportDetailResponse:
     """Get detailed risk report with explanation and AI recommendations."""
     report = MonitoringService.get_risk_report_detail(
+        patient_id=target_profile_id,
         report_id=report_id,
         db=db,
     )
@@ -131,18 +131,22 @@ def get_risk_report_detail(
 
 @analysis_router.get(
     "/risk-history",
-    response_model=dict,
+    response_model=RiskHistoryResponse,
 )
 def get_risk_history(
     target_profile_id: int = Depends(get_target_profile_id),
     db: Session = Depends(get_db),
-    days: int = 30,
-) -> dict:
-    """Get risk score history over time (aggregated by date)."""
+    range: str = Query(default="7d"),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+) -> RiskHistoryResponse:
+    """Get canonical risk score history for charts and paginated mobile lists."""
     return MonitoringService.get_risk_history(
         patient_id=target_profile_id,
         db=db,
-        days=days,
+        range_key=range,
+        page=page,
+        limit=limit,
     )
 
 

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field
 
 
@@ -120,6 +120,30 @@ class TriggerSOSRequest(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     address: Optional[str] = None
+
+
+class RiskAlertResponseRequest(BaseModel):
+    """Request to respond to an initial risk alert."""
+
+    risk_score_id: Optional[int] = None
+    action: Literal["safe", "help_requested", "timeout_escalated"]
+    source: Literal["overlay", "push_tap"]
+    device_id: Optional[int] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    address: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = Field(None, max_length=500)
+
+
+class RiskAlertResponseResponse(BaseModel):
+    """Response returned after handling a risk alert response."""
+
+    success: bool = True
+    status: Literal["acknowledged", "escalated", "duplicate"]
+    acknowledged_at: datetime
+    sos_event_id: Optional[int] = None
+
+
 class ResolveSOSRequest(BaseModel):
     """Request to resolve SOS event by caregiver."""
     resolution_status: str = Field(..., pattern="^(safe|assisted|cancelled)$")

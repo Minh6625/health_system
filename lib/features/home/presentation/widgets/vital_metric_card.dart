@@ -104,13 +104,15 @@ class VitalMetricCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: item.visualState == VitalMetricVisualState.warning ||
-                              item.visualState == VitalMetricVisualState.critical
+                      color:
+                          item.visualState == VitalMetricVisualState.warning ||
+                              item.visualState ==
+                                  VitalMetricVisualState.critical
                           ? accentColor.withValues(alpha: 0.1)
                           : Colors.transparent,
                       shape: BoxShape.circle,
@@ -119,10 +121,13 @@ class VitalMetricCard extends StatelessWidget {
                   ),
                   const SizedBox(width: AppSpacing.gapSm),
                   Expanded(
-                    child: Text(
-                      item.label,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w600,
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        item.label,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
                   ),
@@ -130,12 +135,12 @@ class VitalMetricCard extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.gapMd),
               Text(
-                item.value, 
+                item.value,
                 style: AppTextStyles.vitalValue.copyWith(
-                  fontSize: 28, 
+                  fontSize: 28,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5,
-                )
+                ),
               ),
               const SizedBox(height: AppSpacing.gapSm),
               Row(
@@ -143,7 +148,11 @@ class VitalMetricCard extends StatelessWidget {
                   if (item.visualState == VitalMetricVisualState.warning)
                     Padding(
                       padding: const EdgeInsets.only(right: 4),
-                      child: Icon(Icons.warning_amber_rounded, size: 14, color: accentColor),
+                      child: Icon(
+                        Icons.warning_amber_rounded,
+                        size: 14,
+                        color: accentColor,
+                      ),
                     ),
                   Text(
                     item.statusLabel,

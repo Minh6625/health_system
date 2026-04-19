@@ -138,8 +138,8 @@ class _WeeklyDatePicker extends StatelessWidget {
                         color: isSelected
                             ? const Color(0xFF48D6FF)
                             : isToday
-                                ? const Color(0x554EDAFF)
-                                : const Color(0x223A5580),
+                            ? const Color(0x554EDAFF)
+                            : const Color(0x223A5580),
                         width: isSelected ? 1.5 : 1,
                       ),
                     ),
@@ -164,8 +164,8 @@ class _WeeklyDatePicker extends StatelessWidget {
                             color: isSelected
                                 ? Colors.white
                                 : isToday
-                                    ? const Color(0xFFA6BACF)
-                                    : const Color(0xFF5B7FA6),
+                                ? const Color(0xFFA6BACF)
+                                : const Color(0xFF5B7FA6),
                             fontSize: 16,
                             fontWeight: isSelected
                                 ? FontWeight.w800
@@ -200,8 +200,7 @@ class _WeeklyDatePicker extends StatelessWidget {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(AppRadii.radiusMd),
                 color: const Color(0x0F48D6FF),
-                border: Border.all(
-                    color: const Color(0x3348D6FF), width: 1),
+                border: Border.all(color: const Color(0x3348D6FF), width: 1),
               ),
               child: const Icon(
                 Icons.calendar_month_rounded,
@@ -264,8 +263,7 @@ class _ScoreAndDurationRow extends StatelessWidget {
                     ),
                     const Text(
                       'điểm',
-                      style: TextStyle(
-                          color: Color(0xFF90A6C3), fontSize: 12),
+                      style: TextStyle(color: Color(0xFF90A6C3), fontSize: 12),
                     ),
                   ],
                 ),
@@ -329,8 +327,7 @@ class _ScoreAndDurationRow extends StatelessWidget {
                 icon: Icons.percent_rounded,
                 iconColor: const Color(0xFF81C784),
                 label: 'Hiệu quả',
-                value:
-                    '${(session.efficiencyRatio * 100).toStringAsFixed(0)}%',
+                value: '${(session.efficiencyRatio * 100).toStringAsFixed(0)}%',
               ),
             ],
           ),
@@ -401,8 +398,8 @@ class _AIAssessmentBubble extends StatelessWidget {
     final wakeText = s.wakeCount == 0
         ? 'Bác ngủ ngon, không thức giấc lần nào cả!'
         : s.wakeCount == 1
-            ? 'Bác thức giấc 1 lần đêm qua, khá ổn đấy!'
-            : 'Bác đã thức dậy ${s.wakeCount} lần đêm qua.';
+        ? 'Bác thức giấc 1 lần đêm qua, khá ổn đấy!'
+        : 'Bác đã thức dậy ${s.wakeCount} lần đêm qua.';
 
     switch (s.qualityLabel.toUpperCase()) {
       case 'GOOD':
@@ -418,8 +415,7 @@ class _AIAssessmentBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = _buildMessage(session);
-    final dateStr =
-        DateFormat('dd/MM/yyyy').format(session.endTime);
+    final dateStr = DateFormat('dd/MM/yyyy').format(session.sleepDate);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
@@ -435,7 +431,10 @@ class _AIAssessmentBubble extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: const Color(0xFF1A2B42),
-                  border: Border.all(color: const Color(0x2648D6FF), width: 1.5),
+                  border: Border.all(
+                    color: const Color(0x2648D6FF),
+                    width: 1.5,
+                  ),
                 ),
                 child: ClipOval(
                   child: Image.asset(
@@ -478,15 +477,20 @@ class _AIAssessmentBubble extends StatelessWidget {
                       bottomLeft: Radius.circular(6),
                     ),
                     border: Border.all(
-                        color: const Color(0x2648D6FF), width: 1),
+                      color: const Color(0x2648D6FF),
+                      width: 1,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.auto_awesome_rounded,
-                              color: Color(0xFF48D6FF), size: 12),
+                          const Icon(
+                            Icons.auto_awesome_rounded,
+                            color: Color(0xFF48D6FF),
+                            size: 12,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Phân tích ngày $dateStr',

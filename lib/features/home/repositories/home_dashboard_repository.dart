@@ -29,7 +29,9 @@ class VitalSignsResponse {
       respiratoryRate: (json['respiratory_rate'] as num?)?.toDouble(),
       bloodPressureSys: (json['blood_pressure_sys'] as num?)?.toDouble(),
       bloodPressureDia: (json['blood_pressure_dia'] as num?)?.toDouble(),
-      timestamp: DateTime.parse(json['timestamp'] as String? ?? DateTime.now().toIso8601String()),
+      timestamp: DateTime.parse(
+        json['timestamp'] as String? ?? DateTime.now().toIso8601String(),
+      ),
       isStale: json['is_stale'] as bool? ?? false,
     );
   }
@@ -38,27 +40,42 @@ class VitalSignsResponse {
 class HealthReportResponse {
   final Map<String, dynamic> vitals24hAvg;
   final double? latestRiskScore;
+  final double? healthScore;
+  final String? healthLevel;
+  final String? healthSummary;
   final String? riskLevel;
   final String? riskType;
   final DateTime? lastUpdated;
+  final double? confidence;
+  final bool isStale;
 
   HealthReportResponse({
     required this.vitals24hAvg,
     required this.latestRiskScore,
+    required this.healthScore,
+    required this.healthLevel,
+    required this.healthSummary,
     required this.riskLevel,
     required this.riskType,
     required this.lastUpdated,
+    required this.confidence,
+    required this.isStale,
   });
 
   factory HealthReportResponse.fromJson(Map<String, dynamic> json) {
     return HealthReportResponse(
       vitals24hAvg: json['vitals_24h_avg'] as Map<String, dynamic>? ?? {},
       latestRiskScore: (json['latest_risk_score'] as num?)?.toDouble(),
+      healthScore: (json['health_score'] as num?)?.toDouble(),
+      healthLevel: json['health_level'] as String?,
+      healthSummary: json['health_summary'] as String?,
       riskLevel: json['risk_level'] as String?,
       riskType: json['risk_type'] as String?,
-      lastUpdated: json['last_updated'] != null 
-        ? DateTime.parse(json['last_updated'] as String)
-        : null,
+      lastUpdated: json['last_updated'] != null
+          ? DateTime.parse(json['last_updated'] as String)
+          : null,
+      confidence: (json['confidence'] as num?)?.toDouble(),
+      isStale: json['is_stale'] as bool? ?? true,
     );
   }
 }
@@ -127,7 +144,9 @@ class HomeDashboardRepository {
       );
       final List<dynamic> data = result is List ? result : result['data'] ?? [];
       return data
-          .map((item) => RiskReportResponse.fromJson(item as Map<String, dynamic>))
+          .map(
+            (item) => RiskReportResponse.fromJson(item as Map<String, dynamic>),
+          )
           .toList();
     } catch (e) {
       rethrow;

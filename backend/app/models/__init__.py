@@ -10,6 +10,7 @@ from app.models.sos_event_model import FallEvent, SOSEvent
 from app.models.audit_log_model import AuditLog
 from app.models.risk_score_model import RiskScore
 from app.models.risk_explanation_model import RiskExplanation
+from app.models.risk_alert_response_model import RiskAlertResponse
 
 __all__ = [
     "User",
@@ -21,4 +22,5 @@ __all__ = [
     "AuditLog",
     "RiskScore",
     "RiskExplanation",
+    "RiskAlertResponse",
 ]

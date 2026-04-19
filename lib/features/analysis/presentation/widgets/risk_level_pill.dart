@@ -20,17 +20,12 @@ class RiskLevelPill extends StatelessWidget {
       case RiskLevel.low:
         bgColor = AppStateColors.successBg;
         textColor = AppColors.success;
-        label = "Thấp";
+        label = "Ổn định";
         break;
-      case RiskLevel.moderate:
+      case RiskLevel.medium:
         bgColor = AppStateColors.warningBg;
         textColor = AppColors.warning;
-        label = "Theo dõi";
-        break;
-      case RiskLevel.high:
-        bgColor = AppStateColors.criticalBg;
-        textColor = AppColors.critical;
-        label = "Cao";
+        label = "Cần theo dõi";
         break;
       case RiskLevel.critical:
         bgColor = AppColors.emergency;

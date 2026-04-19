@@ -30,12 +30,16 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<SleepProvider>();
-      provider.loadAll(patientId: widget.profileId);
-      if (widget.date != null) {
-        provider.selectDate(widget.date!);
-      }
+      _bootstrapSleepState();
     });
+  }
+
+  Future<void> _bootstrapSleepState() async {
+    final provider = context.read<SleepProvider>();
+    await provider.loadAll(patientId: widget.profileId);
+    if (widget.date != null && mounted) {
+      await provider.selectDate(widget.date!);
+    }
   }
 
   Future<void> _onOpenFullCalendar(BuildContext context, SleepProvider provider) async {

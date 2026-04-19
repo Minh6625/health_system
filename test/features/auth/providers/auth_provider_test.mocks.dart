@@ -51,6 +51,19 @@ class MockAuthRepository extends _i1.Mock implements _i3.AuthRepository {
           as _i4.Future<_i2.AuthResponse>);
 
   @override
+  _i4.Future<_i2.AuthResponse> refreshToken(String? refreshToken) =>
+      (super.noSuchMethod(
+            Invocation.method(#refreshToken, [refreshToken]),
+            returnValue: _i4.Future<_i2.AuthResponse>.value(
+              _FakeAuthResponse_0(
+                this,
+                Invocation.method(#refreshToken, [refreshToken]),
+              ),
+            ),
+          )
+          as _i4.Future<_i2.AuthResponse>);
+
+  @override
   _i4.Future<_i2.AuthResponse> register(_i5.UserModel? user) =>
       (super.noSuchMethod(
             Invocation.method(#register, [user]),

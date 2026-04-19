@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/routes/app_router.dart';
@@ -23,6 +24,90 @@ import '../widgets/live_vitals_section.dart';
 import '../widgets/risk_insight_card.dart';
 import '../widgets/sleep_insight_card.dart';
 import '../widgets/vital_metric_card.dart';
+
+String? normalizeRiskLevelLabel(String? level) {
+  switch (level?.trim().toLowerCase()) {
+    case 'low':
+      return 'low';
+    case 'medium':
+    case 'moderate':
+    case 'high':
+      return 'medium';
+    case 'critical':
+      return 'critical';
+    default:
+      return null;
+  }
+}
+
+String dashboardRiskDisplayLabel(String? level) {
+  switch (normalizeRiskLevelLabel(level)) {
+    case 'low':
+      return 'Ổn định';
+    case 'medium':
+      return 'Cảnh báo';
+    case 'critical':
+      return 'Nguy hiểm';
+    default:
+      return 'Không xác định';
+  }
+}
+
+String dashboardRiskSummary(String? level) {
+  switch (normalizeRiskLevelLabel(level)) {
+    case 'low':
+      return 'Các chỉ số sức khỏe hôm nay đang ở mức ổn định.';
+    case 'medium':
+      return 'Một vài chỉ số đang ở mức cảnh báo, bạn nên theo dõi thêm.';
+    case 'critical':
+      return 'Một vài chỉ số đang ở mức nguy hiểm, bạn cần theo dõi sát hơn.';
+    default:
+      return 'Cập nhật dữ liệu...';
+  }
+}
+
+String dashboardHealthSummary({
+  required String? backendSummary,
+  required bool isStale,
+  required String? riskLevel,
+}) {
+  if (isStale) {
+    return 'Dữ liệu đánh giá sức khỏe đã cũ, vui lòng đồng bộ lại thiết bị.';
+  }
+  if (backendSummary != null && backendSummary.trim().isNotEmpty) {
+    return backendSummary;
+  }
+  return dashboardRiskSummary(riskLevel);
+}
+
+String sleepQualityLabelVi({required int qualityScore, String? qualityLabel}) {
+  final normalizedLabel = qualityLabel?.trim().toUpperCase();
+  switch (normalizedLabel) {
+    case 'GOOD':
+      return 'Tốt';
+    case 'AVERAGE':
+      return 'Trung bình';
+    case 'POOR':
+      return 'Kém';
+  }
+
+  if (qualityScore >= 80) {
+    return 'Tốt';
+  }
+  if (qualityScore >= 60) {
+    return 'Trung bình';
+  }
+  return 'Kém';
+}
+
+RiskVisualState dashboardRiskVisualState(String? level) {
+  return switch (normalizeRiskLevelLabel(level)) {
+    'low' => RiskVisualState.low,
+    'medium' => RiskVisualState.moderate,
+    'critical' => RiskVisualState.high,
+    _ => RiskVisualState.moderate,
+  };
+}
 
 bool hasRecentDeviceConnection(
   DeviceModel device, {
@@ -64,7 +149,14 @@ DeviceConnectionUiState resolveDashboardConnectionState({
 }
 
 class HomeDashboardScreen extends StatefulWidget {
-  const HomeDashboardScreen({super.key});
+  const HomeDashboardScreen({
+    super.key,
+    this.unreadNotificationCountLoader,
+    this.enableAutoRefresh = true,
+  });
+
+  final Future<int> Function()? unreadNotificationCountLoader;
+  final bool enableAutoRefresh;
 
   @override
   State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
@@ -74,6 +166,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     with WidgetsBindingObserver {
   static const Duration _autoRefreshInterval = Duration(seconds: 1);
   static const Duration _notificationRefreshInterval = Duration(seconds: 5);
+  static const Duration _utcPlus7Offset = Duration(hours: 7);
 
   final ApiClient _apiClient = ApiClient();
   late final HomeDashboardProvider _dashboardProvider;
@@ -117,12 +210,15 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
 
     _isFetchingUnreadCount = true;
     try {
-      final result = await _apiClient.get(
-        '/notifications',
-        queryParams: {'limit': 1, 'offset': 0},
-      );
-
-      final unreadCount = (result['unread_count'] as num?)?.toInt() ?? 0;
+      final unreadCount = widget.unreadNotificationCountLoader != null
+          ? await widget.unreadNotificationCountLoader!()
+          : await (() async {
+              final result = await _apiClient.get(
+                '/notifications',
+                queryParams: {'limit': 1, 'offset': 0},
+              );
+              return (result['unread_count'] as num?)?.toInt() ?? 0;
+            })();
       if (!mounted) {
         return;
       }
@@ -171,9 +267,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     // Gọi sau khi build xong (an toàn context)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshDashboard();
-      _startAutoRefresh();
       _fetchUnreadNotificationCount();
-      _startNotificationRefresh();
+      if (widget.enableAutoRefresh) {
+        _startAutoRefresh();
+        _startNotificationRefresh();
+      }
 
       if (_sleepProvider.loadState == SleepLoadState.initial) {
         _sleepProvider.loadAll();
@@ -187,6 +285,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!widget.enableAutoRefresh) {
+      return;
+    }
+
     if (state == AppLifecycleState.resumed) {
       _startAutoRefresh();
       _refreshDashboard(silent: true);
@@ -259,6 +361,21 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     );
   }
 
+  DateTime _toUtcPlus7(DateTime value) {
+    final utcValue = value.isUtc ? value : value.toUtc();
+    return utcValue.add(_utcPlus7Offset);
+  }
+
+  String _buildLatestUpdatedLabel(HomeDashboardProvider provider) {
+    final latestTimestamp = provider.latestDashboardTimestamp;
+    if (latestTimestamp == null) {
+      return 'Đang tải dữ liệu...';
+    }
+
+    final utcPlus7Time = _toUtcPlus7(latestTimestamp);
+    return 'Cập nhật lúc ${DateFormat('HH:mm:ss').format(utcPlus7Time)}';
+  }
+
   HomeDashboardViewModel _buildViewModel(
     BuildContext context,
     HomeDashboardProvider provider,
@@ -298,23 +415,30 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       isStale: provider.vitalsStale,
     );
     final primaryDevice = _pickPrimaryDevice(activeDevices);
+    final normalizedRiskLevel = normalizeRiskLevelLabel(provider.riskLevel);
+    final displayRiskLevel = dashboardRiskDisplayLabel(provider.riskLevel);
     final overallStatus = _getOverallStatus(
       level: provider.riskLevel,
       deviceState: deviceConnectionState,
     );
+    final sleepData = provider.sleepData;
+    final sleepQualityScore = (sleepData?['quality_score'] as num?)?.toInt();
+    final sleepInsightSummary = sleepQualityScore != null
+        ? 'Chất lượng: $sleepQualityScore% (${sleepQualityLabelVi(qualityScore: sleepQualityScore, qualityLabel: sleepData?['quality_label'] as String?)})'
+        : 'Chưa có dữ liệu giấc ngủ';
 
     return HomeDashboardViewModel(
       onRefresh: () async {
         await provider.refreshDashboard();
       },
       displayName: displayName,
-      latestUpdatedLabel: provider.vitalsTimestamp != null
-          ? 'Cập nhật lúc ${provider.vitalsTimestamp!.hour}:${provider.vitalsTimestamp!.minute.toString().padLeft(2, '0')}'
-          : 'Đang tải dữ liệu...',
+      latestUpdatedLabel: _buildLatestUpdatedLabel(provider),
       overallStatus: overallStatus,
       heroTitle: _heroTitleForStatus(overallStatus),
-      heroSummary: provider.riskLevel != null
-          ? 'Mức rủi ro: ${provider.riskLevel}'
+      heroSummary: normalizedRiskLevel != null
+          ? (provider.reportStale
+                ? 'Dữ liệu đánh giá sức khỏe đã cũ.'
+                : 'Trạng thái sức khỏe hiện tại: $displayRiskLevel')
           : 'Các chỉ số đang được đồng bộ...',
       deviceConnectionState: deviceConnectionState,
       batteryPercent: primaryDevice?.batteryLevel,
@@ -404,19 +528,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
           : '-- h',
       sleepDurationMinutes:
           (provider.sleepData?['in_bed_minutes'] as int?) ?? 0,
-      sleepInsightSummary: provider.sleepData != null
-          ? 'Quality: ${provider.sleepData!['quality_score']}%'
-          : 'Chưa có dữ liệu giấc ngủ',
-      riskScoreLabel: provider.latestRiskScore?.toStringAsFixed(0) ?? '--',
-      riskLevelLabel: provider.riskLevel ?? 'Không xác định',
-      riskSummary: provider.riskLevel == 'low'
-          ? 'Sức khoẻ của bạn đang ở mức ổn định'
-          : provider.riskLevel == 'medium' || provider.riskLevel == 'moderate'
-          ? 'Một số chỉ số cần chú ý trong hôm nay'
-          : provider.riskLevel == 'high'
-          ? 'Cần theo dõi các chỉ số sức khỏe'
-          : 'Cập nhật dữ liệu...',
-      riskVisualState: _getRiskVisualState(provider.riskLevel),
+      sleepInsightSummary: sleepInsightSummary,
+      riskScoreLabel: provider.healthScore?.toStringAsFixed(0) ?? '--',
+      riskLevelLabel:
+          provider.healthLevel ??
+          (normalizedRiskLevel != null ? displayRiskLevel : 'Không xác định'),
+      riskSummary: dashboardHealthSummary(
+        backendSummary: provider.healthSummary,
+        isStale: provider.reportStale,
+        riskLevel: provider.riskLevel,
+      ),
+      riskVisualState: dashboardRiskVisualState(provider.riskLevel),
     );
   }
 
@@ -440,19 +562,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       return DashboardOverallStatus.offline;
     }
 
-    final normalized = level?.trim().toLowerCase();
+    final normalized = normalizeRiskLevelLabel(level);
     return switch (normalized) {
-      'high' || 'critical' => DashboardOverallStatus.critical,
-      'medium' || 'moderate' => DashboardOverallStatus.warning,
+      'critical' => DashboardOverallStatus.critical,
+      'medium' => DashboardOverallStatus.warning,
       _ => DashboardOverallStatus.normal,
     };
   }
 
   String _heroTitleForStatus(DashboardOverallStatus status) {
     return switch (status) {
-      DashboardOverallStatus.normal => 'Ổn định hôm nay',
-      DashboardOverallStatus.warning => 'Cần chú ý',
-      DashboardOverallStatus.critical => 'Nguy cơ cao',
+      DashboardOverallStatus.normal => 'Hôm nay sức khỏe của bạn khá ổn định',
+      DashboardOverallStatus.warning => 'Hôm nay có chỉ số sức khỏe cần chú ý',
+      DashboardOverallStatus.critical =>
+        'Hôm nay sức khỏe của bạn đang ở mức nguy hiểm',
       DashboardOverallStatus.noDevice => 'Chưa kết nối thiết bị',
       DashboardOverallStatus.offline => 'Thiết bị ngoại tuyến',
     };
@@ -528,16 +651,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     }
 
     return baseLabel;
-  }
-
-  RiskVisualState _getRiskVisualState(String? level) {
-    return switch (level?.toLowerCase()) {
-      'low' => RiskVisualState.low,
-      'medium' || 'moderate' => RiskVisualState.moderate,
-      'high' => RiskVisualState.high,
-      'critical' => RiskVisualState.high,
-      _ => RiskVisualState.moderate,
-    };
   }
 }
 
@@ -635,8 +748,7 @@ class _DashboardBody extends StatelessWidget {
               ]),
             ),
           ),
-          // Thêm một khoảng đệm ở dưới cùng để nội dung không bị che bởi EmergencyStickyBar
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
+          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.gapSm)),
         ],
       ),
     );

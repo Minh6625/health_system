@@ -13,10 +13,14 @@ class SleepProvider extends ChangeNotifier {
   /// Cache TTL = 1 phút
   static const _cacheTTL = Duration(minutes: 1);
 
-  SleepProvider({SleepRepository? repository})
-      : _repository = repository ?? (_useMock ? MockSleepRepository() : SleepRepositoryImpl());
+  SleepProvider({SleepRepository? repository, DateTime Function()? now})
+    : _repository =
+          repository ??
+          (_useMock ? MockSleepRepository() : SleepRepositoryImpl()),
+      _now = now ?? DateTime.now;
 
   final SleepRepository _repository;
+  final DateTime Function() _now;
 
   // ── State ─────────────────────────────────────────────────────────────────
 
@@ -55,7 +59,7 @@ class SleepProvider extends ChangeNotifier {
   /// Loads latest + 7-day history in parallel.
   /// Skips API call if cache is still fresh (< 1 minute).
   Future<void> loadAll({String? patientId, bool forceRefresh = false}) async {
-    if (patientId != null) _patientId = patientId;
+    _applyPatientContext(patientId);
 
     // Return cached data immediately if within TTL and already has data
     if (!forceRefresh && _isCacheValid()) {
@@ -68,22 +72,18 @@ class SleepProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final now = DateTime.now();
+      final now = _now();
       final from = now.subtract(const Duration(days: 7));
 
       final results = await Future.wait([
         _repository.getLatestSleep(patientId: _patientId),
-        _repository.getSleepHistory(
-          from: from,
-          to: now,
-          patientId: _patientId,
-        ),
+        _repository.getSleepHistory(from: from, to: now, patientId: _patientId),
       ]);
 
       _latestSession = results[0] as SleepSession?;
       _historyList = results[1] as List<SleepSession>;
       _selectedSession = _latestSession;
-      _selectedDate = _latestSession?.endTime ?? DateTime.now();
+      _selectedDate = _latestSession?.sleepDate ?? _now();
 
       if (_latestSession == null && _historyList.isEmpty) {
         _loadState = SleepLoadState.empty;
@@ -101,7 +101,7 @@ class SleepProvider extends ChangeNotifier {
 
   /// RefreshIndicator: always forces a fresh fetch, bypassing cache
   Future<void> fetchLatestSleep({String? patientId}) async {
-    if (patientId != null) _patientId = patientId;
+    _applyPatientContext(patientId);
     await loadAll(patientId: _patientId, forceRefresh: true);
   }
 
@@ -109,10 +109,13 @@ class SleepProvider extends ChangeNotifier {
   Future<void> selectDate(DateTime date) async {
     final day = DateTime(date.year, date.month, date.day);
     _selectedDate = day;
-    
-    final now = DateTime.now();
+
+    final now = _now();
     // Rule: Nếu là ngày hiện tại && trước 6:00 sáng -> noDataYet
-    if (day.year == now.year && day.month == now.month && day.day == now.day && now.hour < 6) {
+    if (day.year == now.year &&
+        day.month == now.month &&
+        day.day == now.day &&
+        now.hour < 6) {
       _loadState = SleepLoadState.noDataYet;
       _selectedSession = null;
       notifyListeners();
@@ -123,9 +126,14 @@ class SleepProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final session = await _repository.getSessionByDate(day, patientId: _patientId);
+      final session = await _repository.getSessionByDate(
+        day,
+        patientId: _patientId,
+      );
       _selectedSession = session;
-      _loadState = session == null ? SleepLoadState.empty : SleepLoadState.success;
+      _loadState = session == null
+          ? SleepLoadState.empty
+          : SleepLoadState.success;
     } catch (_) {
       // keep previous selectedSession on error
       _loadState = SleepLoadState.error;
@@ -138,12 +146,39 @@ class SleepProvider extends ChangeNotifier {
   /// Called when user taps a bar in SleepTrendChart.
   void selectHistorySession(SleepSession session) {
     _selectedSession = session;
-    _selectedDate = session.endTime;
+    _selectedDate = session.sleepDate;
     notifyListeners();
   }
 
-  void setPatient(String patientId) {
-    _patientId = patientId;
+  void setPatient(String? patientId) {
+    _applyPatientContext(patientId);
+  }
+
+  void _applyPatientContext(String? patientId) {
+    final normalizedPatientId = _normalizePatientId(patientId);
+    if (_patientId == normalizedPatientId) {
+      return;
+    }
+
+    _patientId = normalizedPatientId;
+    _resetCachedState();
+  }
+
+  String? _normalizePatientId(String? patientId) {
+    if (patientId == null) {
+      return null;
+    }
+    final trimmed = patientId.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  void _resetCachedState() {
+    _latestSession = null;
+    _selectedSession = null;
+    _historyList = [];
+    _errorMessage = null;
+    _lastFetchTime = null;
+    _loadState = SleepLoadState.initial;
   }
 
   // ── Cache helpers ─────────────────────────────────────────────────────────
@@ -151,7 +186,7 @@ class SleepProvider extends ChangeNotifier {
   bool _isCacheValid() {
     if (_lastFetchTime == null) return false;
     if (_loadState != SleepLoadState.success) return false;
-    return DateTime.now().difference(_lastFetchTime!) < _cacheTTL;
+    return _now().difference(_lastFetchTime!) < _cacheTTL;
   }
 
   // ── Error helpers ─────────────────────────────────────────────────────────

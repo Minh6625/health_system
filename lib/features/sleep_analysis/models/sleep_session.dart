@@ -28,6 +28,7 @@ class SleepPhasesDTO {
 
 class SleepSession {
   final String sessionId;
+  final DateTime sleepDate;
   final DateTime startTime;
   final DateTime endTime;
   final int inBedMinutes;
@@ -41,6 +42,7 @@ class SleepSession {
 
   const SleepSession({
     required this.sessionId,
+    required this.sleepDate,
     required this.startTime,
     required this.endTime,
     required this.inBedMinutes,
@@ -62,6 +64,10 @@ class SleepSession {
 
     return SleepSession(
       sessionId: json['session_id'] as String? ?? '',
+      sleepDate: _parseSleepDate(
+        json['sleep_date'] as String?,
+        json['end_time'] as String?,
+      ),
       startTime: DateTime.parse(json['start_time'] as String).toLocal(),
       endTime: DateTime.parse(json['end_time'] as String).toLocal(),
       inBedMinutes: (json['in_bed_minutes'] as num?)?.toInt() ?? 0,
@@ -144,4 +150,20 @@ class SleepSession {
     0.27, 0.11, 0.38, 0.74, 0.52, 0.33, 0.28,
     0.92, 0.87, 0.31, 0.46, 0.12, 0.18, 0.89,
   ];
+
+  static DateTime _parseSleepDate(String? sleepDate, String? endTime) {
+    if (sleepDate != null && sleepDate.trim().isNotEmpty) {
+      final parsed = DateTime.tryParse(sleepDate);
+      if (parsed != null) {
+        return DateTime(parsed.year, parsed.month, parsed.day);
+      }
+    }
+
+    final fallbackEndTime = DateTime.parse(endTime!).toLocal();
+    return DateTime(
+      fallbackEndTime.year,
+      fallbackEndTime.month,
+      fallbackEndTime.day,
+    );
+  }
 }

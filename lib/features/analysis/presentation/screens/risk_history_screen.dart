@@ -31,14 +31,17 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<RiskHistoryProvider>().fetchHistory(
-            profileId: widget.profileId ?? 'self',
-            refresh: true,
-          );
+        profileId: widget.profileId ?? 'self',
+        refresh: true,
+      );
     });
 
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-        context.read<RiskHistoryProvider>().loadMore(widget.profileId ?? 'self');
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        context.read<RiskHistoryProvider>().loadMore(
+          widget.profileId ?? 'self',
+        );
       }
     });
   }
@@ -51,13 +54,15 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
 
   Future<void> _onRefresh() async {
     await context.read<RiskHistoryProvider>().fetchHistory(
-          profileId: widget.profileId ?? 'self',
-          refresh: true,
-        );
+      profileId: widget.profileId ?? 'self',
+      refresh: true,
+    );
   }
 
   // Helper to group items by month and year
-  Map<String, List<RiskHistoryItemEntity>> _groupItemsByMonth(List<RiskHistoryItemEntity> items) {
+  Map<String, List<RiskHistoryItemEntity>> _groupItemsByMonth(
+    List<RiskHistoryItemEntity> items,
+  ) {
     final Map<String, List<RiskHistoryItemEntity>> grouped = {};
     for (var item in items) {
       final key = DateFormat('MM/yyyy').format(item.analyzedAt);
@@ -71,7 +76,8 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isLinkedProfile = widget.profileId != null && widget.profileId != "self";
+    final isLinkedProfile =
+        widget.profileId != null && widget.profileId != "self";
     final provider = context.watch<RiskHistoryProvider>();
 
     return Scaffold(
@@ -86,8 +92,10 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
             ),
             if (isLinkedProfile)
               Text(
-                'Lê Văn A - Bố',
-                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                'Hồ sơ người thân',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
           ],
         ),
@@ -107,10 +115,7 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
     if (provider.error != null && provider.items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.gapLg),
-        child: InlineErrorBlock(
-          message: provider.error!,
-          onRetry: _onRefresh,
-        ),
+        child: InlineErrorBlock(message: provider.error!, onRetry: _onRefresh),
       );
     }
 
@@ -131,7 +136,8 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
               ),
               child: RangeFilterChips(
                 currentRange: provider.currentRange,
-                onRangeSelected: (range) => provider.changeRange(widget.profileId ?? 'self', range),
+                onRangeSelected: (range) =>
+                    provider.changeRange(widget.profileId ?? 'self', range),
               ),
             ),
           ),
@@ -142,43 +148,59 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
                 if (provider.summary != null) ...[
                   RiskTrendSummaryCard(summary: provider.summary!),
                   const SizedBox(height: AppSpacing.gapLg),
-                  CompareInsightCard(delta: provider.summary!.deltaVsPreviousPeriod),
+                  CompareInsightCard(
+                    delta: provider.summary!.deltaVsPreviousPeriod,
+                  ),
                   const SizedBox(height: AppSpacing.gapLg),
                 ],
                 if (provider.items.isEmpty && !provider.isLoading)
                   const Padding(
                     padding: EdgeInsets.only(top: 40),
-                    child: Center(
-                      child: Text('Chưa có lịch sử'),
-                    ),
+                    child: Center(child: Text('Chưa có lịch sử')),
                   ),
                 ...groupedItems.entries.map((entry) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.gapMd, top: AppSpacing.gapMd),
+                        padding: const EdgeInsets.only(
+                          bottom: AppSpacing.gapMd,
+                          top: AppSpacing.gapMd,
+                        ),
                         child: Text(
-                          'Tháng \${entry.key}',
-                          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.textSecondary),
+                          'Tháng ${entry.key}',
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
-                      ...entry.value.map((item) => Padding(
-                            padding: const EdgeInsets.only(bottom: AppSpacing.gapSm),
-                            child: RiskHistoryItemCard(
-                              item: item,
-                              onTap: () {
-                                Navigator.pushNamed(context, AppRouter.riskReportDetail, arguments: {
+                      ...entry.value.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(
+                            bottom: AppSpacing.gapSm,
+                          ),
+                          child: RiskHistoryItemCard(
+                            item: item,
+                            onTap: () {
+                              Navigator.pushNamed(
+                                context,
+                                AppRouter.riskReportDetail,
+                                arguments: {
                                   'reportId': item.reportId,
                                   'profileId': widget.profileId,
-                                });
-                              },
-                            ),
-                          )),
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     ],
                   );
                 }),
-                PaginationFooter(isLoadingMore: provider.isLoadingMore, hasMore: provider.hasMore),
+                PaginationFooter(
+                  isLoadingMore: provider.isLoadingMore,
+                  hasMore: provider.hasMore,
+                ),
               ]),
             ),
           ),

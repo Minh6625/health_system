@@ -1,51 +1,575 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
-import hashlib
+from datetime import UTC, date, datetime, timedelta
 import json
+import logging
+from typing import Any
 
 from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
-from app.schemas.monitoring import SleepSessionResponse, VitalSignsResponse, HealthReportResponse, RiskReportResponse, RiskReportDetailResponse
+from app.schemas.monitoring import (
+    FactorBreakdownResponse,
+    HealthReportResponse,
+    RiskHistoryItemResponse,
+    RiskHistoryResponse,
+    RiskHistorySummaryResponse,
+    RiskReportDetailResponse,
+    RiskReportResponse,
+    SleepSessionResponse,
+    SnapshotMetricsResponse,
+    TopFactorResponse,
+    VitalSignsResponse,
+)
+from app.services.risk_inference_service import (
+    canonicalize_risk_level,
+    derive_display_status,
+    derive_health_level,
+    derive_health_score,
+    derive_health_summary,
+    derive_risk_summary,
+    is_risk_report_stale,
+    normalize_risk_score,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class MonitoringService:
-    """Fetch real-time telemetry from database - NO MOCK DATA."""
+    """Fetch mobile monitoring data using canonical risk/health semantics."""
 
     VITALS_STALE_AFTER = timedelta(seconds=30)
+    RISK_HISTORY_RANGE_DAYS = {
+        "7d": 7,
+        "30d": 30,
+        "90d": 90,
+    }
+    _FEATURE_META: dict[str, dict[str, str]] = {
+        "heart_rate": {"label": "Nhịp tim", "unit": "bpm", "route_target": "vital_hr"},
+        "spo2": {"label": "SpO2", "unit": "%", "route_target": "vital_spo2"},
+        "sys_bp": {"label": "Huyết áp tâm thu", "unit": "mmHg", "route_target": "vital_bp"},
+        "dia_bp": {"label": "Huyết áp tâm trương", "unit": "mmHg", "route_target": "vital_bp"},
+        "resp_rate": {"label": "Nhịp thở", "unit": "lần/phút", "route_target": "vital_rr"},
+        "body_temp": {"label": "Nhiệt độ", "unit": "độ C", "route_target": "vital_temp"},
+        "hrv": {"label": "Biến thiên nhịp tim", "unit": "ms", "route_target": "vital_hrv"},
+        "map_val": {"label": "Huyết áp trung bình", "unit": "mmHg", "route_target": "vital_bp"},
+        "bmi": {"label": "BMI", "unit": "kg/m2", "route_target": "vital_bmi"},
+    }
+
+    @staticmethod
+    def _safe_float(value: Any, default: float = 0.0) -> float:
+        if value is None:
+            return default
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _safe_int(value: Any, default: int = 0) -> int:
+        if value is None:
+            return default
+        try:
+            return int(round(float(value)))
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _parse_json_object(value: Any) -> dict[str, Any]:
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                return {}
+        return {}
+
+    @staticmethod
+    def _parse_json_list(value: Any) -> list[Any]:
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return parsed
+            except json.JSONDecodeError:
+                return []
+        return []
 
     @staticmethod
     def _calculate_sleep_metrics(
-        phases: dict,
+        phases: dict[str, int],
         quality_score: int,
         in_bed_minutes: int,
     ) -> tuple[int, int, float, str]:
-        """Calculate derived sleep metrics from phases and quality score."""
-        sleep_minutes = phases.get('light', 0) + phases.get('deep', 0) + phases.get('rem', 0)
-        awake_minutes = phases.get('awake', 0)
-        efficiency_ratio = (
-            sleep_minutes / in_bed_minutes if in_bed_minutes > 0 else 0.0
-        )
-        
+        sleep_minutes = phases.get("light", 0) + phases.get("deep", 0) + phases.get("rem", 0)
+        awake_minutes = phases.get("awake", 0)
+        efficiency_ratio = sleep_minutes / in_bed_minutes if in_bed_minutes > 0 else 0.0
+
         if quality_score >= 70:
             quality_label = "GOOD"
         elif quality_score >= 50:
             quality_label = "AVERAGE"
         else:
             quality_label = "POOR"
-        
+
         return sleep_minutes, awake_minutes, efficiency_ratio, quality_label
 
     @staticmethod
-    def get_latest_vital_signs(patient_id: int, db: Session) -> VitalSignsResponse:
-        """
-        Query latest vital signs from DB for the user's primary device.
-        Returns data from timescale vitals table (real-time).
-        """
+    def _normalize_sleep_date(value: str | date | datetime | None) -> date | None:
+        if value is None:
+            return None
+        if isinstance(value, date) and not isinstance(value, datetime):
+            return value
+        if isinstance(value, datetime):
+            return value.date()
         try:
-            # Get latest vitals for user's device
+            return date.fromisoformat(str(value))
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _build_sleep_session_response(row: dict[str, Any]) -> SleepSessionResponse:
+        phases = {"awake": 0, "light": 0, "deep": 0, "rem": 0}
+        parsed_phases = MonitoringService._parse_json_object(row.get("phases"))
+        for key, value in parsed_phases.items():
+            phases[key] = MonitoringService._safe_int(value)
+
+        start_time = row["start_time"]
+        end_time = row["end_time"]
+        in_bed_minutes = max(0, int((end_time - start_time).total_seconds() // 60))
+        quality_score = MonitoringService._safe_int(row.get("sleep_score"))
+        sleep_minutes, awake_minutes, efficiency_ratio, quality_label = (
+            MonitoringService._calculate_sleep_metrics(phases, quality_score, in_bed_minutes)
+        )
+        sleep_date = MonitoringService._normalize_sleep_date(row.get("sleep_date")) or end_time.date()
+
+        return SleepSessionResponse(
+            session_id=str(start_time.timestamp()),
+            sleep_date=sleep_date,
+            quality_score=quality_score,
+            quality_label=quality_label,
+            in_bed_minutes=in_bed_minutes,
+            sleep_minutes=sleep_minutes,
+            awake_minutes=awake_minutes,
+            efficiency_ratio=efficiency_ratio,
+            wake_count=MonitoringService._safe_int(row.get("wake_count")),
+            phases=phases,
+            start_time=start_time,
+            end_time=end_time,
+        )
+
+    @staticmethod
+    def _normalize_risk_row(row: dict[str, Any]) -> dict[str, Any]:
+        features = MonitoringService._parse_json_object(row.get("features"))
+        backend = row.get("algorithm") or features.get("backend") or "unknown"
+        confidence = MonitoringService._safe_float(features.get("confidence"), 0.0)
+        risk_level = canonicalize_risk_level(
+            row.get("risk_level") or features.get("risk_level") or features.get("label")
+        ) or "medium"
+        risk_score = normalize_risk_score(
+            level=risk_level,
+            confidence=confidence,
+            raw_score=row.get("score"),
+            backend=backend,
+        )
+        health_score = derive_health_score(risk_score)
+        timestamp = row.get("calculated_at")
+        feature_snapshot = MonitoringService._parse_json_object(features.get("model_features"))
+        raw_vitals = MonitoringService._parse_json_object(features.get("raw_vitals"))
+        feature_importance = MonitoringService._parse_json_object(row.get("feature_importance"))
+        recommendations = MonitoringService._parse_json_list(row.get("recommendations"))
+        return {
+            **row,
+            "features": features,
+            "feature_snapshot": feature_snapshot,
+            "raw_vitals": raw_vitals,
+            "feature_importance": feature_importance,
+            "recommendations": [str(item) for item in recommendations if str(item).strip()],
+            "confidence": round(confidence, 4),
+            "risk_level": risk_level,
+            "risk_score": risk_score,
+            "health_score": health_score,
+            "health_level": derive_health_level(risk_level),
+            "display_status": derive_display_status(risk_level),
+            "risk_summary": derive_risk_summary(risk_level),
+            "health_summary": derive_health_summary(risk_level),
+            "is_stale": is_risk_report_stale(timestamp),
+            "timestamp": timestamp,
+        }
+
+    @staticmethod
+    def _top_factors(feature_importance: dict[str, Any], limit: int = 2) -> list[TopFactorResponse]:
+        items = sorted(
+            ((key, MonitoringService._safe_float(value)) for key, value in feature_importance.items()),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+        top_items: list[TopFactorResponse] = []
+        for key, _score in items[:limit]:
+            meta = MonitoringService._FEATURE_META.get(
+                key,
+                {"label": key.replace("_", " ").title(), "unit": "", "route_target": ""},
+            )
+            top_items.append(TopFactorResponse(key=key, label=meta["label"]))
+        return top_items
+
+    @staticmethod
+    def _format_metric_value(value: Any) -> str:
+        if value is None:
+            return "--"
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError):
+            return str(value)
+        if abs(numeric - round(numeric)) < 0.01:
+            return str(int(round(numeric)))
+        return f"{numeric:.1f}"
+
+    @staticmethod
+    def _build_breakdown(
+        feature_importance: dict[str, Any],
+        feature_snapshot: dict[str, Any],
+        raw_vitals: dict[str, Any],
+    ) -> list[FactorBreakdownResponse]:
+        breakdown: list[FactorBreakdownResponse] = []
+        for key, value in sorted(
+            feature_importance.items(),
+            key=lambda item: MonitoringService._safe_float(item[1]),
+            reverse=True,
+        ):
+            contribution_score = round(MonitoringService._safe_float(value), 4)
+            meta = MonitoringService._FEATURE_META.get(
+                key,
+                {"label": key.replace("_", " ").title(), "unit": "", "route_target": ""},
+            )
+            snapshot_value = feature_snapshot.get(key)
+            if snapshot_value is None:
+                if key == "sys_bp":
+                    snapshot_value = raw_vitals.get("blood_pressure_sys")
+                elif key == "dia_bp":
+                    snapshot_value = raw_vitals.get("blood_pressure_dia")
+                elif key == "body_temp":
+                    snapshot_value = raw_vitals.get("temperature")
+                elif key == "resp_rate":
+                    snapshot_value = raw_vitals.get("respiratory_rate")
+                else:
+                    snapshot_value = raw_vitals.get(key)
+
+            if contribution_score >= 0.5:
+                impact_level = "high"
+            elif contribution_score >= 0.2:
+                impact_level = "medium"
+            else:
+                impact_level = "low"
+
+            breakdown.append(
+                FactorBreakdownResponse(
+                    key=key,
+                    label=meta["label"],
+                    contribution_score=contribution_score,
+                    impact_level=impact_level,
+                    value=MonitoringService._format_metric_value(snapshot_value),
+                    unit=meta["unit"],
+                    route_target=meta["route_target"],
+                )
+            )
+        return breakdown
+
+    @staticmethod
+    def _build_snapshot(feature_snapshot: dict[str, Any], raw_vitals: dict[str, Any]) -> SnapshotMetricsResponse:
+        heart_rate = raw_vitals.get("heart_rate", feature_snapshot.get("heart_rate"))
+        spo2 = raw_vitals.get("spo2", feature_snapshot.get("spo2"))
+        sys_bp = raw_vitals.get("blood_pressure_sys", feature_snapshot.get("sys_bp"))
+        dia_bp = raw_vitals.get("blood_pressure_dia", feature_snapshot.get("dia_bp"))
+        body_temp = raw_vitals.get("temperature", feature_snapshot.get("body_temp"))
+        hrv = raw_vitals.get("hrv", feature_snapshot.get("hrv"))
+        map_val = feature_snapshot.get("map_val")
+        if map_val is None and sys_bp is not None and dia_bp is not None:
+            map_val = (MonitoringService._safe_float(sys_bp) + 2 * MonitoringService._safe_float(dia_bp)) / 3
+
+        return SnapshotMetricsResponse(
+            heart_rate=MonitoringService._safe_int(heart_rate),
+            spo2=MonitoringService._safe_int(spo2),
+            sys_bp=MonitoringService._safe_int(sys_bp),
+            dia_bp=MonitoringService._safe_int(dia_bp),
+            body_temp=round(MonitoringService._safe_float(body_temp), 1),
+            hrv=MonitoringService._safe_int(hrv),
+            map_val=MonitoringService._safe_int(map_val),
+        )
+
+    @staticmethod
+    def _compute_trend_7d(
+        patient_id: int,
+        risk_type: str,
+        reference_time: datetime,
+        db: Session,
+    ) -> list[int]:
+        start_time = reference_time - timedelta(days=6)
+        rows = db.execute(
+            text(
+                """
+                SELECT calculated_at, score, risk_level, algorithm, features
+                FROM risk_scores
+                WHERE user_id = :user_id
+                  AND risk_type = :risk_type
+                  AND calculated_at >= :start_time
+                  AND calculated_at <= :end_time
+                ORDER BY calculated_at ASC
+                """
+            ),
+            {
+                "user_id": patient_id,
+                "risk_type": risk_type,
+                "start_time": start_time,
+                "end_time": reference_time,
+            },
+        ).mappings().all()
+
+        daily_max: dict[str, int] = {}
+        for raw_row in rows:
+            normalized = MonitoringService._normalize_risk_row(dict(raw_row))
+            day_key = normalized["timestamp"].date().isoformat()
+            daily_max[day_key] = max(
+                daily_max.get(day_key, 0),
+                MonitoringService._safe_int(normalized["risk_score"]),
+            )
+
+        trend_points: list[int] = []
+        for days_ago in range(6, -1, -1):
+            day = (reference_time - timedelta(days=days_ago)).date().isoformat()
+            trend_points.append(daily_max.get(day, 0))
+        return trend_points
+
+    @staticmethod
+    def _select_latest_risk_row(patient_id: int, db: Session) -> dict[str, Any] | None:
+        latest_risk_row = db.execute(
+            text(
+                """
+                SELECT
+                    id,
+                    risk_type,
+                    score,
+                    risk_level,
+                    calculated_at,
+                    features,
+                    algorithm
+                FROM risk_scores
+                WHERE user_id = :user_id
+                ORDER BY calculated_at DESC
+                LIMIT 1
+                """
+            ),
+            {"user_id": patient_id},
+        ).mappings().first()
+        return dict(latest_risk_row) if latest_risk_row else None
+
+    @staticmethod
+    def _select_latest_active_device(patient_id: int, db: Session) -> dict[str, Any] | None:
+        try:
+            row = db.execute(
+                text(
+                    """
+                    SELECT
+                        d.id AS device_id,
+                        MAX(v.time) AS latest_vitals_at
+                    FROM devices d
+                    LEFT JOIN vitals v
+                        ON v.device_id = d.id
+                    WHERE d.user_id = :user_id
+                      AND d.deleted_at IS NULL
+                      AND COALESCE(d.is_active, TRUE) = TRUE
+                    GROUP BY d.id
+                    ORDER BY latest_vitals_at DESC NULLS LAST, d.id DESC
+                    LIMIT 1
+                    """
+                ),
+                {"user_id": patient_id},
+            ).mappings().first()
+        except ProgrammingError as error:
+            db.rollback()
+            if 'relation "devices" does not exist' in str(error) or 'relation "vitals" does not exist' in str(error):
+                return None
+            raise
+
+        if row is None:
+            return None
+
+        row_dict = dict(row)
+        if row_dict.get("latest_vitals_at") is None:
+            return None
+        return row_dict
+
+    @staticmethod
+    def _should_refresh_risk_report(
+        latest_risk_row: dict[str, Any] | None,
+        latest_vitals_at: datetime | None,
+    ) -> bool:
+        if latest_vitals_at is None:
+            return False
+        if latest_risk_row is None:
+            return True
+
+        latest_risk_at = latest_risk_row.get("calculated_at")
+        if latest_risk_at is None:
+            return True
+
+        latest_risk_at = (
+            latest_risk_at if latest_risk_at.tzinfo is not None else latest_risk_at.replace(tzinfo=UTC)
+        )
+        latest_vitals_at = (
+            latest_vitals_at if latest_vitals_at.tzinfo is not None else latest_vitals_at.replace(tzinfo=UTC)
+        )
+        return is_risk_report_stale(latest_risk_at) and latest_vitals_at > latest_risk_at
+
+    @staticmethod
+    def _refresh_latest_risk_row(patient_id: int, db: Session) -> dict[str, Any] | None:
+        latest_risk_row = MonitoringService._select_latest_risk_row(patient_id, db)
+        latest_device = MonitoringService._select_latest_active_device(patient_id, db)
+        latest_vitals_at = latest_device.get("latest_vitals_at") if latest_device else None
+
+        if not MonitoringService._should_refresh_risk_report(latest_risk_row, latest_vitals_at):
+            return latest_risk_row
+
+        try:
+            from app.services.risk_alert_service import calculate_device_risk
+
+            calculate_device_risk(
+                db,
+                device_id=int(latest_device["device_id"]),
+                user_id=patient_id,
+                allow_cached=False,
+                dispatch_alerts=False,
+            )
+            return MonitoringService._select_latest_risk_row(patient_id, db)
+        except Exception:
+            logger.exception(
+                "Health report refresh failed for patient_id=%s; falling back to latest persisted risk row",
+                patient_id,
+            )
+            return latest_risk_row
+
+    @staticmethod
+    def _previous_risk_score(
+        patient_id: int,
+        risk_type: str,
+        current_timestamp: datetime,
+        db: Session,
+    ) -> float | None:
+        previous_row = db.execute(
+            text(
+                """
+                SELECT score, risk_level, algorithm, features
+                FROM risk_scores
+                WHERE user_id = :user_id
+                  AND risk_type = :risk_type
+                  AND calculated_at < :current_timestamp
+                ORDER BY calculated_at DESC
+                LIMIT 1
+                """
+            ),
+            {
+                "user_id": patient_id,
+                "risk_type": risk_type,
+                "current_timestamp": current_timestamp,
+            },
+        ).mappings().first()
+        if previous_row is None:
+            return None
+
+        normalized = MonitoringService._normalize_risk_row(dict(previous_row))
+        return normalized["risk_score"]
+
+    @staticmethod
+    def _get_history_summary(
+        patient_id: int,
+        range_key: str,
+        db: Session,
+    ) -> RiskHistorySummaryResponse:
+        days = MonitoringService.RISK_HISTORY_RANGE_DAYS.get(range_key, 7)
+        current_start = datetime.now(UTC) - timedelta(days=days)
+        previous_start = current_start - timedelta(days=days)
+
+        current_rows = db.execute(
+            text(
+                """
+                SELECT calculated_at, score, risk_level, algorithm, features
+                FROM risk_scores
+                WHERE user_id = :user_id
+                  AND calculated_at >= :current_start
+                ORDER BY calculated_at ASC
+                """
+            ),
+            {"user_id": patient_id, "current_start": current_start},
+        ).mappings().all()
+
+        previous_rows = db.execute(
+            text(
+                """
+                SELECT calculated_at, score, risk_level, algorithm, features
+                FROM risk_scores
+                WHERE user_id = :user_id
+                  AND calculated_at >= :previous_start
+                  AND calculated_at < :current_start
+                ORDER BY calculated_at ASC
+                """
+            ),
+            {
+                "user_id": patient_id,
+                "previous_start": previous_start,
+                "current_start": current_start,
+            },
+        ).mappings().all()
+
+        current_scores = [
+            MonitoringService._normalize_risk_row(dict(row))["risk_score"]
+            for row in current_rows
+        ]
+        previous_scores = [
+            MonitoringService._normalize_risk_row(dict(row))["risk_score"]
+            for row in previous_rows
+        ]
+
+        average_score = round(sum(current_scores) / len(current_scores), 2) if current_scores else 0.0
+        highest_score = round(max(current_scores), 2) if current_scores else 0.0
+        lowest_score = round(min(current_scores), 2) if current_scores else 0.0
+        previous_average = (
+            round(sum(previous_scores) / len(previous_scores), 2)
+            if previous_scores
+            else average_score
+        )
+        delta_vs_previous_period = round(average_score - previous_average, 2)
+
+        trend_map: dict[str, int] = {}
+        for row in current_rows:
+            normalized = MonitoringService._normalize_risk_row(dict(row))
+            day_key = normalized["timestamp"].date().isoformat()
+            trend_map[day_key] = max(
+                trend_map.get(day_key, 0),
+                MonitoringService._safe_int(normalized["risk_score"]),
+            )
+
+        trend_points: list[int] = []
+        for days_ago in range(min(days - 1, 6), -1, -1):
+            day_key = (datetime.now(UTC) - timedelta(days=days_ago)).date().isoformat()
+            trend_points.append(trend_map.get(day_key, 0))
+
+        return RiskHistorySummaryResponse(
+            average_score=average_score,
+            highest_score=highest_score,
+            lowest_score=lowest_score,
+            delta_vs_previous_period=delta_vs_previous_period,
+            trend_points=trend_points,
+        )
+
+    @staticmethod
+    def get_latest_vital_signs(patient_id: int, db: Session) -> VitalSignsResponse:
+        try:
             row = db.execute(
                 text(
                     """
@@ -71,16 +595,14 @@ class MonitoringService:
             if row is None:
                 raise ValueError("No vital signs data found for this user")
 
-            # Check if data is stale (>5 minutes old)
             is_stale = (datetime.now(UTC) - row["time"]).total_seconds() > 300
-
             return VitalSignsResponse(
-                heart_rate=float(row["heart_rate"]) if row["heart_rate"] else None,
-                spo2=float(row["spo2"]) if row["spo2"] else None,
-                temperature=float(row["temperature"]) if row["temperature"] else None,
-                respiratory_rate=float(row["respiratory_rate"]) if row["respiratory_rate"] else None,
-                blood_pressure_sys=float(row["blood_pressure_sys"]) if row["blood_pressure_sys"] else None,
-                blood_pressure_dia=float(row["blood_pressure_dia"]) if row["blood_pressure_dia"] else None,
+                heart_rate=MonitoringService._safe_float(row["heart_rate"]) if row["heart_rate"] is not None else None,
+                spo2=MonitoringService._safe_float(row["spo2"]) if row["spo2"] is not None else None,
+                temperature=MonitoringService._safe_float(row["temperature"]) if row["temperature"] is not None else None,
+                respiratory_rate=MonitoringService._safe_float(row["respiratory_rate"]) if row["respiratory_rate"] is not None else None,
+                blood_pressure_sys=MonitoringService._safe_float(row["blood_pressure_sys"]) if row["blood_pressure_sys"] is not None else None,
+                blood_pressure_dia=MonitoringService._safe_float(row["blood_pressure_dia"]) if row["blood_pressure_dia"] is not None else None,
                 timestamp=row["time"],
                 is_stale=is_stale,
             )
@@ -91,14 +613,7 @@ class MonitoringService:
             raise
 
     @staticmethod
-    def get_latest_sleep_session(
-        patient_id: int,
-        db: Session,
-    ) -> SleepSessionResponse | None:
-        """
-        Query latest sleep session from DB (real data only - no mock).
-        Returns None if no data found.
-        """
+    def get_latest_sleep_session(patient_id: int, db: Session) -> SleepSessionResponse | None:
         try:
             row = db.execute(
                 text(
@@ -108,10 +623,11 @@ class MonitoringService:
                         end_time,
                         sleep_score,
                         wake_count,
-                        phases
+                        phases,
+                        sleep_date
                     FROM sleep_sessions
                     WHERE user_id = :user_id
-                    ORDER BY start_time DESC
+                    ORDER BY sleep_date DESC NULLS LAST, start_time DESC
                     LIMIT 1
                     """
                 ),
@@ -126,67 +642,7 @@ class MonitoringService:
         if row is None:
             return None
 
-        # Parse phases from JSONB/JSON
-        phases_raw = row.get("phases")
-        phases = {"awake": 0, "light": 0, "deep": 0, "rem": 0}
-
-        if isinstance(phases_raw, dict):
-            phases = {
-                key: int(value)
-                for key, value in phases_raw.items()
-                if isinstance(value, (int, float))
-            }
-        elif isinstance(phases_raw, str):
-            try:
-                parsed = json.loads(phases_raw)
-                if isinstance(parsed, dict):
-                    phases = {
-                        key: int(value)
-                        for key, value in parsed.items()
-                        if isinstance(value, (int, float))
-                    }
-            except json.JSONDecodeError:
-                pass
-
-        start_time = row["start_time"]
-        end_time = row["end_time"]
-        in_bed_minutes = max(
-            0,
-            int((end_time - start_time).total_seconds() // 60),
-        )
-        
-        quality_score = int(row.get("sleep_score") or 0)
-        sleep_minutes, awake_minutes, efficiency_ratio, quality_label = (
-            MonitoringService._calculate_sleep_metrics(
-                phases, quality_score, in_bed_minutes
-            )
-        )
-
-        sleep_minutes = phases.get("light", 0) + phases.get("deep", 0) + phases.get("rem", 0)
-        awake_minutes = phases.get("awake", 0)
-        efficiency_ratio = sleep_minutes / in_bed_minutes if in_bed_minutes > 0 else 0.0
-        
-        quality_score = int(row.get("sleep_score") or 0)
-        if quality_score >= 80:
-            quality_label = "GOOD"
-        elif quality_score >= 60:
-            quality_label = "AVERAGE"
-        else:
-            quality_label = "POOR"
-
-        return SleepSessionResponse(
-            session_id=str(start_time.timestamp()),
-            quality_score=quality_score,
-            quality_label=quality_label,
-            in_bed_minutes=in_bed_minutes,
-            sleep_minutes=sleep_minutes,
-            awake_minutes=awake_minutes,
-            efficiency_ratio=efficiency_ratio,
-            wake_count=int(row.get("wake_count") or 0),
-            phases=phases,
-            start_time=start_time,
-            end_time=end_time,
-        )
+        return MonitoringService._build_sleep_session_response(dict(row))
 
     @staticmethod
     def get_sleep_history(
@@ -196,31 +652,20 @@ class MonitoringService:
         to_date: str | None = None,
         limit: int = 30,
     ) -> list[SleepSessionResponse]:
-        """
-        Query sleep history from DB within a date range.
-        from_date and to_date should be ISO format strings (e.g., "2026-03-23T18:35:42.095752Z").
-        Returns list of sleep sessions, sorted by start_time DESC.
-        """
         try:
-            # Build WHERE clause for date range
             where_clause = "user_id = :user_id"
-            params = {"user_id": patient_id, "limit": limit}
-            
+            params: dict[str, Any] = {"user_id": patient_id, "limit": limit}
+
             if from_date:
-                try:
-                    from_dt = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
-                    where_clause += " AND start_time >= :from_date"
-                    params["from_date"] = from_dt
-                except (ValueError, AttributeError):
-                    pass
-                    
+                normalized_from_date = MonitoringService._normalize_sleep_date(from_date)
+                if normalized_from_date is not None:
+                    params["from_date"] = normalized_from_date
+                    where_clause += " AND sleep_date >= :from_date"
             if to_date:
-                try:
-                    to_dt = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
-                    where_clause += " AND end_time <= :to_date"
-                    params["to_date"] = to_dt
-                except (ValueError, AttributeError):
-                    pass
+                normalized_to_date = MonitoringService._normalize_sleep_date(to_date)
+                if normalized_to_date is not None:
+                    params["to_date"] = normalized_to_date
+                    where_clause += " AND sleep_date <= :to_date"
 
             rows = db.execute(
                 text(
@@ -230,10 +675,11 @@ class MonitoringService:
                         end_time,
                         sleep_score,
                         wake_count,
-                        phases
+                        phases,
+                        sleep_date
                     FROM sleep_sessions
                     WHERE {where_clause}
-                    ORDER BY start_time DESC
+                    ORDER BY sleep_date DESC NULLS LAST, start_time DESC
                     LIMIT :limit
                     """
                 ),
@@ -245,83 +691,12 @@ class MonitoringService:
                 return []
             raise
 
-        results = []
-        for row in rows:
-            # Parse phases from JSONB/JSON
-            phases_raw = row.get("phases")
-            phases = {"awake": 0, "light": 0, "deep": 0, "rem": 0}
-
-            if isinstance(phases_raw, dict):
-                phases = {
-                    key: int(value)
-                    for key, value in phases_raw.items()
-                    if isinstance(value, (int, float))
-                }
-            elif isinstance(phases_raw, str):
-                try:
-                    parsed = json.loads(phases_raw)
-                    if isinstance(parsed, dict):
-                        phases = {
-                            key: int(value)
-                            for key, value in parsed.items()
-                            if isinstance(value, (int, float))
-                        }
-                except json.JSONDecodeError:
-                    pass
-
-            start_time = row["start_time"]
-            end_time = row["end_time"]
-            in_bed_minutes = max(
-                0,
-                int((end_time - start_time).total_seconds() // 60),
-            )
-            
-            quality_score = int(row.get("sleep_score") or 0)
-            sleep_minutes, awake_minutes, efficiency_ratio, quality_label = (
-                MonitoringService._calculate_sleep_metrics(
-                    phases, quality_score, in_bed_minutes
-                )
-            )
-
-            sleep_minutes = phases.get("light", 0) + phases.get("deep", 0) + phases.get("rem", 0)
-            awake_minutes = phases.get("awake", 0)
-            efficiency_ratio = sleep_minutes / in_bed_minutes if in_bed_minutes > 0 else 0.0
-            
-            quality_score = int(row.get("sleep_score") or 0)
-            if quality_score >= 80:
-                quality_label = "GOOD"
-            elif quality_score >= 60:
-                quality_label = "AVERAGE"
-            else:
-                quality_label = "POOR"
-
-            results.append(
-                SleepSessionResponse(
-                    session_id=str(start_time.timestamp()),
-                    quality_score=quality_score,
-                    quality_label=quality_label,
-                    in_bed_minutes=in_bed_minutes,
-                    sleep_minutes=sleep_minutes,
-                    awake_minutes=awake_minutes,
-                    efficiency_ratio=efficiency_ratio,
-                    wake_count=int(row.get("wake_count") or 0),
-                    phases=phases,
-                    start_time=start_time,
-                    end_time=end_time,
-                )
-            )
-
-        return results
+        return [MonitoringService._build_sleep_session_response(dict(row)) for row in rows]
 
     @staticmethod
     def get_health_report(patient_id: int, db: Session) -> HealthReportResponse:
-        """
-        Get comprehensive health report:
-        - Latest vitals stats (24h average)
-        - Current risk scores
-        """
+        vitals_dict: dict[str, Any] = {}
         try:
-            # Get latest vitals stats (24h average)
             vitals_stats = db.execute(
                 text(
                     """
@@ -337,224 +712,315 @@ class MonitoringService:
                     FROM vitals v
                     INNER JOIN devices d ON v.device_id = d.id
                     WHERE d.user_id = :user_id
-                    AND v.time > NOW() - INTERVAL '24 hours'
+                      AND v.time > NOW() - INTERVAL '24 hours'
                     """
                 ),
                 {"user_id": patient_id},
             ).mappings().first()
+        except Exception:
+            logger.exception("Failed to aggregate vitals stats for patient_id=%s", patient_id)
+            vitals_stats = None
 
-            # Get latest risk assessment
-            latest_risk = db.execute(
-                text(
-                    """
-                    SELECT
-                        score,
-                        risk_level,
-                        risk_type,
-                        calculated_at
-                    FROM risk_scores
-                    WHERE user_id = :user_id
-                    ORDER BY calculated_at DESC
-                    LIMIT 1
-                    """
-                ),
-                {"user_id": patient_id},
-            ).mappings().first()
+        vitals_dict = dict(vitals_stats) if vitals_stats else {}
 
-            # Convert vitals_stats Row to dict
-            vitals_dict = dict(vitals_stats) if vitals_stats else {}
+        try:
+            latest_risk_row = MonitoringService._refresh_latest_risk_row(patient_id, db)
+        except Exception:
+            logger.exception(
+                "Failed to refresh health report for patient_id=%s; using latest persisted risk row",
+                patient_id,
+            )
+            latest_risk_row = MonitoringService._select_latest_risk_row(patient_id, db)
 
+        if latest_risk_row is None:
+            return HealthReportResponse(vitals_24h_avg=vitals_dict)
+
+        try:
+            normalized = MonitoringService._normalize_risk_row(dict(latest_risk_row))
             return HealthReportResponse(
                 vitals_24h_avg=vitals_dict,
-                latest_risk_score=float(latest_risk["score"]) if latest_risk and latest_risk["score"] else None,
-                risk_level=latest_risk["risk_level"] if latest_risk else None,
-                risk_type=latest_risk["risk_type"] if latest_risk else None,
-                last_updated=latest_risk["calculated_at"] if latest_risk else None,
+                latest_risk_score=normalized["risk_score"],
+                risk_level=normalized["risk_level"],
+                risk_type=normalized["risk_type"],
+                last_updated=normalized["timestamp"],
+                health_score=normalized["health_score"],
+                health_level=normalized["health_level"],
+                health_summary=normalized["health_summary"],
+                confidence=normalized["confidence"],
+                is_stale=normalized["is_stale"],
             )
         except Exception:
-            # Return empty report on error
-            return HealthReportResponse()
+            logger.exception(
+                "Failed to normalize latest risk row for patient_id=%s; returning vitals-only health report",
+                patient_id,
+            )
+            return HealthReportResponse(vitals_24h_avg=vitals_dict)
 
     @staticmethod
     def get_risk_reports(patient_id: int, db: Session, limit: int = 10) -> list[RiskReportResponse]:
-        """
-        Get recent risk reports/scores for the user.
-        """
         try:
             rows = db.execute(
                 text(
                     """
                     SELECT
-                        id,
-                        risk_type,
-                        score,
-                        risk_level,
-                        calculated_at,
-                        features
-                    FROM risk_scores
-                    WHERE user_id = :user_id
-                    ORDER BY calculated_at DESC
+                        rs.id,
+                        rs.risk_type,
+                        rs.score,
+                        rs.risk_level,
+                        rs.calculated_at,
+                        rs.features,
+                        rs.algorithm,
+                        re.explanation_text,
+                        re.feature_importance,
+                        re.recommendations
+                    FROM risk_scores rs
+                    LEFT JOIN LATERAL (
+                        SELECT explanation_text, feature_importance, recommendations
+                        FROM risk_explanations
+                        WHERE risk_score_id = rs.id
+                        ORDER BY id DESC
+                        LIMIT 1
+                    ) re ON TRUE
+                    WHERE rs.user_id = :user_id
+                    ORDER BY rs.calculated_at DESC
                     LIMIT :limit
                     """
                 ),
                 {"user_id": patient_id, "limit": limit},
             ).mappings().all()
-
-            reports = []
-            for row in rows:
-                features = row.get("features", {})
-                if isinstance(features, str):
-                    try:
-                        features = json.loads(features)
-                    except json.JSONDecodeError:
-                        features = {}
-
-                reports.append(
-                    RiskReportResponse(
-                        id=row["id"],
-                        risk_type=row["risk_type"],
-                        score=float(row["score"]),
-                        risk_level=row["risk_level"],
-                        timestamp=row["calculated_at"],
-                        key_features=list(features.keys()) if features else [],
-                    )
-                )
-            return reports
         except ProgrammingError:
             return []
 
+        reports: list[RiskReportResponse] = []
+        for raw_row in rows:
+            normalized = MonitoringService._normalize_risk_row(dict(raw_row))
+            previous_score = MonitoringService._previous_risk_score(
+                patient_id,
+                normalized["risk_type"],
+                normalized["timestamp"],
+                db,
+            )
+            trend_7d = MonitoringService._compute_trend_7d(
+                patient_id,
+                normalized["risk_type"],
+                normalized["timestamp"],
+                db,
+            )
+            top_factors = MonitoringService._top_factors(normalized["feature_importance"])
+            reports.append(
+                RiskReportResponse(
+                    id=normalized["id"],
+                    risk_type=normalized["risk_type"],
+                    risk_score=normalized["risk_score"],
+                    score=normalized["risk_score"],
+                    health_score=normalized["health_score"],
+                    risk_level=normalized["risk_level"],
+                    health_level=normalized["health_level"],
+                    display_status=normalized["display_status"],
+                    summary=normalized["health_summary"],
+                    timestamp=normalized["timestamp"],
+                    previous_score=previous_score,
+                    trend_7d=trend_7d,
+                    key_features=[factor.key for factor in top_factors],
+                    top_factors=top_factors,
+                    recommendation_preview=normalized["recommendations"][:2],
+                    confidence=normalized["confidence"],
+                    is_stale=normalized["is_stale"],
+                )
+            )
+        return reports
+
     @staticmethod
-    def get_risk_report_detail(report_id: int, db: Session) -> RiskReportDetailResponse | None:
-        """
-        Get detailed risk report with explanation and recommendations.
-        """
+    def get_risk_report_detail(patient_id: int, report_id: int, db: Session) -> RiskReportDetailResponse | None:
         try:
-            # Get risk score
             risk_row = db.execute(
                 text(
                     """
                     SELECT
-                        id,
-                        risk_type,
-                        score,
-                        risk_level,
-                        calculated_at,
-                        features,
-                        model_version,
-                        algorithm
-                    FROM risk_scores
-                    WHERE id = :report_id
-                    """
-                ),
-                {"report_id": report_id},
-            ).mappings().first()
-
-            if not risk_row:
-                return None
-
-            # Get explanation
-            explanation_row = db.execute(
-                text(
-                    """
-                    SELECT
-                        explanation_text,
-                        feature_importance,
-                        recommendations
-                    FROM risk_explanations
-                    WHERE risk_score_id = :risk_score_id
+                        rs.id,
+                        rs.user_id,
+                        rs.risk_type,
+                        rs.score,
+                        rs.risk_level,
+                        rs.calculated_at,
+                        rs.features,
+                        rs.model_version,
+                        rs.algorithm,
+                        re.explanation_text,
+                        re.feature_importance,
+                        re.recommendations
+                    FROM risk_scores rs
+                    LEFT JOIN LATERAL (
+                        SELECT explanation_text, feature_importance, recommendations
+                        FROM risk_explanations
+                        WHERE risk_score_id = rs.id
+                        ORDER BY id DESC
+                        LIMIT 1
+                    ) re ON TRUE
+                    WHERE rs.id = :report_id
+                      AND rs.user_id = :user_id
                     LIMIT 1
                     """
                 ),
-                {"risk_score_id": report_id},
+                {"report_id": report_id, "user_id": patient_id},
             ).mappings().first()
-
-            features = risk_row.get("features", {})
-            if isinstance(features, str):
-                try:
-                    features = json.loads(features)
-                except json.JSONDecodeError:
-                    features = {}
-
-            feature_importance = {}
-            recommendations = []
-            explanation_text = ""
-
-            if explanation_row:
-                explanation_text = explanation_row.get("explanation_text", "")
-                feature_importance = explanation_row.get("feature_importance", {})
-                if isinstance(feature_importance, str):
-                    try:
-                        feature_importance = json.loads(feature_importance)
-                    except json.JSONDecodeError:
-                        feature_importance = {}
-
-                recs = explanation_row.get("recommendations", [])
-                if isinstance(recs, str):
-                    try:
-                        recommendations = json.loads(recs)
-                    except json.JSONDecodeError:
-                        recommendations = []
-                else:
-                    recommendations = list(recs) if recs else []
-
-            return RiskReportDetailResponse(
-                id=risk_row["id"],
-                risk_type=risk_row["risk_type"],
-                score=float(risk_row["score"]),
-                risk_level=risk_row["risk_level"],
-                timestamp=risk_row["calculated_at"],
-                explanation=explanation_text,
-                features=features,
-                feature_importance=feature_importance,
-                recommendations=recommendations,
-                model_version=risk_row.get("model_version", "1.0"),
-                algorithm=risk_row.get("algorithm", "unknown"),
-            )
         except ProgrammingError:
             return None
 
+        if risk_row is None:
+            return None
+
+        normalized = MonitoringService._normalize_risk_row(dict(risk_row))
+        previous_score = MonitoringService._previous_risk_score(
+            patient_id,
+            normalized["risk_type"],
+            normalized["timestamp"],
+            db,
+        )
+        trend_7d = MonitoringService._compute_trend_7d(
+            patient_id,
+            normalized["risk_type"],
+            normalized["timestamp"],
+            db,
+        )
+        breakdown = MonitoringService._build_breakdown(
+            normalized["feature_importance"],
+            normalized["feature_snapshot"],
+            normalized["raw_vitals"],
+        )
+        snapshot = MonitoringService._build_snapshot(
+            normalized["feature_snapshot"],
+            normalized["raw_vitals"],
+        )
+        top_factors = MonitoringService._top_factors(normalized["feature_importance"])
+
+        return RiskReportDetailResponse(
+            id=normalized["id"],
+            risk_type=normalized["risk_type"],
+            risk_score=normalized["risk_score"],
+            score=normalized["risk_score"],
+            health_score=normalized["health_score"],
+            risk_level=normalized["risk_level"],
+            health_level=normalized["health_level"],
+            display_status=normalized["display_status"],
+            summary=normalized["risk_summary"],
+            timestamp=normalized["timestamp"],
+            previous_score=previous_score,
+            trend_7d=trend_7d,
+            explanation=str(normalized.get("explanation_text") or ""),
+            xai_explanation=str(normalized.get("explanation_text") or ""),
+            features=normalized["features"],
+            feature_importance={
+                key: round(MonitoringService._safe_float(value), 4)
+                for key, value in normalized["feature_importance"].items()
+            },
+            breakdown=breakdown,
+            recommendations=normalized["recommendations"],
+            recommendation_preview=normalized["recommendations"][:2],
+            top_factors=top_factors,
+            snapshot=snapshot,
+            model_version=str(normalized.get("model_version") or "1.0"),
+            algorithm=str(normalized.get("algorithm") or "unknown"),
+            confidence=normalized["confidence"],
+            is_stale=normalized["is_stale"],
+        )
+
     @staticmethod
-    def get_risk_history(patient_id: int, db: Session, days: int = 30) -> dict:
-        """
-        Get risk score history over time (for charts/graphs).
-        Returns daily aggregated statistics.
-        """
+    def get_risk_history(
+        patient_id: int,
+        db: Session,
+        range_key: str = "7d",
+        page: int = 1,
+        limit: int = 20,
+    ) -> RiskHistoryResponse:
+        range_key = range_key if range_key in MonitoringService.RISK_HISTORY_RANGE_DAYS else "7d"
+        days = MonitoringService.RISK_HISTORY_RANGE_DAYS[range_key]
+        page = max(page, 1)
+        limit = max(1, min(limit, 100))
+        offset = (page - 1) * limit
+        start_time = datetime.now(UTC) - timedelta(days=days)
+
         try:
+            total = db.execute(
+                text(
+                    """
+                    SELECT COUNT(*)
+                    FROM risk_scores
+                    WHERE user_id = :user_id
+                      AND calculated_at >= :start_time
+                    """
+                ),
+                {"user_id": patient_id, "start_time": start_time},
+            ).scalar() or 0
+
             rows = db.execute(
                 text(
                     """
                     SELECT
-                        DATE(calculated_at) as date,
-                        risk_type,
-                        ROUND(AVG(score)::numeric, 2) as avg_score,
-                        MAX(score) as max_score,
-                        MIN(score) as min_score,
-                        COUNT(*) as count
-                    FROM risk_scores
-                    WHERE user_id = :user_id
-                    AND calculated_at > NOW() - INTERVAL :days || ' days'
-                    GROUP BY DATE(calculated_at), risk_type
-                    ORDER BY date DESC, risk_type
+                        rs.id,
+                        rs.risk_type,
+                        rs.score,
+                        rs.risk_level,
+                        rs.calculated_at,
+                        rs.features,
+                        rs.algorithm,
+                        re.explanation_text
+                    FROM risk_scores rs
+                    LEFT JOIN LATERAL (
+                        SELECT explanation_text
+                        FROM risk_explanations
+                        WHERE risk_score_id = rs.id
+                        ORDER BY id DESC
+                        LIMIT 1
+                    ) re ON TRUE
+                    WHERE rs.user_id = :user_id
+                      AND rs.calculated_at >= :start_time
+                    ORDER BY rs.calculated_at DESC
+                    OFFSET :offset
+                    LIMIT :limit
                     """
                 ),
-                {"user_id": patient_id, "days": days},
+                {
+                    "user_id": patient_id,
+                    "start_time": start_time,
+                    "offset": offset,
+                    "limit": limit,
+                },
             ).mappings().all()
-
-            # Organize by risk type
-            history = {}
-            for row in rows:
-                risk_type = row["risk_type"]
-                if risk_type not in history:
-                    history[risk_type] = []
-
-                history[risk_type].append({
-                    "date": row["date"].isoformat(),
-                    "avg_score": float(row["avg_score"]),
-                    "max_score": float(row["max_score"]),
-                    "min_score": float(row["min_score"]),
-                    "measurements": row["count"],
-                })
-
-            return history
         except ProgrammingError:
-            return {}
+            return RiskHistoryResponse(
+                range=range_key,
+                summary=RiskHistorySummaryResponse(),
+                items=[],
+                page=page,
+                limit=limit,
+                has_more=False,
+            )
+
+        items: list[RiskHistoryItemResponse] = []
+        for raw_row in rows:
+            normalized = MonitoringService._normalize_risk_row(dict(raw_row))
+            reason_preview = str(normalized.get("explanation_text") or normalized["risk_summary"]).strip()
+            items.append(
+                RiskHistoryItemResponse(
+                    report_id=normalized["id"],
+                    risk_score=normalized["risk_score"],
+                    score=normalized["risk_score"],
+                    health_score=normalized["health_score"],
+                    risk_level=normalized["risk_level"],
+                    display_status=normalized["display_status"],
+                    analyzed_at=normalized["timestamp"],
+                    reason_preview=reason_preview,
+                    is_stale=normalized["is_stale"],
+                )
+            )
+
+        summary = MonitoringService._get_history_summary(patient_id, range_key, db)
+        return RiskHistoryResponse(
+            range=range_key,
+            summary=summary,
+            items=items,
+            page=page,
+            limit=limit,
+            has_more=offset + len(items) < int(total),
+        )

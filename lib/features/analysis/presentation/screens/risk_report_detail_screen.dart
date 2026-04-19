@@ -15,7 +15,7 @@ import '../widgets/supporting_metrics_snapshot_card.dart';
 import '../widgets/xai_narrative_card.dart';
 
 class RiskReportDetailScreen extends StatefulWidget {
-  final String reportId;
+  final int reportId;
   final String? profileId;
 
   const RiskReportDetailScreen({
@@ -33,17 +33,24 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<RiskReportProvider>().fetchReportDetail(widget.reportId, widget.profileId);
+      context.read<RiskReportProvider>().fetchReportDetail(
+        widget.reportId,
+        widget.profileId,
+      );
     });
   }
 
   Future<void> _onRefresh() async {
-    await context.read<RiskReportProvider>().fetchReportDetail(widget.reportId, widget.profileId);
+    await context.read<RiskReportProvider>().fetchReportDetail(
+      widget.reportId,
+      widget.profileId,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isLinkedProfile = widget.profileId != null && widget.profileId != "self";
+    final isLinkedProfile =
+        widget.profileId != null && widget.profileId != "self";
     final provider = context.watch<RiskReportProvider>();
 
     return Scaffold(
@@ -53,13 +60,15 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Giải thích điểm sức khoẻ',
+              'Giải thích báo cáo rủi ro',
               style: AppTextStyles.sectionTitle,
             ),
             if (isLinkedProfile)
               Text(
-                'Lê Văn A - Bố',
-                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                'Hồ sơ người thân',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
               ),
           ],
         ),
@@ -79,10 +88,7 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
     if (provider.error != null && provider.reportDetail == null) {
       return Padding(
         padding: const EdgeInsets.all(AppSpacing.gapLg),
-        child: InlineErrorBlock(
-          message: provider.error!,
-          onRetry: _onRefresh,
-        ),
+        child: InlineErrorBlock(message: provider.error!, onRetry: _onRefresh),
       );
     }
 
@@ -110,29 +116,41 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
                     // Xử lý route tương ứng (vd vital_hr -> vitalDetail)
                     if (routeTarget.startsWith('vital_')) {
                       final type = routeTarget.split('_')[1];
-                      Navigator.pushNamed(context, AppRouter.vitalDetail, arguments: {
-                        'vitalType': type,
-                        'profileId': widget.profileId,
-                      });
+                      Navigator.pushNamed(
+                        context,
+                        AppRouter.vitalDetail,
+                        arguments: {
+                          'vitalType': type,
+                          'profileId': widget.profileId,
+                        },
+                      );
                     }
                   },
                 ),
                 const SizedBox(height: AppSpacing.gapLg),
                 SupportingMetricsSnapshotCard(snapshot: detail.snapshot),
                 const SizedBox(height: AppSpacing.gapLg),
-                RecommendationChecklistCard(recommendations: detail.recommendations),
+                RecommendationChecklistCard(
+                  recommendations: detail.recommendations,
+                ),
                 const SizedBox(height: AppSpacing.gapLg),
                 RelatedDrilldownSection(
                   onVitalTap: () {
-                    Navigator.pushNamed(context, AppRouter.vitalDetail, arguments: {
-                      'vitalType': 'hr',
-                      'profileId': widget.profileId,
-                    });
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.vitalDetail,
+                      arguments: {
+                        'vitalType': 'hr',
+                        'profileId': widget.profileId,
+                      },
+                    );
                   },
                   onSleepTap: () {
-                    Navigator.pushNamed(context, AppRouter.sleepReport, arguments: {
-                      'profileId': widget.profileId,
-                    });
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.sleepReport,
+                      arguments: {'profileId': widget.profileId},
+                    );
                   },
                 ),
                 const SizedBox(height: AppSpacing.gapLg),

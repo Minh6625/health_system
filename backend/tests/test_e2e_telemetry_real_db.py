@@ -25,6 +25,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from app.core.config import settings
+from app.utils.jwt import create_access_token
 
 
 RUN_REAL_DB_E2E = os.getenv("RUN_REAL_DB_E2E") == "1"
@@ -51,6 +52,14 @@ def _pick_free_port() -> int:
 
 def _iso_utc(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _auth_headers(*, user_id: int, target_profile_id: int | None = None) -> dict[str, str]:
+    token = create_access_token({"user_id": user_id})
+    headers = {"Authorization": f"Bearer {token}"}
+    if target_profile_id is not None:
+        headers["X-Target-Profile-Id"] = str(target_profile_id)
+    return headers
 
 
 @pytest.fixture(scope="session")
@@ -184,6 +193,54 @@ def temp_device(engine: Engine) -> Iterator[dict[str, int]]:
             )
 
 
+@pytest.fixture(scope="session")
+def temp_caregiver(engine: Engine) -> Iterator[dict[str, int]]:
+    caregiver_email = f"sleep-e2e-caregiver-{uuid.uuid4().hex[:12]}@example.com"
+
+    with engine.begin() as connection:
+        caregiver_id = connection.execute(
+            text(
+                """
+                INSERT INTO users (
+                    email,
+                    password_hash,
+                    full_name,
+                    role,
+                    is_active,
+                    is_verified
+                )
+                VALUES (
+                    :email,
+                    :password_hash,
+                    :full_name,
+                    'caregiver',
+                    TRUE,
+                    TRUE
+                )
+                RETURNING id
+                """
+            ),
+            {
+                "email": caregiver_email,
+                "password_hash": "e2e-not-used",
+                "full_name": "Sleep E2E Caregiver",
+            },
+        ).scalar_one()
+
+    try:
+        yield {"user_id": int(caregiver_id)}
+    finally:
+        with engine.begin() as connection:
+            connection.execute(
+                text("DELETE FROM user_relationships WHERE caregiver_id = :caregiver_id"),
+                {"caregiver_id": int(caregiver_id)},
+            )
+            connection.execute(
+                text("DELETE FROM users WHERE id = :caregiver_id"),
+                {"caregiver_id": int(caregiver_id)},
+            )
+
+
 @pytest.fixture(autouse=True)
 def clean_device_rows(engine: Engine, temp_device: dict[str, int]) -> Iterator[None]:
     with engine.begin() as connection:
@@ -205,6 +262,35 @@ def clean_device_rows(engine: Engine, temp_device: dict[str, int]) -> Iterator[N
             text("DELETE FROM sleep_sessions WHERE device_id = :device_id"),
             {"device_id": temp_device["device_id"]},
         )
+
+
+def _seed_sleep_session(
+    *,
+    backend_base_url: str,
+    temp_device: dict[str, int],
+    sleep_date: date,
+) -> httpx.Response:
+    start_time = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=7)
+    end_time = start_time + timedelta(hours=6, minutes=35)
+    payload = {
+        "db_device_id": temp_device["device_id"],
+        "user_id": temp_device["user_id"],
+        "date": sleep_date.isoformat(),
+        "score": 86,
+        "efficiency": 92.4,
+        "duration_minutes": 395,
+        "phases": {
+            "deep": 90,
+            "light": 205,
+            "rem": 70,
+            "awake": 30,
+        },
+        "start_time": _iso_utc(start_time),
+        "end_time": _iso_utc(end_time),
+    }
+
+    with httpx.Client(timeout=10.0) as client:
+        return client.post(f"{backend_base_url}/mobile/telemetry/sleep", json=payload)
 
 
 def test_vital_ingest_persists_to_postgres(
@@ -293,29 +379,12 @@ def test_sleep_ingest_persists_to_postgres(
     engine: Engine,
     temp_device: dict[str, int],
 ) -> None:
-    start_time = datetime.now(UTC).replace(microsecond=0) - timedelta(hours=7)
-    end_time = start_time + timedelta(hours=6, minutes=35)
     sleep_date = date.today() + timedelta(days=1)
-
-    payload = {
-        "db_device_id": temp_device["device_id"],
-        "user_id": temp_device["user_id"],
-        "date": sleep_date.isoformat(),
-        "score": 86,
-        "efficiency": 92.4,
-        "duration_minutes": 395,
-        "phases": {
-            "deep": 90,
-            "light": 205,
-            "rem": 70,
-            "awake": 30,
-        },
-        "start_time": _iso_utc(start_time),
-        "end_time": _iso_utc(end_time),
-    }
-
-    with httpx.Client(timeout=10.0) as client:
-        response = client.post(f"{backend_base_url}/mobile/telemetry/sleep", json=payload)
+    response = _seed_sleep_session(
+        backend_base_url=backend_base_url,
+        temp_device=temp_device,
+        sleep_date=sleep_date,
+    )
 
     assert response.status_code == 200, response.text
     assert response.json() == {"ingested": 1, "errors": []}
@@ -355,3 +424,109 @@ def test_sleep_ingest_persists_to_postgres(
         "rem": 70,
         "awake": 30,
     }
+
+
+def test_sleep_metrics_latest_and_history_require_auth_and_return_canonical_fields(
+    backend_base_url: str,
+    temp_device: dict[str, int],
+) -> None:
+    today = date.today() + timedelta(days=1)
+    ingest_response = _seed_sleep_session(
+        backend_base_url=backend_base_url,
+        temp_device=temp_device,
+        sleep_date=today,
+    )
+    assert ingest_response.status_code == 200, ingest_response.text
+
+    headers = _auth_headers(user_id=temp_device["user_id"])
+    with httpx.Client(timeout=10.0, headers=headers) as client:
+        latest_response = client.get(f"{backend_base_url}/mobile/metrics/sleep/latest")
+        history_response = client.get(
+            f"{backend_base_url}/mobile/metrics/sleep/history",
+            params={"from_date": today.isoformat(), "to_date": today.isoformat()},
+        )
+
+    assert latest_response.status_code == 200, latest_response.text
+    assert history_response.status_code == 200, history_response.text
+
+    latest_payload = latest_response.json()
+    history_payload = history_response.json()
+    assert latest_payload["sleep_date"] == today.isoformat()
+    assert latest_payload["quality_score"] == 86
+    assert latest_payload["quality_label"] == "GOOD"
+    assert latest_payload["sleep_minutes"] == 365
+    assert latest_payload["awake_minutes"] == 30
+    assert latest_payload["wake_count"] == 1
+    assert latest_payload["phases"] == {
+        "awake": 30,
+        "light": 205,
+        "deep": 90,
+        "rem": 70,
+    }
+    assert history_payload["data"] == [latest_payload]
+
+
+def test_sleep_metrics_linked_profile_requires_relationship(
+    backend_base_url: str,
+    engine: Engine,
+    temp_device: dict[str, int],
+    temp_caregiver: dict[str, int],
+) -> None:
+    today = date.today() + timedelta(days=1)
+    ingest_response = _seed_sleep_session(
+        backend_base_url=backend_base_url,
+        temp_device=temp_device,
+        sleep_date=today,
+    )
+    assert ingest_response.status_code == 200, ingest_response.text
+
+    headers = _auth_headers(
+        user_id=temp_caregiver["user_id"],
+        target_profile_id=temp_device["user_id"],
+    )
+    with httpx.Client(timeout=10.0, headers=headers) as client:
+        forbidden_response = client.get(f"{backend_base_url}/mobile/metrics/sleep/latest")
+
+    assert forbidden_response.status_code == 403, forbidden_response.text
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                """
+                INSERT INTO user_relationships (
+                    patient_id,
+                    caregiver_id,
+                    relationship_type,
+                    status,
+                    can_view_vitals,
+                    can_receive_alerts,
+                    can_view_location
+                )
+                VALUES (
+                    :patient_id,
+                    :caregiver_id,
+                    'family',
+                    'accepted',
+                    TRUE,
+                    FALSE,
+                    FALSE
+                )
+                """
+            ),
+            {
+                "patient_id": temp_device["user_id"],
+                "caregiver_id": temp_caregiver["user_id"],
+            },
+        )
+
+    with httpx.Client(timeout=10.0, headers=headers) as client:
+        latest_response = client.get(f"{backend_base_url}/mobile/metrics/sleep/latest")
+        history_response = client.get(
+            f"{backend_base_url}/mobile/metrics/sleep/history",
+            params={"from_date": today.isoformat(), "to_date": today.isoformat()},
+        )
+
+    assert latest_response.status_code == 200, latest_response.text
+    assert history_response.status_code == 200, history_response.text
+    assert latest_response.json()["sleep_date"] == today.isoformat()
+    assert history_response.json()["data"][0]["sleep_date"] == today.isoformat()

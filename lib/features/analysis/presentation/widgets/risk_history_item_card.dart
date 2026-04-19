@@ -25,10 +25,9 @@ class RiskHistoryItemCard extends StatelessWidget {
       case RiskLevel.low:
         scoreColor = AppColors.success;
         break;
-      case RiskLevel.moderate:
+      case RiskLevel.medium:
         scoreColor = AppColors.warning;
         break;
-      case RiskLevel.high:
       case RiskLevel.critical:
         scoreColor = AppColors.critical;
         break;
@@ -65,10 +64,7 @@ class RiskHistoryItemCard extends StatelessWidget {
                     RiskLevelPill(level: item.level),
                   ],
                 ),
-                Text(
-                  timeStr,
-                  style: AppTextStyles.caption,
-                ),
+                Text(timeStr, style: AppTextStyles.caption),
               ],
             ),
             const SizedBox(height: AppSpacing.gapMd),
@@ -76,7 +72,9 @@ class RiskHistoryItemCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    item.reasonPreview.isNotEmpty ? item.reasonPreview : 'Không có tóm tắt',
+                    item.reasonPreview.isNotEmpty
+                        ? item.reasonPreview
+                        : 'Không có tóm tắt',
                     style: AppTextStyles.bodyMedium,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

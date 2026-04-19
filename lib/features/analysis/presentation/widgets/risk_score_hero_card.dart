@@ -19,10 +19,9 @@ class RiskScoreHeroCard extends StatelessWidget {
       case RiskLevel.low:
         scoreColor = AppColors.success;
         break;
-      case RiskLevel.moderate:
+      case RiskLevel.medium:
         scoreColor = AppColors.warning;
         break;
-      case RiskLevel.high:
       case RiskLevel.critical:
         scoreColor = AppColors.critical;
         break;
@@ -47,14 +46,8 @@ class RiskScoreHeroCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Điểm đánh giá hiện tại',
-                style: AppTextStyles.bodyMedium,
-              ),
-              Text(
-                timeStr,
-                style: AppTextStyles.caption,
-              ),
+              Text('Điểm đánh giá hiện tại', style: AppTextStyles.bodyMedium),
+              Text(timeStr, style: AppTextStyles.caption),
             ],
           ),
           const SizedBox(height: AppSpacing.gapMd),
@@ -67,7 +60,10 @@ class RiskScoreHeroCard extends StatelessWidget {
                 height: 80,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: scoreColor.withValues(alpha: 0.3), width: 4),
+                  border: Border.all(
+                    color: scoreColor.withValues(alpha: 0.3),
+                    width: 4,
+                  ),
                 ),
                 alignment: Alignment.center,
                 child: Text(

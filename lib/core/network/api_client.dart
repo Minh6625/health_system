@@ -35,7 +35,10 @@ class ApiClient {
 
   int? targetProfileId;
 
-  Future<Map<String, String>> _buildHeaders({bool requiresAuth = true}) async {
+  Future<Map<String, String>> _buildHeaders({
+    bool requiresAuth = true,
+    int? requestTargetProfileId,
+  }) async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     if (requiresAuth) {
       final token = await _tokenStorageService.readAccessToken();
@@ -43,8 +46,9 @@ class ApiClient {
         headers['Authorization'] = 'Bearer $token';
       }
     }
-    if (targetProfileId != null) {
-      headers['X-Target-Profile-Id'] = targetProfileId.toString();
+    final resolvedTargetProfileId = requestTargetProfileId ?? targetProfileId;
+    if (resolvedTargetProfileId != null) {
+      headers['X-Target-Profile-Id'] = resolvedTargetProfileId.toString();
     }
     return headers;
   }
@@ -53,10 +57,14 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
+    int? targetProfileId,
   }) async {
     try {
       final url = Uri.parse('$baseUrl$path');
-      final headers = await _buildHeaders(requiresAuth: requiresAuth);
+      final headers = await _buildHeaders(
+        requiresAuth: requiresAuth,
+        requestTargetProfileId: targetProfileId,
+      );
       final response = await http
           .post(url, headers: headers, body: jsonEncode(body ?? {}))
           .timeout(const Duration(seconds: 10));
@@ -75,13 +83,17 @@ class ApiClient {
     String path, {
     bool requiresAuth = true,
     Map<String, dynamic>? queryParams,
+    int? targetProfileId,
   }) async {
     try {
       Uri url = Uri.parse('$baseUrl$path');
       if (queryParams != null && queryParams.isNotEmpty) {
         url = url.replace(queryParameters: _normalizeQueryParams(queryParams));
       }
-      final headers = await _buildHeaders(requiresAuth: requiresAuth);
+      final headers = await _buildHeaders(
+        requiresAuth: requiresAuth,
+        requestTargetProfileId: targetProfileId,
+      );
       final response = await http
           .get(url, headers: headers)
           .timeout(const Duration(seconds: 10));
@@ -100,10 +112,14 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
+    int? targetProfileId,
   }) async {
     try {
       final url = Uri.parse('$baseUrl$path');
-      final headers = await _buildHeaders(requiresAuth: requiresAuth);
+      final headers = await _buildHeaders(
+        requiresAuth: requiresAuth,
+        requestTargetProfileId: targetProfileId,
+      );
       final response = await http
           .patch(url, headers: headers, body: jsonEncode(body ?? {}))
           .timeout(const Duration(seconds: 10));
@@ -122,10 +138,14 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? body,
     bool requiresAuth = true,
+    int? targetProfileId,
   }) async {
     try {
       final url = Uri.parse('$baseUrl$path');
-      final headers = await _buildHeaders(requiresAuth: requiresAuth);
+      final headers = await _buildHeaders(
+        requiresAuth: requiresAuth,
+        requestTargetProfileId: targetProfileId,
+      );
       final response = await http
           .put(url, headers: headers, body: jsonEncode(body ?? {}))
           .timeout(const Duration(seconds: 10));
@@ -144,10 +164,14 @@ class ApiClient {
     String path, {
     bool requiresAuth = true,
     Map<String, dynamic>? body,
+    int? targetProfileId,
   }) async {
     try {
       final url = Uri.parse('$baseUrl$path');
-      final headers = await _buildHeaders(requiresAuth: requiresAuth);
+      final headers = await _buildHeaders(
+        requiresAuth: requiresAuth,
+        requestTargetProfileId: targetProfileId,
+      );
       final response = await http
           .delete(
             url,

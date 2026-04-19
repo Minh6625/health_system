@@ -25,11 +25,11 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<SleepProvider>();
-      provider.setPatient(widget.profileId ?? '');
+      provider.setPatient(widget.profileId);
       if (widget.date != null) {
         provider.selectDate(widget.date!);
       } else {
-        provider.loadAll();
+        provider.loadAll(patientId: widget.profileId);
       }
     });
   }

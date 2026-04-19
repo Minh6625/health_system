@@ -20,6 +20,16 @@ from app.services.risk_inference_service import describe_feature_vector, infer_r
 from app.models.risk_score_model import RiskScore
 from app.models.risk_explanation_model import RiskExplanation
 from app.utils.datetime_helper import get_current_time
+from app.core.alert_constants import get_escalation_rule
+from app.schemas.emergency import RiskAlertResponseRequest, RiskAlertResponseResponse
+from app.services.emergency_service import EmergencyService
+from app.services.notification_service import NotificationService
+from app.services.push_notification_service import PushNotificationService
+from app.services.risk_alert_service import (
+    RISK_ALERT_AUTO_ESCALATE_AFTER_SECONDS,
+    calculate_device_risk,
+    dispatch_risk_alerts,
+)
 
 
 
@@ -281,6 +291,52 @@ def _build_feature_importance(feature_snapshot: dict[str, float]) -> dict[str, f
     return importance
 
 
+
+def _dispatch_risk_alerts(
+    db: Session,
+    *,
+    device_id: int,
+    user_id: int,
+    risk_level: str,
+    score: float,
+    risk_score_id: int,
+) -> None:
+    dispatch_risk_alerts(
+        db,
+        device_id=device_id,
+        user_id=user_id,
+        risk_level=risk_level,
+        score=score,
+        risk_score_id=risk_score_id,
+    )
+
+
+@router.post(
+    "/risk/alerts/{notification_id}/respond",
+    response_model=RiskAlertResponseResponse,
+)
+def respond_to_risk_alert(
+    notification_id: int,
+    payload: RiskAlertResponseRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RiskAlertResponseResponse:
+    result = EmergencyService.respond_to_risk_alert(
+        db,
+        current_user_id=int(current_user.id),
+        notification_id=notification_id,
+        response_action=payload.action,
+        risk_score_id=payload.risk_score_id,
+        source=payload.source,
+        device_id=payload.device_id,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        address=payload.address,
+        notes=payload.notes,
+    )
+    return RiskAlertResponseResponse(**result)
+
+
 @router.post("/risk/calculate", response_model=RiskCalculateResponse)
 def calculate_risk(
     payload: RiskCalculateRequest,
@@ -294,129 +350,19 @@ def calculate_risk(
         x_internal_service=x_internal_service,
         db=db,
     )
-
-    # --- Task 3.12: Cooldown check ---
-    risk_type = "general"  # current hardcoded risk_type
-    last_calc = (
-        db.query(func.max(RiskScore.calculated_at))
-        .filter(RiskScore.device_id == int(payload.device_id))
-        .filter(RiskScore.risk_type == risk_type)
-        .scalar()
+    result = calculate_device_risk(
+        db,
+        device_id=int(payload.device_id),
+        user_id=int(context["user_id"]),
+        allow_cached=True,
+        dispatch_alerts=True,
     )
-    if last_calc is not None:
-        elapsed = (get_current_time() - last_calc).total_seconds()
-        if elapsed < RISK_COOLDOWN_SECONDS:
-            # Return cached result instead of recalculating
-            cached = (
-                db.query(RiskScore)
-                .filter(RiskScore.device_id == int(payload.device_id))
-                .filter(RiskScore.risk_type == risk_type)
-                .order_by(RiskScore.calculated_at.desc())
-                .first()
-            )
-            if cached is not None:
-                logger.info(
-                    "Cooldown active for device %s, returning cached result (%.0fs remaining)",
-                    payload.device_id,
-                    RISK_COOLDOWN_SECONDS - elapsed,
-                )
-                return RiskCalculateResponse(
-                    risk_score_id=cached.id,
-                    score=round(float(cached.score), 2),
-                    risk_level=cached.risk_level,
-                    model=cached.algorithm or "unknown",
-                    calculated_at=str(cached.calculated_at),
-                )
-
-    # --- Task 3.13: Guard against NULL user_id ---
-    if context.get("user_id") is None:
-        logger.warning("Risk calculation skipped: device %s has no assigned user", payload.device_id)
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Device not assigned to any user",
-        )
-
-    vitals_row = _fetch_latest_vitals(db, payload.device_id)
-    if vitals_row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không có vitals data cho device này",
-        )
-
-    inference_payload, defaults_applied = _build_inference_payload(vitals_row, context)
-    inference_result = infer_risk(inference_payload)
-    feature_snapshot = describe_feature_vector(inference_payload)
-    risk_level = _risk_level_from_label_id(inference_result.label_id)
-    explanation_text = _build_explanation_text(
-        risk_level=risk_level,
-        backend=inference_result.backend,
-        defaults_applied=defaults_applied,
-        fallback_reason=inference_result.fallback_reason,
-    )
-    feature_importance = _build_feature_importance(feature_snapshot)
-
-    features_json = {
-        "model_features": feature_snapshot,
-        "raw_vitals": {
-            "heart_rate": vitals_row.get("heart_rate"),
-            "spo2": vitals_row.get("spo2"),
-            "temperature": vitals_row.get("temperature"),
-            "respiratory_rate": vitals_row.get("respiratory_rate"),
-            "blood_pressure_sys": vitals_row.get("blood_pressure_sys"),
-            "blood_pressure_dia": vitals_row.get("blood_pressure_dia"),
-            "hrv": vitals_row.get("hrv"),
-        },
-        "defaults_applied": defaults_applied,
-        "backend": inference_result.backend,
-        "label_id": inference_result.label_id,
-        "label": inference_result.label,
-        "confidence": inference_result.confidence,
-        "fallback_reason": inference_result.fallback_reason,
-    }
-    # Sanitize Decimal values so JSONB serialization works
-    features_json = json.loads(json.dumps(features_json, cls=_DecimalEncoder))
-
-    try:
-        risk_score = RiskScore(
-            user_id=int(context["user_id"]),
-            device_id=int(payload.device_id),
-            calculated_at=get_current_time(),
-            risk_type="general",
-            score=round(float(inference_result.score), 2),
-            risk_level=risk_level.lower(),
-            features=features_json,
-            model_version=f"{inference_result.backend}-v1.0",
-            algorithm=inference_result.backend,
-        )
-        db.add(risk_score)
-        db.flush()
-
-        risk_explanation = RiskExplanation(
-            risk_score_id=risk_score.id,
-            explanation_text=explanation_text,
-            feature_importance=feature_importance,
-            xai_method="rule_based" if inference_result.backend == "rule_based" else "shap",
-            recommendations=[
-                "Review recent vitals and repeat the measurement if symptoms persist.",
-                "Escalate to medical review for CRITICAL results.",
-            ],
-        )
-        db.add(risk_explanation)
-        db.commit()
-        db.refresh(risk_score)
-    except Exception:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Không thể lưu risk score",
-        )
-
     return RiskCalculateResponse(
-        risk_score_id=risk_score.id,
-        score=round(float(inference_result.score), 2),
-        risk_level=risk_level,
-        model=inference_result.backend,
-        calculated_at=str(risk_score.calculated_at),
+        risk_score_id=result.risk_score_id,
+        score=result.score,
+        risk_level=result.risk_level,
+        model=result.model,
+        calculated_at=str(result.calculated_at),
     )
 
 

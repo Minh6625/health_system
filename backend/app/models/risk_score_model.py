@@ -23,7 +23,7 @@ class RiskScore(Base):
             name="check_score_range",
         ),
         CheckConstraint(
-            "risk_level IN ('low', 'medium', 'high', 'critical')",
+            "risk_level IN ('low', 'medium', 'critical')",
             name="check_risk_level",
         ),
     )

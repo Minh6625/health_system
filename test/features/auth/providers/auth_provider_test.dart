@@ -1,3 +1,7 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_secure_storage/test/test_flutter_secure_storage_platform.dart';
+// ignore: depend_on_referenced_packages
+import 'package:flutter_secure_storage_platform_interface/flutter_secure_storage_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/features/auth/models/auth_response_model.dart';
 import 'package:healthguard/features/auth/models/user_model.dart';
@@ -14,6 +18,7 @@ void main() {
   late MockAuthRepository mockRepository;
 
   setUp(() {
+    FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({});
     mockRepository = MockAuthRepository();
     authProvider = AuthProvider(mockRepository);
   });
@@ -247,6 +252,110 @@ void main() {
 
       // Assert - isLoading should be false after completion
       expect(authProvider.isLoading, false);
+    });
+  });
+
+  group('AuthProvider.bootstrapSession', () {
+    test('restores session from secure storage when user snapshot exists', () async {
+      FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({
+        'access_token': 'stored-access-token',
+        'refresh_token': 'stored-refresh-token',
+        'user_session':
+            '{"user_id":1,"email":"elder@example.com","full_name":"Nguyen Van A","role":"patient"}',
+      });
+      authProvider = AuthProvider(mockRepository);
+
+      final result = await authProvider.bootstrapSession();
+
+      expect(result, true);
+      expect(authProvider.isAuthenticated, true);
+      expect(authProvider.accessToken, 'stored-access-token');
+      expect(authProvider.refreshToken, 'stored-refresh-token');
+      expect(authProvider.currentUser?.email, 'elder@example.com');
+      verifyNever(mockRepository.refreshToken('stored-refresh-token'));
+    });
+
+    test('refreshes session when stored user snapshot is missing', () async {
+      FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({
+        'refresh_token': 'stored-refresh-token',
+      });
+      authProvider = AuthProvider(mockRepository);
+
+      when(mockRepository.refreshToken('stored-refresh-token')).thenAnswer(
+        (_) async => AuthResponse(
+          success: true,
+          message: 'Token đã được làm mới',
+          accessToken: 'new-access-token',
+          user: UserData(
+            userId: 2,
+            email: 'caregiver@example.com',
+            fullName: 'Le Thi B',
+            role: 'caregiver',
+          ),
+        ),
+      );
+
+      final result = await authProvider.bootstrapSession();
+
+      expect(result, true);
+      expect(authProvider.isAuthenticated, true);
+      expect(authProvider.accessToken, 'new-access-token');
+      expect(authProvider.refreshToken, 'stored-refresh-token');
+      expect(authProvider.currentUser?.email, 'caregiver@example.com');
+      verify(mockRepository.refreshToken('stored-refresh-token')).called(1);
+    });
+
+    test('clears invalid session when refresh fails', () async {
+      FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({
+        'refresh_token': 'expired-refresh-token',
+      });
+      authProvider = AuthProvider(mockRepository);
+
+      when(mockRepository.refreshToken('expired-refresh-token')).thenAnswer(
+        (_) async => AuthResponse(
+          success: false,
+          message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+        ),
+      );
+
+      final result = await authProvider.bootstrapSession();
+
+      expect(result, false);
+      expect(authProvider.isAuthenticated, false);
+      expect(authProvider.accessToken, null);
+      expect(authProvider.refreshToken, null);
+      expect(
+        authProvider.message,
+        'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+      );
+      verify(mockRepository.refreshToken('expired-refresh-token')).called(1);
+    });
+
+    test('logout clears stored session snapshot', () async {
+      FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({
+        'access_token': 'stored-access-token',
+        'refresh_token': 'stored-refresh-token',
+        'user_session':
+            '{"user_id":1,"email":"elder@example.com","full_name":"Nguyen Van A","role":"patient"}',
+      });
+      authProvider = AuthProvider(mockRepository);
+
+      await authProvider.bootstrapSession();
+      await authProvider.logout();
+
+      const storage = FlutterSecureStorage();
+      final accessToken = await storage.read(key: 'access_token');
+      final refreshToken = await storage.read(key: 'refresh_token');
+      final userSession = await storage.read(key: 'user_session');
+
+      expect(authProvider.isAuthenticated, false);
+      expect(authProvider.accessToken, null);
+      expect(authProvider.refreshToken, null);
+      expect(authProvider.currentUser, null);
+      expect(authProvider.message, 'Đã đăng xuất');
+      expect(accessToken, null);
+      expect(refreshToken, null);
+      expect(userSession, null);
     });
   });
 

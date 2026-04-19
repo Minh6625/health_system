@@ -31,8 +31,10 @@ class SleepRepositoryImpl implements SleepRepository {
   @override
   Future<SleepSession?> getLatestSleep({String? patientId}) async {
     try {
-      final path = _buildPath(ApiEndpoints.latestSleep, patientId: patientId);
-      final json = await _client.get(path);
+      final json = await _client.get(
+        ApiEndpoints.latestSleep,
+        targetProfileId: _parseTargetProfileId(patientId),
+      );
       if (json == null) return null;
       return SleepSession.fromJson(json);
     } catch (e) {
@@ -53,13 +55,14 @@ class SleepRepositoryImpl implements SleepRepository {
     String? patientId,
   }) async {
     try {
-      final fromStr = from.toUtc().toIso8601String();
-      final toStr = to.toUtc().toIso8601String();
-      final path =
-          '${ApiEndpoints.sleepHistory}?from=${Uri.encodeComponent(fromStr)}&to=${Uri.encodeComponent(toStr)}';
-      final fullPath = _buildPath(path, patientId: patientId);
-
-      final response = await _client.get(fullPath);
+      final response = await _client.get(
+        ApiEndpoints.sleepHistory,
+        queryParams: {
+          'from_date': _formatReportDate(from),
+          'to_date': _formatReportDate(to),
+        },
+        targetProfileId: _parseTargetProfileId(patientId),
+      );
 
       // Response can be a Map with a list field, or directly a List
       dynamic rawList;
@@ -86,24 +89,36 @@ class SleepRepositoryImpl implements SleepRepository {
   }
 
   @override
-  Future<SleepSession?> getSessionByDate(DateTime date,
-      {String? patientId}) async {
-    // Query a 1-day window starting at midnight of the given date
-    final from = DateTime(date.year, date.month, date.day);
-    final to = from.add(const Duration(days: 1));
+  Future<SleepSession?> getSessionByDate(DateTime date, {String? patientId}) async {
+    final reportDate = DateTime(date.year, date.month, date.day);
     final sessions = await getSleepHistory(
-      from: from,
-      to: to,
+      from: reportDate,
+      to: reportDate,
       patientId: patientId,
     );
-    return sessions.isNotEmpty ? sessions.first : null;
+    for (final session in sessions) {
+      if (_isSameReportDay(session.sleepDate, reportDate)) {
+        return session;
+      }
+    }
+    return null;
   }
 
-  String _buildPath(String base, {String? patientId}) {
-    if (patientId != null && patientId.isNotEmpty) {
-      final separator = base.contains('?') ? '&' : '?';
-      return '$base${separator}patient_id=${Uri.encodeComponent(patientId)}';
+  int? _parseTargetProfileId(String? patientId) {
+    if (patientId == null || patientId.trim().isEmpty) {
+      return null;
     }
-    return base;
+    return int.tryParse(patientId.trim());
+  }
+
+  String _formatReportDate(DateTime date) {
+    final normalized = DateTime(date.year, date.month, date.day);
+    final month = normalized.month.toString().padLeft(2, '0');
+    final day = normalized.day.toString().padLeft(2, '0');
+    return '${normalized.year}-$month-$day';
+  }
+
+  bool _isSameReportDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 }
