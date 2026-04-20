@@ -230,5 +230,77 @@ void main() {
         expect(provider.selectedDate, DateTime(2026, 4, 17));
       },
     );
+
+    test('loadAll prefers an injected report date during bootstrap', () async {
+      final latest = _session(id: 'latest', sleepDate: DateTime(2026, 4, 17));
+      final older = _session(
+        id: 'older',
+        sleepDate: DateTime(2026, 4, 16),
+        sleepMinutes: 350,
+      );
+      final repository = _FakeSleepRepository(
+        latestSleep: latest,
+        history: [latest, older],
+      );
+      final provider = SleepProvider(repository: repository);
+
+      await provider.loadAll(
+        forceRefresh: true,
+        preferredDate: DateTime(2026, 4, 16, 22),
+      );
+
+      expect(provider.loadState, SleepLoadState.success);
+      expect(provider.selectedSession?.sessionId, 'older');
+      expect(provider.selectedDate, DateTime(2026, 4, 16));
+      expect(repository.sessionByDateCalls, isEmpty);
+    });
+
+    test(
+      'loadAll prefers noDataYet over stale fallback data for current day before 6am',
+      () async {
+        final latest = _session(id: 'latest', sleepDate: DateTime(2026, 4, 17));
+        final provider = SleepProvider(
+          repository: _FakeSleepRepository(
+            latestSleep: latest,
+            history: [latest],
+          ),
+          now: () => DateTime(2026, 4, 18, 5, 30),
+        );
+
+        await provider.loadAll(
+          forceRefresh: true,
+          preferredDate: DateTime(2026, 4, 18),
+        );
+
+        expect(provider.loadState, SleepLoadState.noDataYet);
+        expect(provider.selectedSession, isNull);
+        expect(provider.selectedDate, DateTime(2026, 4, 18));
+      },
+    );
+
+    test(
+      'selectDate failure preserves current session and exposes a date error banner message',
+      () async {
+        final latest = _session(id: 'latest', sleepDate: DateTime(2026, 4, 17));
+        final provider = SleepProvider(
+          repository: _FakeSleepRepository(
+            latestSleep: latest,
+            history: [latest],
+            throwOnSessionByDate: Exception('Network error: SocketException'),
+          ),
+        );
+
+        await provider.loadAll(forceRefresh: true);
+        await provider.selectDate(DateTime(2026, 4, 16));
+
+        expect(provider.loadState, SleepLoadState.success);
+        expect(provider.selectedSession?.sessionId, 'latest');
+        expect(provider.selectedDate, DateTime(2026, 4, 17));
+        expect(
+          provider.dateErrorMessage,
+          'Mất kết nối mạng. Vui lòng kiểm tra Wi-Fi/4G.',
+        );
+      },
+    );
   });
 }

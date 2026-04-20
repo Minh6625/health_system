@@ -213,7 +213,7 @@ def temp_caregiver(engine: Engine) -> Iterator[dict[str, int]]:
                     :email,
                     :password_hash,
                     :full_name,
-                    'caregiver',
+                    'user',
                     TRUE,
                     TRUE
                 )

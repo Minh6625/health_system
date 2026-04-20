@@ -13,6 +13,7 @@ class HomeDashboardProvider extends ChangeNotifier {
        _profileId = _normalizeProfileId(profileId);
 
   final HomeDashboardRepository _repository;
+  bool _disposed = false;
 
   bool _isLoading = false;
   String? _error;
@@ -194,13 +195,23 @@ class HomeDashboardProvider extends ChangeNotifier {
 
   void _recordSectionError(HomeDashboardSection section, Object error) {
     _sectionErrors[section] = error.toString();
-    debugPrint(
-      'Home dashboard failed to load ${_sectionLabel(section)} for profile '
-      '${_profileId ?? 'self'}: $error',
-    );
   }
 
   Future<void> refreshDashboard() async {
     await loadDashboardData();
+  }
+
+  @override
+  void notifyListeners() {
+    if (_disposed) {
+      return;
+    }
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
