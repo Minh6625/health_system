@@ -79,11 +79,15 @@ SleepSession _session({
   );
 }
 
-Widget _buildApp({required SleepProvider provider, String? profileId}) {
+Widget _buildApp({
+  required SleepProvider provider,
+  String? profileId,
+  DateTime? date,
+}) {
   return ChangeNotifierProvider<SleepProvider>.value(
     value: provider,
     child: MaterialApp(
-      home: SleepReportScreen(profileId: profileId),
+      home: SleepReportScreen(profileId: profileId, date: date),
       onGenerateRoute: (settings) {
         final args = settings.arguments as Map<String, dynamic>?;
         switch (settings.name) {
@@ -154,30 +158,13 @@ void main() {
       now: () => DateTime(today.year, today.month, today.day, 9),
     );
 
-    await tester.pumpWidget(_buildApp(provider: provider));
+    await tester.pumpWidget(
+      _buildApp(provider: provider, date: previous.sleepDate),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Báo cáo Giấc ngủ'), findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
-    expect(provider.selectedSession?.sessionId, 'latest');
-
-    await tester.tap(find.byIcon(Icons.calendar_month_rounded));
-    await tester.pumpAndSettle();
-    expect(find.byType(DatePickerDialog), findsOneWidget);
-
-    final previousDayText = previous.sleepDate.day.toString();
-    await tester.tap(
-      find
-          .descendant(
-            of: find.byType(DatePickerDialog),
-            matching: find.text(previousDayText),
-          )
-          .first,
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('OK'));
-    await tester.pumpAndSettle();
-
     expect(provider.selectedSession?.sessionId, 'previous');
     expect(find.text(previous.sleepText), findsWidgets);
 
@@ -208,13 +195,27 @@ void main() {
     await tester.tap(find.text(_dayLabel(older.sleepDate)).last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Báo cáo Giấc ngủ'), findsOneWidget);
+    expect(find.text('Chi tiết giấc ngủ'), findsOneWidget);
     expect(provider.selectedSession?.sessionId, 'older');
+    expect(find.text('Hiệu quả giấc ngủ'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Lịch sử giấc ngủ'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Báo cáo Giấc ngủ'), findsOneWidget);
     expect(find.text(older.sleepText), findsWidgets);
 
     await tester.tap(find.byIcon(Icons.settings_outlined));
     await tester.pumpAndSettle();
     expect(find.text('Cài đặt theo dõi giấc ngủ'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Báo cáo Giấc ngủ'), findsOneWidget);
+    expect(provider.selectedSession?.sessionId, 'older');
   });
 
   testWidgets('linked profile hides settings action on report screen', (

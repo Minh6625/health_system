@@ -149,6 +149,21 @@ DeviceConnectionUiState resolveDashboardConnectionState({
   return DeviceConnectionUiState.offline;
 }
 
+DateTime? canonicalSleepDateFromPayload(Map<String, dynamic>? sleepData) {
+  final rawDate = sleepData?['sleep_date'];
+  if (rawDate is DateTime) {
+    return DateTime(rawDate.year, rawDate.month, rawDate.day);
+  }
+  if (rawDate is String) {
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed == null) {
+      return null;
+    }
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+  return null;
+}
+
 class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({
     super.key,
@@ -441,6 +456,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       deviceState: deviceConnectionState,
     );
     final sleepData = provider.sleepData;
+    final sleepDate = canonicalSleepDateFromPayload(sleepData);
     final sleepQualityScore = (sleepData?['quality_score'] as num?)?.toInt();
     final sleepInsightSummary = sleepQualityScore != null
         ? 'Chất lượng: $sleepQualityScore% (${sleepQualityLabelVi(qualityScore: sleepQualityScore, qualityLabel: sleepData?['quality_label'] as String?)})'
@@ -725,10 +741,19 @@ class _DashboardBody extends StatelessWidget {
                   durationLabel: vm.sleepDurationLabel,
                   insightSummary: vm.sleepInsightSummary,
                   onTap: () {
+                    final sleepDate = canonicalSleepDateFromPayload(
+                      provider.sleepData,
+                    );
+                    final arguments = <String, dynamic>{
+                      'profileId': provider.profileId,
+                    };
+                    if (sleepDate != null) {
+                      arguments['date'] = sleepDate;
+                    }
                     Navigator.pushNamed(
                       context,
-                      '/sleep-report',
-                      arguments: {'profileId': provider.profileId},
+                      AppRouter.sleepReport,
+                      arguments: arguments,
                     );
                   },
                 ),

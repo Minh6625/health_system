@@ -61,6 +61,7 @@ class _StubHomeDashboardProvider extends HomeDashboardProvider {
     'in_bed_minutes': 430,
     'quality_score': 86,
     'quality_label': 'GOOD',
+    'sleep_date': '2026-04-18',
   };
 
   @override
@@ -99,7 +100,11 @@ class _CountingSleepProvider extends SleepProvider {
   int loadAllCalls = 0;
 
   @override
-  Future<void> loadAll({String? patientId, bool forceRefresh = false}) async {
+  Future<void> loadAll({
+    String? patientId,
+    bool forceRefresh = false,
+    DateTime? preferredDate,
+  }) async {
     loadAllCalls += 1;
   }
 }
@@ -199,7 +204,10 @@ void main() {
     tester.widget<SleepInsightCard>(find.byType(SleepInsightCard)).onTap();
     await tester.pumpAndSettle();
     expect(lastRoute?.name, AppRouter.sleepReport);
-    expect(lastRoute?.arguments, {'profileId': '42'});
+    expect(lastRoute?.arguments, {
+      'profileId': '42',
+      'date': DateTime(2026, 4, 18),
+    });
   });
 
   testWidgets(

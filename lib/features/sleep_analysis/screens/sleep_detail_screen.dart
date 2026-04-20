@@ -27,16 +27,27 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
       final provider = context.read<SleepProvider>();
       provider.setPatient(widget.profileId);
       if (widget.date != null) {
-        provider.selectDate(widget.date!);
+        final selectedSession = provider.selectedSession;
+        if (selectedSession != null &&
+            _isSameDay(selectedSession.sleepDate, widget.date!)) {
+          provider.selectHistorySession(selectedSession);
+        } else if (!_isSameDay(provider.selectedDate, widget.date!)) {
+          provider.selectDate(widget.date!);
+        }
       } else {
         provider.loadAll(patientId: widget.profileId);
       }
     });
   }
 
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const ValueKey('sleep-detail-screen'),
       extendBodyBehindAppBar: true,
       backgroundColor: const Color(0xFF071220),
       appBar: AppBar(
@@ -50,35 +61,40 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
           child: Consumer<SleepProvider>(
             builder: (context, provider, _) {
               if (provider.isLoading || provider.dateLoading) {
-                return const Center(child: CircularProgressIndicator(color: Color(0xFF48D6FF)));
+                return const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF48D6FF)),
+                );
               }
-              
+
               final session = provider.selectedSession;
               if (session == null) {
-                return const Center(child: Text('Không tìm thấy dữ liệu chi tiết.', style: TextStyle(color: Colors.white)));
+                return const Center(
+                  child: Text(
+                    'Không tìm thấy dữ liệu chi tiết.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                );
               }
 
               return SingleChildScrollView(
-              padding: AppSpacing.cardPadding,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _SectionHeader(title: 'Thời gian phân bổ'),
-                  const SizedBox(height: AppSpacing.gapLg),
-                  SleepTimelineBar(session: session),
-                  const SizedBox(height: 32),
-                  
-                  _SectionHeader(title: 'Cơ cấu giấc ngủ'),
-                  const SizedBox(height: AppSpacing.gapLg),
-                  PhaseCompositionChart(session: session),
-                  const SizedBox(height: 32),
-                  
-                  _SectionHeader(title: 'Chi tiết chỉ số'),
-                  const SizedBox(height: AppSpacing.gapLg),
-                  _buildMetrics(session),
-                ],
-              ),
-            );
+                padding: AppSpacing.cardPadding,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _SectionHeader(title: 'Thời gian phân bổ'),
+                    const SizedBox(height: AppSpacing.gapLg),
+                    SleepTimelineBar(session: session),
+                    const SizedBox(height: 32),
+                    const _SectionHeader(title: 'Cơ cấu giấc ngủ'),
+                    const SizedBox(height: AppSpacing.gapLg),
+                    PhaseCompositionChart(session: session),
+                    const SizedBox(height: 32),
+                    const _SectionHeader(title: 'Chi tiết chỉ số'),
+                    const SizedBox(height: AppSpacing.gapLg),
+                    _buildMetrics(session),
+                  ],
+                ),
+              );
             },
           ),
         ),
@@ -95,13 +111,34 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
       ),
       child: Column(
         children: [
-          MetricTile(icon: Icons.hotel_rounded, iconColor: const Color(0xFF48A9D6), label: 'Thời gian trên giường', value: session.inBedText),
+          MetricTile(
+            icon: Icons.hotel_rounded,
+            iconColor: const Color(0xFF48A9D6),
+            label: 'Thời gian trên giường',
+            value: session.inBedText,
+          ),
           const Divider(color: Color(0x224B5E82), height: 1),
-          MetricTile(icon: Icons.nightlight_rounded, iconColor: const Color(0xFF9C6ADE), label: 'Thời gian thức', value: session.awakeText),
+          MetricTile(
+            icon: Icons.nightlight_rounded,
+            iconColor: const Color(0xFF9C6ADE),
+            label: 'Thời gian thức',
+            value: session.awakeText,
+          ),
           const Divider(color: Color(0x224B5E82), height: 1),
-          MetricTile(icon: Icons.alarm_rounded, iconColor: const Color(0xFFFFC400), label: 'Số lần thức giấc', value: '${session.wakeCount}', unit: 'lần'),
+          MetricTile(
+            icon: Icons.alarm_rounded,
+            iconColor: const Color(0xFFFFC400),
+            label: 'Số lần thức giấc',
+            value: '${session.wakeCount}',
+            unit: 'lần',
+          ),
           const Divider(color: Color(0x224B5E82), height: 1),
-          MetricTile(icon: Icons.percent_rounded, iconColor: const Color(0xFF4CAF50), label: 'Hiệu quả giấc ngủ', value: '${(session.efficiencyRatio * 100).toStringAsFixed(0)}%'),
+          MetricTile(
+            icon: Icons.percent_rounded,
+            iconColor: const Color(0xFF4CAF50),
+            label: 'Hiệu quả giấc ngủ',
+            value: '${(session.efficiencyRatio * 100).toStringAsFixed(0)}%',
+          ),
         ],
       ),
     );
@@ -110,14 +147,30 @@ class _SleepDetailScreenState extends State<SleepDetailScreen> {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
+
   const _SectionHeader({required this.title});
+
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(width: 3, height: AppSpacing.gapLg, decoration: BoxDecoration(color: const Color(0xFF48D6FF), borderRadius: BorderRadius.circular(2))),
+        Container(
+          width: 3,
+          height: AppSpacing.gapLg,
+          decoration: BoxDecoration(
+            color: const Color(0xFF48D6FF),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
         const SizedBox(width: AppSpacing.gapSm),
-        Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }

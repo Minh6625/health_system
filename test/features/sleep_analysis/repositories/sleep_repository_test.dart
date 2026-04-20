@@ -190,5 +190,30 @@ void main() {
         expect(client.calls.single.targetProfileId, 12);
       },
     );
+
+    test(
+      'getSleepHistory rejects non-canonical response wrappers to expose contract drift early',
+      () async {
+        final client = _FakeApiClient((call) async {
+          return [
+            _sleepJson(
+              sessionId: 'history-1',
+              sleepDate: DateTime(2026, 4, 15),
+              startTime: DateTime(2026, 4, 14, 22, 30),
+              endTime: DateTime(2026, 4, 15, 5, 30),
+            ),
+          ];
+        });
+        final repository = SleepRepositoryImpl(client: client);
+
+        expect(
+          () => repository.getSleepHistory(
+            from: DateTime(2026, 4, 14),
+            to: DateTime(2026, 4, 16),
+          ),
+          throwsA(isA<FormatException>()),
+        );
+      },
+    );
   });
 }

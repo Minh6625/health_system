@@ -15,11 +15,7 @@ class SleepReportScreen extends StatefulWidget {
   final String? profileId;
   final DateTime? date;
 
-  const SleepReportScreen({
-    super.key,
-    this.profileId,
-    this.date,
-  });
+  const SleepReportScreen({super.key, this.profileId, this.date});
 
   @override
   State<SleepReportScreen> createState() => _SleepReportScreenState();
@@ -36,14 +32,17 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
 
   Future<void> _bootstrapSleepState() async {
     final provider = context.read<SleepProvider>();
-    await provider.loadAll(patientId: widget.profileId);
-    if (widget.date != null && mounted) {
-      await provider.selectDate(widget.date!);
-    }
+    await provider.loadAll(
+      patientId: widget.profileId,
+      preferredDate: widget.date,
+    );
   }
 
-  Future<void> _onOpenFullCalendar(BuildContext context, SleepProvider provider) async {
-    final today = DateTime.now();
+  Future<void> _onOpenFullCalendar(
+    BuildContext context,
+    SleepProvider provider,
+  ) async {
+    final today = provider.currentTime;
     final picked = await showDatePicker(
       context: context,
       initialDate: provider.selectedDate,
@@ -73,6 +72,7 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const ValueKey('sleep-report-screen'),
       extendBodyBehindAppBar: true,
       backgroundColor: const Color(0xFF071220),
       body: StarryBackground(
@@ -80,7 +80,8 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
           child: Consumer<SleepProvider>(
             builder: (context, provider, _) {
               return RefreshIndicator(
-                onRefresh: () => provider.fetchLatestSleep(patientId: widget.profileId),
+                onRefresh: () =>
+                    provider.fetchLatestSleep(patientId: widget.profileId),
                 color: const Color(0xFF48D6FF),
                 backgroundColor: const Color(0xFF10233F),
                 child: CustomScrollView(
@@ -104,16 +105,21 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
       foregroundColor: Colors.white,
       elevation: 0,
       pinned: true,
-      title: const Text('Báo cáo Giấc ngủ', style: TextStyle(fontWeight: FontWeight.w700)),
+      title: const Text(
+        'Báo cáo Giấc ngủ',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
       actions: [
         IconButton(
           icon: const Icon(Icons.refresh),
-          onPressed: () => context.read<SleepProvider>().fetchLatestSleep(patientId: widget.profileId),
+          onPressed: () => context.read<SleepProvider>().fetchLatestSleep(
+            patientId: widget.profileId,
+          ),
           tooltip: 'Làm mới',
         ),
-        // Settings only for self-profile
         if (widget.profileId == null)
           IconButton(
+            key: const ValueKey('sleep-report-settings-button'),
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
               Navigator.pushNamed(context, '/sleep-settings');
@@ -126,9 +132,12 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
 
   Widget _buildBody(BuildContext context, SleepProvider provider) {
     if (provider.isLoading) {
-      return const SliverFillRemaining(hasScrollBody: false, child: ShimmerSleepLoading());
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: ShimmerSleepLoading(),
+      );
     }
-    if (provider.hasError) {
+    if (provider.hasError && provider.selectedSession == null) {
       return SliverFillRemaining(
         hasScrollBody: false,
         child: _ErrorView(
@@ -138,18 +147,33 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
       );
     }
     if (provider.isNoDataYet) {
-      return const SliverFillRemaining(hasScrollBody: false, child: NoDataTonightView());
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: NoDataTonightView(),
+      );
     }
     if (provider.isEmpty) {
-      return const SliverFillRemaining(hasScrollBody: false, child: EmptySleepView());
+      return const SliverFillRemaining(
+        hasScrollBody: false,
+        child: EmptySleepView(),
+      );
     }
 
     final session = provider.selectedSession;
 
     return SliverPadding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapSm, AppSpacing.gapLg, 32),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.gapLg,
+        AppSpacing.gapSm,
+        AppSpacing.gapLg,
+        32,
+      ),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
+          if (provider.hasDateError) ...[
+            _DateErrorBanner(message: provider.dateErrorMessage!),
+            const SizedBox(height: AppSpacing.gapMd),
+          ],
           if (provider.dateLoading)
             _DateLoadingShimmer()
           else
@@ -160,34 +184,48 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
               onCalendarTap: () => _onOpenFullCalendar(context, provider),
             ),
           const SizedBox(height: AppSpacing.sectionGapXl),
-          
+
           if (session != null) ...[
-            // Preview of timeline & phases
-            const Text('Dữ liệu đêm', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              'Dữ liệu đêm',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: AppSpacing.gapMd),
             SleepTimelineBar(session: session),
             const SizedBox(height: AppSpacing.sectionGapLg),
             PhaseCompositionChart(session: session),
             const SizedBox(height: 32),
-            
-            // CTA Buttons
+
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
+                key: const ValueKey('sleep-report-detail-button'),
                 onPressed: () {
                   Navigator.pushNamed(
-                    context, 
-                    '/sleep-detail', 
-                    arguments: {'profileId': widget.profileId, 'date': provider.selectedDate}
+                    context,
+                    '/sleep-detail',
+                    arguments: {
+                      'profileId': widget.profileId,
+                      'date': provider.selectedDate,
+                    },
                   );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF48D6FF),
                   foregroundColor: const Color(0xFF07162B),
-                  shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadii.cardRadius,
+                  ),
                 ),
-                child: const Text('Xem chi tiết', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Xem chi tiết',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
               ),
             ),
           ],
@@ -196,19 +234,25 @@ class _SleepReportScreenState extends State<SleepReportScreen> {
             width: double.infinity,
             height: 52,
             child: OutlinedButton(
+              key: const ValueKey('sleep-report-history-button'),
               onPressed: () {
                 Navigator.pushNamed(
-                  context, 
+                  context,
                   '/sleep-history',
-                  arguments: {'profileId': widget.profileId}
+                  arguments: {'profileId': widget.profileId},
                 );
               },
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.white,
                 side: const BorderSide(color: Color(0xFF48D6FF)),
-                shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
+                shape: RoundedRectangleBorder(
+                  borderRadius: AppRadii.cardRadius,
+                ),
               ),
-              child: const Text('Lịch sử giấc ngủ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              child: const Text(
+                'Lịch sử giấc ngủ',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              ),
             ),
           ),
         ]),
@@ -228,7 +272,47 @@ class _DateLoadingShimmer extends StatelessWidget {
         border: Border.all(color: const Color(0x332C4367), width: 1),
       ),
       child: const Center(
-        child: SizedBox(width: 28, height: 28, child: CircularProgressIndicator(color: Color(0xFF48D6FF), strokeWidth: 2.5)),
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            color: Color(0xFF48D6FF),
+            strokeWidth: 2.5,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DateErrorBanner extends StatelessWidget {
+  const _DateErrorBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.gapMd),
+      decoration: BoxDecoration(
+        color: const Color(0xFF3A1E25),
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+        border: Border.all(color: const Color(0x66FF7A91)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Color(0xFFFFB4C0)),
+          const SizedBox(width: AppSpacing.gapSm),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Color(0xFFFFD9DF),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -246,7 +330,11 @@ class _ErrorView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.cloud_off_rounded, color: Color(0xFF5B7FA6), size: 64),
+          const Icon(
+            Icons.cloud_off_rounded,
+            color: Color(0xFF5B7FA6),
+            size: 64,
+          ),
           const SizedBox(height: AppSpacing.sectionGapLg),
           Text(message, style: const TextStyle(color: Color(0xFF90A6C3))),
           const SizedBox(height: AppSpacing.sectionGapXl),

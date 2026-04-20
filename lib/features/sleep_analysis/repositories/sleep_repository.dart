@@ -63,22 +63,24 @@ class SleepRepositoryImpl implements SleepRepository {
         },
         targetProfileId: _parseTargetProfileId(patientId),
       );
-
-      // Response can be a Map with a list field, or directly a List
-      dynamic rawList;
-      if (response is List) {
-        rawList = response;
-      } else if (response is Map) {
-        rawList = response['data'] ?? response['items'] ?? response['sessions'];
+      if (response == null) {
+        return [];
       }
-      
-      if (rawList is List) {
-        return rawList
-            .whereType<Map<String, dynamic>>()
-            .map(SleepSession.fromJson)
-            .toList();
+      if (response is! Map) {
+        throw const FormatException(
+          'Unexpected /metrics/sleep/history response shape.',
+        );
       }
-      return [];
+      final rawList = response['data'];
+      if (rawList is! List) {
+        throw const FormatException(
+          'Unexpected /metrics/sleep/history response shape.',
+        );
+      }
+      return rawList
+          .whereType<Map<String, dynamic>>()
+          .map(SleepSession.fromJson)
+          .toList();
     } catch (e) {
       final msg = e.toString();
       if (msg.contains('Not found') || msg.contains('404')) {
@@ -89,7 +91,10 @@ class SleepRepositoryImpl implements SleepRepository {
   }
 
   @override
-  Future<SleepSession?> getSessionByDate(DateTime date, {String? patientId}) async {
+  Future<SleepSession?> getSessionByDate(
+    DateTime date, {
+    String? patientId,
+  }) async {
     final reportDate = DateTime(date.year, date.month, date.day);
     final sessions = await getSleepHistory(
       from: reportDate,

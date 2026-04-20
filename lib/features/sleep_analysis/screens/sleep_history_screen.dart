@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/sleep_trend_chart.dart';
 import 'package:healthguard/features/sleep_analysis/widgets/starry_background.dart';
@@ -27,6 +28,7 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const ValueKey('sleep-history-screen'),
       extendBodyBehindAppBar: true,
       backgroundColor: const Color(0xFF071220),
       appBar: AppBar(
@@ -66,10 +68,7 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                       historyList: history,
                       highlightedDate: provider.selectedSession?.sleepDate,
                       onSessionTapped: (session) {
-                        provider.selectHistorySession(session);
-                        Navigator.pop(
-                          context,
-                        ); // Return to report with new date selected
+                        _openDetail(context, provider, session);
                       },
                     ),
                   ),
@@ -83,9 +82,11 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
                       itemBuilder: (context, index) {
                         final session = history[index];
                         return InkWell(
+                          key: ValueKey(
+                            'sleep-history-item-${session.sessionId}',
+                          ),
                           onTap: () {
-                            provider.selectHistorySession(session);
-                            Navigator.pop(context);
+                            _openDetail(context, provider, session);
                           },
                           borderRadius: AppRadii.cardRadius,
                           child: Container(
@@ -156,6 +157,19 @@ class _SleepHistoryScreenState extends State<SleepHistoryScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _openDetail(
+    BuildContext context,
+    SleepProvider provider,
+    SleepSession session,
+  ) {
+    provider.selectHistorySession(session);
+    Navigator.pushNamed(
+      context,
+      '/sleep-detail',
+      arguments: {'profileId': widget.profileId, 'date': session.sleepDate},
     );
   }
 }

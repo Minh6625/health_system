@@ -65,6 +65,7 @@ class _StubHomeDashboardProvider extends HomeDashboardProvider {
     'in_bed_minutes': 430,
     'quality_score': 86,
     'quality_label': 'GOOD',
+    'sleep_date': '2026-04-17',
   };
 
   @override
