@@ -10,32 +10,35 @@ from app.schemas.emergency import (
     ResolveSOSRequest,
     TriggerSOSRequest,
     SuccessResponse,
+    TriggerSOSResponse,
 )
 from app.services.emergency_service import EmergencyService
 
 
 router = APIRouter(prefix="/emergency", tags=["Emergency"])
 
-@router.post("/sos/trigger", response_model=SuccessResponse)
+@router.post("/sos/trigger", response_model=TriggerSOSResponse)
 def trigger_sos(
     payload: TriggerSOSRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
-) -> SuccessResponse:
+) -> TriggerSOSResponse:
     """
     Triggers a manual or automatic SOS event for the current user.
     """
-    EmergencyService.trigger_sos(
-        db, 
-        current_user.id, 
-        payload.trigger_type,
-        payload.latitude,
-        payload.longitude,
-        payload.address
+    sos_event, dispatch_info = EmergencyService.trigger_sos(
+        db,
+        current_user.id,
+        trigger_type=payload.trigger_type,
+        latitude=payload.latitude,
+        longitude=payload.longitude,
+        address=payload.address,
     )
-    return SuccessResponse(
+    return TriggerSOSResponse(
         success=True,
-        message="Đã gửi tín hiệu khẩn cấp thành công"
+        message="Đã gửi tín hiệu khẩn cấp thành công",
+        sos_id=int(sos_event.id),
+        recipient_count=len(dispatch_info["recipient_user_ids"]),
     )
 
 @router.get("/caregiver/sos-alerts", response_model=SOSAlertsResponse)

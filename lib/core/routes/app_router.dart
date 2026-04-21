@@ -240,7 +240,7 @@ class AppRouter {
           ),
         );
       case manualSos:
-        return MaterialPageRoute(builder: (_) => const ManualSOSScreen());
+        return MaterialPageRoute(builder: (_) => ManualSOSScreen());
       case sosConfirm:
         return MaterialPageRoute(
           builder: (_) => SosConfirmScreen(

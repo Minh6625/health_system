@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/app.dart';
 import 'package:healthguard/core/routes/app_router.dart';
@@ -7,14 +6,15 @@ import 'package:healthguard/features/auth/services/auth_session_service.dart';
 import 'package:healthguard/features/family/repositories/family_repository.dart';
 import 'package:healthguard/features/home/presentation/widgets/risk_insight_card.dart';
 import 'package:healthguard/features/analysis/presentation/widgets/risk_history_item_card.dart';
+import 'package:healthguard/shared/presentation/shell/main_scaffold_shell.dart';
 import 'package:integration_test/integration_test.dart';
+
+import 'helpers/e2e_test_config.dart';
 
 const _patientEmail = 'e2e.dashboard.patient@example.com';
 const _patientPassword = 'PatientE2E!123';
 const _caregiverEmail = 'e2e.dashboard.caregiver@example.com';
 const _caregiverPassword = 'CaregiverE2E!123';
-const _testApiUrl = 'http://127.0.0.1:8000/api/v1/mobile';
-
 Finder _textFieldWithLabel(String label) {
   final fields = find.byType(TextFormField);
   return switch (label) {
@@ -42,7 +42,7 @@ Future<void> _pumpUntilVisible(
 
 Future<void> _launchApp(WidgetTester tester) async {
   await AuthSessionService.shared.clearSession();
-  dotenv.testLoad(fileInput: 'API_URL=$_testApiUrl\nMOCK_DEVICE=false');
+  await loadE2ETestConfig(mockDevice: false);
   await tester.pumpWidget(const HealthSystemApp());
   await tester.pump(const Duration(milliseconds: 300));
 }
@@ -63,8 +63,10 @@ Future<void> _login(
   await _openLoginForm(tester);
   await tester.enterText(_textFieldWithLabel('Email'), email);
   await tester.enterText(_textFieldWithLabel('Mật khẩu'), password);
-  await tester.tap(find.text('ĐĂNG NHẬP'));
+  final loginButton = find.widgetWithText(ElevatedButton, 'ĐĂNG NHẬP');
+  tester.widget<ElevatedButton>(loginButton).onPressed!.call();
   await tester.pump(const Duration(milliseconds: 300));
+  await _pumpUntilVisible(tester, find.byType(MainScaffoldShell));
   await _pumpUntilVisible(tester, find.text('Điểm sức khoẻ hôm nay'));
 }
 

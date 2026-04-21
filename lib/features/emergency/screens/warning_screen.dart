@@ -34,7 +34,7 @@ class WarningScreen extends StatelessWidget {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const ManualSOSScreen(),
+                          builder: (context) => ManualSOSScreen(),
                         ),
                       );
                     },

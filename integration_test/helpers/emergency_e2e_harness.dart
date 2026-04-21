@@ -1,7 +1,11 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/app.dart';
 import 'package:healthguard/features/auth/services/auth_session_service.dart';
+import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
+import 'package:healthguard/shared/presentation/shell/main_scaffold_shell.dart';
 
 import 'e2e_test_config.dart';
 
@@ -17,6 +21,20 @@ Finder textFieldWithLabel(String label) {
     'Mật khẩu' => fields.last,
     _ => fields,
   };
+}
+
+String _visibleTextDebugDump(WidgetTester tester) {
+  final values = <String>{};
+
+  for (final widget in tester.widgetList<Text>(find.byType(Text))) {
+    final text = widget.data ?? widget.textSpan?.toPlainText();
+    final normalized = text?.trim();
+    if (normalized != null && normalized.isNotEmpty) {
+      values.add(normalized);
+    }
+  }
+
+  return values.isEmpty ? '<no visible Text widgets>' : values.join(' | ');
 }
 
 Future<void> pumpUntilVisible(
@@ -38,6 +56,8 @@ Future<void> pumpUntilVisible(
 Future<void> launchEmergencyApp(WidgetTester tester) async {
   await AuthSessionService.shared.clearSession();
   await loadE2ETestConfig(mockDevice: false);
+  await Firebase.initializeApp();
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   await tester.pumpWidget(const HealthSystemApp());
   await tester.pump(const Duration(milliseconds: 300));
 }
@@ -58,9 +78,23 @@ Future<void> login(
   await openLoginForm(tester);
   await tester.enterText(textFieldWithLabel('Email'), email);
   await tester.enterText(textFieldWithLabel('Mật khẩu'), password);
-  await tester.tap(find.text('ĐĂNG NHẬP'));
+  final loginButton = find.widgetWithText(ElevatedButton, 'ĐĂNG NHẬP');
+  tester.widget<ElevatedButton>(loginButton).onPressed!.call();
   await tester.pump(const Duration(milliseconds: 300));
-  await pumpUntilVisible(tester, find.text('Điểm sức khoẻ hôm nay'));
+
+  final dashboardShell = find.byType(MainScaffoldShell);
+  final deadline = DateTime.now().add(const Duration(seconds: 30));
+  while (DateTime.now().isBefore(deadline)) {
+    await tester.pump(const Duration(milliseconds: 250));
+    if (dashboardShell.evaluate().isNotEmpty) {
+      return;
+    }
+  }
+
+  fail(
+    'Timed out waiting for authenticated dashboard shell. '
+    'Visible texts: ${_visibleTextDebugDump(tester)}',
+  );
 }
 
 Future<void> relaunchWithClearedSession(WidgetTester tester) async {

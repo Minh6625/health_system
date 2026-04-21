@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/app.dart';
 import 'package:healthguard/core/routes/app_router.dart';
@@ -14,14 +13,14 @@ import 'package:healthguard/features/sleep_analysis/screens/sleep_report_screen.
 import 'package:integration_test/integration_test.dart';
 import 'package:provider/provider.dart';
 
+import 'helpers/e2e_test_config.dart';
+
 const _patientEmail = 'e2e.dashboard.patient@example.com';
 const _patientPassword = 'PatientE2E!123';
 const _caregiverEmail = 'e2e.dashboard.caregiver@example.com';
 const _caregiverPassword = 'CaregiverE2E!123';
 const _emptySleepEmail = 'e2e.sleep.empty@example.com';
 const _emptySleepPassword = 'SleepEmptyE2E!123';
-const _testApiUrl = 'http://127.0.0.1:8000/api/v1/mobile';
-
 Finder _textFieldWithLabel(String label) {
   final fields = find.byType(TextFormField);
   return switch (label) {
@@ -52,7 +51,7 @@ Future<void> _launchApp(
   DateTime Function()? sleepNow,
 }) async {
   await AuthSessionService.shared.clearSession();
-  dotenv.testLoad(fileInput: 'API_URL=$_testApiUrl\nMOCK_DEVICE=false');
+  await loadE2ETestConfig(mockDevice: false);
   await tester.pumpWidget(HealthSystemApp(sleepNow: sleepNow));
   await tester.pump(const Duration(milliseconds: 300));
 }
