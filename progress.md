@@ -1,55 +1,34 @@
-# Progress Log
+# Emergency SOS Verification Log
 
-## Session: 2026-04-19 (Sleep Analysis ship audit)
+## Snapshot Date
 
-### Phase 1: Discovery
-- **Status:** complete
-- Actions taken:
-  - Enforced session diary sentinel.
-  - Verified MemPalace status and semantic health resource.
-  - Confirmed active repo is `health_system`.
-  - Loaded `task-router-lite`, `planning-with-files`, and `e2e-testing` skills.
-  - Confirmed `plans/sleep/README.md` is absent from the current repo snapshot.
-  - Traced sleep mobile flow: home preview, `SleepReportScreen`, `SleepDetailScreen`, `SleepHistoryScreen`, `SleepSettingsScreen`, `SleepProvider`, `SleepRepositoryImpl`.
-  - Traced backend sleep ingest/read flow: `telemetry.py`, `monitoring.py`, `monitoring_service.py`, `dependencies.py`, sleep schema, and migration.
+- April 21, 2026
 
-### Phase 2: Risk Analysis
-- **Status:** complete
-- Actions taken:
-  - Identified that history interactions pop back to report instead of opening sleep detail.
-  - Identified a semantics gap between dashboard sleep preview and report bootstrap because the route does not carry `sleep_date`.
-  - Identified provider error-state behavior that can replace already-loaded report data with a generic error view on date fetch failure.
-  - Confirmed `SleepSettingsScreen` is local-only UI and should not be treated as persisted settings coverage.
-  - Confirmed existing E2E planning docs overstate readiness versus the current real-device evidence.
+## Automated Verification Completed
 
-### Phase 3: Verification
-- **Status:** complete
-- Actions taken:
-  - Re-ran backend monitoring contract/routes tests successfully.
-  - Re-ran Flutter sleep repository/provider/widget/screen tests successfully.
-  - Re-ran live DB telemetry E2E gate and captured one failure plus one fixture/setup error.
+- `cmd.exe /c D:/DoAn2/VSmartwatch/flutter/bin/flutter.bat test test/features/emergency`
+  - Result: `22 passed`
+- `cmd.exe /c python -m pytest tests/test_emergency_routes_http.py tests/test_emergency_service_contract.py -q`
+  - Result: `8 passed`
+- `cmd.exe /c python -m pytest tests/test_e2e_manual_sos.py tests/test_e2e_risk_response_real_db.py -q`
+  - Result: `3 skipped`
+  - Reason: `RUN_REAL_DB_E2E` not enabled
+- `cmd.exe /c python -m pytest tests/test_e2e_risk_notification.py -q`
+  - Result: `5 skipped`
+  - Reason: `RUN_REAL_DB_E2E` not enabled
 
-## Test Results
-| Test | Input | Expected | Actual | Status |
-|------|-------|----------|--------|--------|
-| Session context | `mempalace_status` + `semantic://health` | Context layer ready | MemPalace available, semantic `status=ok` | PASS |
-| Backend monitoring sleep contract/routes | `backend\\venv\\Scripts\\python.exe -m pytest backend\\tests\\test_monitoring_service_contract.py backend\\tests\\test_monitoring_routes_http.py -q` | Canonical monitoring sleep contract passes | `14 passed, 9 warnings` | PASS |
-| Flutter sleep flow suite | `flutter test test\\features\\sleep_analysis\\repositories\\sleep_repository_test.dart test\\features\\sleep_analysis\\providers\\sleep_provider_test.dart test\\features\\sleep_analysis\\widgets\\sleep_widgets_test.dart test\\features\\sleep_analysis\\screens\\sleep_flow_test.dart` | Repository/provider/widget/screen flow passes | `16 passed` | PASS |
-| Live DB telemetry E2E gate | `RUN_REAL_DB_E2E=1 backend\\venv\\Scripts\\python.exe -m pytest backend\\tests\\test_e2e_telemetry_real_db.py -q` | Live ingest/read gate passes cleanly | `1 failed, 2 passed, 1 error` | FAIL |
+## Integration Harness Status
 
-## Error Log
-| Timestamp | Error | Attempt | Resolution |
-|-----------|-------|---------|------------|
-| 2026-04-19 23:xx | `flutter test` could not write `.flutter_tool_state` in sandbox | 1 | Re-ran outside sandbox with approval |
-| 2026-04-19 23:xx | Live DB E2E launch returned access denied in sandbox | 1 | Re-ran outside sandbox with approval |
-| 2026-04-19 23:xx | Live DB E2E caregiver fixture violated `users_role_check` | 1 | Captured as ship blocker for test harness |
-| 2026-04-19 23:xx | Live DB E2E vitals ingest returned `risk_eval_failed ... RiskScore` | 1 | Captured as release-gate failure; no code change in this analysis session |
+- `cmd.exe /c D:/DoAn2/VSmartwatch/flutter/bin/flutter.bat test integration_test/emergency_risk_alert_real_device_e2e_test.dart`
+  - Result: blocked before execution because Flutter required an explicit device target
+- `cmd.exe /c D:/DoAn2/VSmartwatch/flutter/bin/flutter.bat test integration_test/emergency_risk_alert_real_device_e2e_test.dart -d windows`
+  - Result: blocked by missing Visual Studio toolchain for the Windows desktop target
+- `cmd.exe /c python -m uvicorn app.main:app --host 127.0.0.1 --port 8000`
+  - Result: backend failed to boot because PostgreSQL on `localhost:5432` refused connections
 
-## 5-Question Reboot Check
-| Question | Answer |
-|----------|--------|
-| Where am I? | Delivery phase for Sleep Analysis ship review |
-| Where am I going? | Final findings + real-device integration design |
-| What's the goal? | Decide what still blocks shipping Sleep as a real E2E module |
-| What have I learned? | See `findings.md` |
-| What have I done? | See phases and test results above |
+## Current Release Read
+
+- Code and focused automated Emergency gates are green on this branch.
+- Live DB backend E2E is staged and runnable, but not proven on this machine without the real DB gate.
+- Device/integration harness exists, but this machine cannot prove a real-device pass yet because host toolchain and runtime dependencies are missing.
+- Release status remains `PARTIAL`, but it is the strongest verifiable Emergency SOS state currently available from this branch.

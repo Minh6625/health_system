@@ -92,6 +92,7 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const ValueKey('sos-confirm-screen'),
       backgroundColor: AppColors.textPrimary.withValues(alpha: 0.5),
       body: SafeArea(
         child: LayoutBuilder(
@@ -133,6 +134,7 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
                     child: Column(
                       children: [
                         Text(
+                          key: const ValueKey('sos-confirm-title'),
                           _titleText,
                           style: const TextStyle(
                             fontSize: 28,
@@ -206,6 +208,7 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
                             label: 'Trạng thái',
                             value: _statusText,
                             color: AppColors.warning,
+                            key: const ValueKey('sos-confirm-status'),
                           ),
                         ],
                       ),
@@ -247,6 +250,7 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
+                      key: const ValueKey('sos-confirm-home-button'),
                       onPressed: _onBackToHome,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.brandPrimary,
@@ -276,12 +280,14 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
   }
 
   Widget _buildInfoRow({
+    Key? key,
     required IconData icon,
     required String label,
     required String value,
     required Color color,
   }) {
     return Row(
+      key: key,
       children: [
         Container(
           width: 36,

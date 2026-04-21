@@ -1,6 +1,26 @@
 import 'package:healthguard/core/network/api_client.dart';
 import 'package:healthguard/features/emergency/models/sos_event_model.dart';
 
+class TriggerSOSResult {
+  final String sosId;
+  final int recipientCount;
+  final String? message;
+
+  const TriggerSOSResult({
+    required this.sosId,
+    required this.recipientCount,
+    this.message,
+  });
+
+  factory TriggerSOSResult.fromJson(Map<String, dynamic> json) {
+    return TriggerSOSResult(
+      sosId: json['sos_id'].toString(),
+      recipientCount: (json['recipient_count'] as num?)?.toInt() ?? 0,
+      message: json['message'] as String?,
+    );
+  }
+}
+
 class SOSAlertsResult {
   final List<SOSEventModel> sosAlerts;
   final int totalCount;
@@ -16,7 +36,10 @@ class SOSAlertsResult {
 }
 
 class EmergencyCaregiverRepository {
-  final ApiClient _apiClient = ApiClient();
+  EmergencyCaregiverRepository({ApiClient? apiClient})
+    : _apiClient = apiClient ?? ApiClient();
+
+  final ApiClient _apiClient;
 
   /// Get list of SOS alerts with optional status filter
   Future<SOSAlertsResult> getSOSAlerts({required String status}) async {
@@ -52,13 +75,13 @@ class EmergencyCaregiverRepository {
   }
 
   /// Trigger manual SOS event
-  Future<void> triggerSOS({
+  Future<TriggerSOSResult> triggerSOS({
     double? latitude,
     double? longitude,
     String? address,
   }) async {
     try {
-      await _apiClient.post(
+      final result = await _apiClient.post(
         '/emergency/sos/trigger',
         body: {
           'trigger_type': 'manual',
@@ -70,6 +93,7 @@ class EmergencyCaregiverRepository {
           if (address != null) 'address': address,
         },
       );
+      return TriggerSOSResult.fromJson(result as Map<String, dynamic>);
     } catch (e) {
       throw Exception('Không thể gửi cảnh báo khẩn cấp: ${e.toString()}');
     }

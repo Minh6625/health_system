@@ -16,8 +16,15 @@ import 'package:latlong2/latlong.dart';
 /// SOS Detail screen for Caregiver
 class EmergencySOSDetailScreen extends StatefulWidget {
   final String sosId;
+  final bool enableAutoRefresh;
+  final Duration detailPollInterval;
 
-  const EmergencySOSDetailScreen({super.key, required this.sosId});
+  const EmergencySOSDetailScreen({
+    super.key,
+    required this.sosId,
+    this.enableAutoRefresh = true,
+    this.detailPollInterval = const Duration(seconds: 30),
+  });
 
   @override
   State<EmergencySOSDetailScreen> createState() =>
@@ -75,8 +82,17 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     if (!_isInitialized) {
       _isInitialized = true;
       _provider = context.read<EmergencyCaregiverProvider>();
-      _provider.fetchSOSDetail(widget.sosId);
-      _provider.subscribeToSOSUpdates(widget.sosId);
+      Future.microtask(() {
+        if (!mounted) {
+          return;
+        }
+        _provider.fetchSOSDetail(widget.sosId);
+        _provider.subscribeToSOSUpdates(
+          widget.sosId,
+          enabled: widget.enableAutoRefresh,
+          interval: widget.detailPollInterval,
+        );
+      });
     }
   }
 
@@ -119,6 +135,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const ValueKey('emergency-sos-detail-screen'),
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(title: const Text('Chi tiết SOS'), elevation: 0),
       body: Builder(
@@ -174,8 +191,14 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
   }
 
   Widget _buildDetailContent(BuildContext context) {
-    return Column(
-      children: [
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mapHeight = math.max(
+          160.0,
+          math.min(220.0, constraints.maxHeight * 0.3),
+        );
+        return Column(
+          children: [
         // Patient Header
         Selector<EmergencyCaregiverProvider, SOSEventModel?>(
           selector: (context, provider) => provider.sosDetail,
@@ -316,7 +339,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
           builder: (context, locStr, child) {
             final sos = context.read<EmergencyCaregiverProvider>().sosDetail!;
             return Container(
-              height: 220,
+              height: mapHeight,
               margin:
                   const EdgeInsets.symmetric(horizontal: AppSpacing.gapLg),
               decoration: BoxDecoration(
@@ -501,7 +524,9 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             return _buildActionButtons(provider, sos);
           },
         ),
-      ],
+          ],
+        );
+      },
     );
   }
 
@@ -788,6 +813,13 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
               color: AppColors.textSecondary,
             ),
           ),
+          const SizedBox(height: AppSpacing.gapXs),
+          Text(
+            'Trạng thái xử lý: ${resolution.resolutionStatus}',
+            style: AppTextStyles.body.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
           if (resolution.notes != null) ...[
             const SizedBox(height: AppSpacing.gapSm),
             Text(
@@ -888,6 +920,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
+                key: const ValueKey('emergency-sos-detail-resolve-button'),
                 onPressed: _isResolving
                     ? null
                     : () => _confirmSafety(provider, sos.id),
@@ -911,6 +944,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
 
   Widget _buildErrorState(String message) {
     return Center(
+      key: const ValueKey('emergency-sos-detail-error'),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -927,6 +961,7 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
           ),
           const SizedBox(height: AppSpacing.gapLg),
           ElevatedButton.icon(
+            key: const ValueKey('emergency-sos-detail-retry'),
             onPressed: () {
               context
                   .read<EmergencyCaregiverProvider>()
@@ -959,16 +994,19 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        key: const ValueKey('emergency-sos-detail-resolve-dialog'),
         title: const Text('Xác nhận xử lý'),
         content: const Text(
           'Bạn có chắc chắn muốn xác nhận đã xử lý sự kiện này?',
         ),
         actions: [
           TextButton(
+            key: const ValueKey('emergency-sos-detail-resolve-cancel'),
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Hủy'),
           ),
           ElevatedButton(
+            key: const ValueKey('emergency-sos-detail-resolve-confirm'),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Xác nhận'),
           ),

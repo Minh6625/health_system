@@ -203,14 +203,22 @@ class EmergencyCaregiverProvider extends ChangeNotifier {
   /// Subscribe to real-time SOS updates (WebSocket)
   /// Note: WebSocket implementation would require a WebSocket service
   /// For now, this is a placeholder that uses polling as fallback
-  void subscribeToSOSUpdates(String sosId) {
+  void subscribeToSOSUpdates(
+    String sosId, {
+    Duration interval = const Duration(seconds: 30),
+    bool enabled = true,
+  }) {
     // Cancel existing subscription
     _sosUpdateSubscription?.cancel();
+
+    if (!enabled) {
+      return;
+    }
 
     // TODO: Implement WebSocket connection here
     // For MVP, we'll use polling every 30 seconds
     _sosUpdateSubscription =
-        Stream.periodic(const Duration(seconds: 30), (_) => sosId)
+        Stream.periodic(interval, (_) => sosId)
             .asyncMap((id) async {
               try {
                 return await repository.getSOSDetail(sosId: id);
