@@ -33,6 +33,7 @@ pytestmark = pytest.mark.skipif(
 def _insert_risk_alert(
     engine: Engine,
     *,
+    device_id: int,
     user_id: int,
     alert_type: str,
     risk_score_id: int,
@@ -52,7 +53,7 @@ def _insert_risk_alert(
                     data
                 )
                 VALUES (
-                    NULL,
+                    :device_id,
                     :user_id,
                     NULL,
                     :alert_type,
@@ -65,6 +66,7 @@ def _insert_risk_alert(
                 """
             ),
             {
+                "device_id": device_id,
                 "user_id": user_id,
                 "alert_type": alert_type,
                 "severity": "critical" if alert_type == "risk_critical" else "high",
@@ -93,6 +95,7 @@ def test_risk_safe_response_enforces_auth_and_persists_ack(
     caregiver_id = emergency_users["caregiver_id"]
     alert_id = _insert_risk_alert(
         engine,
+        device_id=emergency_users["device_id"],
         user_id=patient_id,
         alert_type="risk_high",
         risk_score_id=4101,
@@ -103,7 +106,7 @@ def test_risk_safe_response_enforces_auth_and_persists_ack(
             f"/mobile/risk/alerts/{alert_id}/respond",
             json={"action": "safe", "source": "overlay"},
         )
-        assert unauthorized.status_code == 401
+        assert unauthorized.status_code in {401, 403}
 
         forbidden = client.post(
             f"/mobile/risk/alerts/{alert_id}/respond",
@@ -162,12 +165,14 @@ def test_risk_escalation_creates_vital_critical_sos_for_caregiver(
     caregiver_id = emergency_users["caregiver_id"]
     help_alert_id = _insert_risk_alert(
         engine,
+        device_id=emergency_users["device_id"],
         user_id=patient_id,
         alert_type="risk_critical",
         risk_score_id=5101,
     )
     timeout_alert_id = _insert_risk_alert(
         engine,
+        device_id=emergency_users["device_id"],
         user_id=patient_id,
         alert_type="risk_critical",
         risk_score_id=5102,

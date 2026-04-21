@@ -4,6 +4,8 @@ from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+from fastapi import HTTPException
+
 from app.services.emergency_service import EmergencyService
 
 
@@ -164,3 +166,49 @@ def test_help_requested_response_includes_recipient_count() -> None:
     assert result["status"] == "escalated"
     assert result["sos_event_id"] == 888
     assert result["recipient_count"] == 3
+
+
+def test_trigger_sos_uses_active_device_when_request_omits_device_id() -> None:
+    db = object()
+    sos_event = SimpleNamespace(id=91, user_id=12, trigger_type="manual")
+
+    with patch(
+        "app.services.emergency_service.EmergencyRepository.get_active_device_id_for_user",
+        return_value=44,
+    ) as get_active_device_id, patch(
+        "app.services.emergency_service.EmergencyRepository.create_sos_event",
+        return_value=sos_event,
+    ) as create_sos_event, patch(
+        "app.services.emergency_service.EmergencyService._create_alerts_for_sos_event",
+        return_value={"recipient_user_ids": [77]},
+    ):
+        result = EmergencyService.trigger_sos(
+            db,
+            user_id=12,
+            trigger_type="manual",
+        )
+
+    get_active_device_id.assert_called_once_with(db, 12)
+    create_sos_event.assert_called_once()
+    assert create_sos_event.call_args.kwargs["device_id"] == 44
+    assert result[0] is sos_event
+
+
+def test_trigger_sos_rejects_request_without_active_device() -> None:
+    db = object()
+
+    with patch(
+        "app.services.emergency_service.EmergencyRepository.get_active_device_id_for_user",
+        return_value=None,
+    ):
+        try:
+            EmergencyService.trigger_sos(
+                db,
+                user_id=12,
+                trigger_type="manual",
+            )
+        except HTTPException as error:
+            assert error.status_code == 400
+            assert "thiết bị hoạt động" in error.detail
+        else:
+            raise AssertionError("Expected HTTPException when no active device exists")

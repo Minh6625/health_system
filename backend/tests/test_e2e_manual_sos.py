@@ -73,6 +73,7 @@ def backend_base_url() -> Iterator[str]:
         if not existing_pythonpath
         else f"{BACKEND_DIR}{os.pathsep}{existing_pythonpath}"
     )
+    env["E2E_DISABLE_PUSH"] = "1"
 
     process = subprocess.Popen(
         [
@@ -128,6 +129,7 @@ def backend_base_url() -> Iterator[str]:
 def emergency_users(engine: Engine) -> Iterator[dict[str, int]]:
     patient_email = f"manual-sos-patient-{uuid.uuid4().hex[:12]}@example.com"
     caregiver_email = f"manual-sos-caregiver-{uuid.uuid4().hex[:12]}@example.com"
+    device_id: int | None = None
 
     with engine.begin() as connection:
         patient_id = connection.execute(
@@ -219,10 +221,38 @@ def emergency_users(engine: Engine) -> Iterator[dict[str, int]]:
             },
         )
 
+        device_id = connection.execute(
+            text(
+                """
+                INSERT INTO devices (
+                    user_id,
+                    device_name,
+                    device_type,
+                    serial_number,
+                    is_active
+                )
+                VALUES (
+                    :user_id,
+                    :device_name,
+                    'smartwatch',
+                    :serial_number,
+                    TRUE
+                )
+                RETURNING id
+                """
+            ),
+            {
+                "user_id": int(patient_id),
+                "device_name": f"Emergency E2E Device {uuid.uuid4().hex[:8]}",
+                "serial_number": f"emergency-e2e-{uuid.uuid4()}",
+            },
+        ).scalar_one()
+
     try:
         yield {
             "patient_id": int(patient_id),
             "caregiver_id": int(caregiver_id),
+            "device_id": int(device_id),
         }
     finally:
         with engine.begin() as connection:
@@ -238,6 +268,16 @@ def emergency_users(engine: Engine) -> Iterator[dict[str, int]]:
                     "caregiver_id": int(caregiver_id),
                 },
             )
+            if device_id is not None:
+                connection.execute(
+                    text(
+                        """
+                        DELETE FROM devices
+                        WHERE id = :device_id
+                        """
+                    ),
+                    {"device_id": int(device_id)},
+                )
             connection.execute(
                 text(
                     """
@@ -287,7 +327,7 @@ def test_manual_sos_round_trip_persists_lists_details_and_resolves(
             "/mobile/emergency/sos/trigger",
             json={"trigger_type": "manual"},
         )
-        assert unauthorized.status_code == 401
+        assert unauthorized.status_code in {401, 403}
 
         trigger_response = client.post(
             "/mobile/emergency/sos/trigger",

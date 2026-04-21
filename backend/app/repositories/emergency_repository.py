@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import and_, or_, func, exists
 from sqlalchemy.orm import Session, joinedload
 
+from app.models.device_model import Device
 from app.models.risk_alert_response_model import RiskAlertResponse
 from app.models.sos_event_model import Alert, SOSEvent, FallEvent
 from app.models.user_model import User
@@ -27,6 +28,36 @@ class EmergencyRepository:
             .filter(RiskAlertResponse.notification_id == notification_id)
             .first()
         )
+
+    @staticmethod
+    def get_risk_alert_response_by_sos_event_id(
+        db: Session,
+        sos_event_id: int,
+    ) -> Optional[RiskAlertResponse]:
+        return (
+            db.query(RiskAlertResponse)
+            .filter(RiskAlertResponse.sos_event_id == sos_event_id)
+            .first()
+        )
+
+    @staticmethod
+    def get_risk_response_sos_event_ids(
+        db: Session,
+        sos_event_ids: list[int],
+    ) -> set[int]:
+        if not sos_event_ids:
+            return set()
+
+        rows = (
+            db.query(RiskAlertResponse.sos_event_id)
+            .filter(RiskAlertResponse.sos_event_id.in_(sos_event_ids))
+            .all()
+        )
+        return {
+            int(sos_event_id)
+            for (sos_event_id,) in rows
+            if sos_event_id is not None
+        }
 
     @staticmethod
     def check_user_has_access(db: Session, viewer_id: int, target_user_id: int) -> bool:
@@ -214,6 +245,25 @@ class EmergencyRepository:
         db.add(response)
         db.flush()
         return response
+
+    @staticmethod
+    def get_active_device_id_for_user(
+        db: Session,
+        user_id: int,
+    ) -> int | None:
+        row = (
+            db.query(Device.id)
+            .filter(
+                Device.user_id == user_id,
+                Device.is_active.is_(True),
+                Device.deleted_at.is_(None),
+            )
+            .order_by(Device.registered_at.desc(), Device.id.desc())
+            .first()
+        )
+        if row is None:
+            return None
+        return int(row[0])
 
     @staticmethod
     def get_alert_recipient_user_ids(

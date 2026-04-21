@@ -24,6 +24,44 @@ class EmergencyService:
     """Business logic for emergency/SOS operations."""
 
     @staticmethod
+    def _normalize_read_trigger_type(
+        stored_trigger_type: str | None,
+        *,
+        is_risk_origin: bool,
+    ) -> str:
+        if is_risk_origin:
+            return "vital_critical"
+
+        normalized = (stored_trigger_type or "").strip().lower()
+        if normalized in {"auto", "fall_detected", "fall_detection"}:
+            return "fall_detected"
+        if normalized == "manual":
+            return "manual"
+        return normalized or "manual"
+
+    @staticmethod
+    def _parse_resolution_notes(
+        raw_notes: str | None,
+    ) -> tuple[str, str | None]:
+        default_status = "safe"
+        if raw_notes is None:
+            return default_status, None
+
+        normalized = raw_notes.strip()
+        if not normalized:
+            return default_status, None
+
+        if normalized.startswith("[") and "]" in normalized:
+            closing_index = normalized.find("]")
+            status_value = normalized[1:closing_index].strip().lower() or default_status
+            cleaned_notes = normalized[closing_index + 1 :].strip()
+            if not cleaned_notes or cleaned_notes.lower() == "no notes":
+                cleaned_notes = None
+            return status_value, cleaned_notes
+
+        return default_status, normalized
+
+    @staticmethod
     def trigger_sos(
         db: Session,
         user_id: int,
@@ -39,10 +77,23 @@ class EmergencyService:
     ) -> tuple[SOSEvent, dict[str, Any]]:
         """Trigger a new SOS event and fan out alerts."""
 
+        resolved_device_id = device_id
+        if resolved_device_id is None:
+            resolved_device_id = EmergencyRepository.get_active_device_id_for_user(
+                db,
+                int(user_id),
+            )
+
+        if resolved_device_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Không tìm thấy thiết bị hoạt động để gửi SOS",
+            )
+
         sos_event = EmergencyRepository.create_sos_event(
             db=db,
             user_id=user_id,
-            device_id=device_id,
+            device_id=resolved_device_id,
             trigger_type=trigger_type,
             latitude=latitude,
             longitude=longitude,
@@ -150,6 +201,7 @@ class EmergencyService:
             "alert_type": alert_type,
             "trigger_type": sos_event.trigger_type,
             "notification_id_by_user": notification_id_by_user,
+            "recipient_count": len(recipient_user_ids),
         }
 
     @staticmethod
@@ -277,6 +329,7 @@ class EmergencyService:
                 "status": "escalated",
                 "acknowledged_at": response_row.responded_at,
                 "sos_event_id": response_row.sos_event_id,
+                "recipient_count": len(dispatch_info["recipient_user_ids"]),
             }
         except IntegrityError:
             db.rollback()
@@ -313,6 +366,10 @@ class EmergencyService:
         sos_events, total, active, resolved = EmergencyRepository.get_sos_alerts_by_caregiver(
             db, caregiver_user_id, status
         )
+        risk_origin_sos_ids = EmergencyRepository.get_risk_response_sos_event_ids(
+            db,
+            [int(sos.id) for sos in sos_events],
+        )
         
         sos_list_items = []
         for sos in sos_events:
@@ -325,12 +382,10 @@ class EmergencyService:
             elapsed = datetime.now(timezone.utc) - sos.triggered_at
             elapsed_minutes = int(elapsed.total_seconds() / 60)
             
-            # Map trigger type
-            trigger_type_map = {
-                'auto': 'fall_detected',
-                'manual': 'manual'
-            }
-            trigger_type = trigger_type_map.get(sos.trigger_type, sos.trigger_type)
+            trigger_type = EmergencyService._normalize_read_trigger_type(
+                sos.trigger_type,
+                is_risk_origin=int(sos.id) in risk_origin_sos_ids,
+            )
             
             sos_list_items.append(SOSEventListItem(
                 sos_id=sos.id,
@@ -372,12 +427,14 @@ class EmergencyService:
         if not patient:
             return None
         
-        # Map trigger type
-        trigger_type_map = {
-            'auto': 'fall_detected',
-            'manual': 'manual'
-        }
-        trigger_type = trigger_type_map.get(sos.trigger_type, sos.trigger_type)
+        risk_response = EmergencyRepository.get_risk_alert_response_by_sos_event_id(
+            db,
+            int(sos.id),
+        )
+        trigger_type = EmergencyService._normalize_read_trigger_type(
+            sos.trigger_type,
+            is_risk_origin=risk_response is not None,
+        )
         
         # Get fall detection XAI if available
         fall_xai = None
@@ -402,11 +459,14 @@ class EmergencyService:
         resolution_info = None
         if sos.status == 'resolved' and sos.resolved_at:
             resolver = EmergencyRepository.get_user_by_id(db, sos.resolved_by_user_id) if sos.resolved_by_user_id else None
+            resolution_status, cleaned_notes = EmergencyService._parse_resolution_notes(
+                sos.resolution_notes,
+            )
             resolution_info = ResolutionInfo(
                 resolved_at=sos.resolved_at,
                 resolved_by_name=resolver.full_name if resolver else "Unknown",
-                resolution_status="safe",
-                notes=sos.resolution_notes
+                resolution_status=resolution_status,
+                notes=cleaned_notes,
             )
         
         return SOSEventResponse(

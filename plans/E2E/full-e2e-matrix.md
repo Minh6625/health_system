@@ -228,9 +228,9 @@ Một module chỉ nên được xem là ship E2E khi đạt đủ các lớp sa
 - Fresh host verification log: [`progress.md`](progress.md)
 
 ### Gaps
-- Focused Flutter + backend contract evidence đã được refresh ngày April 21, 2026 trong [`progress.md`](progress.md), nhưng chưa có evidence pass trên thiết bị thật.
+- Focused Flutter, backend contract, và live-DB manual SOS evidence đã được refresh ngày April 21, 2026 trong [`progress.md`](progress.md), nhưng chưa có evidence pass trên thiết bị thật.
 - Một thiết bị chưa đủ để chứng minh live caregiver push trên thiết bị thứ hai.
-- Cần re-run live DB với `RUN_REAL_DB_E2E=1` và device harness trên máy có `adb`/toolchain đầy đủ để chốt evidence mới nhất.
+- Cần re-run device harness trên máy có `adb`/toolchain đầy đủ để chốt evidence mới nhất.
 
 ### Trạng thái
 `PARTIAL`
@@ -265,9 +265,10 @@ Một module chỉ nên được xem là ship E2E khi đạt đủ các lớp sa
 - Verification log trong [`progress.md`](progress.md)
 
 ### Gaps
-- Focused Flutter + backend contract evidence đã được refresh ngày April 21, 2026, nhưng foreground/background/terminated trên thiết bị thật vẫn chưa có proof lưu cùng checklist.
+- Focused Flutter, backend contract, và live-DB risk-response evidence đã được refresh ngày April 21, 2026, nhưng foreground/background/terminated trên thiết bị thật vẫn chưa có proof lưu cùng checklist.
 - Cần chốt pass/fail thực tế cho stale-token refresh và refresh-fail replay trên thiết bị thật.
-- Device harness hiện mới dừng ở mức code + harness trên branch; máy hiện tại còn thiếu toolchain Windows desktop và backend DB để prove thêm.
+- Live DB risk-notification E2E vẫn còn partial vì DB hiện tại thiếu active device + recent vitals cho 2 case.
+- Device harness hiện mới dừng ở mức code + harness trên branch; máy hiện tại còn thiếu toolchain Windows desktop và `adb` từ WSL để prove thêm.
 
 ### Trạng thái
 `PARTIAL`

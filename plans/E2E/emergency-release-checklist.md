@@ -29,9 +29,9 @@ This checklist replaces the stale reference to `plans/risk-alert-escalation-end-
 ## 2. Preflight
 
 ### Backend
-- [ ] Backend runs locally on port `8000`
-- [ ] Real DB reachable and seeded with dedicated emergency test users
-- [ ] `RUN_REAL_DB_E2E=1` suites pass for manual SOS and risk response
+- [x] Backend runs locally on an ephemeral host port during the live-DB E2E harness
+- [x] Real DB reachable with dedicated emergency test users/devices created by the E2E fixtures
+- [x] `RUN_REAL_DB_E2E=1` suites pass for manual SOS and risk response
 
 ### Android USB
 - [ ] Device detected by host `adb devices`
@@ -51,12 +51,12 @@ This checklist replaces the stale reference to `plans/risk-alert-escalation-end-
 ### Backend contract
 - [x] `backend/tests/test_emergency_routes_http.py`
 - [x] `backend/tests/test_emergency_service_contract.py`
-- [ ] `backend/tests/test_risk_escalation_flow.py`
+- [x] `backend/tests/test_risk_escalation_flow.py`
 
 ### Backend live DB
-- [ ] `backend/tests/test_e2e_manual_sos.py`
+- [x] `backend/tests/test_e2e_manual_sos.py`
 - [ ] `backend/tests/test_e2e_risk_notification.py`
-- [ ] `backend/tests/test_e2e_risk_response_real_db.py`
+- [x] `backend/tests/test_e2e_risk_response_real_db.py`
 
 ### Flutter focused
 - [x] `test/features/emergency/screens/manual_sos_screen_test.dart`
@@ -74,9 +74,10 @@ This checklist replaces the stale reference to `plans/risk-alert-escalation-end-
 
 - Fresh verification captured on April 21, 2026 in [`progress.md`](../../progress.md).
 - Host Flutter focused suite passed: `22 passed`.
-- Backend Emergency contract/service suite passed: `8 passed`.
-- Live DB suites are present and compile, but remain skipped until `RUN_REAL_DB_E2E=1`.
-- Integration harness execution is still blocked on this machine by missing Windows desktop Visual Studio toolchain and by unavailable real-device `adb`.
+- Backend Emergency contract/service suites passed: `10 passed` and `5 passed`.
+- Live DB Emergency suites executed with `RUN_REAL_DB_E2E=1`: `6 passed, 2 skipped`.
+- `test_e2e_risk_notification.py` remains partial because the current DB snapshot lacks the seeded active-device/vitals prerequisites for 2 cases.
+- Integration harness execution is still blocked on this machine by missing Windows desktop Visual Studio toolchain and by unavailable real-device `adb` from WSL.
 
 ## 4. Manual SOS Device Matrix
 
@@ -136,7 +137,7 @@ flutter test integration_test/emergency_risk_alert_real_device_e2e_test.dart -d 
 
 - Host `adb` is not available in the current WSL execution context.
 - Host Windows desktop integration target is missing the Visual Studio toolchain required by `flutter test ... -d windows`.
-- Host backend cannot boot the real app path because PostgreSQL on `localhost:5432` is not running.
+- Live DB risk-notification E2E still needs a seeded active device with recent vitals to eliminate the remaining `2 skipped`.
 - Real-device execution must run from a host terminal until the bridge is repaired.
 - One connected device is enough for sequential patient/caregiver verification, but not enough for live two-device caregiver push proof.
 
