@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-// ignore: depend_on_referenced_packages
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:healthguard/core/constants/app_strings.dart';
 import 'package:healthguard/core/routes/app_router.dart';
@@ -12,19 +11,20 @@ import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
 import 'package:healthguard/features/auth/screens/auth_pages_screen.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
-import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
-// ignore: unused_import — giữ để dễ switch sang real backend
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
 import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
 import 'package:healthguard/features/home/providers/home_dashboard_provider.dart';
+import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
 import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:provider/provider.dart';
 
 class HealthSystemApp extends StatefulWidget {
-  const HealthSystemApp({super.key});
+  const HealthSystemApp({super.key, this.sleepNow});
+
+  final DateTime Function()? sleepNow;
 
   @override
   State<HealthSystemApp> createState() => _HealthSystemAppState();
@@ -73,60 +73,43 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
       if (!kIsWeb) {
         try {
           FlutterNativeSplash.remove();
-        } catch (e) {
-          debugPrint('Splash remove skipped: $e');
-        }
+        } catch (_) {}
       }
-      debugPrint("==== SPLASH REMOVED IN INITSTATE ====");
     });
   }
 
   Future<void> _initDeepLinks() async {
-    // Handle initial deep link when app is opened from link (cold start)
     try {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) {
         _lastHandledUri = initialUri.toString();
         _handleDeepLink(initialUri);
       }
-    } catch (e) {
-      // debugPrint('Error getting initial link: $e');
-    }
+    } catch (_) {}
 
-    // Handle deep links when app is already running.
-    // Skip the URI if it's the same as the initial link (app_links fires it
-    // via both getInitialLink and the stream on Android cold start).
-    _linkSubscription = _appLinks.uriLinkStream.listen(
-      (Uri uri) {
-        final uriStr = uri.toString();
-        if (uriStr == _lastHandledUri) {
-          _lastHandledUri = null; // reset so future same-URL links work
-          return;
-        }
-        _lastHandledUri = uriStr;
-        _handleDeepLink(uri);
-      },
-      onError: (err) {
-        // debugPrint('Error listening to deep links: $err');
-      },
-    );
+    _linkSubscription = _appLinks.uriLinkStream.listen((Uri uri) {
+      final uriStr = uri.toString();
+      if (uriStr == _lastHandledUri) {
+        _lastHandledUri = null;
+        return;
+      }
+      _lastHandledUri = uriStr;
+      _handleDeepLink(uri);
+    }, onError: (_) {});
   }
 
   void _routeToDeepLink(String routeName, Map<String, dynamic> arguments) {
     if (_navigatorKey.currentState?.mounted == true) {
       if (routeName == AppRouter.verifyResetOtp) {
-        // For password reset: clear the entire auth stack back to /start.
         _navigatorKey.currentState?.pushNamedAndRemoveUntil(
           routeName,
           (route) => route.settings.name == AppRouter.start,
           arguments: arguments,
         );
       } else {
-        // For other deep links (e.g. verifyEmail): regular push
         _navigatorKey.currentState?.pushNamed(routeName, arguments: arguments);
       }
     } else {
-      // Navigator not mounted yet (cold start) — store for after first frame.
       _pendingDeepLinkRoute = routeName;
       _pendingDeepLinkArgs = arguments;
     }
@@ -153,7 +136,6 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         _routeToDeepLink(AppRouter.verifyEmail, {
           'code': code,
           'email': email,
-          // ignore: use_null_aware_elements
           if (action != null) 'action': action,
         });
       }
@@ -164,14 +146,10 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         _routeToDeepLink(AppRouter.verifyResetOtp, {
           'code': code,
           'email': email,
-          // ignore: use_null_aware_elements
           if (action != null) 'action': action,
         });
       }
-    } else {
-      debugPrint('[DeepLink] → No matching route found, ignoring.');
     }
-    debugPrint('════════════════════════════════════════');
   }
 
   @override
@@ -186,16 +164,16 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthProvider>.value(value: _authProvider),
-        ChangeNotifierProvider(create: (_) => SleepProvider()),
+        ChangeNotifierProvider(
+          create: (_) => SleepProvider(now: widget.sleepNow),
+        ),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
         ChangeNotifierProvider(create: (_) => HomeDashboardProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => FamilyDashboardProvider()),
         ChangeNotifierProvider(
-          create: (_) => EmergencyCaregiverProvider(
-            // ✅ Using live API - backend ready
-            EmergencyCaregiverRepository(),
-          ),
+          create: (_) =>
+              EmergencyCaregiverProvider(EmergencyCaregiverRepository()),
         ),
       ],
       child: _SOSAlertAuthBridge(
@@ -236,9 +214,7 @@ class AuthBootstrapGate extends StatelessWidget {
         if (!authProvider.sessionResolved ||
             snapshot.connectionState == ConnectionState.waiting) {
           return loadingBuilder?.call(context) ??
-              const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              );
+              const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
 
         if (authProvider.isAuthenticated) {
@@ -246,8 +222,7 @@ class AuthBootstrapGate extends StatelessWidget {
               const HomeDashboardScreen();
         }
 
-        return unauthenticatedBuilder?.call(context) ??
-            const AuthPagesScreen();
+        return unauthenticatedBuilder?.call(context) ?? const AuthPagesScreen();
       },
     );
   }

@@ -322,10 +322,87 @@ RealtimeNotificationOpenTarget? parseRealtimeNotificationOpenTarget(
   );
 }
 
-class SOSRealtimeAlertService {
-  SOSRealtimeAlertService._();
+typedef RiskAlertTargetPresenter =
+    Future<void> Function(RealtimeNotificationOpenTarget target);
+typedef SosDetailNavigator = Future<void> Function(String sosId);
+typedef NotificationsNavigator = Future<void> Function();
+typedef CriticalAlertAuthRedirector =
+    Future<void> Function(RealtimeNotificationOpenTarget target);
+typedef RiskEscalationConfirmOpener = Future<void> Function(int recipientCount);
+typedef AlertNotificationPresenter =
+    Future<void> Function(Map<String, dynamic> item, {required String sosId});
 
-  static final SOSRealtimeAlertService instance = SOSRealtimeAlertService._();
+class SOSRealtimeAlertService {
+  SOSRealtimeAlertService._internal({
+    ApiClient? apiClient,
+    TokenStorageService? tokenStorageService,
+    EmergencyCaregiverRepository? emergencyCaregiverRepository,
+    FlutterSecureStorage? storage,
+    FlutterLocalNotificationsPlugin? notifications,
+    MethodChannel? androidCriticalAlertBridge,
+    RiskAlertTargetPresenter? riskAlertTargetPresenter,
+    SosDetailNavigator? sosDetailNavigator,
+    NotificationsNavigator? notificationsNavigator,
+    CriticalAlertAuthRedirector? criticalAlertAuthRedirector,
+    RiskEscalationConfirmOpener? riskEscalationConfirmOpener,
+    AlertNotificationPresenter? fullScreenAlertPresenter,
+    AlertNotificationPresenter? missedAlertPresenter,
+    Duration overlayVibrationInterval = _defaultOverlayVibrationInterval,
+  }) : _apiClient = apiClient ?? ApiClient(),
+       _tokenStorageService = tokenStorageService ?? TokenStorageService(),
+       _emergencyCaregiverRepository =
+           emergencyCaregiverRepository ?? EmergencyCaregiverRepository(),
+       _storage = storage ?? const FlutterSecureStorage(),
+       _notifications = notifications ?? FlutterLocalNotificationsPlugin(),
+       _androidCriticalAlertBridge =
+           androidCriticalAlertBridge ??
+           const MethodChannel(_androidCriticalAlertChannel),
+       _riskAlertTargetPresenter = riskAlertTargetPresenter,
+       _sosDetailNavigator = sosDetailNavigator,
+       _notificationsNavigator = notificationsNavigator,
+       _criticalAlertAuthRedirector = criticalAlertAuthRedirector,
+       _riskEscalationConfirmOpener = riskEscalationConfirmOpener,
+       _fullScreenAlertPresenter = fullScreenAlertPresenter,
+       _missedAlertPresenter = missedAlertPresenter,
+       _overlayVibrationInterval = overlayVibrationInterval;
+
+  static final SOSRealtimeAlertService instance =
+      SOSRealtimeAlertService._internal();
+
+  @visibleForTesting
+  factory SOSRealtimeAlertService.test({
+    ApiClient? apiClient,
+    TokenStorageService? tokenStorageService,
+    EmergencyCaregiverRepository? emergencyCaregiverRepository,
+    FlutterSecureStorage? storage,
+    FlutterLocalNotificationsPlugin? notifications,
+    MethodChannel? androidCriticalAlertBridge,
+    RiskAlertTargetPresenter? riskAlertTargetPresenter,
+    SosDetailNavigator? sosDetailNavigator,
+    NotificationsNavigator? notificationsNavigator,
+    CriticalAlertAuthRedirector? criticalAlertAuthRedirector,
+    RiskEscalationConfirmOpener? riskEscalationConfirmOpener,
+    AlertNotificationPresenter? fullScreenAlertPresenter,
+    AlertNotificationPresenter? missedAlertPresenter,
+    Duration overlayVibrationInterval = _defaultOverlayVibrationInterval,
+  }) {
+    return SOSRealtimeAlertService._internal(
+      apiClient: apiClient,
+      tokenStorageService: tokenStorageService,
+      emergencyCaregiverRepository: emergencyCaregiverRepository,
+      storage: storage,
+      notifications: notifications,
+      androidCriticalAlertBridge: androidCriticalAlertBridge,
+      riskAlertTargetPresenter: riskAlertTargetPresenter,
+      sosDetailNavigator: sosDetailNavigator,
+      notificationsNavigator: notificationsNavigator,
+      criticalAlertAuthRedirector: criticalAlertAuthRedirector,
+      riskEscalationConfirmOpener: riskEscalationConfirmOpener,
+      fullScreenAlertPresenter: fullScreenAlertPresenter,
+      missedAlertPresenter: missedAlertPresenter,
+      overlayVibrationInterval: overlayVibrationInterval,
+    );
+  }
 
   static const String _fullScreenChannelId = 'sos_fullscreen_alerts';
   static const String _fullScreenChannelName = 'SOS Fullscreen Alerts';
@@ -343,18 +420,24 @@ class SOSRealtimeAlertService {
       'sos_last_presented_notification_id';
   static const String _registeredPushTokenKey = 'sos_registered_push_token';
   static const Duration _reLoginRingingWindow = Duration(hours: 1);
-  static const Duration _overlayVibrationInterval = Duration(milliseconds: 420);
-
-  final ApiClient _apiClient = ApiClient();
-  final TokenStorageService _tokenStorageService = TokenStorageService();
-  final EmergencyCaregiverRepository _emergencyCaregiverRepository =
-      EmergencyCaregiverRepository();
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
-  final FlutterLocalNotificationsPlugin _notifications =
-      FlutterLocalNotificationsPlugin();
-  final MethodChannel _androidCriticalAlertBridge = const MethodChannel(
-    _androidCriticalAlertChannel,
+  static const Duration _defaultOverlayVibrationInterval = Duration(
+    milliseconds: 420,
   );
+
+  final ApiClient _apiClient;
+  final TokenStorageService _tokenStorageService;
+  final EmergencyCaregiverRepository _emergencyCaregiverRepository;
+  final FlutterSecureStorage _storage;
+  final FlutterLocalNotificationsPlugin _notifications;
+  final MethodChannel _androidCriticalAlertBridge;
+  final RiskAlertTargetPresenter? _riskAlertTargetPresenter;
+  final SosDetailNavigator? _sosDetailNavigator;
+  final NotificationsNavigator? _notificationsNavigator;
+  final CriticalAlertAuthRedirector? _criticalAlertAuthRedirector;
+  final RiskEscalationConfirmOpener? _riskEscalationConfirmOpener;
+  final AlertNotificationPresenter? _fullScreenAlertPresenter;
+  final AlertNotificationPresenter? _missedAlertPresenter;
+  final Duration _overlayVibrationInterval;
 
   FirebaseMessaging? _messaging;
   WebSocketChannel? _wsChannel;
@@ -573,6 +656,62 @@ class SOSRealtimeAlertService {
     await _dispatchMissedAlertsOnReLogin();
     await _connectWebSocket();
     await _restorePendingCriticalAlertAfterAuth();
+  }
+
+  @visibleForTesting
+  Future<void> handleRemoteMessageOpenForTest(Map<String, dynamic> data) {
+    return _handleRemoteMessageOpen(data);
+  }
+
+  @visibleForTesting
+  Future<void> handleAndroidCriticalAlertLaunchForTest(dynamic rawPayload) {
+    return _handleAndroidCriticalAlertLaunch(rawPayload);
+  }
+
+  @visibleForTesting
+  Future<void> processNotificationEventForTest(
+    Map<String, dynamic> item, {
+    required bool preferFullscreen,
+  }) {
+    return _processNotificationEvent(item, preferFullscreen: preferFullscreen);
+  }
+
+  @visibleForTesting
+  Future<void> redirectCriticalAlertToAuthForTest(
+    RealtimeNotificationOpenTarget target,
+  ) {
+    return _redirectCriticalAlertToAuth(target);
+  }
+
+  @visibleForTesting
+  Future<void> restorePendingCriticalAlertAfterAuthForTest() {
+    return _restorePendingCriticalAlertAfterAuth();
+  }
+
+  @visibleForTesting
+  Future<void> openRiskEscalationConfirmScreenForTest({
+    required int recipientCount,
+  }) {
+    return _openRiskEscalationConfirmScreen(recipientCount: recipientCount);
+  }
+
+  @visibleForTesting
+  bool looksLikeAuthFailureForTest(Object error) {
+    return _looksLikeAuthFailure(error);
+  }
+
+  @visibleForTesting
+  int extractRecipientCountForTest(Map<String, dynamic> response) {
+    return _extractRecipientCount(response);
+  }
+
+  @visibleForTesting
+  RealtimeNotificationOpenTarget? get pendingCriticalAlertForTest =>
+      _pendingCriticalAlertAfterAuth;
+
+  @visibleForTesting
+  void setRealtimeEnabledForTest(bool value) {
+    _isRealtimeEnabled = value;
   }
 
   Future<void> _ensureAndroidAlertPermissions({
@@ -947,6 +1086,11 @@ class SOSRealtimeAlertService {
 
     _rememberPresentedAlert(dedupeKey);
 
+    if (_riskAlertTargetPresenter != null) {
+      await _riskAlertTargetPresenter(target);
+      return;
+    }
+
     await _navigateToRiskAlertScreen(
       notificationId: notificationId,
       alertType: target.alertType ?? 'risk_critical',
@@ -989,6 +1133,11 @@ class SOSRealtimeAlertService {
     _lastOpenedSosId = sosId;
     _lastOpenedSosAt = now;
 
+    if (_sosDetailNavigator != null) {
+      await _sosDetailNavigator(sosId);
+      return;
+    }
+
     navigatorState.pushNamed(
       AppRouter.emergencySosDetail,
       arguments: {'sosId': sosId},
@@ -996,6 +1145,11 @@ class SOSRealtimeAlertService {
   }
 
   Future<void> _navigateToNotificationsScreen() async {
+    if (_notificationsNavigator != null) {
+      await _notificationsNavigator();
+      return;
+    }
+
     final navigatorState = _navigatorKey?.currentState;
     if (navigatorState == null) {
       return;
@@ -1164,6 +1318,9 @@ class SOSRealtimeAlertService {
     required RealtimeNotificationOpenTarget target,
   }) async {
     if (!await _canSubmitCriticalRiskResponse()) {
+      if (!dialogContext.mounted) {
+        return;
+      }
       await _closeDialogAndRedirectCriticalAlertToAuth(
         dialogContext: dialogContext,
         target: target,
@@ -1180,6 +1337,9 @@ class SOSRealtimeAlertService {
       );
     } catch (e) {
       if (_handleRiskResponseAuthFailure(e)) {
+        if (!dialogContext.mounted) {
+          return;
+        }
         await _closeDialogAndRedirectCriticalAlertToAuth(
           dialogContext: dialogContext,
           target: target,
@@ -1202,6 +1362,9 @@ class SOSRealtimeAlertService {
     required String responseType,
   }) async {
     if (!await _canSubmitCriticalRiskResponse()) {
+      if (!dialogContext.mounted) {
+        return;
+      }
       await _closeDialogAndRedirectCriticalAlertToAuth(
         dialogContext: dialogContext,
         target: target,
@@ -1219,6 +1382,9 @@ class SOSRealtimeAlertService {
       );
     } catch (e) {
       if (_handleRiskResponseAuthFailure(e)) {
+        if (!dialogContext.mounted) {
+          return;
+        }
         await _closeDialogAndRedirectCriticalAlertToAuth(
           dialogContext: dialogContext,
           target: target,
@@ -1290,6 +1456,11 @@ class SOSRealtimeAlertService {
   ) async {
     _pendingCriticalAlertAfterAuth = target;
 
+    if (_criticalAlertAuthRedirector != null) {
+      await _criticalAlertAuthRedirector(target);
+      return;
+    }
+
     final navigatorState = _navigatorKey?.currentState;
     if (navigatorState == null) {
       return;
@@ -1333,6 +1504,11 @@ class SOSRealtimeAlertService {
   Future<void> _openRiskEscalationConfirmScreen({
     required int recipientCount,
   }) async {
+    if (_riskEscalationConfirmOpener != null) {
+      await _riskEscalationConfirmOpener(recipientCount);
+      return;
+    }
+
     final navigatorState = _navigatorKey?.currentState;
     if (navigatorState == null) {
       return;
@@ -1582,10 +1758,6 @@ class SOSRealtimeAlertService {
         _isRiskAlertType(alertType);
   }
 
-  String? _normalizeRiskLevel(String? level) {
-    return normalizeRealtimeRiskLevel(level);
-  }
-
   String _resolveRiskLevel(String? rawLevel, {required String alertType}) {
     return resolveRealtimeRiskLevel(rawLevel, alertType: alertType);
   }
@@ -1682,6 +1854,11 @@ class SOSRealtimeAlertService {
     Map<String, dynamic> item, {
     required String sosId,
   }) async {
+    if (_fullScreenAlertPresenter != null) {
+      await _fullScreenAlertPresenter(item, sosId: sosId);
+      return;
+    }
+
     final alertType =
         (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
     final isRisk = _isRiskAlertType(alertType);
@@ -1763,6 +1940,11 @@ class SOSRealtimeAlertService {
     Map<String, dynamic> item, {
     required String sosId,
   }) async {
+    if (_missedAlertPresenter != null) {
+      await _missedAlertPresenter(item, sosId: sosId);
+      return;
+    }
+
     final alertType =
         (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
     final isRisk = _isRiskAlertType(alertType);

@@ -142,6 +142,7 @@ class RiskAlertResponseResponse(BaseModel):
     status: Literal["acknowledged", "escalated", "duplicate"]
     acknowledged_at: datetime
     sos_event_id: Optional[int] = None
+    recipient_count: Optional[int] = None
 
 
 class ResolveSOSRequest(BaseModel):
@@ -158,3 +159,10 @@ class SuccessResponse(BaseModel):
     """Generic success response."""
     success: bool = True
     message: str
+
+
+class TriggerSOSResponse(SuccessResponse):
+    """Manual SOS trigger response with fan-out metadata."""
+
+    sos_id: int
+    recipient_count: int

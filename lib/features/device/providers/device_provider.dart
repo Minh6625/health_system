@@ -13,6 +13,7 @@ class DeviceProvider extends ChangeNotifier {
   String _statusFilter = 'all';
   String? _typeFilter;
   int _total = 0;
+  bool _disposed = false;
 
   List<DeviceModel> get devices => _devices;
   bool get isLoading => _isLoading;
@@ -267,5 +268,19 @@ class DeviceProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  @override
+  void notifyListeners() {
+    if (_disposed) {
+      return;
+    }
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

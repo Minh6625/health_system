@@ -208,11 +208,13 @@ class TimelineEventModel {
 
 /// Resolution information when SOS is resolved
 class ResolutionInfoModel {
+  final String resolutionStatus;
   final String resolvedBy; // Name of person who resolved
   final DateTime resolvedTime;
   final String? notes;
 
   ResolutionInfoModel({
+    required this.resolutionStatus,
     required this.resolvedBy,
     required this.resolvedTime,
     this.notes,
@@ -220,6 +222,7 @@ class ResolutionInfoModel {
 
   factory ResolutionInfoModel.fromJson(Map<String, dynamic> json) {
     return ResolutionInfoModel(
+      resolutionStatus: json['resolution_status'] as String? ?? 'safe',
       resolvedBy: json['resolved_by_name'] as String,
       resolvedTime: DateTime.parse(json['resolved_at'] as String),
       notes: json['notes'] as String?,
@@ -228,6 +231,7 @@ class ResolutionInfoModel {
 
   Map<String, dynamic> toJson() {
     return {
+      'resolution_status': resolutionStatus,
       'resolved_by': resolvedBy,
       'resolved_time': resolvedTime.toIso8601String(),
       'notes': notes,

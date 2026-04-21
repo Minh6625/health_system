@@ -155,6 +155,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
   @override
   Widget build(BuildContext context) {
     return Material(
+      key: const ValueKey('risk-alert-fullscreen-overlay'),
       color: Colors.transparent,
       child: Stack(
         children: [
@@ -217,6 +218,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
 
                           // Title
                           Text(
+                            key: const ValueKey('risk-alert-title'),
                             widget.title,
                             style: const TextStyle(
                               fontSize: 24,
@@ -253,6 +255,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
 
                           // Countdown
                           Text(
+                            key: const ValueKey('risk-alert-countdown'),
                             'Tự động yêu cầu hỗ trợ sau $_remainingSeconds giây',
                             style: TextStyle(
                               fontSize: 13,
@@ -309,6 +312,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
+                              key: const ValueKey('risk-alert-safe-button'),
                               onPressed: _isActionInProgress
                                   ? null
                                   : () async {
@@ -338,6 +342,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
                           SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
+                              key: const ValueKey('risk-alert-help-button'),
                               onPressed: _isActionInProgress
                                   ? null
                                   : () async {
@@ -365,6 +370,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
 
                           // Dismiss
                           TextButton(
+                            key: const ValueKey('risk-alert-dismiss-button'),
                             onPressed: _isActionInProgress
                                 ? null
                                 : () async {

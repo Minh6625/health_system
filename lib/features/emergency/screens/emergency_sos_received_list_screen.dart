@@ -12,7 +12,14 @@ import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
 /// SOS Received List screen for Caregiver
 class EmergencySOSReceivedListScreen extends StatefulWidget {
-  const EmergencySOSReceivedListScreen({super.key});
+  const EmergencySOSReceivedListScreen({
+    super.key,
+    this.autoRefreshInterval = const Duration(seconds: 2),
+    this.enableAutoRefresh = true,
+  });
+
+  final Duration autoRefreshInterval;
+  final bool enableAutoRefresh;
 
   @override
   State<EmergencySOSReceivedListScreen> createState() =>
@@ -22,8 +29,6 @@ class EmergencySOSReceivedListScreen extends StatefulWidget {
 class _EmergencySOSReceivedListScreenState
     extends State<EmergencySOSReceivedListScreen>
     with WidgetsBindingObserver {
-  static const Duration _autoRefreshInterval = Duration(seconds: 2);
-
   bool _isInitialized = false;
   String _selectedStatus = 'all';
   final TextEditingController _searchController = TextEditingController();
@@ -56,8 +61,11 @@ class _EmergencySOSReceivedListScreenState
   }
 
   void _startAutoRefresh() {
+    if (!widget.enableAutoRefresh) {
+      return;
+    }
     _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+    _autoRefreshTimer = Timer.periodic(widget.autoRefreshInterval, (_) {
       _refreshCurrentStatus(silent: true);
     });
   }
@@ -95,7 +103,9 @@ class _EmergencySOSReceivedListScreenState
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _startAutoRefresh();
+      if (widget.enableAutoRefresh) {
+        _startAutoRefresh();
+      }
       _refreshCurrentStatus(silent: true);
       return;
     }
@@ -125,6 +135,7 @@ class _EmergencySOSReceivedListScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      key: const ValueKey('emergency-sos-list-screen'),
       backgroundColor: AppColors.bgPrimary,
       resizeToAvoidBottomInset: false,
       body: Column(
@@ -143,6 +154,7 @@ class _EmergencySOSReceivedListScreenState
                 borderRadius: BorderRadius.circular(AppRadii.radiusMd),
               ),
               child: TextField(
+                key: const ValueKey('sos-search-field'),
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Tìm kiếm theo tên bệnh nhân...',
@@ -223,6 +235,7 @@ class _EmergencySOSReceivedListScreenState
     }
 
     return FilterChip(
+      key: ValueKey('sos-filter-$value'),
       selected: isSelected,
       label: Row(
         mainAxisSize: MainAxisSize.min,
@@ -281,14 +294,17 @@ class _EmergencySOSReceivedListScreenState
         }
 
         final listView = RefreshIndicator(
+          key: const ValueKey('sos-list-refresh'),
           onRefresh: () => provider.refreshSOSAlerts(_selectedStatus),
           child: ListView.builder(
+            key: const ValueKey('sos-list-view'),
             itemCount: filteredList.length,
             padding:
                 const EdgeInsets.symmetric(vertical: AppSpacing.gapMd),
             itemBuilder: (context, index) {
               final sos = filteredList[index];
               return SOSCard(
+                key: ValueKey('sos-card-${sos.id}'),
                 sos: sos,
                 onTap: () async {
                   await Navigator.pushNamed(
@@ -359,6 +375,7 @@ class _EmergencySOSReceivedListScreenState
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
+          key: const ValueKey('sos-list-empty'),
           physics: const AlwaysScrollableScrollPhysics(),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),
@@ -387,6 +404,7 @@ class _EmergencySOSReceivedListScreenState
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
+          key: const ValueKey('sos-list-error'),
           physics: const AlwaysScrollableScrollPhysics(),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight),

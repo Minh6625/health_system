@@ -30,6 +30,10 @@ class PushNotificationService:
     _enabled = False
 
     @staticmethod
+    def _push_disabled_for_e2e() -> bool:
+        return os.getenv("E2E_DISABLE_PUSH", "").strip() == "1"
+
+    @staticmethod
     def _token_prefix(token: str) -> str:
         normalized = (token or "").strip()
         if not normalized:
@@ -132,6 +136,12 @@ class PushNotificationService:
         if not recipient_user_ids:
             return
 
+        if cls._push_disabled_for_e2e():
+            logger.info(
+                "Skipping SOS push fan-out because E2E_DISABLE_PUSH=1",
+            )
+            return
+
         if not cls._ensure_initialized():
             return
 
@@ -221,6 +231,12 @@ class PushNotificationService:
         notification channel (from ``EscalationRule.fcm_channel``).
         """
         if not recipient_user_ids:
+            return
+
+        if cls._push_disabled_for_e2e():
+            logger.info(
+                "Skipping risk push fan-out because E2E_DISABLE_PUSH=1",
+            )
             return
 
         if not cls._ensure_initialized():

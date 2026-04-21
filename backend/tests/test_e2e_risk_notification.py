@@ -90,6 +90,7 @@ def backend_base_url() -> Iterator[str]:
     # Disable risk-calc cooldown for testing
     env["RISK_ALERT_COOLDOWN_SECONDS"] = "0"
     env["RISK_COOLDOWN_SECONDS"] = "0"
+    env["E2E_DISABLE_PUSH"] = "1"
 
     process = subprocess.Popen(
         [

@@ -87,6 +87,31 @@ CAREGIVER = SeedUser(
     wake_count=1,
 )
 
+EMPTY_SLEEP = SeedUser(
+    email="e2e.sleep.empty@example.com",
+    password="SleepEmptyE2E!123",
+    full_name="Sleep Empty E2E",
+    role="user",
+    device_name="unused-empty-sleep-watch",
+    serial_number="unused-empty-sleep-watch",
+    risk_series=(),
+    vitals={
+        "heart_rate": 72,
+        "spo2": Decimal("98.0"),
+        "temperature": Decimal("36.7"),
+        "blood_pressure_sys": 118,
+        "blood_pressure_dia": 76,
+        "hrv": 54,
+        "respiratory_rate": 16,
+        "signal_quality": 1,
+        "motion_artifact": False,
+    },
+    sleep_score=0,
+    sleep_minutes=0,
+    awake_minutes=0,
+    wake_count=0,
+)
+
 
 def _now_utc() -> datetime:
     return datetime.now(UTC).replace(microsecond=0)
@@ -503,9 +528,11 @@ def main() -> None:
         with engine.begin() as connection:
             patient_id = _upsert_user(connection, PATIENT)
             caregiver_id = _upsert_user(connection, CAREGIVER)
+            empty_sleep_id = _upsert_user(connection, EMPTY_SLEEP)
 
             _reset_user_data(connection, patient_id)
             _reset_user_data(connection, caregiver_id)
+            _reset_user_data(connection, empty_sleep_id)
 
             patient_device_id = _create_device(connection, patient_id, PATIENT)
             caregiver_device_id = _create_device(connection, caregiver_id, CAREGIVER)
@@ -531,6 +558,11 @@ def main() -> None:
                 "email": CAREGIVER.email,
                 "password": CAREGIVER.password,
                 "user_id": caregiver_id,
+            },
+            "empty_sleep": {
+                "email": EMPTY_SLEEP.email,
+                "password": EMPTY_SLEEP.password,
+                "user_id": empty_sleep_id,
             },
         }
         print(json.dumps(summary, ensure_ascii=True, indent=2))

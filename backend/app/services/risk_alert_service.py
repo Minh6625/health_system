@@ -407,7 +407,7 @@ def calculate_device_risk(
     features_json = json.loads(json.dumps(features_json, cls=_DecimalEncoder))
 
     try:
-        risk_score = RiskScore(
+        risk_score_row = RiskScore(
             user_id=int(user_id),
             device_id=int(device_id),
             calculated_at=get_current_time(),
@@ -418,11 +418,11 @@ def calculate_device_risk(
             model_version=f"{inference_result.backend}-v1.0",
             algorithm=inference_result.backend,
         )
-        db.add(risk_score)
+        db.add(risk_score_row)
         db.flush()
 
         risk_explanation = RiskExplanation(
-            risk_score_id=risk_score.id,
+            risk_score_id=risk_score_row.id,
             explanation_text=explanation_text,
             feature_importance=feature_importance,
             xai_method="rule_based" if inference_result.backend == "rule_based" else "shap",
@@ -433,7 +433,7 @@ def calculate_device_risk(
         )
         db.add(risk_explanation)
         db.commit()
-        db.refresh(risk_score)
+        db.refresh(risk_score_row)
     except Exception:
         db.rollback()
         logger.exception("Failed to persist risk score for device %s", device_id)
@@ -443,11 +443,11 @@ def calculate_device_risk(
         )
 
     result = RiskCalculationResult(
-        risk_score_id=risk_score.id,
+        risk_score_id=risk_score_row.id,
         score=round(float(risk_score), 2),
         risk_level=risk_level,
         model=inference_result.backend,
-        calculated_at=risk_score.calculated_at,
+        calculated_at=risk_score_row.calculated_at,
     )
 
     if dispatch_alerts:
@@ -457,7 +457,7 @@ def calculate_device_risk(
             user_id=int(user_id),
             risk_level=risk_level,
             score=result.score,
-            risk_score_id=risk_score.id,
+            risk_score_id=risk_score_row.id,
         )
 
     return result
