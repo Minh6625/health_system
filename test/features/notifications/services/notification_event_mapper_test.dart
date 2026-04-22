@@ -49,5 +49,60 @@ void main() {
         'notif-medium-2',
       );
     });
+
+    test(
+      'mapNotificationEventFromPushData returns null for unsupported type',
+      () {
+        final event = mapNotificationEventFromPushData(<String, dynamic>{
+          'alert_type': 'medication_missed',
+          'notification_id': 'notif-ignore-1',
+        });
+
+        expect(event, isNull);
+      },
+    );
+
+    test(
+      'mapNotificationEventFromPushData returns null when actionable alert has no identifier',
+      () {
+        final event = mapNotificationEventFromPushData(<String, dynamic>{
+          'alert_type': 'risk_high',
+          'risk_level': 'high',
+        });
+
+        expect(event, isNull);
+      },
+    );
+
+    test(
+      'mapNotificationEventFromPushData uses risk fallback title/body when push content missing',
+      () {
+        final event = mapNotificationEventFromPushData(<String, dynamic>{
+          'alert_type': 'risk_critical',
+          'notification_id': 'notif-risk-default-1',
+        });
+
+        expect(event, isNotNull);
+        expect(event!.title, '🚨 Cảnh báo sức khỏe khẩn cấp');
+        expect(
+          event.message,
+          'Phát hiện chỉ số sức khỏe bất thường. Nhấn để xem.',
+        );
+      },
+    );
+
+    test(
+      'mapNotificationEventFromPushData uses SOS fallback title/body when push content missing',
+      () {
+        final event = mapNotificationEventFromPushData(<String, dynamic>{
+          'alert_type': 'sos',
+          'sos_id': 'sos-default-1',
+        });
+
+        expect(event, isNotNull);
+        expect(event!.title, 'Cảnh báo SOS');
+        expect(event.message, 'Có cảnh báo khẩn cấp mới');
+      },
+    );
   });
 }

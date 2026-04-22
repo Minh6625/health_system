@@ -65,7 +65,7 @@ NotificationEvent? mapNotificationEventFromPushData(
       .toString()
       .trim()
       .toLowerCase();
-  if (alertType.isEmpty) {
+  if (alertType.isEmpty || !isActionableNotificationType(alertType)) {
     return null;
   }
 
@@ -83,10 +83,16 @@ NotificationEvent? mapNotificationEventFromPushData(
   final notificationId = (data['notification_id'] ?? data['id'])
       ?.toString()
       .trim();
-  final effectiveId = (sosId?.isNotEmpty ?? false)
-      ? sosId!
-      : ((notificationId?.isNotEmpty ?? false) ? notificationId! : null);
-  if (effectiveId == null) {
+
+  final String? effectiveId;
+  if (isRisk) {
+    effectiveId = (notificationId?.isNotEmpty ?? false)
+        ? notificationId!
+        : null;
+  } else {
+    effectiveId = (sosId?.isNotEmpty ?? false) ? sosId! : null;
+  }
+  if (effectiveId == null || effectiveId.isEmpty) {
     return null;
   }
 
