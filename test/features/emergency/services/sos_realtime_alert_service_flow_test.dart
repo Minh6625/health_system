@@ -41,7 +41,7 @@ void main() {
           notificationsOpened += 1;
         },
       );
-      final runtime = NotificationRuntimeService.test(
+      final runtime = NotificationRuntimeService(
         emergencyAdapter: service,
       );
 
@@ -71,7 +71,6 @@ void main() {
       final fullscreenCalls = <String>[];
       final overlayTargets = <RealtimeNotificationOpenTarget>[];
       final service = SOSRealtimeAlertService.test(
-        storage: storage,
         fullScreenAlertPresenter: (item, {required sosId}) async {
           fullscreenCalls.add('${item['id']}:$sosId');
         },
@@ -79,7 +78,7 @@ void main() {
           overlayTargets.add(target);
         },
       );
-      final runtime = NotificationRuntimeService.test(
+      final runtime = NotificationRuntimeService(
         emergencyAdapter: service,
         storage: storage,
       );
@@ -109,7 +108,6 @@ void main() {
     final missedCalls = <String>[];
     final overlayTargets = <RealtimeNotificationOpenTarget>[];
       final service = SOSRealtimeAlertService.test(
-        storage: storage,
         missedAlertPresenter: (item, {required sosId}) async {
           missedCalls.add('${item['id']}:$sosId');
         },
@@ -117,7 +115,7 @@ void main() {
           overlayTargets.add(target);
         },
       );
-      final runtime = NotificationRuntimeService.test(
+      final runtime = NotificationRuntimeService(
         emergencyAdapter: service,
         storage: storage,
       );
@@ -144,12 +142,11 @@ void main() {
       final storage = const FlutterSecureStorage();
       final missedCalls = <String>[];
       final service = SOSRealtimeAlertService.test(
-        storage: storage,
         missedAlertPresenter: (item, {required sosId}) async {
           missedCalls.add('${item['id']}:$sosId');
         },
       );
-      final runtime = NotificationRuntimeService.test(
+      final runtime = NotificationRuntimeService(
         emergencyAdapter: service,
         storage: storage,
       );
@@ -182,7 +179,7 @@ void main() {
           redirectedTargets.add(target);
         },
       );
-      final runtime = NotificationRuntimeService.test(
+      final runtime = NotificationRuntimeService(
         emergencyAdapter: service,
         tokenStorageService: _FakeTokenStorageService('token-123'),
       );

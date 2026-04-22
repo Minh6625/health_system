@@ -5,9 +5,9 @@ import 'dart:ui' show DartPluginRegistrant;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -43,16 +43,6 @@ abstract interface class NotificationEmergencyAdapter {
     required String subjectId,
   });
   Future<void> redirectCriticalAlertToAuth(NotificationOpenTarget target);
-}
-
-abstract interface class NotificationRuntimeNavigatorOwner {
-  void bindNotificationRuntimeNavigatorKey(
-    GlobalKey<NavigatorState> navigatorKey,
-  );
-}
-
-abstract interface class NotificationRuntimeNotificationsOwner {
-  FlutterLocalNotificationsPlugin get notificationRuntimeNotifications;
 }
 
 int _deriveCriticalRiskNotificationId(String notificationId) {
@@ -140,7 +130,7 @@ Future<void> notificationFirebaseMessagingBackgroundHandler(
 }
 
 class NotificationRuntimeService {
-  NotificationRuntimeService._internal({
+  NotificationRuntimeService({
     required NotificationEmergencyAdapter emergencyAdapter,
     ApiClient? apiClient,
     TokenStorageService? tokenStorageService,
@@ -157,57 +147,6 @@ class NotificationRuntimeService {
            androidCriticalAlertBridge ??
            const MethodChannel(_androidCriticalAlertChannel),
        _reLoginRingingWindow = reLoginRingingWindow;
-
-  factory NotificationRuntimeService.instance({
-    required NotificationEmergencyAdapter emergencyAdapter,
-    ApiClient? apiClient,
-    TokenStorageService? tokenStorageService,
-    FlutterSecureStorage? storage,
-    FlutterLocalNotificationsPlugin? notifications,
-    MethodChannel? androidCriticalAlertBridge,
-    Duration reLoginRingingWindow = const Duration(hours: 1),
-  }) {
-    return NotificationRuntimeService._internal(
-      emergencyAdapter: emergencyAdapter,
-      apiClient: apiClient,
-      tokenStorageService: tokenStorageService,
-      storage: storage,
-      notifications:
-          notifications ??
-          (emergencyAdapter is NotificationRuntimeNotificationsOwner
-              ? (emergencyAdapter as NotificationRuntimeNotificationsOwner)
-                    .notificationRuntimeNotifications
-              : null),
-      androidCriticalAlertBridge: androidCriticalAlertBridge,
-      reLoginRingingWindow: reLoginRingingWindow,
-    );
-  }
-
-  @visibleForTesting
-  factory NotificationRuntimeService.test({
-    required NotificationEmergencyAdapter emergencyAdapter,
-    ApiClient? apiClient,
-    TokenStorageService? tokenStorageService,
-    FlutterSecureStorage? storage,
-    FlutterLocalNotificationsPlugin? notifications,
-    MethodChannel? androidCriticalAlertBridge,
-    Duration reLoginRingingWindow = const Duration(hours: 1),
-  }) {
-    return NotificationRuntimeService._internal(
-      emergencyAdapter: emergencyAdapter,
-      apiClient: apiClient,
-      tokenStorageService: tokenStorageService,
-      storage: storage,
-      notifications:
-          notifications ??
-          (emergencyAdapter is NotificationRuntimeNotificationsOwner
-              ? (emergencyAdapter as NotificationRuntimeNotificationsOwner)
-                    .notificationRuntimeNotifications
-              : null),
-      androidCriticalAlertBridge: androidCriticalAlertBridge,
-      reLoginRingingWindow: reLoginRingingWindow,
-    );
-  }
 
   static const String _fullScreenChannelId = 'sos_fullscreen_alerts';
   static const String _fullScreenChannelName = 'SOS Fullscreen Alerts';
@@ -255,14 +194,7 @@ class NotificationRuntimeService {
   final Map<String, DateTime> _recentAlertPresentation = {};
   NotificationOpenTarget? _pendingCriticalAlertAfterAuth;
 
-  Future<void> initialize({
-    required GlobalKey<NavigatorState> navigatorKey,
-  }) async {
-    if (_emergencyAdapter is NotificationRuntimeNavigatorOwner) {
-      (_emergencyAdapter as NotificationRuntimeNavigatorOwner)
-          .bindNotificationRuntimeNavigatorKey(navigatorKey);
-    }
-
+  Future<void> initialize() async {
     if (_isInitialized) {
       return;
     }
@@ -375,7 +307,7 @@ class NotificationRuntimeService {
 
   @visibleForTesting
   Future<void> redirectCriticalAlertToAuthForTest(NotificationOpenTarget target) {
-    return _redirectCriticalAlertToAuth(target);
+    return redirectCriticalAlertToAuth(target);
   }
 
   @visibleForTesting
@@ -390,6 +322,10 @@ class NotificationRuntimeService {
   @visibleForTesting
   void setRealtimeEnabledForTest(bool value) {
     _isRealtimeEnabled = value;
+  }
+
+  Future<void> redirectCriticalAlertToAuth(NotificationOpenTarget target) {
+    return _redirectCriticalAlertToAuth(target);
   }
 
   Future<void> _initializeFcm() async {

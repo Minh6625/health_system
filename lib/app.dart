@@ -54,10 +54,15 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     super.initState();
     _appLinks = AppLinks();
     _bootstrapAuthFuture = _authProvider.bootstrapSession();
-    _notificationRuntimeService = NotificationRuntimeService.instance(
+    _notificationRuntimeService = NotificationRuntimeService(
       emergencyAdapter: _sosRealtimeAlertService,
+      notifications: _sosRealtimeAlertService.notificationsPlugin,
     );
-    unawaited(_notificationRuntimeService.initialize(navigatorKey: _navigatorKey));
+    _sosRealtimeAlertService.bindNavigatorKey(_navigatorKey);
+    _sosRealtimeAlertService.bindNotificationRuntimeCriticalAlertRedirector(
+      _notificationRuntimeService.redirectCriticalAlertToAuth,
+    );
+    unawaited(_notificationRuntimeService.initialize());
     _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_deepLinkDispatched && _pendingDeepLinkRoute != null) {

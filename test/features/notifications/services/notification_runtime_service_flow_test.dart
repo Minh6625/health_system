@@ -49,7 +49,7 @@ void main() {
     'medium risk opens notifications while critical risk opens target presenter',
     () async {
       final adapter = _FakeNotificationEmergencyAdapter();
-      final service = NotificationRuntimeService.test(
+      final service = NotificationRuntimeService(
         emergencyAdapter: adapter,
       );
 
