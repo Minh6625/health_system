@@ -182,6 +182,7 @@ class NotificationRuntimeService {
   bool _isInitialized = false;
   bool _isFcmInitialized = false;
   bool _isRealtimeEnabled = false;
+  bool _hasAppliedAuthState = false;
   bool _isConnecting = false;
   bool _isSyncingPushToken = false;
   bool _pendingPushTokenSync = false;
@@ -190,6 +191,7 @@ class NotificationRuntimeService {
   String? _lastPresentedNotificationId;
   String? _currentFcmToken;
   bool? _hasFullScreenIntentPermission;
+  bool? _deferredAuthState;
   String _activeStorageScope = 'signed_out';
   final Map<String, DateTime> _recentAlertPresentation = {};
   NotificationOpenTarget? _pendingCriticalAlertAfterAuth;
@@ -256,17 +258,28 @@ class NotificationRuntimeService {
     await _initializeAndroidCriticalAlertBridge();
     await _initializeFcm();
     _isInitialized = true;
+
+    final deferredAuthState = _deferredAuthState;
+    _deferredAuthState = null;
+    if (deferredAuthState != null) {
+      await onAuthStateChanged(isAuthenticated: deferredAuthState);
+    }
   }
 
   Future<void> onAuthStateChanged({required bool isAuthenticated}) async {
     if (!_isInitialized) {
+      _deferredAuthState = isAuthenticated;
       return;
     }
 
-    if (isAuthenticated == _isRealtimeEnabled) {
+    _deferredAuthState = null;
+
+    final isInitialAuthSync = !_hasAppliedAuthState;
+    if (!isInitialAuthSync && isAuthenticated == _isRealtimeEnabled) {
       return;
     }
 
+    _hasAppliedAuthState = true;
     _isRealtimeEnabled = isAuthenticated;
 
     if (!_isRealtimeEnabled) {
