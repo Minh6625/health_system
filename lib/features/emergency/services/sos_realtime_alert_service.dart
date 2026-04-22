@@ -19,6 +19,7 @@ import '../screens/sos_confirm_screen.dart';
 import '../../family/models/family_profile_snapshot.dart';
 import '../../family/widgets/family_sos_full_screen_overlay.dart';
 import '../../notifications/models/notification_open_target.dart';
+import '../../notifications/services/notification_event_mapper.dart';
 import '../../notifications/services/notification_open_router.dart';
 import '../widgets/risk_alert_full_screen_overlay.dart';
 
@@ -786,92 +787,12 @@ class SOSRealtimeAlertService {
       return;
     }
 
-    final mapped = _mapPushDataToNotificationItem(data, message: message);
-    if (mapped == null) {
+    final event = mapNotificationEventFromPushData(data, message: message);
+    if (event == null) {
       return;
     }
 
-    await _processNotificationEvent(mapped, preferFullscreen: true);
-  }
-
-  Map<String, dynamic>? _mapPushDataToNotificationItem(
-    Map<String, dynamic> rawData, {
-    RemoteMessage? message,
-  }) {
-    final data = rawData.map(
-      (String key, dynamic value) => MapEntry(key.toString(), value),
-    );
-    final alertType = (data['alert_type'] ?? data['trigger_type'] ?? '')
-        .toString()
-        .toLowerCase();
-    if (alertType.isEmpty) {
-      return null;
-    }
-
-    final isRisk = _isRiskAlertType(alertType);
-    final riskLevel = isRisk
-        ? _resolveRiskLevel(
-            data['risk_level']?.toString(),
-            alertType: alertType,
-          )
-        : null;
-
-    // SOS alerts require sosId; risk alerts use notification_id as identifier.
-    final sosId = (data['sos_id'] ?? data['sos_event_id'] ?? data['event_id'])
-        ?.toString();
-    final notificationId = data['notification_id']?.toString();
-
-    // For SOS: sosId is mandatory. For risk: notification_id suffices.
-    final effectiveId = sosId?.isNotEmpty == true
-        ? sosId!
-        : (notificationId?.isNotEmpty == true ? notificationId! : null);
-    if (effectiveId == null) {
-      return null;
-    }
-
-    final createdAt =
-        data['created_at']?.toString() ??
-        DateTime.now().toUtc().toIso8601String();
-
-    final String defaultTitle;
-    final String defaultMessage;
-    if (isRisk) {
-      defaultTitle = riskLevel == 'critical'
-          ? '🚨 Cảnh báo sức khỏe khẩn cấp'
-          : '⚠️ Cảnh báo sức khỏe';
-      defaultMessage = 'Phát hiện chỉ số sức khỏe bất thường. Nhấn để xem.';
-    } else {
-      defaultTitle = 'Cảnh báo SOS';
-      defaultMessage = 'Có cảnh báo khẩn cấp mới';
-    }
-
-    final resolvedTitle =
-        message?.notification?.title ??
-        data['title']?.toString() ??
-        defaultTitle;
-    final resolvedMessage =
-        message?.notification?.body ??
-        data['body']?.toString() ??
-        data['message']?.toString() ??
-        defaultMessage;
-
-    return {
-      'id': (notificationId ?? '$alertType-$effectiveId').toString(),
-      'alert_type': alertType,
-      'severity': isRisk ? (riskLevel ?? 'medium') : 'critical',
-      'title': resolvedTitle,
-      'message': resolvedMessage,
-      'data': {
-        if (sosId != null && sosId.isNotEmpty) 'sos_id': sosId,
-        if (sosId != null && sosId.isNotEmpty) 'sos_event_id': sosId,
-        'trigger_type': data['trigger_type']?.toString(),
-        if (isRisk) 'risk_level': riskLevel ?? 'medium',
-        if (isRisk) 'notification_id': notificationId,
-        if (isRisk) 'risk_score_id': data['risk_score_id'],
-      },
-      'created_at': createdAt,
-      'is_read': false,
-    };
+    await _processNotificationEvent(event.toItemMap(), preferFullscreen: true);
   }
 
   Future<void> _handleRemoteMessageOpen(Map<String, dynamic> data) async {
@@ -1572,19 +1493,14 @@ class SOSRealtimeAlertService {
 
   /// Returns true for any risk_* alert types.
   bool _isRiskAlertType(String alertType) {
-    return alertType.startsWith('risk_');
+    return isRiskAlertType(alertType);
   }
 
   /// Returns true for any actionable alert (SOS, fall, or risk).
   bool _isEmergencyAlert(Map<String, dynamic> item) {
     final alertType =
         (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
-    return alertType == 'sos' ||
-        alertType == 'manual' ||
-        alertType.contains('sos') ||
-        alertType == 'fall_detected' ||
-        alertType == 'fall_detection' ||
-        _isRiskAlertType(alertType);
+    return isActionableNotificationType(alertType);
   }
 
   String _resolveRiskLevel(String? rawLevel, {required String alertType}) {
@@ -1634,37 +1550,7 @@ class SOSRealtimeAlertService {
 
   /// Extract SOS ID or, for risk alerts, fall back to notification_id / item id.
   String? _extractSosId(Map<String, dynamic> item) {
-    final data = _toMap(item['data']);
-    final candidates = <Object?>[
-      item['sos_id'],
-      item['sos_event_id'],
-      data['sos_id'],
-      data['sos_event_id'],
-      data['sosId'],
-      data['sosEventId'],
-      data['event_id'],
-    ];
-
-    for (final candidate in candidates) {
-      if (candidate == null) {
-        continue;
-      }
-      final value = candidate.toString().trim();
-      if (value.isNotEmpty) {
-        return value;
-      }
-    }
-
-    // Risk alerts may not have sosId — use notification_id or item id.
-    final alertType =
-        (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
-    if (_isRiskAlertType(alertType)) {
-      final fallbackId = (data['notification_id'] ?? item['id'])?.toString();
-      if (fallbackId != null && fallbackId.isNotEmpty) {
-        return fallbackId;
-      }
-    }
-    return null;
+    return extractNotificationSubjectId(item);
   }
 
   Map<String, dynamic> _toMap(Object? value) {

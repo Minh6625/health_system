@@ -127,6 +127,31 @@ void main() {
   });
 
   test(
+    'risk event falls back to item id when notification_id is missing',
+    () async {
+      final storage = const FlutterSecureStorage();
+      final missedCalls = <String>[];
+      final service = SOSRealtimeAlertService.test(
+        storage: storage,
+        missedAlertPresenter: (item, {required sosId}) async {
+          missedCalls.add('${item['id']}:$sosId');
+        },
+      );
+
+      await service.processNotificationEventForTest(<String, dynamic>{
+        'id': 'notif-medium-2',
+        'alert_type': 'risk_high',
+        'title': 'Medium risk',
+        'message': 'Check soon',
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+        'data': <String, dynamic>{'risk_level': 'medium'},
+      }, preferFullscreen: false);
+
+      expect(missedCalls, <String>['notif-medium-2:notif-medium-2']);
+    },
+  );
+
+  test(
     'android launch payload and auth replay reopen pending critical alert',
     () async {
       final openedTargets = <RealtimeNotificationOpenTarget>[];
