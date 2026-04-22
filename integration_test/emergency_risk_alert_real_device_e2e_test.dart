@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/features/emergency/screens/sos_confirm_screen.dart';
 import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
 import 'package:healthguard/features/emergency/widgets/risk_alert_full_screen_overlay.dart';
+import 'package:healthguard/features/notifications/services/notification_runtime_service.dart';
 import 'package:integration_test/integration_test.dart';
 
 class _RiskOverlayHarness extends StatefulWidget {
@@ -124,6 +125,7 @@ void main() {
         redirectedTargets.add(target.notificationId ?? '');
       },
     );
+    final runtime = NotificationRuntimeService(emergencyAdapter: service);
     const replayTarget = RealtimeNotificationOpenTarget(
       type: 'risk',
       notificationId: 'notif-auth-replay',
@@ -133,12 +135,12 @@ void main() {
       message: 'Open after login',
     );
 
-    await service.handleAndroidCriticalAlertLaunchForTest(
+    await runtime.handleAndroidCriticalAlertLaunchForTest(
       '{"type":"risk","notificationId":"notif-native-launch","alertType":"risk_critical","riskLevel":"critical","title":"Launch","message":"Native"}',
     );
-    await service.redirectCriticalAlertToAuthForTest(replayTarget);
-    service.setRealtimeEnabledForTest(true);
-    await service.restorePendingCriticalAlertAfterAuthForTest();
+    await runtime.redirectCriticalAlertToAuthForTest(replayTarget);
+    runtime.setRealtimeEnabledForTest(true);
+    await runtime.restorePendingCriticalAlertAfterAuthForTest();
 
     expect(redirectedTargets, <String>['notif-auth-replay']);
     expect(openedTargets, <String>['notif-native-launch', 'notif-auth-replay']);
