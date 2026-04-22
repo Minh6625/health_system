@@ -72,6 +72,28 @@ void main() {
       expect(payload['message'], 'Wake the device now');
     });
 
+    test(
+      'uses fallback title/body for critical launch payload when absent',
+      () {
+        final payload = buildAndroidCriticalRiskLaunchPayload(
+          {
+            'type': 'risk_alert',
+            'alert_type': 'risk_critical',
+            'risk_level': 'critical',
+            'notification_id': 'notif-critical-fallback',
+            'risk_score_id': '445',
+          },
+          fallbackTitle: 'Fallback title',
+          fallbackBody: 'Fallback body',
+        );
+
+        expect(payload, isNotNull);
+        expect(payload!['title'], 'Fallback title');
+        expect(payload['body'], 'Fallback body');
+        expect(payload['message'], 'Fallback body');
+      },
+    );
+
     test('does not build Android takeover payload for non-critical risk', () {
       final payload = buildAndroidCriticalRiskLaunchPayload({
         'type': 'risk_alert',
