@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/features/notifications/screens/notifications_screen.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';

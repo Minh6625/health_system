@@ -51,14 +51,16 @@ String notificationSeverityLabel(String? severity) {
 }
 
 class NotificationsScreen extends StatefulWidget {
-  const NotificationsScreen({super.key});
+  const NotificationsScreen({super.key, this.apiClient});
+
+  final ApiClient? apiClient;
 
   @override
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final ApiClient _apiClient = ApiClient();
+  ApiClient get _apiClient => widget.apiClient ?? ApiClient();
   final TextEditingController _searchController = TextEditingController();
   static const int _pageSize = 10;
   static const int _fetchAllPageSize = 100;
