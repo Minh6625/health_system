@@ -21,6 +21,7 @@ import '../../family/widgets/family_sos_full_screen_overlay.dart';
 import '../../notifications/models/notification_open_target.dart';
 import '../../notifications/services/notification_event_mapper.dart';
 import '../../notifications/services/notification_open_router.dart';
+import '../../notifications/services/notification_runtime_service.dart';
 import '../widgets/risk_alert_full_screen_overlay.dart';
 
 const String _androidCriticalAlertChannel =
@@ -162,7 +163,11 @@ typedef RiskEscalationConfirmOpener = Future<void> Function(int recipientCount);
 typedef AlertNotificationPresenter =
     Future<void> Function(Map<String, dynamic> item, {required String sosId});
 
-class SOSRealtimeAlertService {
+class SOSRealtimeAlertService
+    implements
+        NotificationEmergencyAdapter,
+        NotificationRuntimeNavigatorOwner,
+        NotificationRuntimeNotificationsOwner {
   SOSRealtimeAlertService._internal({
     ApiClient? apiClient,
     TokenStorageService? tokenStorageService,
@@ -300,6 +305,77 @@ class SOSRealtimeAlertService {
   DateTime? _lastOpenedAlertAt;
   bool _isAlertOverlayVisible = false;
   RealtimeNotificationOpenTarget? _pendingCriticalAlertAfterAuth;
+
+  @override
+  FlutterLocalNotificationsPlugin get notificationRuntimeNotifications =>
+      _notifications;
+
+  @override
+  void bindNotificationRuntimeNavigatorKey(
+    GlobalKey<NavigatorState> navigatorKey,
+  ) {
+    _navigatorKey = navigatorKey;
+  }
+
+  @override
+  Future<void> openNotifications() {
+    return _navigateToNotificationsScreen();
+  }
+
+  @override
+  Future<void> openSosDetail(String sosId) {
+    return _navigateToSosDetail(sosId);
+  }
+
+  @override
+  Future<void> presentCriticalRiskTarget(NotificationOpenTarget target) {
+    return _presentCriticalRiskTarget(target);
+  }
+
+  @override
+  Future<void> presentFullscreenAlert(
+    Map<String, dynamic> item, {
+    required String subjectId,
+  }) async {
+    await _showFullScreenAlert(item, sosId: subjectId);
+
+    final alertType =
+        (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
+    if (_isRiskAlertType(alertType)) {
+      return;
+    }
+
+    await _navigateToEmergencyAlertScreen(
+      sosId: subjectId,
+      title: (item['title'] as String?) ?? 'Canh bao khan cap',
+      message:
+          (item['message'] as String?) ??
+          'Phat hien tinh huong khan cap. Nhan de xem chi tiet.',
+    );
+  }
+
+  @override
+  Future<void> presentMissedAlert(
+    Map<String, dynamic> item, {
+    required String subjectId,
+  }) {
+    return _showMissedAlert(item, sosId: subjectId);
+  }
+
+  @override
+  Future<void> redirectCriticalAlertToAuth(NotificationOpenTarget target) async {
+    if (_criticalAlertAuthRedirector != null) {
+      await _criticalAlertAuthRedirector(target);
+      return;
+    }
+
+    final navigatorState = _navigatorKey?.currentState;
+    if (navigatorState == null) {
+      return;
+    }
+
+    navigatorState.pushNamedAndRemoveUntil(AppRouter.start, (_) => false);
+  }
 
   Future<void> initialize({
     required GlobalKey<NavigatorState> navigatorKey,

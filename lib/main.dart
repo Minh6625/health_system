@@ -3,7 +3,7 @@ import 'package:healthguard/app.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
+import 'package:healthguard/features/notifications/services/notification_runtime_service.dart';
 
 void main() async {
   debugPrint("==== MAIN STARTED ====");
@@ -23,7 +23,9 @@ void main() async {
 
     try {
       await Firebase.initializeApp();
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      FirebaseMessaging.onBackgroundMessage(
+        notificationFirebaseMessagingBackgroundHandler,
+      );
       debugPrint("==== FIREBASE INITIALIZED ====");
     } catch (e) {
       debugPrint("==== FIREBASE INIT ERROR (IGNORING) ==== $e");

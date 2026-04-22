@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/features/auth/services/token_storage_service.dart';
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
 import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
+import 'package:healthguard/features/notifications/services/notification_runtime_service.dart';
 
 class _FakeTokenStorageService extends TokenStorageService {
   _FakeTokenStorageService(this.accessToken);
@@ -40,14 +41,17 @@ void main() {
           notificationsOpened += 1;
         },
       );
+      final runtime = NotificationRuntimeService.test(
+        emergencyAdapter: service,
+      );
 
-      await service.handleRemoteMessageOpenForTest(<String, dynamic>{
+      await runtime.handleRemoteMessageOpenForTest(<String, dynamic>{
         'type': 'risk_alert',
         'alert_type': 'risk_high',
         'risk_level': 'high',
         'notification_id': 'notif-medium',
       });
-      await service.handleRemoteMessageOpenForTest(<String, dynamic>{
+      await runtime.handleRemoteMessageOpenForTest(<String, dynamic>{
         'type': 'risk_alert',
         'alert_type': 'risk_critical',
         'risk_level': 'critical',
@@ -75,8 +79,12 @@ void main() {
           overlayTargets.add(target);
         },
       );
+      final runtime = NotificationRuntimeService.test(
+        emergencyAdapter: service,
+        storage: storage,
+      );
 
-      await service.processNotificationEventForTest(<String, dynamic>{
+      await runtime.processNotificationEventForTest(<String, dynamic>{
         'id': 'notif-critical-1',
         'alert_type': 'risk_critical',
         'title': 'Critical risk',
@@ -100,20 +108,24 @@ void main() {
     final storage = const FlutterSecureStorage();
     final missedCalls = <String>[];
     final overlayTargets = <RealtimeNotificationOpenTarget>[];
-    final service = SOSRealtimeAlertService.test(
-      storage: storage,
-      missedAlertPresenter: (item, {required sosId}) async {
-        missedCalls.add('${item['id']}:$sosId');
-      },
-      riskAlertTargetPresenter: (target) async {
-        overlayTargets.add(target);
-      },
-    );
+      final service = SOSRealtimeAlertService.test(
+        storage: storage,
+        missedAlertPresenter: (item, {required sosId}) async {
+          missedCalls.add('${item['id']}:$sosId');
+        },
+        riskAlertTargetPresenter: (target) async {
+          overlayTargets.add(target);
+        },
+      );
+      final runtime = NotificationRuntimeService.test(
+        emergencyAdapter: service,
+        storage: storage,
+      );
 
-    await service.processNotificationEventForTest(<String, dynamic>{
-      'id': 'notif-medium-1',
-      'alert_type': 'risk_high',
-      'title': 'Medium risk',
+      await runtime.processNotificationEventForTest(<String, dynamic>{
+        'id': 'notif-medium-1',
+        'alert_type': 'risk_high',
+        'title': 'Medium risk',
       'message': 'Check soon',
       'created_at': DateTime.now().toUtc().toIso8601String(),
       'data': <String, dynamic>{
@@ -137,8 +149,12 @@ void main() {
           missedCalls.add('${item['id']}:$sosId');
         },
       );
+      final runtime = NotificationRuntimeService.test(
+        emergencyAdapter: service,
+        storage: storage,
+      );
 
-      await service.processNotificationEventForTest(<String, dynamic>{
+      await runtime.processNotificationEventForTest(<String, dynamic>{
         'id': 'notif-medium-2',
         'alert_type': 'risk_high',
         'title': 'Medium risk',
@@ -166,6 +182,10 @@ void main() {
           redirectedTargets.add(target);
         },
       );
+      final runtime = NotificationRuntimeService.test(
+        emergencyAdapter: service,
+        tokenStorageService: _FakeTokenStorageService('token-123'),
+      );
       final replayTarget = const RealtimeNotificationOpenTarget(
         type: 'risk',
         notificationId: 'notif-replay-1',
@@ -175,20 +195,20 @@ void main() {
         message: 'Return after login',
       );
 
-      await service.handleAndroidCriticalAlertLaunchForTest(
+      await runtime.handleAndroidCriticalAlertLaunchForTest(
         '{"type":"risk","notificationId":"notif-launch-1","alertType":"risk_critical","riskLevel":"critical","riskScoreId":81,"title":"Launch","message":"From native"}',
       );
-      await service.redirectCriticalAlertToAuthForTest(replayTarget);
+      await runtime.redirectCriticalAlertToAuthForTest(replayTarget);
       expect(redirectedTargets, <RealtimeNotificationOpenTarget>[replayTarget]);
-      expect(service.pendingCriticalAlertForTest, replayTarget);
+      expect(runtime.pendingCriticalAlertForTest, replayTarget);
 
-      service.setRealtimeEnabledForTest(true);
-      await service.restorePendingCriticalAlertAfterAuthForTest();
+      runtime.setRealtimeEnabledForTest(true);
+      await runtime.restorePendingCriticalAlertAfterAuthForTest();
 
       expect(openedTargets, hasLength(2));
       expect(openedTargets.first.notificationId, 'notif-launch-1');
       expect(openedTargets.last.notificationId, 'notif-replay-1');
-      expect(service.pendingCriticalAlertForTest, isNull);
+      expect(runtime.pendingCriticalAlertForTest, isNull);
     },
   );
 

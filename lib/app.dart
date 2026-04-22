@@ -16,6 +16,8 @@ import 'package:healthguard/features/emergency/repositories/emergency_caregiver_
 import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
 import 'package:healthguard/features/home/providers/home_dashboard_provider.dart';
 import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
+import 'package:healthguard/features/notifications/services/notification_runtime_service.dart';
+import 'package:healthguard/features/notifications/widgets/notification_runtime_auth_bridge.dart';
 import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
@@ -34,6 +36,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final SOSRealtimeAlertService _sosRealtimeAlertService =
       SOSRealtimeAlertService.instance;
+  late final NotificationRuntimeService _notificationRuntimeService;
   final AuthProvider _authProvider = AuthProvider(AuthRepository());
   late final Future<bool> _bootstrapAuthFuture;
   late AppLinks _appLinks;
@@ -51,7 +54,10 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     super.initState();
     _appLinks = AppLinks();
     _bootstrapAuthFuture = _authProvider.bootstrapSession();
-    unawaited(_sosRealtimeAlertService.initialize(navigatorKey: _navigatorKey));
+    _notificationRuntimeService = NotificationRuntimeService.instance(
+      emergencyAdapter: _sosRealtimeAlertService,
+    );
+    unawaited(_notificationRuntimeService.initialize(navigatorKey: _navigatorKey));
     _initDeepLinks();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_deepLinkDispatched && _pendingDeepLinkRoute != null) {
@@ -136,7 +142,10 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         _routeToDeepLink(AppRouter.verifyEmail, {
           'code': code,
           'email': email,
-          if (action != null) 'action': action,
+          ...switch (action) {
+            final String value => <String, dynamic>{'action': value},
+            null => const <String, dynamic>{},
+          },
         });
       }
     } else if (isResetPassword) {
@@ -146,7 +155,10 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         _routeToDeepLink(AppRouter.verifyResetOtp, {
           'code': code,
           'email': email,
-          if (action != null) 'action': action,
+          ...switch (action) {
+            final String value => <String, dynamic>{'action': value},
+            null => const <String, dynamic>{},
+          },
         });
       }
     }
@@ -154,6 +166,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
 
   @override
   void dispose() {
+    unawaited(_notificationRuntimeService.dispose());
     unawaited(_sosRealtimeAlertService.dispose());
     _linkSubscription?.cancel();
     super.dispose();
@@ -176,8 +189,8 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
               EmergencyCaregiverProvider(EmergencyCaregiverRepository()),
         ),
       ],
-      child: _SOSAlertAuthBridge(
-        service: _sosRealtimeAlertService,
+      child: NotificationRuntimeAuthBridge(
+        service: _notificationRuntimeService,
         child: MaterialApp(
           navigatorKey: _navigatorKey,
           debugShowCheckedModeBanner: false,
@@ -226,55 +239,4 @@ class AuthBootstrapGate extends StatelessWidget {
       },
     );
   }
-}
-
-class _SOSAlertAuthBridge extends StatefulWidget {
-  const _SOSAlertAuthBridge({required this.service, required this.child});
-
-  final SOSRealtimeAlertService service;
-  final Widget child;
-
-  @override
-  State<_SOSAlertAuthBridge> createState() => _SOSAlertAuthBridgeState();
-}
-
-class _SOSAlertAuthBridgeState extends State<_SOSAlertAuthBridge> {
-  AuthProvider? _authProvider;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final nextProvider = context.read<AuthProvider>();
-    if (identical(nextProvider, _authProvider)) {
-      return;
-    }
-
-    _authProvider?.removeListener(_onAuthChanged);
-    _authProvider = nextProvider;
-    _authProvider?.addListener(_onAuthChanged);
-    _onAuthChanged();
-  }
-
-  void _onAuthChanged() {
-    final authProvider = _authProvider;
-    if (authProvider == null) {
-      return;
-    }
-
-    unawaited(
-      widget.service.onAuthStateChanged(
-        isAuthenticated:
-            authProvider.sessionResolved && authProvider.isAuthenticated,
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _authProvider?.removeListener(_onAuthChanged);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => widget.child;
 }
