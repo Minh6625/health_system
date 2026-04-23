@@ -7,12 +7,13 @@ from app.core.dependencies import get_current_user
 from app.models.user_model import User
 from app.schemas.relationship import (
     AccessProfileResponse,
-    RelationshipRequestCreate,
+    FamilyProfileSnapshot,
+    LinkedContactDetailResponse,
     RelationshipAcceptRequest,
-    RelationshipUpdate,
+    RelationshipRequestCreate,
     RelationshipResponse,
+    RelationshipUpdate,
     UserSearchResponse,
-    FamilyProfileSnapshot
 )
 from app.services.relationship_service import RelationshipService
 
@@ -32,7 +33,7 @@ def get_family_dashboard(
 
 @router.get(
     "/relationships/{contact_id}/detail",
-    response_model=dict,
+    response_model=LinkedContactDetailResponse,
     summary="Get detail health data of a linked contact"
 )
 def get_linked_contact_detail(
@@ -40,7 +41,6 @@ def get_linked_contact_detail(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """View the dashboard stats of a specific tracked person."""
     return RelationshipService.get_linked_contact_detail(db, current_user, contact_id)
 
 @router.get(

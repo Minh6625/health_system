@@ -1,6 +1,7 @@
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
+from typing import Any, List, Optional
 from datetime import datetime
+
+from pydantic import BaseModel, EmailStr
 
 class AccessProfileResponse(BaseModel):
     id: int
@@ -10,6 +11,19 @@ class AccessProfileResponse(BaseModel):
     can_view_vitals: bool
     can_receive_alerts: bool
     can_view_location: bool
+
+
+class LinkedContactDetailResponse(BaseModel):
+    id: str
+    displayName: str
+    email: str
+    avatarUrl: str = ""
+    primaryRelationshipLabel: Optional[str] = None
+    tags: List[Any] = []
+    role: str = "unclassified"
+    status: str
+    permissions: List[str] = []
+    isIncomingRequest: bool = False
 
 class RelationshipRequestCreate(BaseModel):
     email: Optional[EmailStr] = None
