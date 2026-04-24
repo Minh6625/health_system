@@ -16,6 +16,8 @@ class FamilyProfileHealthCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isNoData = !profile.hasVitalsData;
+    final isCriticalRisk =
+        profile.riskLevel == 'high' || profile.riskLevel == 'critical';
 
     Color cardColor;
     Color iconBgColor;
@@ -29,7 +31,7 @@ class FamilyProfileHealthCard extends StatelessWidget {
       cardColor = AppStateColors.criticalBg;
       iconBgColor = AppColors.critical;
       iconColor = Colors.white;
-    } else if (profile.riskLevel == 'high') {
+    } else if (isCriticalRisk) {
       cardColor = AppStateColors.criticalBg;
       iconBgColor = AppStateColors.criticalBg;
       iconColor = AppColors.critical;
@@ -131,7 +133,7 @@ class FamilyProfileHealthCard extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                               if (profile.isSosActive ||
-                                  profile.riskLevel == 'high') ...[
+                                  isCriticalRisk) ...[
                                 const SizedBox(width: 6),
                                 const Icon(
                                   Icons.warning_amber_rounded,
@@ -154,7 +156,7 @@ class FamilyProfileHealthCard extends StatelessWidget {
                                 color: isNoData
                                     ? AppColors.textSecondary
                                     : (profile.isSosActive ||
-                                              profile.riskLevel == 'high'
+                                              isCriticalRisk
                                           ? AppColors.critical
                                           : AppColors.warning),
                               ),

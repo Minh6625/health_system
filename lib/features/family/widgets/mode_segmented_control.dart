@@ -26,6 +26,7 @@ class ModeSegmentedControl extends StatelessWidget {
         children: [
           Expanded(
             child: _buildSegment(
+              segmentKey: const ValueKey('family-add-mode-scan'),
               title: 'Quét mã',
               icon: Icons.qr_code_scanner,
               isSelected: currentMode == AddContactMode.scan,
@@ -34,6 +35,7 @@ class ModeSegmentedControl extends StatelessWidget {
           ),
           Expanded(
             child: _buildSegment(
+              segmentKey: const ValueKey('family-add-mode-my-code'),
               title: 'Mã của tôi',
               icon: Icons.qr_code,
               isSelected: currentMode == AddContactMode.myCode,
@@ -42,6 +44,7 @@ class ModeSegmentedControl extends StatelessWidget {
           ),
           Expanded(
             child: _buildSegment(
+              segmentKey: const ValueKey('family-add-mode-search'),
               title: 'SĐT',
               icon: Icons.search,
               isSelected: currentMode == AddContactMode.searchPhone,
@@ -54,12 +57,14 @@ class ModeSegmentedControl extends StatelessWidget {
   }
 
   Widget _buildSegment({
+    Key? segmentKey,
     required String title,
     required IconData icon,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
     return GestureDetector(
+      key: segmentKey,
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(

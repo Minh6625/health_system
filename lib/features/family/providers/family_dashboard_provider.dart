@@ -5,7 +5,10 @@ import "package:healthguard/features/family/repositories/family_repository.dart"
 enum FamilyFilter { all, sos, attention, priority }
 
 class FamilyDashboardProvider extends ChangeNotifier {
-  final FamilyRepository _repository = FamilyRepository();
+  FamilyDashboardProvider({FamilyRepository? repository})
+    : _repository = repository ?? FamilyRepository();
+
+  final FamilyRepository _repository;
   bool _isLoading = true;
   String? _error;
   FamilyFilter _currentFilter = FamilyFilter.all;
@@ -16,6 +19,9 @@ class FamilyDashboardProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   FamilyFilter get currentFilter => _currentFilter;
+
+  bool _isAttentionRisk(String riskLevel) =>
+      riskLevel == "medium" || riskLevel == "high" || riskLevel == "critical";
 
   void setFilter(FamilyFilter filter) {
     if (_currentFilter != filter) {
@@ -40,7 +46,7 @@ class FamilyDashboardProvider extends ChangeNotifier {
       .where(
         (p) =>
             p.hasVitalsData &&
-            (p.riskLevel == "medium" || p.riskLevel == "high") &&
+            _isAttentionRisk(p.riskLevel) &&
             !p.isSosActive &&
             p.hasViewVitalsPermission,
       )
@@ -51,8 +57,7 @@ class FamilyDashboardProvider extends ChangeNotifier {
         (p) =>
             p.hasViewVitalsPermission &&
             (p.isSosActive ||
-                (p.hasVitalsData &&
-                    (p.riskLevel == "medium" || p.riskLevel == "high"))),
+                (p.hasVitalsData && _isAttentionRisk(p.riskLevel))),
       )
       .length;
 
@@ -63,6 +68,7 @@ class FamilyDashboardProvider extends ChangeNotifier {
       if (!a.isSosActive && b.isSosActive) return 1;
 
       int riskWeight(String r) {
+        if (r == "critical") return 4;
         if (r == "high") return 3;
         if (r == "medium") return 2;
         return 1;
@@ -74,9 +80,7 @@ class FamilyDashboardProvider extends ChangeNotifier {
     if (_currentFilter == FamilyFilter.sos) {
       list = list.where((p) => p.isSosActive).toList();
     } else if (_currentFilter == FamilyFilter.attention) {
-      list = list
-          .where((p) => p.riskLevel == "medium" || p.riskLevel == "high")
-          .toList();
+      list = list.where((p) => _isAttentionRisk(p.riskLevel)).toList();
     } else if (_currentFilter == FamilyFilter.priority) {
       list = list.where((p) => p.isPinned).toList();
     }

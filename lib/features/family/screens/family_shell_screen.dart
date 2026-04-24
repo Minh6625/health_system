@@ -1,26 +1,33 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:healthguard/core/routes/app_router.dart';
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 import 'package:healthguard/features/emergency/screens/emergency_sos_received_list_screen.dart';
+import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
+import 'package:healthguard/features/family/providers/family_relationship_provider.dart';
 import 'package:healthguard/features/family/screens/contact_list_screen.dart';
 import 'package:healthguard/features/family/screens/family_dashboard_screen.dart';
-import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
-import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
-import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/shared/presentation/shell/app_shell_bottom_nav.dart';
 import 'package:healthguard/shared/presentation/shell/main_scaffold_shell.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:provider/provider.dart';
 
 class FamilyShellScreen extends StatefulWidget {
+  const FamilyShellScreen({
+    super.key,
+    this.initialTab = 0,
+    this.enableAutoRefresh = true,
+    this.badgeRefreshInterval = const Duration(seconds: 2),
+  });
+
   /// 0 = Theo dõi, 1 = Liên hệ, 2 = SOS
   final int initialTab;
-
-  const FamilyShellScreen({super.key, this.initialTab = 0});
+  final bool enableAutoRefresh;
+  final Duration badgeRefreshInterval;
 
   @override
   State<FamilyShellScreen> createState() => _FamilyShellScreenState();
@@ -28,40 +35,46 @@ class FamilyShellScreen extends StatefulWidget {
 
 class _FamilyShellScreenState extends State<FamilyShellScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  static const Duration _badgeRefreshInterval = Duration(seconds: 2);
-
   late TabController _tabController;
-  late SharedFamilyMockProvider _familyProvider;
+  late FamilyRelationshipProvider _familyProvider;
   late AuthProvider _authProvider;
   Timer? _badgeRefreshTimer;
   bool _isRefreshingBadges = false;
+  bool _canReceiveAlerts = false;
   int? _lastRefreshedUserId;
 
-  // Mock: canReceiveAlerts luôn = true trong dev
-  // Sau này check từ API: user có ít nhất 1 relationship với can_receive_alerts = true
-  final bool _canReceiveAlerts = true;
-
   int get _tabCount => _canReceiveAlerts ? 3 : 2;
+  int _clampTabIndex(int index) {
+    final maxIndex = _tabCount - 1;
+    if (index < 0) {
+      return 0;
+    }
+    if (index > maxIndex) {
+      return maxIndex;
+    }
+    return index;
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _familyProvider = SharedFamilyMockProvider();
+    _familyProvider = context.read<FamilyRelationshipProvider>();
     _authProvider = context.read<AuthProvider>();
     _authProvider.addListener(_handleAuthChanged);
-    _tabController = TabController(length: _tabCount, vsync: this);
+    _canReceiveAlerts = _familyProvider.canReceiveAlerts;
+    _tabController = TabController(
+      length: _tabCount,
+      vsync: this,
+      initialIndex: _clampTabIndex(widget.initialTab),
+    );
     _tabController.addListener(_handleTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshTabBadges();
-      _startBadgeAutoRefresh();
+      if (widget.enableAutoRefresh) {
+        _startBadgeAutoRefresh();
+      }
     });
-
-    if (widget.initialTab != 0 && widget.initialTab < _tabCount) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _tabController.animateTo(widget.initialTab);
-      });
-    }
   }
 
   @override
@@ -72,6 +85,27 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
     _tabController.removeListener(_handleTabChanged);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _syncTabController(bool canReceiveAlerts) {
+    if (_canReceiveAlerts == canReceiveAlerts) {
+      return;
+    }
+
+    final previousIndex = _tabController.index;
+    _tabController.removeListener(_handleTabChanged);
+    _tabController.dispose();
+
+    _canReceiveAlerts = canReceiveAlerts;
+    _tabController = TabController(
+      length: _tabCount,
+      vsync: this,
+      initialIndex: _clampTabIndex(previousIndex),
+    );
+    _tabController.addListener(_handleTabChanged);
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _handleAuthChanged() {
@@ -90,7 +124,9 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _startBadgeAutoRefresh();
+      if (widget.enableAutoRefresh) {
+        _startBadgeAutoRefresh();
+      }
       _refreshTabBadges(silent: true);
       return;
     }
@@ -103,8 +139,11 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
   }
 
   void _startBadgeAutoRefresh() {
+    if (!widget.enableAutoRefresh) {
+      return;
+    }
     _badgeRefreshTimer?.cancel();
-    _badgeRefreshTimer = Timer.periodic(_badgeRefreshInterval, (_) {
+    _badgeRefreshTimer = Timer.periodic(widget.badgeRefreshInterval, (_) {
       _refreshTabBadges(silent: true);
     });
   }
@@ -123,11 +162,7 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
 
   Future<void> _navigateToAddContact() async {
     await Navigator.pushNamed(context, AppRouter.addContact);
-    if (!mounted) return;
-
-    final auth = context.read<AuthProvider>();
-    if (auth.currentUser != null) {
-      await _familyProvider.loadInitialData(auth.currentUser!.userId);
+    if (mounted) {
       await _refreshTabBadges();
     }
   }
@@ -137,28 +172,30 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
       return;
     }
 
-    final auth = context.read<AuthProvider>();
-    final user = auth.currentUser;
-    if (user == null) return;
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) {
+      return;
+    }
     _lastRefreshedUserId = user.userId;
 
     _isRefreshingBadges = true;
     try {
+      await _familyProvider.load(user.userId, silent: silent);
+      _syncTabController(_familyProvider.canReceiveAlerts);
+
       final futures = <Future<void>>[
-        _familyProvider.loadInitialData(user.userId, silent: silent),
         context.read<FamilyDashboardProvider>().loadDashboard(
-          user.userId,
-          silent: silent,
-        ),
+              user.userId,
+              silent: silent,
+            ),
       ];
 
-      final isOnSosTab = _canReceiveAlerts && _tabController.index == 2;
-      if (!isOnSosTab) {
+      if (_canReceiveAlerts && _tabController.index != 2) {
         futures.add(
           context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(
-            'all',
-            silent: silent,
-          ),
+                'all',
+                silent: silent,
+              ),
         );
       }
 
@@ -177,7 +214,6 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
       return Text(label);
     }
 
-    final displayCount = count.toString();
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -191,7 +227,7 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
           child: FittedBox(
             fit: BoxFit.scaleDown,
             child: Text(
-              displayCount,
+              count.toString(),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
@@ -207,165 +243,160 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _familyProvider,
-      child: MainScaffoldShell(
-        bottomNavigation: AppShellBottomNav(
-          currentTab: AppMainTab.family,
-          onTabSelected: (tab) {
-            if (tab == AppMainTab.family) return;
-            switch (tab) {
-              case AppMainTab.me:
-                Navigator.pushReplacementNamed(context, '/dashboard');
-                break;
-              case AppMainTab.device:
-                Navigator.pushReplacementNamed(context, '/device');
-                break;
-              case AppMainTab.profile:
-                Navigator.pushReplacementNamed(context, '/profile');
-                break;
-              case AppMainTab.family:
-                break;
-            }
-          },
-        ),
-        child: Scaffold(
-          backgroundColor: AppColors.bgPrimary,
-          appBar: AppBar(
-            title: Text(
-              'Gia đình',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+    return MainScaffoldShell(
+      bottomNavigation: AppShellBottomNav(
+        currentTab: AppMainTab.family,
+        onTabSelected: (tab) {
+          if (tab == AppMainTab.family) return;
+          switch (tab) {
+            case AppMainTab.me:
+              Navigator.pushReplacementNamed(context, '/dashboard');
+              break;
+            case AppMainTab.device:
+              Navigator.pushReplacementNamed(context, '/device');
+              break;
+            case AppMainTab.profile:
+              Navigator.pushReplacementNamed(context, '/profile');
+              break;
+            case AppMainTab.family:
+              break;
+          }
+        },
+      ),
+      child: Scaffold(
+        key: const ValueKey('family-shell-screen'),
+        backgroundColor: AppColors.bgPrimary,
+        appBar: AppBar(
+          title: Text(
+            'Gia đình',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
             ),
-            backgroundColor: AppColors.bgPrimary,
-            elevation: 0,
-            centerTitle: true,
-            automaticallyImplyLeading: false,
-            actions: [
-              AnimatedBuilder(
-                animation: _tabController,
-                builder: (context, child) {
-                  // Nút thêm liên hệ chỉ hiện ở tab "Liên hệ" (index 1)
-                  if (_tabController.index == 1) {
-                    return IconButton(
-                      icon: const Icon(
-                        Icons.person_add,
-                        color: AppColors.textPrimary,
-                      ),
-                      tooltip: 'Thêm liên hệ',
-                      onPressed: _navigateToAddContact,
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-            ],
           ),
-          body: Column(
-            children: [
-              // Segmented Control Tab Bar
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.gapLg,
-                  vertical: AppSpacing.gapSm,
-                ),
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.bgSurface,
-                    borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    dividerColor: Colors.transparent,
-                    indicator: BoxDecoration(
-                      borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
-                      color: AppColors.brandPrimary,
+          backgroundColor: AppColors.bgPrimary,
+          elevation: 0,
+          centerTitle: true,
+          automaticallyImplyLeading: false,
+          actions: [
+            AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, child) {
+                if (_tabController.index == 1) {
+                  return IconButton(
+                    icon: const Icon(
+                      Icons.person_add,
+                      color: AppColors.textPrimary,
                     ),
-                    labelColor: AppColors.bgSurface,
-                    labelStyle: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                    ),
-                    unselectedLabelColor: AppColors.textSecondary,
-                    unselectedLabelStyle: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 15,
-                    ),
-                    tabs: [
-                      Tab(
-                        child: Selector<FamilyDashboardProvider, int>(
-                          selector: (context, provider) =>
-                              provider.trackingAlertCount,
-                          builder: (context, trackingCount, child) {
-                            return _buildTabLabelWithBadge(
-                              label: 'Theo dõi',
-                              count: trackingCount,
-                              badgeColor: AppColors.warning,
-                            );
-                          },
-                        ),
-                      ),
-                      // Tab Liên hệ với badge pending
-                      Tab(
-                        child: Selector<SharedFamilyMockProvider, int>(
-                          selector: (context, provider) =>
-                              provider.pendingRequests.length,
-                          builder: (context, pendingCount, child) {
-                            return _buildTabLabelWithBadge(
-                              label: 'Liên hệ',
-                              count: pendingCount,
-                            );
-                          },
-                        ),
-                      ),
-                      // Tab SOS chỉ hiện khi canReceiveAlerts = true
-                      if (_canReceiveAlerts)
-                        Tab(
-                          child: Selector<EmergencyCaregiverProvider, int>(
-                            selector: (context, provider) =>
-                                provider.activeCount,
-                            builder: (context, activeCount, child) {
-                              return _buildTabLabelWithBadge(
-                                label: 'SOS',
-                                count: activeCount,
-                                badgeColor: AppColors.emergency,
-                              );
-                            },
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+                    tooltip: 'Thêm liên hệ',
+                    onPressed: _navigateToAddContact,
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: AppSpacing.gapLg,
+                vertical: AppSpacing.gapSm,
               ),
-
-              // Tab Views
-              Expanded(
-                child: TabBarView(
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.bgSurface,
+                  borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: TabBar(
                   controller: _tabController,
-                  children: [
-                    // Tab 0: Theo dõi
-                    const FamilyDashboardScreen(),
-                    // Tab 1: Liên hệ
-                    const ContactListScreen(),
-                    // Tab 2: SOS (chỉ khi canReceiveAlerts)
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  indicator: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppRadii.radiusXxl),
+                    color: AppColors.brandPrimary,
+                  ),
+                  labelColor: AppColors.bgSurface,
+                  labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 15,
+                  ),
+                  unselectedLabelColor: AppColors.textSecondary,
+                  unselectedLabelStyle: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 15,
+                  ),
+                  tabs: [
+                    Tab(
+                      key: const ValueKey('family-tab-dashboard'),
+                      child: Selector<FamilyDashboardProvider, int>(
+                        selector: (context, provider) =>
+                            provider.trackingAlertCount,
+                        builder: (context, trackingCount, child) {
+                          return _buildTabLabelWithBadge(
+                            label: 'Theo dõi',
+                            count: trackingCount,
+                            badgeColor: AppColors.warning,
+                          );
+                        },
+                      ),
+                    ),
+                    Tab(
+                      key: const ValueKey('family-tab-contacts'),
+                      child: Selector<FamilyRelationshipProvider, int>(
+                        selector: (context, provider) =>
+                            provider.pendingRequests.length,
+                        builder: (context, pendingCount, child) {
+                          return _buildTabLabelWithBadge(
+                            label: 'Liên hệ',
+                            count: pendingCount,
+                          );
+                        },
+                      ),
+                    ),
                     if (_canReceiveAlerts)
-                      const EmergencySOSReceivedListScreen(),
+                      Tab(
+                        key: const ValueKey('family-tab-sos'),
+                        child: Selector<EmergencyCaregiverProvider, int>(
+                          selector: (context, provider) => provider.activeCount,
+                          builder: (context, activeCount, child) {
+                            return _buildTabLabelWithBadge(
+                              label: 'SOS',
+                              count: activeCount,
+                              badgeColor: AppColors.emergency,
+                            );
+                          },
+                        ),
+                      ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  FamilyDashboardScreen(
+                    enableAutoRefresh: widget.enableAutoRefresh,
+                  ),
+                  const ContactListScreen(),
+                  if (_canReceiveAlerts)
+                    EmergencySOSReceivedListScreen(
+                      enableAutoRefresh: widget.enableAutoRefresh,
+                    ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

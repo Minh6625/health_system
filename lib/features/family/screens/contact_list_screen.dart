@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
+import 'package:healthguard/features/family/providers/family_relationship_provider.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
+import 'package:provider/provider.dart';
 import '../widgets/linked_contacts_hero_card.dart';
 import '../widgets/pending_requests_section.dart';
 import '../widgets/grouped_contacts_section.dart';
@@ -24,7 +24,7 @@ class _ContactListScreenState extends State<ContactListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final auth = context.read<AuthProvider>();
       if (auth.currentUser != null) {
-        context.read<SharedFamilyMockProvider>().loadInitialData(
+        context.read<FamilyRelationshipProvider>().loadInitialData(
           auth.currentUser!.userId,
         );
       }
@@ -37,7 +37,7 @@ class _ContactListScreenState extends State<ContactListScreen> {
 
     final auth = context.read<AuthProvider>();
     if (auth.currentUser != null) {
-      await context.read<SharedFamilyMockProvider>().loadInitialData(
+      await context.read<FamilyRelationshipProvider>().loadInitialData(
         auth.currentUser!.userId,
       );
     }
@@ -47,7 +47,7 @@ class _ContactListScreenState extends State<ContactListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
-      body: Consumer<SharedFamilyMockProvider>(
+      body: Consumer<FamilyRelationshipProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading && provider.contacts.isEmpty) {
             return const Center(child: CircularProgressIndicator());
@@ -95,7 +95,7 @@ class _ContactListScreenState extends State<ContactListScreen> {
     );
   }
 
-  Widget _buildErrorState(SharedFamilyMockProvider provider) {
+  Widget _buildErrorState(FamilyRelationshipProvider provider) {
     return Center(
       child: Padding(
         padding: EdgeInsets.all(AppSpacing.sectionGapXl),

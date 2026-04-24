@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:healthguard/shared/presentation/theme/app_radii.dart';
-import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:provider/provider.dart';
-import 'package:healthguard/features/auth/providers/auth_provider.dart';
-import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
 import 'package:healthguard/core/routes/app_router.dart';
+import 'package:healthguard/features/family/providers/family_relationship_provider.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import '../models/linked_contact_model.dart';
 
 class LinkedContactCard extends StatelessWidget {
@@ -37,18 +36,14 @@ class LinkedContactCard extends StatelessWidget {
     );
 
     if (context.mounted) {
-      final auth = context.read<AuthProvider>();
-      if (auth.currentUser != null) {
-        context.read<SharedFamilyMockProvider>().loadInitialData(
-          auth.currentUser!.userId,
-        );
-      }
+      await context.read<FamilyRelationshipProvider>().reload();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      key: ValueKey('family-contact-card-${contact.id}'),
       decoration: BoxDecoration(
         color: AppColors.bgSurface,
         borderRadius: BorderRadius.circular(AppRadii.radiusXl),

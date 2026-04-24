@@ -1,11 +1,19 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
-import '../repositories/family_repository.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import '../models/user_search_model.dart';
+import '../repositories/family_repository.dart';
 
 class SearchPhoneView extends StatefulWidget {
+  const SearchPhoneView({
+    super.key,
+    required this.onConnect,
+    this.repository,
+  });
+
+  final FamilyRepository? repository;
   final Future<bool> Function(
     UserSearchModel user, {
     bool isCancel,
@@ -15,46 +23,50 @@ class SearchPhoneView extends StatefulWidget {
   })
   onConnect;
 
-  const SearchPhoneView({super.key, required this.onConnect});
-
   @override
   State<SearchPhoneView> createState() => _SearchPhoneViewState();
 }
 
 class _SearchPhoneViewState extends State<SearchPhoneView> {
   final TextEditingController _searchController = TextEditingController();
-  final FamilyRepository _repository = FamilyRepository();
+  late final FamilyRepository _repository;
 
   Timer? _debounce;
   bool _isSearching = false;
-  List<UserSearchModel> _results = [];
-  final Set<int> _sentRequests =
-      {}; // To track which users we've sent requests to
+  List<UserSearchModel> _results = <UserSearchModel>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = widget.repository ?? FamilyRepository();
+  }
 
   void _onSearchChanged(String query) {
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    if (_debounce?.isActive ?? false) {
+      _debounce!.cancel();
+    }
 
     if (query.trim().isEmpty) {
       setState(() {
-        _results = [];
+        _results = <UserSearchModel>[];
         _isSearching = false;
       });
       return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 600), () {
-      _handleSearch();
-    });
+    _debounce = Timer(const Duration(milliseconds: 600), _handleSearch);
   }
 
   Future<void> _handleSearch() async {
     final query = _searchController.text.trim();
-    if (query.isEmpty) return;
+    if (query.isEmpty) {
+      return;
+    }
 
     if (mounted) {
       setState(() {
         _isSearching = true;
-        _results = [];
+        _results = <UserSearchModel>[];
       });
     }
 
@@ -89,7 +101,6 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Search Bar
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: BoxDecoration(
@@ -103,6 +114,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
               const SizedBox(width: 8),
               Expanded(
                 child: TextField(
+                  key: const ValueKey('family-search-field'),
                   controller: _searchController,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
@@ -119,7 +131,6 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
             ],
           ),
         ),
-
         const SizedBox(height: 16),
         Expanded(child: _buildResultsView()),
       ],
@@ -169,7 +180,6 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Skeleton Avatar
           Container(
             width: 80,
             height: 80,
@@ -184,7 +194,6 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Skeleton Name
                 Container(
                   width: 120,
                   height: 18,
@@ -194,7 +203,6 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Skeleton Phone
                 Container(
                   width: 80,
                   height: 14,
@@ -204,7 +212,6 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Skeleton Button
                 Container(
                   width: double.infinity,
                   height: 40,
@@ -222,9 +229,8 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
   }
 
   Widget _buildResultCard(UserSearchModel user) {
-    bool isPending =
-        user.connectionStatus == 'pending' || _sentRequests.contains(user.id);
-    bool isAccepted = user.connectionStatus == 'accepted';
+    final isPending = user.connectionStatus == 'pending';
+    final isAccepted = user.connectionStatus == 'accepted';
 
     Color bgColor = AppColors.info;
     Color fgColor = Colors.white;
@@ -241,6 +247,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
     }
 
     return Container(
+      key: ValueKey('family-search-result-${user.id}'),
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -260,21 +267,21 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
           CircleAvatar(
             radius: 40,
             backgroundColor: AppColors.brandPrimaryLight,
-            backgroundImage: user.avatarUrl != null
-                ? NetworkImage(user.avatarUrl!)
-                : null,
-            child: user.avatarUrl == null
-                ? Text(
-                    user.fullName.isNotEmpty
-                        ? user.fullName[0].toUpperCase()
-                        : 'A',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      color: AppColors.brandPrimary,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
-                : null,
+            backgroundImage:
+                user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
+            child:
+                user.avatarUrl == null
+                    ? Text(
+                      user.fullName.isNotEmpty
+                          ? user.fullName[0].toUpperCase()
+                          : 'A',
+                      style: const TextStyle(
+                        fontSize: 28,
+                        color: AppColors.brandPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                    : null,
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -304,6 +311,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
+                          key: ValueKey('family-search-accept-${user.id}'),
                           onPressed: () async {
                             final success = await widget.onConnect(
                               user,
@@ -313,7 +321,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                               isReject: false,
                             );
                             if (success == true && mounted) {
-                              _handleSearch();
+                              await _handleSearch();
                             }
                           },
                           style: ElevatedButton.styleFrom(
@@ -321,7 +329,9 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                             foregroundColor: AppColors.bgSurface,
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.radiusSm,
+                              ),
                             ),
                             elevation: 0,
                           ),
@@ -337,6 +347,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton(
+                          key: ValueKey('family-search-reject-${user.id}'),
                           onPressed: () async {
                             final success = await widget.onConnect(
                               user,
@@ -346,7 +357,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                               isReject: true,
                             );
                             if (success == true && mounted) {
-                              _handleSearch();
+                              await _handleSearch();
                             }
                           },
                           style: OutlinedButton.styleFrom(
@@ -354,7 +365,9 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                             side: BorderSide(color: Colors.red.shade600),
                             padding: const EdgeInsets.symmetric(vertical: 10),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.radiusSm,
+                              ),
                             ),
                           ),
                           child: const Text(
@@ -372,6 +385,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
+                      key: ValueKey('family-search-action-${user.id}'),
                       onPressed: () async {
                         if (isAccepted) {
                           final success = await widget.onConnect(
@@ -382,7 +396,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                             isReject: false,
                           );
                           if (success == true && mounted) {
-                            _handleSearch();
+                            await _handleSearch();
                           }
                         } else if (isPending) {
                           final success = await widget.onConnect(
@@ -393,10 +407,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                             isReject: false,
                           );
                           if (success == true && mounted) {
-                            setState(() {
-                              _sentRequests.remove(user.id);
-                            });
-                            _handleSearch();
+                            await _handleSearch();
                           }
                         } else {
                           final success = await widget.onConnect(
@@ -407,9 +418,7 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                             isReject: false,
                           );
                           if (success == true && mounted) {
-                            setState(() {
-                              _sentRequests.add(user.id);
-                            });
+                            await _handleSearch();
                           }
                         }
                       },
@@ -418,7 +427,9 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
                         foregroundColor: fgColor,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                          borderRadius: BorderRadius.circular(
+                            AppRadii.radiusSm,
+                          ),
                         ),
                         elevation: 0,
                       ),

@@ -24,7 +24,11 @@ class RelationshipRepository:
         return db.query(UserRelationship).filter(
             UserRelationship.caregiver_id == caregiver_id,
             UserRelationship.status == 'accepted',
-            UserRelationship.can_view_vitals == True
+            or_(
+                UserRelationship.can_view_vitals == True,
+                UserRelationship.can_receive_alerts == True,
+                UserRelationship.can_view_location == True,
+            ),
         ).all()
 
     @staticmethod

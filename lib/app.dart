@@ -19,6 +19,7 @@ import 'package:healthguard/features/home/presentation/screens/home_dashboard_sc
 import 'package:healthguard/features/notifications/services/notification_runtime_service.dart';
 import 'package:healthguard/features/notifications/widgets/notification_runtime_auth_bridge.dart';
 import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
+import 'package:healthguard/features/family/providers/family_relationship_provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:provider/provider.dart';
@@ -189,6 +190,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         ChangeNotifierProvider(create: (_) => HomeDashboardProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => FamilyDashboardProvider()),
+        ChangeNotifierProvider(create: (_) => FamilyRelationshipProvider()),
         ChangeNotifierProvider(
           create: (_) =>
               EmergencyCaregiverProvider(EmergencyCaregiverRepository()),

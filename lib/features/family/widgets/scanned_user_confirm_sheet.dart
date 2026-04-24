@@ -120,9 +120,12 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                 ),
               ),
               const SizedBox(height: 4),
-              if (widget.email != null || widget.phone != null)
+              if ((widget.email?.trim().isNotEmpty ?? false) ||
+                  (widget.phone?.trim().isNotEmpty ?? false))
                 Text(
-                  widget.email ?? widget.phone ?? '',
+                  widget.email?.trim().isNotEmpty == true
+                      ? widget.email!
+                      : widget.phone ?? '',
                   style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                 ),
               if (widget.statusMessage != null) ...[
@@ -245,6 +248,7 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
                     const SizedBox(width: 16),
                     Expanded(
                       child: ElevatedButton(
+                        key: const ValueKey('family-confirm-submit'),
                         onPressed: _isLoading
                             ? null
                             : () async {

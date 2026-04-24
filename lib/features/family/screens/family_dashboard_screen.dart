@@ -17,7 +17,14 @@ import 'package:provider/provider.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
 
 class FamilyDashboardScreen extends StatefulWidget {
-  const FamilyDashboardScreen({super.key});
+  const FamilyDashboardScreen({
+    super.key,
+    this.enableAutoRefresh = true,
+    this.autoRefreshInterval = const Duration(seconds: 1),
+  });
+
+  final bool enableAutoRefresh;
+  final Duration autoRefreshInterval;
 
   @override
   State<FamilyDashboardScreen> createState() => _FamilyDashboardScreenState();
@@ -25,8 +32,6 @@ class FamilyDashboardScreen extends StatefulWidget {
 
 class _FamilyDashboardScreenState extends State<FamilyDashboardScreen>
     with WidgetsBindingObserver {
-  static const Duration _autoRefreshInterval = Duration(seconds: 1);
-
   Timer? _autoRefreshTimer;
   bool _isRefreshing = false;
 
@@ -59,8 +64,11 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen>
   }
 
   void _startAutoRefresh() {
+    if (!widget.enableAutoRefresh) {
+      return;
+    }
     _autoRefreshTimer?.cancel();
-    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+    _autoRefreshTimer = Timer.periodic(widget.autoRefreshInterval, (_) {
       _refreshDashboard(silent: true);
     });
   }
@@ -73,7 +81,9 @@ class _FamilyDashboardScreenState extends State<FamilyDashboardScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _startAutoRefresh();
+      if (widget.enableAutoRefresh) {
+        _startAutoRefresh();
+      }
       _refreshDashboard(silent: true);
       return;
     }

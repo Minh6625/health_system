@@ -17,25 +17,40 @@ import '../widgets/my_code_hero_card.dart';
 import '../widgets/qr_scanner_viewport.dart';
 import '../widgets/scanned_user_confirm_sheet.dart';
 import '../widgets/search_phone_view.dart';
-import '../repositories/family_repository.dart';
 import '../models/contact_tag.dart';
+import '../models/linked_contact_model.dart';
 import '../models/user_search_model.dart';
-import '../providers/shared_family_mock_provider.dart';
+import '../providers/family_relationship_provider.dart';
+import '../repositories/family_repository.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AddContactScreen extends StatefulWidget {
-  const AddContactScreen({super.key});
+  const AddContactScreen({
+    super.key,
+    this.repository,
+    this.initialMode = AddContactMode.scan,
+  });
+
+  final FamilyRepository? repository;
+  final AddContactMode initialMode;
 
   @override
   State<AddContactScreen> createState() => _AddContactScreenState();
 }
 
 class _AddContactScreenState extends State<AddContactScreen> {
-  AddContactMode _currentMode = AddContactMode.scan;
-  final FamilyRepository _repository = FamilyRepository();
+  late AddContactMode _currentMode;
+  late final FamilyRepository _repository;
   final ImagePicker _imagePicker = ImagePicker();
   final GlobalKey<QRScannerViewportState> _scannerKey =
       GlobalKey<QRScannerViewportState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentMode = widget.initialMode;
+    _repository = widget.repository ?? FamilyRepository();
+  }
 
   String _buildMyQrPayload() {
     final currentUser = context.read<AuthProvider>().currentUser;
@@ -51,6 +66,21 @@ class _AddContactScreenState extends State<AddContactScreen> {
     setState(() {
       _currentMode = mode;
     });
+  }
+
+  LinkedContactModel _buildRelationshipRequest(UserSearchModel user) {
+    final relationshipId = user.relationshipId;
+    if (relationshipId == null) {
+      throw Exception('Không tìm thấy yêu cầu liên kết.');
+    }
+
+    return LinkedContactModel(
+      id: relationshipId.toString(),
+      displayName: user.fullName,
+      email: user.email,
+      status: ContactStatus.pending,
+      isIncomingRequest: user.isIncoming,
+    );
   }
 
   Future<bool> _simulateScanSuccess(
@@ -87,28 +117,28 @@ class _AddContactScreenState extends State<AddContactScreen> {
         showTags: showTags,
         cancelButtonText: cancelButtonText,
         confirmButtonText: confirmButtonText,
-        onConfirm: (tags, email) async {
+        onConfirm: (tags, _) async {
           final selectedTags = tags.isNotEmpty
               ? tags
               : [ContactTagsConfig.defaultTags.first];
-
-          final tagsData = selectedTags
-              .map((t) => {'id': t.id, 'name': t.name})
-              .toList();
           final primaryLabel = selectedTags.first.name;
+          final relationshipProvider =
+              rootContext.read<FamilyRelationshipProvider>();
 
           try {
             if (isUnlink || isReject) {
-              if (user != null && user.relationshipId != null) {
-                await _repository.removeRelationshipById(user.relationshipId!);
+              if (user == null) {
+                throw Exception('Không tìm thấy liên hệ để cập nhật.');
+              }
+              final relationshipRequest = _buildRelationshipRequest(user);
+              if (isUnlink) {
+                await relationshipProvider.unlinkByRelationshipId(
+                  int.parse(relationshipRequest.id),
+                );
+              } else {
+                await relationshipProvider.rejectRequest(relationshipRequest);
               }
               if (mounted) {
-                final auth = rootContext.read<AuthProvider>();
-                if (auth.currentUser != null) {
-                  rootContext.read<SharedFamilyMockProvider>().loadInitialData(
-                    auth.currentUser!.userId,
-                  );
-                }
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -122,20 +152,19 @@ class _AddContactScreenState extends State<AddContactScreen> {
               }
               success = true;
             } else if (isAccept) {
-              if (user != null && user.relationshipId != null) {
-                await _repository.acceptRelationship(user.relationshipId!);
-                await _repository.updateRelationship(user.relationshipId!, {
-                  'tags': tagsData,
-                  'primary_relationship_label': primaryLabel,
-                });
+              if (user == null) {
+                throw Exception('Không tìm thấy yêu cầu liên kết.');
               }
+              await relationshipProvider.acceptRequest(
+                request: _buildRelationshipRequest(user),
+                permissions: const <String>[
+                  'can_receive_alerts',
+                  'can_view_location',
+                ],
+                tags: selectedTags,
+                primaryLabel: primaryLabel,
+              );
               if (mounted) {
-                final auth = rootContext.read<AuthProvider>();
-                if (auth.currentUser != null) {
-                  rootContext.read<SharedFamilyMockProvider>().loadInitialData(
-                    auth.currentUser!.userId,
-                  );
-                }
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(
                     content: Text('Đã xác nhận yêu cầu thành công!'),
@@ -146,7 +175,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
               success = true;
             } else if (isCancel) {
               if (user != null) {
-                await _repository.cancelConnectionRequest(user.id);
+                await relationshipProvider.cancelRequest(user);
               }
               if (mounted) {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
@@ -158,28 +187,14 @@ class _AddContactScreenState extends State<AddContactScreen> {
               }
               success = true;
             } else {
-              if (user != null) {
-                if (user.id > 0) {
-                  await _repository.sendConnectionRequest(
-                    targetUserId: user.id,
-                    tags: tagsData,
-                    primaryLabel: primaryLabel,
-                  );
-                } else {
-                  await _repository.sendConnectionRequest(
-                    email: user.email,
-                    tags: tagsData,
-                    primaryLabel: primaryLabel,
-                  );
-                }
-              } else {
-                // Simulated QR code fallback
-                await _repository.sendConnectionRequest(
-                  targetUserId: 1, // Mock dummy ID
-                  tags: tagsData,
-                  primaryLabel: primaryLabel,
-                );
+              if (user == null) {
+                throw Exception('Không thể xác định người dùng từ mã QR.');
               }
+              await relationshipProvider.sendRequestToUser(
+                user: user,
+                tags: selectedTags,
+                primaryLabel: primaryLabel,
+              );
 
               if (mounted) {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
@@ -221,10 +236,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
         },
       ),
     );
-
-    if (success && user == null && mounted) {
-      Navigator.pop(context); // Return to contact list if scanned (mock)
-    }
 
     return success;
   }
@@ -487,7 +498,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
       return UserSearchModel(
         id: qrUserId,
         fullName: (qrName != null && qrName.isNotEmpty) ? qrName : 'Người dùng',
-        email: 'user_$qrUserId@healthguard.local',
+        email: '',
       );
     }
 
@@ -676,7 +687,10 @@ class _AddContactScreenState extends State<AddContactScreen> {
         return Padding(
           key: const ValueKey('search_phone_mode'),
           padding: EdgeInsets.all(AppSpacing.gapLg),
-          child: SearchPhoneView(onConnect: _simulateScanSuccess),
+          child: SearchPhoneView(
+            repository: _repository,
+            onConnect: _simulateScanSuccess,
+          ),
         );
     }
   }

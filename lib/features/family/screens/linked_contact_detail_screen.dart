@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/family/models/contact_tag.dart';
 import 'package:healthguard/features/family/providers/linked_contact_detail_provider.dart';
+import 'package:healthguard/features/family/repositories/family_repository.dart';
 import 'package:healthguard/features/family/widgets/label_management_card.dart';
 import 'package:healthguard/features/family/widgets/linked_contact_hero_card.dart';
 import 'package:healthguard/features/family/widgets/permission_toggle_card.dart';
@@ -14,20 +15,29 @@ import 'package:provider/provider.dart';
 
 class LinkedContactDetailScreen extends StatelessWidget {
   final String contactId;
+  final FamilyRepository? repository;
 
-  const LinkedContactDetailScreen({super.key, required this.contactId});
+  const LinkedContactDetailScreen({
+    super.key,
+    required this.contactId,
+    this.repository,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => LinkedContactDetailProvider()..loadContact(contactId),
-      child: const _LinkedContactDetailContent(),
+      create: (_) =>
+          LinkedContactDetailProvider(repository: repository)
+            ..loadContact(contactId),
+      child: _LinkedContactDetailContent(contactId: contactId),
     );
   }
 }
 
 class _LinkedContactDetailContent extends StatelessWidget {
-  const _LinkedContactDetailContent();
+  const _LinkedContactDetailContent({required this.contactId});
+
+  final String contactId;
 
   void _showTagPicker(
     BuildContext context,
@@ -203,7 +213,7 @@ class _LinkedContactDetailContent extends StatelessWidget {
             ),
             SizedBox(height: AppSpacing.gapSm),
             ElevatedButton(
-              onPressed: () => provider.loadContact(provider.contact?.id ?? ''),
+              onPressed: () => provider.loadContact(contactId),
               child: const Text('Thử lại'),
             ),
           ],

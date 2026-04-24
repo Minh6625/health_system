@@ -89,6 +89,42 @@ class RelationshipService:
             )
 
         return responses
+
+    @staticmethod
+    def _family_sleep_quality_label(quality_label: str | None) -> str:
+        normalized = str(quality_label or "").strip().lower()
+        if normalized in {"good", "tot", "tốt"}:
+            return "Tốt"
+        if normalized in {"poor", "kem", "kém"}:
+            return "Kém"
+        return "Trung bình"
+
+    @staticmethod
+    def _family_health_level_label(health_level: str | None) -> str:
+        normalized = str(health_level or "").strip().lower()
+        if normalized in {"stable", "good", "high"}:
+            return "Cao"
+        if normalized in {"critical", "poor", "low"}:
+            return "Thấp"
+        return "Trung bình"
+
+    @staticmethod
+    def _family_vitals_unavailable_message(db: Session, user_id: int) -> str:
+        has_device = db.execute(
+            text(
+                """
+                SELECT 1
+                FROM devices
+                WHERE user_id = :user_id
+                LIMIT 1
+                """
+            ),
+            {"user_id": user_id},
+        ).first() is not None
+        if has_device:
+            return "Thiết bị đã kết nối nhưng chưa có dữ liệu đo."
+        return "Người dùng chưa kết nối thiết bị với tài khoản."
+
     @staticmethod
     def get_access_profiles(db: Session, current_user: User) -> List[AccessProfileResponse]:
         profiles = []
@@ -325,9 +361,10 @@ class RelationshipService:
         return result
     @staticmethod
     def get_dashboard_snapshots(db: Session, current_user: User) -> List[Any]:
-        from app.services.monitoring_service import MonitoringService
-        from app.schemas.relationship import FamilyProfileSnapshot
         from datetime import datetime, UTC
+        from app.repositories.emergency_repository import EmergencyRepository
+        from app.schemas.relationship import FamilyProfileSnapshot
+        from app.services.monitoring_service import MonitoringService
 
         # Get all accepted relationships where current_user is caregiver or patient
         relationships = RelationshipRepository.get_user_relationships(db, current_user.id)
@@ -341,6 +378,19 @@ class RelationshipService:
                     contact_rels[contact_id] = []
                 contact_rels[contact_id].append(rel)
 
+        try:
+            active_sos_events, _, _, _ = EmergencyRepository.get_sos_alerts_by_caregiver(
+                db,
+                current_user.id,
+                status_filter="active",
+            )
+        except Exception:
+            active_sos_events = []
+
+        latest_active_sos_by_user: Dict[int, Any] = {}
+        for event in active_sos_events:
+            latest_active_sos_by_user.setdefault(event.user_id, event)
+
         snapshots = []
         for contact_id, rels in contact_rels.items():
             contact = UserRepository.get_by_id(db, contact_id)
@@ -349,22 +399,43 @@ class RelationshipService:
 
             # Determine permissions for current_user to view contact's data
             # current_user must be the caregiver of the contact, and that specific relationship must allow it.
-            can_view_vitals = any((r.caregiver_id == current_user.id and getattr(r, 'can_view_vitals', False)) for r in rels)
+            can_view_vitals = any(
+                (
+                    r.caregiver_id == current_user.id
+                    and bool(getattr(r, "can_view_vitals", False))
+                )
+                for r in rels
+            )
 
-            # Setup detail label. Prefer the relationship where current_user is patient
-            rel = next((r for r in rels if r.patient_id == current_user.id), rels[0])
+            viewer_rel = next((r for r in rels if r.caregiver_id == current_user.id), None)
+            if not viewer_rel:
+                viewer_rel = next((r for r in rels if r.patient_id == current_user.id), rels[0])
 
-            # Fetch vitals
+            active_sos = latest_active_sos_by_user.get(contact.id)
+
+            # Fetch live monitoring data only when the viewer currently has vitals access.
             sys, dia, hr, spo2, temp = None, None, 0, 0, None
             last_updated = datetime.now(UTC)
-            has_vitals_data = True
+            has_vitals_data = False
             vitals_data_message = None
-            try:
-                vitals = MonitoringService.get_latest_vital_signs(contact.id, db)
-                if hasattr(vitals, "blood_pressure_sys"):
+            risk_level = "low"
+            sleep_duration_minutes = 0
+            sleep_quality = "Trung bình"
+            health_score_7_days = 0
+            health_score_level = "Trung bình"
+            special_note = ""
+
+            if can_view_vitals:
+                try:
+                    vitals = MonitoringService.get_latest_vital_signs(contact.id, db)
+                except Exception:
+                    vitals = None
+
+                if vitals is not None:
+                    has_vitals_data = True
                     sys = int(vitals.blood_pressure_sys) if vitals.blood_pressure_sys else None
                     dia = int(vitals.blood_pressure_dia) if vitals.blood_pressure_dia else None
-                    hr = int(vitals.heart_rate) if vitals.heart_rate else 0 
+                    hr = int(vitals.heart_rate) if vitals.heart_rate else 0
                     spo2 = int(vitals.spo2) if vitals.spo2 else 0
                     temp_value = getattr(vitals, "temperature", None)
                     if temp_value is None:
@@ -372,41 +443,82 @@ class RelationshipService:
                     temp = float(temp_value) if temp_value is not None else None
                     if vitals.timestamp:
                         last_updated = vitals.timestamp
-            except Exception:
-                has_vitals_data = False
-                has_device = db.execute(
-                    text(
-                        """
-                        SELECT 1
-                        FROM devices
-                        WHERE user_id = :user_id
-                        LIMIT 1
-                        """
-                    ),
-                    {"user_id": contact.id},
-                ).first() is not None
-
-                if has_device:
-                    vitals_data_message = "Thiết bị đã kết nối nhưng chưa có dữ liệu đo."
                 else:
-                    vitals_data_message = "Người dùng chưa kết nối thiết bị với tài khoản."
+                    vitals_data_message = RelationshipService._family_vitals_unavailable_message(
+                        db,
+                        contact.id,
+                    )
+
+                sleep_session = MonitoringService.get_latest_sleep_session(contact.id, db)
+                if sleep_session is not None:
+                    sleep_duration_minutes = sleep_session.sleep_minutes
+                    sleep_quality = RelationshipService._family_sleep_quality_label(
+                        sleep_session.quality_label,
+                    )
+
+                try:
+                    health_report = MonitoringService.get_health_report(contact.id, db)
+                except Exception:
+                    health_report = None
+
+                if health_report is not None:
+                    if health_report.risk_level:
+                        risk_level = health_report.risk_level
+                    if health_report.health_score is not None:
+                        health_score_7_days = int(round(float(health_report.health_score)))
+                    health_score_level = RelationshipService._family_health_level_label(
+                        health_report.health_level,
+                    )
+                    if health_report.last_updated is not None:
+                        last_updated = health_report.last_updated
+                    if risk_level == "critical":
+                        special_note = (
+                            health_report.health_summary
+                            or "Sức khỏe hôm nay đang ở mức cần cảnh báo cao."
+                        )
+                    elif risk_level == "medium":
+                        special_note = (
+                            health_report.health_summary
+                            or "Sức khỏe hôm nay cần được theo dõi thêm."
+                        )
+            else:
+                vitals_data_message = RelationshipService._family_vitals_unavailable_message(
+                    db,
+                    contact.id,
+                )
+
+            if active_sos is not None:
+                risk_level = "critical" if risk_level == "low" else risk_level
+                special_note = "Cần hỗ trợ ngay!"
+                if getattr(active_sos, "triggered_at", None) is not None:
+                    last_updated = active_sos.triggered_at
 
             snapshot = FamilyProfileSnapshot(
                 id=str(contact.id),
                 name=contact.full_name.split(" ")[-1] if contact.full_name else "Name",
-                relation=rel.primary_relationship_label if rel.primary_relationship_label else rel.relationship_type,
+                relation=(
+                    viewer_rel.primary_relationship_label
+                    if viewer_rel.primary_relationship_label
+                    else viewer_rel.relationship_type
+                ),
                 heart_rate=hr,
                 spo2=spo2,
                 blood_pressure_systolic=sys,
                 blood_pressure_diastolic=dia,
                 body_temperature=temp,
-                risk_level="low",
-                is_sos_active=False,
+                risk_level=risk_level,
+                is_sos_active=active_sos is not None,
+                sos_id=str(active_sos.id) if active_sos is not None else None,
                 has_view_vitals_permission=can_view_vitals,
                 has_vitals_data=has_vitals_data,
                 vitals_data_message=vitals_data_message,
-                is_pinned=False,
-                last_updated=last_updated
+                is_pinned=bool(viewer_rel.is_primary),
+                last_updated=last_updated,
+                special_note=special_note,
+                sleep_duration_minutes=sleep_duration_minutes,
+                sleep_quality=sleep_quality,
+                health_score_7_days=health_score_7_days,
+                health_score_level=health_score_level,
             )
             snapshots.append(snapshot)
 

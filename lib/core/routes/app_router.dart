@@ -17,7 +17,6 @@ import 'package:healthguard/features/family/screens/family_dashboard_screen.dart
 import 'package:healthguard/features/family/screens/add_contact_screen.dart';
 import 'package:healthguard/features/family/screens/linked_contact_detail_screen.dart';
 import 'package:healthguard/features/family/screens/person_detail_screen.dart';
-import 'package:healthguard/features/family/providers/shared_family_mock_provider.dart';
 import 'package:healthguard/features/device/screens/device_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_report_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_detail_screen.dart';
@@ -180,13 +179,7 @@ class AppRouter {
           ),
         );
       case addContact:
-        // Bọc AddContactScreen trong provider riêng, không phụ thuộc FamilyShellScreen
-        return MaterialPageRoute(
-          builder: (_) => ChangeNotifierProvider.value(
-            value: SharedFamilyMockProvider(),
-            child: const AddContactScreen(),
-          ),
-        );
+        return MaterialPageRoute(builder: (_) => const AddContactScreen());
       case familyDashboard:
         return MaterialPageRoute(builder: (_) => const FamilyDashboardScreen());
       case linkedContactDetail:

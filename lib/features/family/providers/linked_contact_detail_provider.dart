@@ -4,7 +4,10 @@ import 'package:healthguard/features/family/models/linked_contact_model.dart';
 import 'package:healthguard/features/family/repositories/family_repository.dart';
 
 class LinkedContactDetailProvider extends ChangeNotifier {
-  final FamilyRepository _repository = FamilyRepository();
+  LinkedContactDetailProvider({FamilyRepository? repository})
+    : _repository = repository ?? FamilyRepository();
+
+  final FamilyRepository _repository;
   LinkedContactModel? _contact;
   bool _isLoading = true;
   String? _error;

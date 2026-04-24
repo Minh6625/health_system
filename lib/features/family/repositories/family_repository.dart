@@ -1,18 +1,25 @@
 import '../../../core/network/api_client.dart';
+import '../models/access_profile_model.dart';
 import '../models/user_search_model.dart';
 import '../models/family_profile_snapshot.dart';
 import '../models/linked_contact_model.dart';
 import 'package:flutter/foundation.dart';
 
 class FamilyRepository {
-  final ApiClient _apiClient = ApiClient();
+  FamilyRepository({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
+
+  final ApiClient _apiClient;
 
   Future<List<FamilyProfileSnapshot>> getFamilyDashboard() async {
     try {
       final response = await _apiClient.get('/relationships/dashboard');
       if (response != null && response is List) {
         return response
-            .map((json) => FamilyProfileSnapshot.fromJson(json))
+            .map(
+              (json) => FamilyProfileSnapshot.fromJson(
+                Map<String, dynamic>.from(json as Map),
+              ),
+            )
             .toList();
       }
       return [];
@@ -25,8 +32,8 @@ class FamilyRepository {
   Future<LinkedContactModel> getLinkedContactDetail(String id) async {
     try {
       final response = await _apiClient.get('/relationships/$id/detail');
-      if (response != null) {
-        return LinkedContactModel.fromJson(response);
+      if (response != null && response is Map) {
+        return LinkedContactModel.fromJson(Map<String, dynamic>.from(response));
       }
       throw Exception('Data is null');
     } catch (e) {
@@ -40,7 +47,9 @@ class FamilyRepository {
     try {
       final response = await _apiClient.get('/relationships');
       if (response != null && response is List) {
-        return List<Map<String, dynamic>>.from(response);
+        return response
+            .map((json) => Map<String, dynamic>.from(json as Map))
+            .toList();
       }
       return [];
     } catch (e) {
@@ -57,12 +66,37 @@ class FamilyRepository {
       );
 
       if (response != null && response is List) {
-        return response.map((json) => UserSearchModel.fromJson(json)).toList();
+        return response
+            .map(
+              (json) => UserSearchModel.fromJson(
+                Map<String, dynamic>.from(json as Map),
+              ),
+            )
+            .toList();
       }
       return [];
     } catch (e) {
       debugPrint('Error searching users: $e');
       throw Exception('Không thể tìm kiếm người dùng. Vui lòng thử lại.');
+    }
+  }
+
+  Future<List<AccessProfileModel>> getAccessProfiles() async {
+    try {
+      final response = await _apiClient.get('/access-profiles');
+      if (response != null && response is List) {
+        return response
+            .map(
+              (json) => AccessProfileModel.fromJson(
+                Map<String, dynamic>.from(json as Map),
+              ),
+            )
+            .toList();
+      }
+      return const <AccessProfileModel>[];
+    } catch (e) {
+      debugPrint('Error getting access profiles: $e');
+      throw Exception('Không thể tải hồ sơ truy cập.');
     }
   }
 

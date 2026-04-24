@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:healthguard/shared/presentation/theme/app_radii.dart';
-import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:provider/provider.dart';
+import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import '../models/contact_tag.dart';
 import '../models/linked_contact_model.dart';
-import '../providers/shared_family_mock_provider.dart';
+import '../providers/family_relationship_provider.dart';
 import 'permission_setup_bottom_sheet.dart';
 
 class PendingRequestCard extends StatelessWidget {
@@ -19,8 +20,16 @@ class PendingRequestCard extends StatelessWidget {
       builder: (_) => PermissionSetupBottomSheet(
         contactName: request.displayName,
         onConfirm: (permissions) async {
-          final provider = context.read<SharedFamilyMockProvider>();
-          await provider.acceptRequest(request.id, permissions);
+          final provider = context.read<FamilyRelationshipProvider>();
+          final tags = request.tags.isNotEmpty
+              ? request.tags
+              : <ContactTag>[ContactTagsConfig.defaultTags.first];
+          await provider.acceptRequest(
+            request: request,
+            permissions: permissions,
+            tags: tags,
+            primaryLabel: request.primaryRelationshipLabel,
+          );
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -36,8 +45,8 @@ class PendingRequestCard extends StatelessWidget {
   }
 
   void _onReject(BuildContext context) async {
-    final provider = context.read<SharedFamilyMockProvider>();
-    await provider.rejectRequest(request.id);
+    final provider = context.read<FamilyRelationshipProvider>();
+    await provider.rejectRequest(request);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -57,9 +66,7 @@ class PendingRequestCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFF6E9), // bg.pending
         borderRadius: BorderRadius.circular(AppRadii.radiusXl),
-        border: Border.all(
-          color: AppColors.warning.withValues(alpha: 0.3),
-        ),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       padding: const EdgeInsets.all(16),
       child: Column(
