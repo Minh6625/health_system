@@ -2,42 +2,41 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
-from app.api.routes.relationships import router as relationships_router
-from app.core.dependencies import get_current_user
-from app.db.database import get_db
-from app.schemas.relationship import LinkedContactDetailResponse
+from app.api.routes.relationships import (
+    delete_relationship,
+    get_access_profiles,
+    request_relationship,
+    router as relationships_router,
+)
+from app.schemas.relationship import (
+    LinkedContactDetailResponse,
+    RelationshipRequestCreate,
+)
 from app.services.relationship_service import RelationshipService
 
 
-def _build_test_client(*, user_id: int = 7) -> TestClient:
-    app = FastAPI()
-    app.include_router(relationships_router, prefix="/mobile")
-
-    def _override_current_user():
-        return SimpleNamespace(id=user_id, role="user", is_active=True)
-
-    def _override_db():
-        yield object()
-
-    app.dependency_overrides[get_current_user] = _override_current_user
-    app.dependency_overrides[get_db] = _override_db
-    return TestClient(app)
+def _route(path: str, method: str):
+    return next(
+        route
+        for route in relationships_router.routes
+        if getattr(route, "path", "") == path and method in getattr(route, "methods", set())
+    )
 
 
 def test_detail_route_declares_typed_response_model() -> None:
-    route = next(
-        route
-        for route in relationships_router.routes
-        if getattr(route, "path", "") == "/relationships/{contact_id}/detail"
-    )
+    route = _route("/relationships/{contact_id}/detail", "GET")
     assert route.response_model is LinkedContactDetailResponse
 
 
 def test_get_access_profiles_passes_current_user(monkeypatch) -> None:
-    client = _build_test_client(user_id=42)
+    route = _route("/access-profiles", "GET")
+    current_user = SimpleNamespace(
+        id=42,
+        full_name="Requester",
+        avatar_url=None,
+        role="user",
+        is_active=True,
+    )
     captured: dict[str, int] = {}
 
     def _get_access_profiles(db, current_user):
@@ -50,20 +49,25 @@ def test_get_access_profiles_passes_current_user(monkeypatch) -> None:
         staticmethod(_get_access_profiles),
     )
 
-    response = client.get("/mobile/access-profiles")
+    response = get_access_profiles(current_user=current_user, db=object())
 
-    assert response.status_code == 200
-    assert response.json() == []
+    assert route.path == "/access-profiles"
+    assert response == []
     assert captured == {"user_id": 42}
 
 
 def test_request_relationship_passes_payload(monkeypatch) -> None:
-    client = _build_test_client(user_id=18)
+    route = _route("/relationships/request", "POST")
+    current_user = SimpleNamespace(id=18, role="user", is_active=True)
     captured: dict[str, object] = {}
+    expected_tags = [{"id": "family", "name": "Gia đình"}]
 
     def _request_relationship(db, current_user, payload):
         captured["user_id"] = current_user.id
         captured["target_user_id"] = payload.target_user_id
+        captured["relationship_type"] = payload.relationship_type
+        captured["primary_relationship_label"] = payload.primary_relationship_label
+        captured["tags"] = payload.tags
         return object()
 
     monkeypatch.setattr(
@@ -87,7 +91,7 @@ def test_request_relationship_passes_payload(monkeypatch) -> None:
                     "relationship_type": "family",
                     "status": "pending",
                     "primary_relationship_label": "Mẹ",
-                    "tags": [{"id": "family", "name": "Gia đình"}],
+                    "tags": expected_tags,
                     "can_view_vitals": False,
                     "can_receive_alerts": False,
                     "can_view_location": False,
@@ -100,23 +104,31 @@ def test_request_relationship_passes_payload(monkeypatch) -> None:
         ),
     )
 
-    response = client.post(
-        "/mobile/relationships/request",
-        json={
-            "target_user_id": 7,
-            "relationship_type": "family",
-            "primary_relationship_label": "Mẹ",
-            "tags": [{"id": "family", "name": "Gia đình"}],
-        },
+    response = request_relationship(
+        payload=RelationshipRequestCreate(
+            target_user_id=7,
+            relationship_type="family",
+            primary_relationship_label="Mẹ",
+            tags=expected_tags,
+        ),
+        current_user=current_user,
+        db=object(),
     )
 
-    assert response.status_code == 201
-    assert response.json()["id"] == 91
-    assert captured == {"user_id": 18, "target_user_id": 7}
+    assert route.status_code == 201
+    assert response["id"] == 91
+    assert captured == {
+        "user_id": 18,
+        "target_user_id": 7,
+        "relationship_type": "family",
+        "primary_relationship_label": "Mẹ",
+        "tags": expected_tags,
+    }
 
 
 def test_delete_relationship_returns_204(monkeypatch) -> None:
-    client = _build_test_client(user_id=9)
+    route = _route("/relationships/{relationship_id}", "DELETE")
+    current_user = SimpleNamespace(id=9, role="user", is_active=True)
     captured: dict[str, int] = {}
 
     def _delete_relationship(db, current_user, relationship_id: int) -> None:
@@ -129,7 +141,12 @@ def test_delete_relationship_returns_204(monkeypatch) -> None:
         staticmethod(_delete_relationship),
     )
 
-    response = client.delete("/mobile/relationships/77")
+    response = delete_relationship(
+        relationship_id=77,
+        current_user=current_user,
+        db=object(),
+    )
 
-    assert response.status_code == 204
+    assert route.status_code == 204
+    assert response is None
     assert captured == {"user_id": 9, "relationship_id": 77}
