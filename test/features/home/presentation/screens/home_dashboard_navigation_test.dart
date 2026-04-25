@@ -171,6 +171,11 @@ void main() {
     );
     await _pumpDashboardFrames(tester);
 
+    await tester.scrollUntilVisible(
+      find.byType(RiskInsightCard),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     tester.widget<RiskInsightCard>(find.byType(RiskInsightCard)).onTap();
     await tester.pumpAndSettle();
     expect(lastRoute?.name, AppRouter.riskReport);

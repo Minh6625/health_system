@@ -694,6 +694,7 @@ class _DashboardBody extends StatelessWidget {
             padding: AppSpacing.screenHorizontalPadding,
             sliver: SliverList(
               delegate: SliverChildListDelegate.fixed([
+                // ── Vùng A · Trạng thái tổng quan ─────────────────────
                 DashboardGreetingHeader(
                   displayName: vm.displayName,
                   avatarUrl: vm.avatarUrl,
@@ -702,19 +703,33 @@ class _DashboardBody extends StatelessWidget {
                   unreadNotificationCount: unreadNotificationCount,
                   onTapNotifications: () => onOpenNotifications(),
                 ),
-                const SizedBox(height: AppSpacing.sectionGapMd),
+                const SizedBox(height: AppSpacing.gapMd),
                 HealthStatusHeroCard(
                   overallStatus: vm.overallStatus,
                   title: vm.heroTitle,
                   summary: vm.heroSummary,
                 ),
-                const SizedBox(height: AppSpacing.gapMd),
+                const SizedBox(height: AppSpacing.gapSm),
                 ConnectionStatusStrip(
                   deviceConnectionState: vm.deviceConnectionState,
                   batteryPercent: vm.batteryPercent,
                   lastUpdatedLabel: vm.latestUpdatedLabel,
                   onTapDevice: () {
                     Navigator.pushReplacementNamed(context, '/device');
+                  },
+                ),
+                DashboardTopBannerArea(vm: vm),
+
+                // ── Vùng B · Chỉ số hôm nay ───────────────────────────
+                const SizedBox(height: AppSpacing.sectionGapXl),
+                LiveVitalsSection(
+                  items: vm.vitalItems,
+                  onTapHistory: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.healthReport,
+                      arguments: {'profileId': provider.profileId},
+                    );
                   },
                 ),
                 const SizedBox(height: AppSpacing.gapMd),
@@ -731,19 +746,7 @@ class _DashboardBody extends StatelessWidget {
                     );
                   },
                 ),
-                DashboardTopBannerArea(vm: vm),
                 const SizedBox(height: AppSpacing.gapMd),
-                LiveVitalsSection(
-                  items: vm.vitalItems,
-                  onTapHistory: () {
-                    Navigator.pushNamed(
-                      context,
-                      AppRouter.healthReport,
-                      arguments: {'profileId': provider.profileId},
-                    );
-                  },
-                ),
-                const SizedBox(height: AppSpacing.sectionGapMd),
                 SleepInsightCard(
                   sleepDurationMinutes: vm.sleepDurationMinutes,
                   durationLabel: vm.sleepDurationLabel,
@@ -765,7 +768,11 @@ class _DashboardBody extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: AppSpacing.sectionGapMd),
+
+                // ── Vùng C · Thao tác nhanh ───────────────────────────
+                const SizedBox(height: AppSpacing.sectionGapXl),
+                const _HomeSectionTitle(title: 'Thao tác nhanh'),
+                const SizedBox(height: AppSpacing.gapMd),
                 DashboardSecondaryLinks(
                   onTapHistory: () {
                     Navigator.pushNamed(
@@ -787,6 +794,24 @@ class _DashboardBody extends StatelessWidget {
           ),
           const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.gapSm)),
         ],
+      ),
+    );
+  }
+}
+
+/// Small section title used by the home dashboard to label a visual group
+/// (e.g. "Thao tác nhanh"). Kept private to this screen since the other
+/// groups already have an inline title baked into their hero widget.
+class _HomeSectionTitle extends StatelessWidget {
+  const _HomeSectionTitle({required this.title});
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      title,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w700,
       ),
     );
   }
