@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/routes/app_router.dart';
 import '../../../shared/presentation/theme/app_colors.dart';
 import '../../../shared/presentation/theme/app_radii.dart';
 import '../../../shared/presentation/theme/app_spacing.dart';
@@ -303,7 +304,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
           label: 'Gọi bác sĩ hoặc người thân ngay lập tức',
           child: ElevatedButton.icon(
             onPressed: () {
-               // navigate to SOS trigger (left as TODO pending exact route)
+              Navigator.pushNamed(context, AppRouter.manualSos);
             },
             icon: const Icon(Icons.emergency, size: 28),
             label: Text(

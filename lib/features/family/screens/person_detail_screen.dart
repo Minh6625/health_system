@@ -67,7 +67,7 @@ class PersonDetailScreen extends StatelessWidget {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            if (profile.isSosActive) _buildSosBanner(context),
+            if (profile.isSosActive) _buildSosBanner(context, profile),
             _buildHeroState(profile),
             if (!profile.hasVitalsData) _buildNoVitalsDataBanner(profile),
             _buildLiveVitals(context, profile),
@@ -80,7 +80,7 @@ class PersonDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSosBanner(BuildContext context) {
+  Widget _buildSosBanner(BuildContext context, FamilyProfileSnapshot profile) {
     return Container(
       width: double.infinity,
       color: AppColors.emergency,
@@ -114,8 +114,10 @@ class PersonDetailScreen extends StatelessWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Chuyển đến màn SOS')),
+              Navigator.pushNamed(
+                context,
+                AppRouter.emergencySosDetail,
+                arguments: {'sosId': profile.sosId ?? profile.id},
               );
             },
             style: ElevatedButton.styleFrom(

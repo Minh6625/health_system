@@ -456,7 +456,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       deviceState: deviceConnectionState,
     );
     final sleepData = provider.sleepData;
-    final sleepDate = canonicalSleepDateFromPayload(sleepData);
     final sleepQualityScore = (sleepData?['quality_score'] as num?)?.toInt();
     final sleepInsightSummary = sleepQualityScore != null
         ? 'Chất lượng: $sleepQualityScore% (${sleepQualityLabelVi(qualityScore: sleepQualityScore, qualityLabel: sleepData?['quality_label'] as String?)})'
@@ -560,7 +559,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
         ),
       ],
       sleepDurationLabel: provider.sleepData != null
-          ? '${(provider.sleepData!['in_bed_minutes'] as int?) ?? 0 ~/ 60}h'
+          ? '${((provider.sleepData!['in_bed_minutes'] as int?) ?? 0) ~/ 60}h'
           : '-- h',
       sleepDurationMinutes:
           (provider.sleepData?['in_bed_minutes'] as int?) ?? 0,

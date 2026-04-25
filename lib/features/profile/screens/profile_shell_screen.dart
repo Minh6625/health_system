@@ -65,7 +65,9 @@ class ProfileShellScreen extends StatelessWidget {
           ),
           EmergencyStickyBar(
             emphasis: EmergencyBarEmphasis.defaultLevel,
-            onPressed: () {},
+            onPressed: () {
+              Navigator.pushNamed(context, AppRouter.manualSos);
+            },
           ),
         ],
       ),
