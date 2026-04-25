@@ -1,19 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
-import 'package:healthguard/features/sleep_analysis/repositories/mock_sleep_repository.dart';
 import 'package:healthguard/features/sleep_analysis/repositories/sleep_repository.dart';
 
 enum SleepLoadState { initial, loading, success, empty, error, noDataYet }
 
 class SleepProvider extends ChangeNotifier {
-  static const bool _useMock = false;
   static const _cacheTTL = Duration(minutes: 1);
 
   SleepProvider({SleepRepository? repository, DateTime Function()? now})
-    : _repository =
-          repository ??
-          (_useMock ? MockSleepRepository() : SleepRepositoryImpl()),
+    : _repository = repository ?? SleepRepositoryImpl(),
       _now = now ?? DateTime.now;
 
   final SleepRepository _repository;
