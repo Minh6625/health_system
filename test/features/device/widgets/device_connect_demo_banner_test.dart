@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/features/device/widgets/device_connect/device_connect_demo_banner.dart';
 
-/// Pinned regression for the Phase 5b honest-disclosure banner.
+/// Pinned regression for the Phase 5b/5c-A honest-disclosure banner.
 ///
-/// The full device-connect flow runs on `MockBleDiscovery` data and writes a
-/// hard-coded fake MAC into the real backend on confirm. This banner is what
-/// stops the UI from quietly lying to the user about what is happening, so
-/// it must keep mentioning the demo nature plus the upcoming real-scan
-/// version. If anyone removes either claim the test should fail.
+/// Phase 5b only warned about the mock; Phase 5c-A also locked the final
+/// pair CTA so the demo flow can no longer write a fake device into the
+/// real backend. The banner copy must keep three claims so reviewers
+/// cannot quietly weaken the disclosure:
+///   - the flow is in demo mode
+///   - the "Kết nối máy này" CTA is temporarily locked
+///   - the system does not save the sample device to the user account
 void main() {
   testWidgets('renders demo disclosure copy on a single info row',
       (tester) async {
@@ -26,11 +28,11 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.textContaining('thiết bị mẫu', findRichText: true),
+      find.textContaining('tạm khoá', findRichText: true),
       findsOneWidget,
     );
     expect(
-      find.textContaining('quét thật', findRichText: true),
+      find.textContaining('không lưu', findRichText: true),
       findsOneWidget,
     );
   });

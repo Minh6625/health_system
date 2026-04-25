@@ -11,13 +11,14 @@ import '../../../../shared/presentation/theme/app_text_styles.dart';
 /// `openQrScanner()` waits 2.5s and picks the first entry of
 /// `MockBleDiscovery.nearbyDevices` (`VSmart Watch A1` with the hard-coded
 /// MAC `AA:BB:CC:11:22:33`); `verifyCode()` ignores the user-typed code and
-/// returns the same mock device. Confirming then writes that fake device
-/// into the real backend via `POST /devices/scan/pair`.
+/// returns the same mock device.
 ///
-/// Hiding that fact from the user produced a classic "lying UI": people
-/// thought they had paired their watch when they had really bound a
-/// placeholder. This banner makes the situation explicit so testers and
-/// reviewers know what they are seeing.
+/// In Phase 5b this banner only warned the user; we still wrote the fake
+/// device to the real backend via `POST /devices/scan/pair` if they tapped
+/// confirm. Phase 5c-A locks the final confirm action so we no longer
+/// pollute production data — `DeviceIdentityConfirmCard` keeps the button
+/// disabled until the real BLE/manual code endpoints land. The banner copy
+/// reflects that lock so what the UI says matches what the code does.
 class DeviceConnectDemoBanner extends StatelessWidget {
   const DeviceConnectDemoBanner({super.key});
 
@@ -46,9 +47,10 @@ class DeviceConnectDemoBanner extends StatelessWidget {
           SizedBox(width: AppSpacing.gapSm),
           Expanded(
             child: Text(
-              'Quét QR/BLE đang ở chế độ demo: hệ thống sẽ tự gắn một '
-              'thiết bị mẫu để minh hoạ quy trình. Tính năng quét thật sẽ '
-              'có ở bản tiếp theo.',
+              'Quét QR/BLE đang ở chế độ demo: bạn có thể xem trước các '
+              'bước, nhưng nút "Kết nối máy này" tạm khoá để không lưu '
+              'thiết bị mẫu vào tài khoản. Tính năng quét thật sẽ có ở '
+              'bản tiếp theo.',
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.textSecondary,
                 height: 1.4,
