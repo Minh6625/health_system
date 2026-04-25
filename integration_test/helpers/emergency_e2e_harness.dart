@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/app.dart';
 import 'package:healthguard/features/auth/services/auth_session_service.dart';
-import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
+import 'package:healthguard/features/notifications/services/notification_runtime_service.dart';
 import 'package:healthguard/shared/presentation/shell/main_scaffold_shell.dart';
 
 import 'e2e_test_config.dart';
@@ -57,7 +57,9 @@ Future<void> launchEmergencyApp(WidgetTester tester) async {
   await AuthSessionService.shared.clearSession();
   await loadE2ETestConfig(mockDevice: false);
   await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  FirebaseMessaging.onBackgroundMessage(
+    notificationFirebaseMessagingBackgroundHandler,
+  );
   await tester.pumpWidget(const HealthSystemApp());
   await tester.pump(const Duration(milliseconds: 300));
 }
