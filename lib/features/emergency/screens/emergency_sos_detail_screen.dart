@@ -732,11 +732,23 @@ class _EmergencySOSDetailScreenState extends State<EmergencySOSDetailScreen>
           ),
           const SizedBox(height: AppSpacing.gapMd),
           Text(
-            'Độ tin cậy: ${xai.confidence.toStringAsFixed(1)}%',
+            // Backend stores confidence as 0.0-1.0; multiply for human display.
+            'Độ tin cậy: ${(xai.confidence * 100).toStringAsFixed(0)}%',
             style: AppTextStyles.body.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
+          if (xai.triggerReason != null &&
+              (xai.triggerReason as String).trim().isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.gapXs),
+            Text(
+              xai.triggerReason as String,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.gapMd),
           Text(
             'Timeline:',

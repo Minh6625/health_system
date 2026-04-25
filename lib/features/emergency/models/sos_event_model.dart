@@ -165,10 +165,21 @@ class LocationInfoModel {
 
 /// XAI explanation for fall detection
 class FallDetectionXAIModel {
-  final double confidence; // 0-100
+  /// Detector confidence in the canonical 0.0-1.0 range used by the backend
+  /// (`fall_event.confidence` and `risk_score`). Multiply by 100 for display.
+  final double confidence;
   final List<TimelineEventModel> timeline;
 
-  FallDetectionXAIModel({required this.confidence, required this.timeline});
+  /// Human-readable explanation emitted by the backend
+  /// (`backend/app/schemas/emergency.py` -> `FallDetectionXAI.trigger_reason`).
+  /// Optional so older payloads / unit tests stay valid.
+  final String? triggerReason;
+
+  FallDetectionXAIModel({
+    required this.confidence,
+    required this.timeline,
+    this.triggerReason,
+  });
 
   factory FallDetectionXAIModel.fromJson(Map<String, dynamic> json) {
     return FallDetectionXAIModel(
@@ -176,6 +187,7 @@ class FallDetectionXAIModel {
       timeline: (json['timeline'] as List)
           .map((e) => TimelineEventModel.fromJson(e as Map<String, dynamic>))
           .toList(),
+      triggerReason: json['trigger_reason'] as String?,
     );
   }
 
@@ -183,6 +195,7 @@ class FallDetectionXAIModel {
     return {
       'confidence': confidence,
       'timeline': timeline.map((e) => e.toJson()).toList(),
+      'trigger_reason': triggerReason,
     };
   }
 }
