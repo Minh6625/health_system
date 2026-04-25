@@ -64,48 +64,39 @@ void main() {
       expect(find.text('Email không hợp lệ'), findsOneWidget);
     });
 
-    testWidgets('shows validation error for invalid full name with numbers', (WidgetTester tester) async {
+    // The full-name field installs a FilteringTextInputFormatter that only
+    // allows Unicode letters and whitespace, so digits and special characters
+    // never reach the validator at all. The next two tests pin that input
+    // formatter behaviour. (A previous version of these tests asserted that
+    // the validator's error message appeared, but that path is unreachable
+    // now: the formatter strips the offending characters before the form is
+    // ever submitted, which is the stronger UX guarantee.)
+    testWidgets('strips digits from the full name input', (WidgetTester tester) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
 
       // Act - Find fullName field (second AuthTextField)
       final fullNameFinder = find.byType(AuthTextField).at(1);
       await tester.enterText(fullNameFinder, 'Test123');
-      final check = find.byType(Checkbox);
-      await tester.ensureVisible(check);
-      await tester.pumpAndSettle();
-      await tester.tap(check);
-      await tester.pumpAndSettle();
-      
-      final btn = find.text('ĐĂNG KÝ');
-      await tester.ensureVisible(btn);
-      await tester.tap(btn);
       await tester.pumpAndSettle();
 
-      // Assert
-      expect(find.textContaining('Họ tên chỉ được chứa chữ cái'), findsOneWidget);
+      // Assert - digits are filtered, letters survive
+      expect(find.widgetWithText(AuthTextField, 'Test'), findsOneWidget);
+      expect(find.widgetWithText(AuthTextField, 'Test123'), findsNothing);
     });
 
-    testWidgets('shows validation error for invalid full name with special characters', (WidgetTester tester) async {
+    testWidgets('strips special characters from the full name input', (WidgetTester tester) async {
       // Arrange
       await tester.pumpWidget(createTestWidget());
 
       // Act
       final fullNameFinder = find.byType(AuthTextField).at(1);
       await tester.enterText(fullNameFinder, 'Test@User');
-      final check = find.byType(Checkbox);
-      await tester.ensureVisible(check);
-      await tester.pumpAndSettle();
-      await tester.tap(check);
-      await tester.pumpAndSettle();
-      
-      final btn = find.text('ĐĂNG KÝ');
-      await tester.ensureVisible(btn);
-      await tester.tap(btn);
       await tester.pumpAndSettle();
 
-      // Assert
-      expect(find.textContaining('Họ tên chỉ được chứa chữ cái'), findsOneWidget);
+      // Assert - the '@' character is stripped, the rest is concatenated.
+      expect(find.widgetWithText(AuthTextField, 'TestUser'), findsOneWidget);
+      expect(find.widgetWithText(AuthTextField, 'Test@User'), findsNothing);
     });
 
     testWidgets('accepts valid Vietnamese full name with diacritics', (WidgetTester tester) async {
