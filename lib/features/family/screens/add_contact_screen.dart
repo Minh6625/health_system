@@ -618,14 +618,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
     }
   }
 
-  void _onShareMyCode() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Bạn có thể chụp ảnh mã và gửi qua ứng dụng khác.'),
-      ),
-    );
-  }
-
   Widget _buildUploadQrCard() {
     return SizedBox(
       width: double.infinity,
@@ -679,8 +671,6 @@ class _AddContactScreenState extends State<AddContactScreen> {
           padding: EdgeInsets.all(AppSpacing.gapLg),
           child: MyCodeHeroCard(
             qrData: _buildMyQrPayload(),
-            pinCode: '482 931',
-            onShare: _onShareMyCode,
           ),
         );
       case AddContactMode.searchPhone:

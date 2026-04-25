@@ -5,14 +5,10 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 class MyCodeHeroCard extends StatelessWidget {
   final String qrData;
-  final String pinCode;
-  final VoidCallback onShare;
 
   const MyCodeHeroCard({
     super.key,
     required this.qrData,
-    required this.pinCode,
-    required this.onShare,
   });
 
   @override
@@ -62,35 +58,19 @@ class MyCodeHeroCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          // PIN
-          Text(
-            pinCode,
-            style: const TextStyle(
-              fontSize: 48,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 8,
-              color: AppColors.brandPrimary,
-            ),
-          ),
-          const SizedBox(height: 32),
-          // Share Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onShare,
-              icon: const Icon(Icons.share_rounded, size: 20),
-              label: const Text(
-                'Chia sẻ mã',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.brandPrimaryLight,
-                foregroundColor: AppColors.brandPrimary,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(AppRadii.radiusMd),
-                ),
+          // Honest sharing guidance — replaces a hard-coded fake PIN and a
+          // mock share button. The backend has no PIN-based connection and the
+          // app cannot share an image without an extra dependency, so we tell
+          // people exactly what works today.
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              'Người thân quét mã này trực tiếp, hoặc chụp màn hình rồi gửi qua tin nhắn để họ dùng nút "Tải ảnh lên" ở tab quét.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.4,
+                color: AppColors.textSecondary,
               ),
             ),
           ),
