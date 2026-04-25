@@ -20,7 +20,8 @@ class FamilyProfileSnapshot(BaseModel):
     special_note: str = ""
     sleep_duration_minutes: int = 0
     sleep_quality: str = "Trung bình"
-    health_score_7_days: int = 0
+    # None = no health report data; an int (incl. 0) = real score from latest risk row.
+    health_score_7_days: Optional[int] = None
     health_score_level: str = "Trung bình"
 
 class LinkedContactDetailResponse(BaseModel):

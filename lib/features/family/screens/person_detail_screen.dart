@@ -517,8 +517,10 @@ class PersonDetailScreen extends StatelessWidget {
     BuildContext context,
     FamilyProfileSnapshot profile,
   ) {
-    // Chỉ hiển thị khi có score hợp lệ
-    if (profile.healthScore7Days == 0) return const SizedBox.shrink();
+    // Chỉ ẩn khi backend không có health_report. Score = 0 vẫn render vì
+    // đó là giá trị hợp lệ (sức khoẻ critical, risk_score gần 100).
+    final score = profile.healthScore7Days;
+    if (score == null) return const SizedBox.shrink();
 
     Color scoreColor;
     if (profile.healthScoreLevel == 'Cao') {
@@ -574,9 +576,9 @@ class PersonDetailScreen extends StatelessWidget {
                     ),
                   ),
                   SizedBox(width: AppSpacing.gapLg),
-                  // Điểm số lớn
+                  // Điểm số lớn (đã guard non-null ở trên).
                   Text(
-                    '${profile.healthScore7Days}',
+                    '$score',
                     style: TextStyle(
                       fontSize: 42,
                       fontWeight: FontWeight.w800,
