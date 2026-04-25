@@ -5,6 +5,7 @@ import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../providers/device_connect_provider.dart';
+import 'device_connect_demo_banner.dart';
 
 class DeviceManualCodeStep extends StatefulWidget {
   const DeviceManualCodeStep({super.key});
@@ -35,6 +36,8 @@ class _DeviceManualCodeStepState extends State<DeviceManualCodeStep> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const DeviceConnectDemoBanner(),
+          SizedBox(height: AppSpacing.sectionGapMd),
           Text(
             'Nhập mã thiết bị',
             style: AppTextStyles.sectionTitle.copyWith(fontSize: 24),

@@ -5,6 +5,7 @@ import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../providers/device_connect_provider.dart';
+import 'device_connect_demo_banner.dart';
 
 class DeviceIdentityConfirmCard extends StatelessWidget {
   const DeviceIdentityConfirmCard({super.key});
@@ -25,6 +26,8 @@ class DeviceIdentityConfirmCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const DeviceConnectDemoBanner(),
+          SizedBox(height: AppSpacing.sectionGapMd),
           Text(
             'Đã tìm thấy thiết bị',
             style: AppTextStyles.sectionTitle.copyWith(fontSize: 24),
