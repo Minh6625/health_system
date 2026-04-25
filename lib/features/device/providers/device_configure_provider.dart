@@ -12,6 +12,14 @@ class DeviceConfigureProvider extends ChangeNotifier {
     // In a real app, you would fetch actual config from an endpoint here.
     // For now we use the initial values.
   }
+
+  // Tracks whether the user explicitly typed a different name in the
+  // TextField. We need this separate from `_isDirty` because the initial
+  // `deviceName` is `device.displayName`, which is a synthetic fallback for
+  // devices whose backend `device_name` is null. Saving the synthetic
+  // fallback as the real name without explicit user intent would be a
+  // regression, so we only PATCH when this flag is true.
+  bool _nameDirty = false;
   
   // Local state for the form. The three notify_* booleans correspond 1:1
   // to the backend `DeviceSettingsRequest` schema
@@ -39,6 +47,7 @@ class DeviceConfigureProvider extends ChangeNotifier {
   void updateName(String name) {
     if (deviceName != name) {
       deviceName = name;
+      _nameDirty = true;
       _markDirty();
     }
   }
@@ -76,12 +85,33 @@ class DeviceConfigureProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    // Reject empty names up front so the user gets a clear Vietnamese
+    // message instead of a 422 from the backend Pydantic validator.
+    if (_nameDirty && deviceName.trim().isEmpty) {
+      _isSaving = false;
+      _errorMessage = 'Tên thiết bị không được để trống.';
+      notifyListeners();
+      return false;
+    }
+
     try {
-      // Send the three notify flags using backend keys directly. Previously
-      // this method aliased UI fields onto wrong keys (vibrationAlert was
-      // mapped to BOTH notify_high_hr and notify_high_bp; sleepTracking was
-      // mapped to notify_low_spo2; lowBatteryThreshold and syncInterval were
-      // dropped silently). The new payload matches DeviceSettingsRequest 1:1.
+      // 1) PATCH the device name when the user actually edited it. We do
+      //    this first so a server-side validation error (e.g. duplicate /
+      //    too long) surfaces before we touch settings.
+      if (_nameDirty) {
+        await _repository.updateDeviceName(
+          deviceId: device.id,
+          deviceName: deviceName.trim(),
+        );
+        _nameDirty = false;
+      }
+
+      // 2) PUT the three notify flags using backend keys directly.
+      //    Previously saveChanges aliased UI fields onto wrong keys
+      //    (vibrationAlert -> notify_high_hr AND notify_high_bp,
+      //    sleepTracking -> notify_low_spo2) and silently dropped a battery
+      //    slider and a sync dropdown. The new payload matches
+      //    DeviceSettingsRequest 1:1.
       await _repository.updateDeviceSettings(
         deviceId: device.id,
         calibrationData: {

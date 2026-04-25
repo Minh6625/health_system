@@ -12,12 +12,19 @@ import 'package:healthguard/features/device/repositories/device_repository.dart'
 ///   - returns `false` and stores `errorMessage` when the repo throws
 ///   - keeps `isUnpairing` toggling around the call
 class _FakeDeviceRepository implements DeviceRepository {
-  _FakeDeviceRepository({this.failUnpairWith, this.failUpdateWith});
+  _FakeDeviceRepository({
+    this.failUnpairWith,
+    this.failUpdateWith,
+    this.failUpdateNameWith,
+  });
 
   final Object? failUnpairWith;
   final Object? failUpdateWith;
+  final Object? failUpdateNameWith;
   final List<int> unpairCalls = <int>[];
   final List<Map<String, dynamic>> updateSettingsCalls =
+      <Map<String, dynamic>>[];
+  final List<Map<String, dynamic>> updateNameCalls =
       <Map<String, dynamic>>[];
 
   @override
@@ -43,6 +50,21 @@ class _FakeDeviceRepository implements DeviceRepository {
     return Map<String, dynamic>.from(calibrationData ?? {});
   }
 
+  @override
+  Future<DeviceModel> updateDeviceName({
+    required int deviceId,
+    required String deviceName,
+  }) async {
+    updateNameCalls.add({
+      'device_id': deviceId,
+      'device_name': deviceName,
+    });
+    if (failUpdateNameWith != null) {
+      throw failUpdateNameWith!;
+    }
+    return _device(id: deviceId, deviceName: deviceName);
+  }
+
   // Methods we do not exercise in this test — keep them unimplemented so any
   // accidental usage surfaces loudly instead of silently mocking real network.
   @override
@@ -65,11 +87,11 @@ class _FakeDeviceRepository implements DeviceRepository {
   }
 }
 
-DeviceModel _device({int id = 101}) {
+DeviceModel _device({int id = 101, String? deviceName = 'Tester Watch'}) {
   return DeviceModel(
     id: id,
     uuid: 'uuid-$id',
-    deviceName: 'Tester Watch',
+    deviceName: deviceName,
     deviceType: 'smartwatch',
     isActive: true,
     isOnline: true,
@@ -181,6 +203,83 @@ void main() {
           contains('Cap nhat cau hinh that bai'));
       // We deliberately keep isDirty true on failure so the user can retry
       // with the same edits — verify that contract holds.
+      expect(provider.isDirty, isTrue);
+    });
+
+    // Phase 6b: device-name PATCH wiring.
+    test('skips updateDeviceName when the name was never edited', () async {
+      final repo = _FakeDeviceRepository();
+      final provider =
+          DeviceConfigureProvider(_device(id: 404), repository: repo);
+
+      provider.updateNotifyHighBp(false); // only settings dirty
+      final result = await provider.saveChanges();
+
+      expect(result, isTrue);
+      expect(repo.updateNameCalls, isEmpty,
+          reason:
+              'No PATCH should fire when the user did not change the name '
+              'TextField.');
+      expect(repo.updateSettingsCalls, hasLength(1));
+    });
+
+    test('PATCHes the trimmed name before settings when the user edited it',
+        () async {
+      final repo = _FakeDeviceRepository();
+      final provider =
+          DeviceConfigureProvider(_device(id: 505), repository: repo);
+
+      provider.updateName('  Dong ho cua Bo  ');
+      final result = await provider.saveChanges();
+
+      expect(result, isTrue);
+      expect(repo.updateNameCalls, hasLength(1));
+      expect(repo.updateNameCalls.single, <String, dynamic>{
+        'device_id': 505,
+        'device_name': 'Dong ho cua Bo',
+      });
+      expect(repo.updateSettingsCalls, hasLength(1),
+          reason: 'Settings should still be saved after the name PATCH.');
+    });
+
+    test('rejects an empty name locally without calling either endpoint',
+        () async {
+      final repo = _FakeDeviceRepository();
+      final provider =
+          DeviceConfigureProvider(_device(id: 606), repository: repo);
+
+      provider.updateName('   '); // user clears the field
+      final result = await provider.saveChanges();
+
+      expect(result, isFalse);
+      expect(provider.errorMessage, contains('không được để trống'));
+      expect(repo.updateNameCalls, isEmpty);
+      expect(repo.updateSettingsCalls, isEmpty,
+          reason:
+              'A locally-rejected name must short-circuit before any network '
+              'call to avoid partially-applied saves.');
+    });
+
+    test(
+        'when name PATCH fails the settings PUT is never called and the '
+        'form stays dirty', () async {
+      final repo = _FakeDeviceRepository(
+        failUpdateNameWith: Exception('Ten thiet bi da ton tai'),
+      );
+      final provider =
+          DeviceConfigureProvider(_device(id: 707), repository: repo);
+
+      provider.updateName('Dong ho trung ten');
+      provider.updateNotifyHighHr(false); // also flip a setting
+      final result = await provider.saveChanges();
+
+      expect(result, isFalse);
+      expect(provider.errorMessage, contains('Ten thiet bi da ton tai'));
+      expect(repo.updateNameCalls, hasLength(1));
+      expect(repo.updateSettingsCalls, isEmpty,
+          reason:
+              'Settings PUT must wait until the name PATCH succeeds to avoid '
+              'splitting the save halfway.');
       expect(provider.isDirty, isTrue);
     });
   });
