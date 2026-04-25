@@ -770,9 +770,8 @@ class _DashboardBody extends StatelessWidget {
                 ),
 
                 // ── Vùng C · Thao tác nhanh ───────────────────────────
+                // Title 'Thao tác nhanh' is rendered by DashboardSecondaryLinks itself.
                 const SizedBox(height: AppSpacing.sectionGapXl),
-                const _HomeSectionTitle(title: 'Thao tác nhanh'),
-                const SizedBox(height: AppSpacing.gapMd),
                 DashboardSecondaryLinks(
                   onTapHistory: () {
                     Navigator.pushNamed(
@@ -799,20 +798,3 @@ class _DashboardBody extends StatelessWidget {
   }
 }
 
-/// Small section title used by the home dashboard to label a visual group
-/// (e.g. "Thao tác nhanh"). Kept private to this screen since the other
-/// groups already have an inline title baked into their hero widget.
-class _HomeSectionTitle extends StatelessWidget {
-  const _HomeSectionTitle({required this.title});
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-}
