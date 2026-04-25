@@ -150,26 +150,19 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
 
                 SizedBox(height: AppSpacing.sectionGapXl),
 
-                // 2. Biểu đồ chuyên biệt (Mini chart - 24h trend)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Biến động 24h qua',
-                      style: AppTextStyles.sectionTitle.copyWith(
-                        fontSize: 18,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                         // TODO: navigate to history
-                      },
-                      child: Text(
-                        'Xem xu hướng',
-                        style: AppTextStyles.body,
-                      ),
-                    ),
-                  ],
+                // 2. Biểu đồ chuyên biệt (Mini chart - 24h trend).
+                // The previous header rendered a "Xem xu hướng" TextButton
+                // whose onPressed body was just `// TODO: navigate to history`
+                // — there is no per-vital history screen wired into AppRouter
+                // today (only sleep-history and health-report exist). The
+                // mini chart underneath already shows the 24h trend the
+                // section title promises, so we drop the dead CTA instead of
+                // hiding the lie behind a disabled state.
+                Text(
+                  'Biến động 24h qua',
+                  style: AppTextStyles.sectionTitle.copyWith(
+                    fontSize: 18,
+                  ),
                 ),
                 SizedBox(height: AppSpacing.gapSm),
 
