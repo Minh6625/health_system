@@ -792,18 +792,21 @@ class MonitoringService:
     def get_health_report(patient_id: int, db: Session) -> HealthReportResponse:
         vitals_dict: dict[str, Any] = {}
         try:
+            # Aliases below MUST match the Flutter `HealthReport.vitals24hAvg`
+            # contract documented in
+            # `lib/features/health_monitoring/models/health_report.dart`. The
+            # screen `_VitalsAvgGrid` reads these exact keys; renaming them
+            # silently breaks the 24-hour averages section.
             vitals_stats = db.execute(
                 text(
                     """
                     SELECT
-                        ROUND(AVG(heart_rate)::numeric, 1) as avg_hr,
-                        MIN(heart_rate) as min_hr,
-                        MAX(heart_rate) as max_hr,
-                        ROUND(AVG(spo2)::numeric, 1) as avg_spo2,
-                        MIN(spo2) as min_spo2,
-                        ROUND(AVG(temperature)::numeric, 1) as avg_temp,
-                        ROUND(AVG(blood_pressure_sys)::numeric, 0) as avg_bp_sys,
-                        ROUND(AVG(blood_pressure_dia)::numeric, 0) as avg_bp_dia
+                        ROUND(AVG(heart_rate)::numeric, 1) AS heart_rate,
+                        ROUND(AVG(spo2)::numeric, 1) AS spo2,
+                        ROUND(AVG(temperature)::numeric, 1) AS temperature,
+                        ROUND(AVG(respiratory_rate)::numeric, 1) AS respiratory_rate,
+                        ROUND(AVG(blood_pressure_sys)::numeric, 0) AS blood_pressure_sys,
+                        ROUND(AVG(blood_pressure_dia)::numeric, 0) AS blood_pressure_dia
                     FROM vitals v
                     INNER JOIN devices d ON v.device_id = d.id
                     WHERE d.user_id = :user_id

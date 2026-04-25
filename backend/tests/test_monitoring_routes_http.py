@@ -107,7 +107,7 @@ def test_mobile_monitoring_routes_use_canonical_shape_and_target_profile(
             lambda patient_id, db: (
                 _record("health", patient_id),
                 HealthReportResponse(
-                    vitals_24h_avg={"avg_hr": 72.0},
+                    vitals_24h_avg={"heart_rate": 72.0},
                     latest_risk_score=18.0,
                     risk_level="low",
                     risk_type="general",
