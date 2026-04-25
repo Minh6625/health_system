@@ -64,5 +64,94 @@ void main() {
         expect(parsed.riskScoreId, 901);
       },
     );
+
+    // ------------------------------------------------------------------
+    // P1 #5 — buildNotificationAndroidSosLaunchPayload (data-only takeover)
+    // ------------------------------------------------------------------
+
+    test(
+      'buildNotificationAndroidSosLaunchPayload returns null for non-sos data',
+      () {
+        final payload = buildNotificationAndroidSosLaunchPayload({
+          'type': 'risk_alert',
+          'alert_type': 'risk_critical',
+        });
+        expect(payload, isNull);
+      },
+    );
+
+    test(
+      'buildNotificationAndroidSosLaunchPayload returns null when sos id missing',
+      () {
+        final payload = buildNotificationAndroidSosLaunchPayload({
+          'type': 'sos_alert',
+          'alert_type': 'fall_detected',
+        });
+        expect(payload, isNull);
+      },
+    );
+
+    test(
+      'buildNotificationAndroidSosLaunchPayload builds payload for fall_detected',
+      () {
+        final payload = buildNotificationAndroidSosLaunchPayload({
+          'type': 'sos_alert',
+          'sos_id': '88',
+          'sos_event_id': '88',
+          'alert_type': 'fall_detected',
+          'trigger_type': 'auto',
+          'notification_id': 'notif-fall-77',
+          'title': '',
+          'body': '',
+        });
+
+        expect(payload, isNotNull);
+        expect(payload!['type'], 'sos');
+        expect(payload['sosId'], '88');
+        expect(payload['sos_id'], '88');
+        expect(payload['sos_event_id'], '88');
+        expect(payload['alertType'], 'fall_detected');
+        expect(payload['alert_type'], 'fall_detected');
+        expect(payload['triggerType'], 'auto');
+        expect(payload['notification_id'], 'notif-fall-77');
+        expect(payload['title'], contains('té ngã'));
+      },
+    );
+
+    test(
+      'buildNotificationAndroidSosLaunchPayload uses manual title for sos trigger',
+      () {
+        final payload = buildNotificationAndroidSosLaunchPayload({
+          'type': 'sos_alert',
+          'sos_id': '101',
+          'alert_type': 'sos',
+          'trigger_type': 'manual',
+        });
+
+        expect(payload, isNotNull);
+        expect(payload!['type'], 'sos');
+        expect(payload['sosId'], '101');
+        expect(payload['title'], contains('SOS'));
+      },
+    );
+
+    test(
+      'buildNotificationAndroidSosLaunchPayload prefers explicit title and body',
+      () {
+        final payload = buildNotificationAndroidSosLaunchPayload({
+          'type': 'sos_alert',
+          'sos_id': '7',
+          'alert_type': 'sos',
+          'trigger_type': 'manual',
+          'title': 'Bệnh nhân X cần giúp đỡ',
+          'body': 'Vui lòng phản hồi ngay',
+        });
+
+        expect(payload, isNotNull);
+        expect(payload!['title'], 'Bệnh nhân X cần giúp đỡ');
+        expect(payload['body'], 'Vui lòng phản hồi ngay');
+        expect(payload['message'], 'Vui lòng phản hồi ngay');
+      },
+    );
   });
 }

@@ -145,6 +145,79 @@ Map<String, dynamic>? buildNotificationAndroidCriticalRiskLaunchPayload(
   };
 }
 
+/// Build a launch-payload map for SOS / fall_detected emergencies (P1 #5).
+///
+/// Mirrors [buildNotificationAndroidCriticalRiskLaunchPayload] for the SOS
+/// channel: when the backend sends a data-only emergency push, the Flutter
+/// background handler turns it into a local fullScreenIntent notification on
+/// the ``sos_fullscreen_alerts`` channel using this payload.
+Map<String, dynamic>? buildNotificationAndroidSosLaunchPayload(
+  Map<String, dynamic> rawData, {
+  String? fallbackTitle,
+  String? fallbackBody,
+}) {
+  final target = parseNotificationOpenTarget(rawData);
+  if (target == null || target.type != 'sos') {
+    return null;
+  }
+  final sosId = target.sosId?.trim();
+  if (sosId == null || sosId.isEmpty) {
+    return null;
+  }
+
+  final data = rawData.map(
+    (String key, dynamic value) => MapEntry(key.toString(), value),
+  );
+  final alertType = (data['alert_type'] ?? data['alertType'] ?? '')
+      .toString()
+      .trim()
+      .toLowerCase();
+  final triggerType = (data['trigger_type'] ?? data['triggerType'] ?? '')
+      .toString()
+      .trim()
+      .toLowerCase();
+  final notificationId =
+      (data['notification_id'] ?? data['notificationId'])?.toString().trim();
+
+  final isFall =
+      alertType == 'fall_detected' ||
+      alertType == 'fall_detection' ||
+      triggerType == 'auto' ||
+      triggerType == 'fall_detected' ||
+      triggerType == 'fall_detection';
+
+  final title = (target.title?.trim().isNotEmpty ?? false)
+      ? target.title!.trim()
+      : (fallbackTitle?.trim().isNotEmpty ?? false)
+      ? fallbackTitle!.trim()
+      : (isFall ? '🚨 Phát hiện té ngã' : '🚨 Cảnh báo SOS khẩn cấp');
+  final body = (target.message?.trim().isNotEmpty ?? false)
+      ? target.message!.trim()
+      : (fallbackBody?.trim().isNotEmpty ?? false)
+      ? fallbackBody!.trim()
+      : (isFall
+            ? 'Phát hiện sự kiện té ngã. Cần kiểm tra ngay.'
+            : 'Có cảnh báo SOS khẩn cấp mới.');
+
+  return <String, dynamic>{
+    'type': 'sos',
+    'sosId': sosId,
+    'sos_id': sosId,
+    'sos_event_id': sosId,
+    if (notificationId != null && notificationId.isNotEmpty) 'notificationId':
+        notificationId,
+    if (notificationId != null && notificationId.isNotEmpty) 'notification_id':
+        notificationId,
+    if (alertType.isNotEmpty) 'alertType': alertType,
+    if (alertType.isNotEmpty) 'alert_type': alertType,
+    if (triggerType.isNotEmpty) 'triggerType': triggerType,
+    if (triggerType.isNotEmpty) 'trigger_type': triggerType,
+    'title': title,
+    'body': body,
+    'message': body,
+  };
+}
+
 NotificationOpenTarget? parseNotificationAndroidCriticalRiskLaunchPayload(
   dynamic rawPayload,
 ) {

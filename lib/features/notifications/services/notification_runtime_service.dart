@@ -25,6 +25,8 @@ const String _androidConsumePendingCriticalAlertLaunchMethod =
 const String _androidDefaultNotificationIcon = '@mipmap/ic_launcher';
 const String _backgroundRiskCriticalChannelId = 'risk_critical_alerts';
 const String _backgroundRiskCriticalChannelName = 'Risk Critical Alerts';
+const String _backgroundSosChannelId = 'sos_fullscreen_alerts';
+const String _backgroundSosChannelName = 'SOS Fullscreen Alerts';
 
 final FlutterLocalNotificationsPlugin _backgroundNotifications =
     FlutterLocalNotificationsPlugin();
@@ -49,6 +51,10 @@ int _deriveCriticalRiskNotificationId(String notificationId) {
   return 300000 + (notificationId.hashCode.abs() % 600000);
 }
 
+int _deriveSosNotificationId(String sosId) {
+  return 400000 + (sosId.hashCode.abs() % 500000);
+}
+
 Future<void> _initializeBackgroundNotifications() async {
   if (_backgroundNotificationsInitialized) {
     return;
@@ -68,6 +74,14 @@ Future<void> _initializeBackgroundNotifications() async {
       _backgroundRiskCriticalChannelId,
       _backgroundRiskCriticalChannelName,
       description: 'Cảnh báo chỉ số sức khỏe nguy hiểm',
+      importance: Importance.max,
+    ),
+  );
+  await androidPlugin?.createNotificationChannel(
+    const AndroidNotificationChannel(
+      _backgroundSosChannelId,
+      _backgroundSosChannelName,
+      description: 'Cảnh báo SOS và té ngã toàn màn hình',
       importance: Importance.max,
     ),
   );
@@ -119,6 +133,52 @@ Future<void> _showBackgroundCriticalRiskNotification(
   );
 }
 
+/// P1 #5: full-screen takeover for SOS / fall_detected emergencies in
+/// background / cold-start. Mirrors [_showBackgroundCriticalRiskNotification].
+Future<void> _showBackgroundSosNotification(RemoteMessage message) async {
+  final payload = buildNotificationAndroidSosLaunchPayload(
+    message.data,
+    fallbackTitle: message.notification?.title,
+    fallbackBody: message.notification?.body,
+  );
+  if (payload == null) {
+    return;
+  }
+
+  await _initializeBackgroundNotifications();
+
+  final sosId = payload['sosId']?.toString() ?? '';
+  if (sosId.isEmpty) {
+    return;
+  }
+  final notificationId = _deriveSosNotificationId(sosId);
+  final details = NotificationDetails(
+    android: AndroidNotificationDetails(
+      _backgroundSosChannelId,
+      _backgroundSosChannelName,
+      channelDescription: 'Cảnh báo SOS và té ngã toàn màn hình',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.call,
+      fullScreenIntent: true,
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 900, 400, 900, 400, 1400]),
+      visibility: NotificationVisibility.public,
+      autoCancel: true,
+      ongoing: true,
+    ),
+  );
+
+  await _backgroundNotifications.show(
+    notificationId,
+    payload['title']?.toString(),
+    payload['body']?.toString(),
+    details,
+    payload: jsonEncode(payload),
+  );
+}
+
 @pragma('vm:entry-point')
 Future<void> notificationFirebaseMessagingBackgroundHandler(
   RemoteMessage message,
@@ -126,7 +186,11 @@ Future<void> notificationFirebaseMessagingBackgroundHandler(
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
   await Firebase.initializeApp();
+  // Try the critical-risk takeover first; if not applicable, try the
+  // SOS / fall takeover. Both helpers are idempotent + payload-gated, so it
+  // is safe to call them sequentially.
   await _showBackgroundCriticalRiskNotification(message);
+  await _showBackgroundSosNotification(message);
 }
 
 class NotificationRuntimeService {
