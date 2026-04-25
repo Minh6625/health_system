@@ -195,14 +195,23 @@ class TimelineEventModel {
   TimelineEventModel({required this.time, required this.description});
 
   factory TimelineEventModel.fromJson(Map<String, dynamic> json) {
+    // Backend `TimelineEvent` schema (backend/app/schemas/emergency.py) emits
+    // `time_offset` and `event`. The previous keys (`time`, `description`) did
+    // not exist in the payload, so casting null → String crashed
+    // EmergencySOSDetailScreen whenever an active fall-detection SOS rendered
+    // its XAI timeline. Read the canonical backend keys; tolerate the legacy
+    // names as a fallback in case the payload comes from an older mock.
     return TimelineEventModel(
-      time: json['time'] as String,
-      description: json['description'] as String,
+      time:
+          (json['time_offset'] as String?) ?? (json['time'] as String? ?? ''),
+      description:
+          (json['event'] as String?) ??
+          (json['description'] as String? ?? ''),
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'time': time, 'description': description};
+    return {'time_offset': time, 'event': description};
   }
 }
 
