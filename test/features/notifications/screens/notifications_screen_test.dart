@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:healthguard/features/notifications/screens/notifications_screen.dart';
+import 'package:healthguard/features/notifications/utils/notification_severity.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 
 void main() {
