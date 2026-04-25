@@ -34,7 +34,11 @@ class FamilyShellScreen extends StatefulWidget {
 }
 
 class _FamilyShellScreenState extends State<FamilyShellScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    // _syncTabController disposes the existing TabController and creates a new
+    // one when the caregiver's `can_receive_alerts` permission flips, so the
+    // state legitimately needs more than one ticker over its lifetime.
+    // SingleTickerProviderStateMixin would assert on the second creation.
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   late FamilyRelationshipProvider _familyProvider;
   late AuthProvider _authProvider;
