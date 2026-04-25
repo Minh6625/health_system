@@ -152,80 +152,49 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
             ),
             const SizedBox(height: AppSpacing.sectionGapXl),
 
+            // Notification toggles match the backend `DeviceSettingsRequest`
+            // schema 1:1 (notify_high_hr / notify_low_spo2 / notify_high_bp).
+            // Two earlier controls — a battery-threshold slider and a sync
+            // interval dropdown — were removed because saveChanges() never
+            // forwarded them to any endpoint, so the UI was lying about
+            // persistence.
             ConfigSectionCard(
-              title: 'Theo dõi & cảnh báo',
+              title: 'Cảnh báo sinh hiệu',
               children: [
                 SwitchListTile(
-                  title: Text('Rung khi cảnh báo', style: AppTextStyles.bodyMedium),
-                  subtitle: Text('Thiết bị sẽ rung khi có bất thường.', style: AppTextStyles.caption),
-                  value: provider.vibrationAlert,
-                  onChanged: provider.updateVibration,
+                  title: Text('Cảnh báo nhịp tim cao', style: AppTextStyles.bodyMedium),
+                  subtitle: Text(
+                    'Gửi thông báo khi nhịp tim vượt ngưỡng an toàn.',
+                    style: AppTextStyles.caption,
+                  ),
+                  value: provider.notifyHighHr,
+                  onChanged: provider.updateNotifyHighHr,
                   contentPadding: EdgeInsets.zero,
                   activeThumbColor: AppColors.brandPrimary,
                 ),
                 const Divider(height: 1, color: AppColors.strokeSoft),
                 SwitchListTile(
-                  title: Text('Theo dõi giấc ngủ', style: AppTextStyles.bodyMedium),
-                  value: provider.sleepTracking,
-                  onChanged: provider.updateSleepTracking,
+                  title: Text('Cảnh báo SpO₂ thấp', style: AppTextStyles.bodyMedium),
+                  subtitle: Text(
+                    'Gửi thông báo khi nồng độ oxy trong máu xuống thấp.',
+                    style: AppTextStyles.caption,
+                  ),
+                  value: provider.notifyLowSpo2,
+                  onChanged: provider.updateNotifyLowSpo2,
                   contentPadding: EdgeInsets.zero,
                   activeThumbColor: AppColors.brandPrimary,
                 ),
-                const SizedBox(height: AppSpacing.gapMd),
-                Text('Cảnh báo pin yếu định mức', style: AppTextStyles.bodyMedium),
-                const SizedBox(height: AppSpacing.gapSm),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Slider(
-                        value: provider.lowBatteryThreshold,
-                        min: 5,
-                        max: 40,
-                        divisions: 7,
-                        label: '${provider.lowBatteryThreshold.round()}%',
-                        activeColor: AppColors.brandPrimary,
-                        onChanged: provider.updateBatteryThreshold,
-                      ),
-                    ),
-                    Text('${provider.lowBatteryThreshold.round()}%', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sectionGapXl),
-
-            ConfigSectionCard(
-              title: 'Đồng bộ',
-              children: [
-                DropdownButtonFormField<String>(
-                  initialValue: provider.syncInterval,
-                  decoration: InputDecoration(
-                    labelText: 'Tần suất đồng bộ dữ liệu',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
+                const Divider(height: 1, color: AppColors.strokeSoft),
+                SwitchListTile(
+                  title: Text('Cảnh báo huyết áp cao', style: AppTextStyles.bodyMedium),
+                  subtitle: Text(
+                    'Gửi thông báo khi huyết áp tâm thu vượt ngưỡng.',
+                    style: AppTextStyles.caption,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: '15m', child: Text('Mỗi 15 phút (Tốn pin)')),
-                    DropdownMenuItem(value: '1h', child: Text('Mỗi 1 giờ (Khuyên dùng)')),
-                    DropdownMenuItem(value: '6h', child: Text('Mỗi 6 giờ (Tiết kiệm pin)')),
-                    DropdownMenuItem(value: 'manual', child: Text('Chỉ đồng bộ thủ công')),
-                  ],
-                  onChanged: (val) {
-                    if (val != null) provider.updateSyncInterval(val);
-                  },
-                ),
-                const SizedBox(height: AppSpacing.gapMd),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.info_outline, size: 16, color: AppColors.textSecondary),
-                    const SizedBox(width: AppSpacing.gapSm),
-                    Expanded(
-                      child: Text(
-                        'Cấu hình sẽ tự động đồng bộ khi thiết bị online.',
-                        style: AppTextStyles.caption,
-                      ),
-                    ),
-                  ],
+                  value: provider.notifyHighBp,
+                  onChanged: provider.updateNotifyHighBp,
+                  contentPadding: EdgeInsets.zero,
+                  activeThumbColor: AppColors.brandPrimary,
                 ),
               ],
             ),

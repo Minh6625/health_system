@@ -13,12 +13,15 @@ class DeviceConfigureProvider extends ChangeNotifier {
     // For now we use the initial values.
   }
   
-  // Local state for the form
+  // Local state for the form. The three notify_* booleans correspond 1:1
+  // to the backend `DeviceSettingsRequest` schema
+  // (`backend/app/schemas/device.py`). Defaults match the backend defaults
+  // so the toggles render the same as a freshly-paired device until we plumb
+  // existing calibration_data through DeviceModel (separate follow-up).
   late String deviceName;
-  bool vibrationAlert = true;
-  bool sleepTracking = true;
-  double lowBatteryThreshold = 20.0;
-  String syncInterval = '1h';
+  bool notifyHighHr = true;
+  bool notifyLowSpo2 = true;
+  bool notifyHighBp = true;
 
   // Dirty state tracking
   bool _isDirty = false;
@@ -40,30 +43,23 @@ class DeviceConfigureProvider extends ChangeNotifier {
     }
   }
 
-  void updateVibration(bool value) {
-    if (vibrationAlert != value) {
-      vibrationAlert = value;
+  void updateNotifyHighHr(bool value) {
+    if (notifyHighHr != value) {
+      notifyHighHr = value;
       _markDirty();
     }
   }
 
-  void updateSleepTracking(bool value) {
-    if (sleepTracking != value) {
-      sleepTracking = value;
+  void updateNotifyLowSpo2(bool value) {
+    if (notifyLowSpo2 != value) {
+      notifyLowSpo2 = value;
       _markDirty();
     }
   }
 
-  void updateBatteryThreshold(double value) {
-    if (lowBatteryThreshold != value) {
-      lowBatteryThreshold = value;
-      _markDirty();
-    }
-  }
-
-  void updateSyncInterval(String value) {
-    if (syncInterval != value) {
-      syncInterval = value;
+  void updateNotifyHighBp(bool value) {
+    if (notifyHighBp != value) {
+      notifyHighBp = value;
       _markDirty();
     }
   }
@@ -81,13 +77,17 @@ class DeviceConfigureProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Call live API to update device settings
+      // Send the three notify flags using backend keys directly. Previously
+      // this method aliased UI fields onto wrong keys (vibrationAlert was
+      // mapped to BOTH notify_high_hr and notify_high_bp; sleepTracking was
+      // mapped to notify_low_spo2; lowBatteryThreshold and syncInterval were
+      // dropped silently). The new payload matches DeviceSettingsRequest 1:1.
       await _repository.updateDeviceSettings(
         deviceId: device.id,
         calibrationData: {
-          'notify_high_hr': vibrationAlert,
-          'notify_low_spo2': sleepTracking,
-          'notify_high_bp': vibrationAlert,
+          'notify_high_hr': notifyHighHr,
+          'notify_low_spo2': notifyLowSpo2,
+          'notify_high_bp': notifyHighBp,
         },
       );
 
