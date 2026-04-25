@@ -63,6 +63,10 @@ class DeviceItemResponse(BaseModel):
     last_sync_at: datetime | None = None
     mqtt_client_id: str | None = None
     registered_at: datetime | None = None
+    # Stored notification + calibration preferences as a JSON dict. The mobile
+    # client uses this to seed the configure screen toggles so they reflect
+    # the saved values instead of always defaulting to "true".
+    calibration_data: dict | None = None
 
 
 class DeviceListResponse(BaseModel):

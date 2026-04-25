@@ -9,8 +9,26 @@ class DeviceConfigureProvider extends ChangeNotifier {
   DeviceConfigureProvider(this.device, {DeviceRepository? repository})
       : _repository = repository ?? DeviceRepository() {
     deviceName = device.displayName;
-    // In a real app, you would fetch actual config from an endpoint here.
-    // For now we use the initial values.
+    // Seed the three notification toggles from the device's persisted
+    // calibration_data so the screen opens with whatever the user previously
+    // saved. Falls back to the backend defaults (`true`) for keys that are
+    // missing or for devices that have never been configured.
+    final calibration = device.calibrationData;
+    notifyHighHr = _readBool(calibration, 'notify_high_hr', defaultValue: true);
+    notifyLowSpo2 =
+        _readBool(calibration, 'notify_low_spo2', defaultValue: true);
+    notifyHighBp = _readBool(calibration, 'notify_high_bp', defaultValue: true);
+  }
+
+  static bool _readBool(
+    Map<String, dynamic>? source,
+    String key, {
+    required bool defaultValue,
+  }) {
+    if (source == null) return defaultValue;
+    final raw = source[key];
+    if (raw is bool) return raw;
+    return defaultValue;
   }
 
   // Tracks whether the user explicitly typed a different name in the
@@ -20,16 +38,15 @@ class DeviceConfigureProvider extends ChangeNotifier {
   // fallback as the real name without explicit user intent would be a
   // regression, so we only PATCH when this flag is true.
   bool _nameDirty = false;
-  
+
   // Local state for the form. The three notify_* booleans correspond 1:1
   // to the backend `DeviceSettingsRequest` schema
-  // (`backend/app/schemas/device.py`). Defaults match the backend defaults
-  // so the toggles render the same as a freshly-paired device until we plumb
-  // existing calibration_data through DeviceModel (separate follow-up).
+  // (`backend/app/schemas/device.py`) and are seeded from the device's
+  // persisted `calibration_data` in the constructor.
   late String deviceName;
-  bool notifyHighHr = true;
-  bool notifyLowSpo2 = true;
-  bool notifyHighBp = true;
+  late bool notifyHighHr;
+  late bool notifyLowSpo2;
+  late bool notifyHighBp;
 
   // Dirty state tracking
   bool _isDirty = false;

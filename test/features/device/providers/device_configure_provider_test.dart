@@ -87,7 +87,11 @@ class _FakeDeviceRepository implements DeviceRepository {
   }
 }
 
-DeviceModel _device({int id = 101, String? deviceName = 'Tester Watch'}) {
+DeviceModel _device({
+  int id = 101,
+  String? deviceName = 'Tester Watch',
+  Map<String, dynamic>? calibrationData,
+}) {
   return DeviceModel(
     id: id,
     uuid: 'uuid-$id',
@@ -95,6 +99,7 @@ DeviceModel _device({int id = 101, String? deviceName = 'Tester Watch'}) {
     deviceType: 'smartwatch',
     isActive: true,
     isOnline: true,
+    calibrationData: calibrationData,
   );
 }
 
@@ -281,6 +286,102 @@ void main() {
               'Settings PUT must wait until the name PATCH succeeds to avoid '
               'splitting the save halfway.');
       expect(provider.isDirty, isTrue);
+    });
+  });
+
+  // Phase 6a: seed the three notify_* toggles from device.calibrationData.
+  group('DeviceConfigureProvider seeding from calibration_data', () {
+    test('defaults all three toggles to true when calibration_data is null',
+        () {
+      final provider = DeviceConfigureProvider(
+        _device(calibrationData: null),
+        repository: _FakeDeviceRepository(),
+      );
+
+      expect(provider.notifyHighHr, isTrue);
+      expect(provider.notifyLowSpo2, isTrue);
+      expect(provider.notifyHighBp, isTrue);
+      expect(provider.isDirty, isFalse,
+          reason:
+              'Seeding must not mark the form dirty; the user has not edited '
+              'anything yet.');
+    });
+
+    test('reads explicit booleans from calibration_data without aliasing', () {
+      final provider = DeviceConfigureProvider(
+        _device(calibrationData: <String, dynamic>{
+          'notify_high_hr': false,
+          'notify_low_spo2': true,
+          'notify_high_bp': false,
+          // Extra keys that the configure screen does not surface yet must be
+          // ignored, not coerced or dropped silently.
+          'heart_rate_offset': 3,
+          'wear_side': 'right',
+        }),
+        repository: _FakeDeviceRepository(),
+      );
+
+      expect(provider.notifyHighHr, isFalse);
+      expect(provider.notifyLowSpo2, isTrue);
+      expect(provider.notifyHighBp, isFalse);
+    });
+
+    test('falls back to default true when a key is missing or non-boolean',
+        () {
+      final provider = DeviceConfigureProvider(
+        _device(calibrationData: <String, dynamic>{
+          'notify_high_hr': 'on', // wrong type — must not be coerced
+          // notify_low_spo2 missing entirely
+          'notify_high_bp': null,
+        }),
+        repository: _FakeDeviceRepository(),
+      );
+
+      expect(provider.notifyHighHr, isTrue);
+      expect(provider.notifyLowSpo2, isTrue);
+      expect(provider.notifyHighBp, isTrue);
+    });
+  });
+
+  // Phase 6a: DeviceModel.fromJson round-trips calibration_data.
+  group('DeviceModel.fromJson calibration_data', () {
+    test('parses a JSON object into a Map<String, dynamic>', () {
+      final model = DeviceModel.fromJson(<String, dynamic>{
+        'id': 909,
+        'uuid': 'uuid-909',
+        'device_type': 'smartwatch',
+        'is_active': true,
+        'is_online': true,
+        'calibration_data': <String, dynamic>{
+          'notify_high_hr': false,
+          'notify_low_spo2': true,
+        },
+      });
+
+      expect(model.calibrationData, isNotNull);
+      expect(model.calibrationData!['notify_high_hr'], isFalse);
+      expect(model.calibrationData!['notify_low_spo2'], isTrue);
+    });
+
+    test('returns null when calibration_data is missing or not a Map', () {
+      final missing = DeviceModel.fromJson(<String, dynamic>{
+        'id': 1,
+        'uuid': 'u',
+        'device_type': 'smartwatch',
+        'is_active': true,
+        'is_online': true,
+      });
+      expect(missing.calibrationData, isNull);
+
+      final wrongType = DeviceModel.fromJson(<String, dynamic>{
+        'id': 2,
+        'uuid': 'u',
+        'device_type': 'smartwatch',
+        'is_active': true,
+        'is_online': true,
+        'calibration_data': 'oops', // should not crash
+      });
+      expect(wrongType.calibrationData, isNull);
     });
   });
 }

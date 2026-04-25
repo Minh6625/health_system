@@ -16,6 +16,13 @@ class DeviceModel {
   final String? mqttClientId;
   final DateTime? registeredAt;
 
+  /// Persisted notification + calibration preferences as returned by
+  /// `DeviceItemResponse.calibration_data`. The configure screen seeds its
+  /// notify_high_hr / notify_low_spo2 / notify_high_bp toggles from this
+  /// map so they reflect the saved values instead of always defaulting to
+  /// `true`. Null when the device has never had settings saved.
+  final Map<String, dynamic>? calibrationData;
+
   DeviceModel({
     required this.id,
     required this.uuid,
@@ -33,6 +40,7 @@ class DeviceModel {
     this.lastSyncAt,
     this.mqttClientId,
     this.registeredAt,
+    this.calibrationData,
   });
 
   factory DeviceModel.fromJson(Map<String, dynamic> json) {
@@ -58,6 +66,9 @@ class DeviceModel {
       mqttClientId: json['mqtt_client_id'] as String?,
       registeredAt: json['registered_at'] != null
           ? DateTime.parse(json['registered_at'] as String).toLocal()
+          : null,
+      calibrationData: json['calibration_data'] is Map
+          ? Map<String, dynamic>.from(json['calibration_data'] as Map)
           : null,
     );
   }
