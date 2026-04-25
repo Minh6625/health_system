@@ -86,9 +86,20 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
             onPressed: () async {
               Navigator.pop(ctx);
               final success = await provider.unpairDevice();
-              if (success && context.mounted) {
+              if (!context.mounted) return;
+              if (success) {
                 // Return 'deleted' so Detail screen can route all the way back to list
                 Navigator.of(context).pop('deleted');
+              } else {
+                // Surface the real backend error instead of silently closing.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      provider.errorMessage ?? 'Hủy ghép nối thiết bị thất bại',
+                    ),
+                    backgroundColor: AppColors.critical,
+                  ),
+                );
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.critical),

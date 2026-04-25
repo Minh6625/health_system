@@ -59,6 +59,25 @@ class DeviceRepository {
     }
   }
 
+  /// Unpair device - DELETE /devices/{id}
+  ///
+  /// Calls the live backend `delete_device` endpoint
+  /// (`backend/app/api/routes/device.py:113`). Throws on non-success so the
+  /// caller can surface a real error instead of a silent fake "thành công".
+  Future<void> unpairDevice(int deviceId) async {
+    final result = await _apiClient.delete(
+      '/devices/$deviceId',
+      requiresAuth: true,
+    );
+
+    if (result is! Map<String, dynamic> || result['success'] != true) {
+      final message = result is Map<String, dynamic>
+          ? (result['message'] as String?)
+          : null;
+      throw Exception(message ?? 'Hủy ghép nối thiết bị thất bại');
+    }
+  }
+
   /// Get device list - reuse from DeviceProvider or add here
   Future<List<DeviceModel>> getDeviceList({
     String? status = 'all',

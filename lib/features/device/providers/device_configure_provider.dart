@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
-import 'package:healthguard/features/device/mock/device_mock_data.dart';
 import 'package:healthguard/features/device/repositories/device_repository.dart';
 
 class DeviceConfigureProvider extends ChangeNotifier {
   final DeviceModel device;
-  final DeviceRepository _repository = DeviceRepository();
+  final DeviceRepository _repository;
+
+  DeviceConfigureProvider(this.device, {DeviceRepository? repository})
+      : _repository = repository ?? DeviceRepository() {
+    deviceName = device.displayName;
+    // In a real app, you would fetch actual config from an endpoint here.
+    // For now we use the initial values.
+  }
   
   // Local state for the form
   late String deviceName;
@@ -26,12 +32,6 @@ class DeviceConfigureProvider extends ChangeNotifier {
   
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
-
-  DeviceConfigureProvider(this.device) {
-    deviceName = device.displayName;
-    // In a real app, you would fetch actual config from an endpoint here.
-    // For now we use the initial values.
-  }
 
   void updateName(String name) {
     if (deviceName != name) {
@@ -103,15 +103,27 @@ class DeviceConfigureProvider extends ChangeNotifier {
     }
   }
 
+  /// Unpair device against the live backend (`DELETE /devices/{id}`).
+  ///
+  /// Replaces a previous fake-delay-only implementation that always returned
+  /// `true`, leaving the device record on the server while the UI showed a
+  /// success message. We now propagate failure via [errorMessage] so the
+  /// danger-zone dialog can surface a real error.
   Future<bool> unpairDevice() async {
     _isUnpairing = true;
+    _errorMessage = null;
     notifyListeners();
 
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: DeviceMockConfig.fakeApiDelayMs));
-
-    _isUnpairing = false;
-    notifyListeners();
-    return true; // Return true to indicate it was unpaired
+    try {
+      await _repository.unpairDevice(device.id);
+      _isUnpairing = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isUnpairing = false;
+      _errorMessage = e.toString().replaceFirst('Exception: ', '').trim();
+      notifyListeners();
+      return false;
+    }
   }
 }
