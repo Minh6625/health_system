@@ -73,7 +73,7 @@ class PersonDetailScreen extends StatelessWidget {
             _buildLiveVitals(context, profile),
             _buildHealthScoreBanner(context, profile),
             _buildSleepCard(context, profile),
-            _buildAlertHistory(),
+            _buildAlertHistory(profile),
           ],
         ),
       ),
@@ -532,7 +532,6 @@ class PersonDetailScreen extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapLg, AppSpacing.gapLg, 0),
       child: Container(
-        padding: EdgeInsets.all(AppSpacing.gapLg),
         decoration: BoxDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF0D253F), Color(0xFF163E57)],
@@ -548,60 +547,78 @@ class PersonDetailScreen extends StatelessWidget {
             ),
           ],
         ),
-        child: Row(
-          children: [
-            // Icon trái
-            Container(
-              padding: EdgeInsets.all(AppSpacing.sectionGapSm),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
-              ),
-              child: const Icon(
-                Icons.favorite_rounded,
-                color: Color(0xFF81E6D9),
-                size: 28,
-              ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => Navigator.pushNamed(
+              context,
+              AppRouter.healthReport,
+              arguments: {'profileId': profile.id},
             ),
-            SizedBox(width: AppSpacing.gapLg),
-            // Điểm số lớn
-            Text(
-              '${profile.healthScore7Days}',
-              style: TextStyle(
-                fontSize: 42,
-                fontWeight: FontWeight.w800,
-                color: scoreColor,
-              ),
-            ),
-            SizedBox(width: AppSpacing.gapLg),
-            // Nhãn
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+            child: Padding(
+              padding: EdgeInsets.all(AppSpacing.gapLg),
+              child: Row(
                 children: [
-                  const Text(
-                    'Điểm sức khoẻ',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
+                  // Icon trái
+                  Container(
+                    padding: EdgeInsets.all(AppSpacing.sectionGapSm),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+                    ),
+                    child: const Icon(
+                      Icons.favorite_rounded,
+                      color: Color(0xFF81E6D9),
+                      size: 28,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  SizedBox(width: AppSpacing.gapLg),
+                  // Điểm số lớn
                   Text(
-                    profile.healthScoreLevel,
+                    '${profile.healthScore7Days}',
                     style: TextStyle(
+                      fontSize: 42,
+                      fontWeight: FontWeight.w800,
                       color: scoreColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
                     ),
+                  ),
+                  SizedBox(width: AppSpacing.gapLg),
+                  // Nhãn
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Điểm sức khoẻ',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          profile.healthScoreLevel,
+                          style: TextStyle(
+                            color: scoreColor,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Chevron — actionable, navigates to HealthReportScreen.
+                  const Icon(
+                    Icons.chevron_right,
+                    color: Colors.white38,
+                    size: 22,
                   ),
                 ],
               ),
             ),
-            // Chevron
-            const Icon(Icons.chevron_right, color: Colors.white38, size: 22),
-          ],
+          ),
         ),
       ),
     );
@@ -714,9 +731,20 @@ class PersonDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAlertHistory() {
+  Widget _buildAlertHistory(FamilyProfileSnapshot profile) {
+    // NOTE: Backend hiện chưa có endpoint trả về danh sách cảnh báo gần đây
+    // theo profileId. Trước đây chỗ này render hard-coded mock data ("Nhịp tim
+    // cao 112 bpm — Hôm nay 14:30", "Đã nhấn nút SOS — Hôm qua 09:15") cho mọi
+    // profile, gây hiểu lầm nguy hiểm cho caregiver. Khi có API thật, thay
+    // empty state bên dưới bằng list thực tế filtered theo profile.id.
+    final firstName = profile.name.split(' ').last;
     return Padding(
-      padding: EdgeInsets.fromLTRB(AppSpacing.gapLg, AppSpacing.gapLg, AppSpacing.gapLg, 0),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.gapLg,
+        AppSpacing.gapLg,
+        AppSpacing.gapLg,
+        0,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -729,53 +757,47 @@ class PersonDetailScreen extends StatelessWidget {
             ),
           ),
           SizedBox(height: AppSpacing.sectionGapSm),
-          _buildAlertItem(
-            'Nhịp tim cao (112 bpm)',
-            'Hôm nay, 14:30',
-            AppColors.warning,
-          ),
-          _buildAlertItem(
-            'Đã nhấn nút SOS',
-            'Hôm qua, 09:15',
-            AppColors.emergency,
-          ),
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlertItem(String title, String time, Color color) {
-    return Container(
-      margin: EdgeInsets.only(bottom: AppSpacing.gapSm),
-      padding: EdgeInsets.all(AppSpacing.sectionGapSm),
-      decoration: BoxDecoration(
-        color: AppColors.bgSurface,
-        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
-        border: Border.all(color: AppColors.strokeSoft),
-      ),
-      child: Row(
-        children: [
           Container(
-            width: 10,
-            height: 10,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          SizedBox(width: AppSpacing.sectionGapSm),
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-                fontSize: 14,
-              ),
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+              horizontal: AppSpacing.gapLg,
+              vertical: AppSpacing.sectionGapXl,
+            ),
+            decoration: BoxDecoration(
+              color: AppColors.bgSurface,
+              borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+              border: Border.all(color: AppColors.strokeSoft),
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.notifications_none_rounded,
+                  color: AppColors.textSecondary,
+                  size: 36,
+                ),
+                SizedBox(height: AppSpacing.gapSm),
+                Text(
+                  'Chưa có cảnh báo gần đây',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                SizedBox(height: AppSpacing.gapXs),
+                Text(
+                  'Cảnh báo về $firstName sẽ hiển thị tại đây khi có.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ),
           ),
-          Text(
-            time,
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
+          const SizedBox(height: 32),
         ],
       ),
     );
