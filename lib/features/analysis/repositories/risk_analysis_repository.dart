@@ -82,6 +82,8 @@ class RiskAnalysisRepository {
       value: json['value'] as String? ?? '--',
       unit: json['unit'] as String? ?? '',
       routeTarget: json['route_target'] as String? ?? '',
+      direction: json['direction'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
     );
   }
 
@@ -89,6 +91,23 @@ class RiskAnalysisRepository {
     return TopFactor(
       key: json['key'] as String? ?? '',
       label: json['label'] as String? ?? '',
+      impact: _parseDouble(json['impact']),
+      direction: json['direction'] as String? ?? '',
+      reason: json['reason'] as String? ?? '',
+      featureValue: json['feature_value'] as String? ?? '',
+    );
+  }
+
+  AiExplanation _parseAiExplanation(Map<String, dynamic>? json) {
+    if (json == null || json.isEmpty) return AiExplanation.empty;
+    final actionsRaw = json['recommended_actions'] as List? ?? const [];
+    return AiExplanation(
+      shortText: json['short_text'] as String? ?? '',
+      clinicalNote: json['clinical_note'] as String? ?? '',
+      recommendedActions: actionsRaw
+          .map((item) => item?.toString() ?? '')
+          .where((item) => item.isNotEmpty)
+          .toList(),
     );
   }
 
@@ -150,6 +169,12 @@ class RiskAnalysisRepository {
     final topFactors = (json['top_factors'] as List? ?? const [])
         .map((item) => _parseTopFactor(Map<String, dynamic>.from(item as Map)))
         .toList();
+    final aiExplanationRaw = json['ai_explanation'];
+    final aiExplanation = _parseAiExplanation(
+      aiExplanationRaw is Map
+          ? Map<String, dynamic>.from(aiExplanationRaw)
+          : null,
+    );
 
     return RiskReportDetailEntity(
       reportId: json['id'] as int? ?? reportId,
@@ -184,6 +209,7 @@ class RiskAnalysisRepository {
       ),
       confidence: _parseDouble(json['confidence']),
       isStale: json['is_stale'] as bool? ?? true,
+      aiExplanation: aiExplanation,
     );
   }
 

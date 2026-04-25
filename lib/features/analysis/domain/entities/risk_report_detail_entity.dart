@@ -8,6 +8,8 @@ class FactorBreakdown {
   final String value;
   final String unit;
   final String routeTarget;
+  final String direction;
+  final String reason;
 
   FactorBreakdown({
     required this.key,
@@ -17,7 +19,32 @@ class FactorBreakdown {
     required this.value,
     required this.unit,
     required this.routeTarget,
+    this.direction = '',
+    this.reason = '',
   });
+
+  bool get isRiskUp => direction == 'risk_up';
+  bool get isRiskDown => direction == 'risk_down';
+  bool get hasShapContext => direction.isNotEmpty;
+}
+
+class AiExplanation {
+  final String shortText;
+  final String clinicalNote;
+  final List<String> recommendedActions;
+
+  const AiExplanation({
+    this.shortText = '',
+    this.clinicalNote = '',
+    this.recommendedActions = const [],
+  });
+
+  bool get isEmpty =>
+      shortText.isEmpty && clinicalNote.isEmpty && recommendedActions.isEmpty;
+
+  bool get isNotEmpty => !isEmpty;
+
+  static const AiExplanation empty = AiExplanation();
 }
 
 class SnapshotMetrics {
@@ -59,6 +86,7 @@ class RiskReportDetailEntity {
   final SnapshotMetrics snapshot;
   final double confidence;
   final bool isStale;
+  final AiExplanation aiExplanation;
 
   RiskReportDetailEntity({
     required this.reportId,
@@ -79,5 +107,6 @@ class RiskReportDetailEntity {
     required this.snapshot,
     required this.confidence,
     required this.isStale,
+    this.aiExplanation = AiExplanation.empty,
   });
 }

@@ -119,7 +119,10 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                 ],
                 RiskScoreHeroCard(report: report),
                 const SizedBox(height: AppSpacing.gapLg),
-                RiskQuickExplanationCard(summary: report.summary),
+                RiskQuickExplanationCard(
+                  summary: report.summary,
+                  topFactors: report.topFactors,
+                ),
                 const SizedBox(height: AppSpacing.gapLg),
                 TopFactorChipsSection(factors: report.topFactors),
                 const SizedBox(height: AppSpacing.gapLg),

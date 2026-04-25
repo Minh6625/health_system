@@ -120,7 +120,12 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
                 ],
                 RiskDetailSummaryCard(detail: detail),
                 const SizedBox(height: AppSpacing.gapLg),
-                XaiNarrativeCard(explanation: detail.xaiExplanation),
+                XaiNarrativeCard(
+                  explanation: detail.xaiExplanation,
+                  aiExplanation: detail.aiExplanation.isNotEmpty
+                      ? detail.aiExplanation
+                      : null,
+                ),
                 const SizedBox(height: AppSpacing.gapLg),
                 FactorContributionSection(
                   breakdown: detail.breakdown,
@@ -142,7 +147,10 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
                 SupportingMetricsSnapshotCard(snapshot: detail.snapshot),
                 const SizedBox(height: AppSpacing.gapLg),
                 RecommendationChecklistCard(
-                  recommendations: detail.recommendations,
+                  recommendations:
+                      detail.aiExplanation.recommendedActions.isNotEmpty
+                      ? detail.aiExplanation.recommendedActions
+                      : detail.recommendations,
                 ),
                 const SizedBox(height: AppSpacing.gapLg),
                 RelatedDrilldownSection(
