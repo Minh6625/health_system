@@ -12,6 +12,9 @@ import '../widgets/mini_line_chart.dart';
 import '../widgets/vital_detail_skeleton.dart';
 import '../widgets/empty_chart_placeholder.dart';
 import '../widgets/error_view.dart';
+import '../widgets/vital_education_card.dart';
+import '../widgets/vital_safe_range.dart';
+import '../widgets/vital_safe_range_bar.dart';
 
 class VitalDetailScreen extends StatefulWidget {
   final String vitalType;
@@ -120,6 +123,11 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     final isCritical = provider.vitalStatus == VitalStatus.critical;
     final isEmpty = provider.state == VitalsUIState.empty;
 
+    final safeRange = vitalSafeRangeFor(widget.vitalType);
+    final gaugeValue = safeRange != null
+        ? extractGaugeValue(widget.vitalType, provider.value)
+        : null;
+
     return Column(
       children: [
         Expanded(
@@ -130,7 +138,16 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
               children: [
                 // 1. Nổi bật hiện tại (Huge latest value)
                 _buildVitalValueCard(provider, statusColor),
-                
+
+                if (safeRange != null) ...[
+                  SizedBox(height: AppSpacing.sectionGapLg),
+                  // 1b. Khoảng an toàn (5-zone gauge — W3.1)
+                  VitalSafeRangeBar(
+                    range: safeRange,
+                    currentValue: gaugeValue,
+                  ),
+                ],
+
                 SizedBox(height: AppSpacing.sectionGapXl),
 
                 // 2. Biểu đồ chuyên biệt (Mini chart - 24h trend)
@@ -177,31 +194,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
 
                 SizedBox(height: AppSpacing.sectionGapXl),
 
-                // 3. Kiến thức y khoa (Education Text)
-                Container(
-                  padding: AppSpacing.cardPadding,
-                  decoration: BoxDecoration(
-                    color: AppStateColors.infoBg,
-                    borderRadius: AppRadii.cardRadius,
-                    border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline, color: AppColors.info),
-                      SizedBox(width: AppSpacing.gapMd),
-                      Expanded(
-                        child: Text(
-                          provider.educationText,
-                          style: AppTextStyles.body.copyWith(
-                            height: 1.4,
-                            color: AppColors.info,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // 3. Kiến thức y khoa (collapsible — W3.2)
+                VitalEducationCard(text: provider.educationText),
               ],
             ),
           ),
