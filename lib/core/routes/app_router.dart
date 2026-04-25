@@ -22,6 +22,7 @@ import 'package:healthguard/features/sleep_analysis/screens/sleep_report_screen.
 import 'package:healthguard/features/sleep_analysis/screens/sleep_detail_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_history_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_settings_screen.dart';
+import 'package:healthguard/features/health_monitoring/screens/health_report_screen.dart';
 import 'package:healthguard/features/health_monitoring/screens/vital_detail_screen.dart';
 import 'package:healthguard/features/emergency/screens/manual_sos_screen.dart';
 import 'package:healthguard/features/emergency/screens/sos_confirm_screen.dart';
@@ -57,6 +58,7 @@ class AppRouter {
   static const String sleepHistory = '/sleep-history';
   static const String sleepSettings = '/sleep-settings';
   static const String vitalDetail = '/vital-detail';
+  static const String healthReport = '/health-report';
   static const String addContact = '/add-contact';
   static const String linkedContactDetail = '/linked-contact-detail';
   static const String familyDashboard = '/family-dashboard';
@@ -229,6 +231,13 @@ class AppRouter {
           settings: RouteSettings(name: vitalDetail, arguments: routeArgs),
           builder: (_) => VitalDetailScreen(
             vitalType: routeArgs['vitalType'] as String? ?? 'hr',
+            profileId: routeArgs['profileId'] as String?,
+          ),
+        );
+      case healthReport:
+        return MaterialPageRoute(
+          settings: RouteSettings(name: healthReport, arguments: routeArgs),
+          builder: (_) => HealthReportScreen(
             profileId: routeArgs['profileId'] as String?,
           ),
         );

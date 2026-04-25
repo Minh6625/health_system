@@ -733,7 +733,16 @@ class _DashboardBody extends StatelessWidget {
                 ),
                 DashboardTopBannerArea(vm: vm),
                 const SizedBox(height: AppSpacing.gapMd),
-                LiveVitalsSection(items: vm.vitalItems, onTapHistory: () {}),
+                LiveVitalsSection(
+                  items: vm.vitalItems,
+                  onTapHistory: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.healthReport,
+                      arguments: {'profileId': provider.profileId},
+                    );
+                  },
+                ),
                 const SizedBox(height: AppSpacing.sectionGapMd),
                 SleepInsightCard(
                   sleepDurationMinutes: vm.sleepDurationMinutes,
@@ -758,7 +767,13 @@ class _DashboardBody extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpacing.sectionGapMd),
                 DashboardSecondaryLinks(
-                  onTapHistory: () {},
+                  onTapHistory: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.healthReport,
+                      arguments: {'profileId': provider.profileId},
+                    );
+                  },
                   onTapDeviceSettings: () {
                     Navigator.pushReplacementNamed(context, '/device');
                   },
