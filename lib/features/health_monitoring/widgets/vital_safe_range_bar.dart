@@ -218,11 +218,17 @@ class _Marker extends StatelessWidget {
 }
 
 /// Tick labels under the gauge: critical-low / normal-low / normal-high /
-/// critical-high. The axis-min and axis-max are intentionally omitted so the
-/// row stays uncluttered for elderly users.
+/// critical-high. Each label is positioned at its **true axis fraction** so
+/// the labels line up with the corresponding zone boundaries on the gauge.
+///
+/// Implementation: `Stack` with `Positioned(left: fraction * width - half)`,
+/// each label given a fixed-width centered cell so visual centering stays
+/// stable across 2-, 3- and 4-character numeric values (e.g. "60" vs "37.8").
 class _AxisLabels extends StatelessWidget {
   const _AxisLabels({required this.range});
   final VitalSafeRange range;
+
+  static const double _labelCellWidth = 36;
 
   String _format(double value) {
     if (value == value.roundToDouble()) {
@@ -231,43 +237,85 @@ class _AxisLabels extends StatelessWidget {
     return value.toStringAsFixed(1);
   }
 
+  double _fraction(double value) {
+    final span = range.axisMax - range.axisMin;
+    if (span <= 0) return 0;
+    return ((value - range.axisMin) / span).clamp(0.0, 1.0);
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasUpperWarning = range.criticalHigh > range.normalHigh;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          _format(range.criticalLow),
-          style: AppTextStyles.caption.copyWith(
-            color: AppColors.textSecondary,
-            fontWeight: FontWeight.w600,
-          ),
+    final ticks = <_TickSpec>[
+      _TickSpec(
+        fraction: _fraction(range.criticalLow),
+        label: _format(range.criticalLow),
+        color: AppColors.textSecondary,
+        weight: FontWeight.w600,
+      ),
+      _TickSpec(
+        fraction: _fraction(range.normalLow),
+        label: _format(range.normalLow),
+        color: AppColors.success,
+        weight: FontWeight.w700,
+      ),
+      _TickSpec(
+        fraction: _fraction(range.normalHigh),
+        label: _format(range.normalHigh),
+        color: AppColors.success,
+        weight: FontWeight.w700,
+      ),
+      if (hasUpperWarning)
+        _TickSpec(
+          fraction: _fraction(range.criticalHigh),
+          label: _format(range.criticalHigh),
+          color: AppColors.textSecondary,
+          weight: FontWeight.w600,
         ),
-        Text(
-          _format(range.normalLow),
-          style: AppTextStyles.caption.copyWith(
-            color: AppColors.success,
-            fontWeight: FontWeight.w700,
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        return SizedBox(
+          width: width,
+          height: 18,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: ticks.map((tick) {
+              final centerX = tick.fraction * width;
+              return Positioned(
+                left: centerX - _labelCellWidth / 2,
+                child: SizedBox(
+                  width: _labelCellWidth,
+                  child: Text(
+                    tick.label,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption.copyWith(
+                      color: tick.color,
+                      fontWeight: tick.weight,
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
           ),
-        ),
-        Text(
-          _format(range.normalHigh),
-          style: AppTextStyles.caption.copyWith(
-            color: AppColors.success,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        if (hasUpperWarning)
-          Text(
-            _format(range.criticalHigh),
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-      ],
+        );
+      },
     );
   }
+}
+
+class _TickSpec {
+  const _TickSpec({
+    required this.fraction,
+    required this.label,
+    required this.color,
+    required this.weight,
+  });
+  final double fraction;
+  final String label;
+  final Color color;
+  final FontWeight weight;
 }
