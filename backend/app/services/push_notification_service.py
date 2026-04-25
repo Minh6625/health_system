@@ -34,6 +34,19 @@ class PushNotificationService:
         return os.getenv("E2E_DISABLE_PUSH", "").strip() == "1"
 
     @staticmethod
+    def is_sos_emergency_takeover(alert_type: str | None) -> bool:
+        """Return ``True`` when an SOS / fall alert must use the data-only
+        takeover path (no FCM ``notification`` payload, Flutter background
+        handler will dispatch a fullScreenIntent local notification).
+        """
+        return (alert_type or "").strip().lower() in {
+            "fall_detected",
+            "fall_detection",
+            "sos",
+            "manual",
+        }
+
+    @staticmethod
     def _token_prefix(token: str) -> str:
         normalized = (token or "").strip()
         if not normalized:
@@ -133,6 +146,14 @@ class PushNotificationService:
         trigger_type: str,
         notification_id_by_user: dict[int, int],
     ) -> None:
+        """Fan out SOS push notifications.
+
+        P1 #5 fix: SOS / fall_detected emergencies are sent as **data-only**
+        messages (no FCM ``notification`` payload). The Flutter background
+        handler then re-emits them as local ``flutter_local_notifications``
+        with ``fullScreenIntent: true`` on the ``sos_fullscreen_alerts``
+        channel — matching the proven ``risk_critical`` takeover path.
+        """
         if not recipient_user_ids:
             return
 
@@ -159,6 +180,18 @@ class PushNotificationService:
         created_at = datetime.now(timezone.utc).isoformat()
         messages: list[Any] = []
         sent_token_refs: list[tuple[int, str]] = []
+        is_emergency_takeover = cls.is_sos_emergency_takeover(alert_type)
+
+        logger.info(
+            "Preparing FCM SOS push: recipients=%s active_tokens=%s alert_type=%s trigger=%s sos_id=%s takeover=%s",
+            list(recipient_user_ids),
+            len(rows),
+            alert_type,
+            trigger_type,
+            sos_id,
+            is_emergency_takeover,
+        )
+
         for row in rows:
             notification_id = notification_id_by_user.get(int(row.user_id))
             data = {
@@ -174,20 +207,32 @@ class PushNotificationService:
                 "click_action": "FLUTTER_NOTIFICATION_CLICK",
             }
 
+            android_config: Any
+            notification_payload: Any
+            if is_emergency_takeover:
+                # Data-only message: Flutter background handler dispatches
+                # a fullScreenIntent local notification.
+                android_config = messaging.AndroidConfig(priority="high")
+                notification_payload = None
+            else:
+                # Non-emergency SOS-style alert (legacy behavior).
+                android_config = messaging.AndroidConfig(
+                    priority="high",
+                    notification=messaging.AndroidNotification(
+                        channel_id="sos_fullscreen_alerts",
+                        click_action="FLUTTER_NOTIFICATION_CLICK",
+                        sound="default",
+                        priority="max",
+                    ),
+                )
+                notification_payload = messaging.Notification(title=title, body=body)
+
             messages.append(
                 messaging.Message(
                     token=row.token,
-                    notification=messaging.Notification(title=title, body=body),
+                    notification=notification_payload,
                     data=data,
-                    android=messaging.AndroidConfig(
-                        priority="high",
-                        notification=messaging.AndroidNotification(
-                            channel_id="sos_fullscreen_alerts",
-                            click_action="FLUTTER_NOTIFICATION_CLICK",
-                            sound="default",
-                            priority="max",
-                        ),
-                    ),
+                    android=android_config,
                 )
             )
             sent_token_refs.append((row.id, row.token))
@@ -202,6 +247,13 @@ class PushNotificationService:
             return
 
         cls._invalidate_stale_tokens(db, response, sent_token_refs)
+        logger.info(
+            "FCM SOS push sent: success=%s failure=%s alert_type=%s sos_id=%s",
+            response.success_count,
+            response.failure_count,
+            alert_type,
+            sos_id,
+        )
 
     # ------------------------------------------------------------------
     # Risk push alerts (A2 — new)

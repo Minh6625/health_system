@@ -10,6 +10,7 @@ from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
 from app.schemas.monitoring import (
+    AiExplanationResponse,
     FactorBreakdownResponse,
     HealthReportResponse,
     RiskHistoryItemResponse,
@@ -184,12 +185,16 @@ class MonitoringService:
         raw_vitals = MonitoringService._parse_json_object(features.get("raw_vitals"))
         feature_importance = MonitoringService._parse_json_object(row.get("feature_importance"))
         recommendations = MonitoringService._parse_json_list(row.get("recommendations"))
+        top_features = MonitoringService._parse_json_list(row.get("top_features_json"))
+        ai_explanation = MonitoringService._parse_json_object(row.get("ai_explanation_json"))
         return {
             **row,
             "features": features,
             "feature_snapshot": feature_snapshot,
             "raw_vitals": raw_vitals,
             "feature_importance": feature_importance,
+            "top_features": [item for item in top_features if isinstance(item, dict)],
+            "ai_explanation": ai_explanation,
             "recommendations": [str(item) for item in recommendations if str(item).strip()],
             "confidence": round(confidence, 4),
             "risk_level": risk_level,
@@ -204,20 +209,53 @@ class MonitoringService:
         }
 
     @staticmethod
-    def _top_factors(feature_importance: dict[str, Any], limit: int = 2) -> list[TopFactorResponse]:
+    def _top_factors(
+        feature_importance: dict[str, Any],
+        limit: int = 2,
+        top_features: list[dict[str, Any]] | None = None,
+    ) -> list[TopFactorResponse]:
+        # Prefer structured SHAP top_features from model-api when available.
+        if top_features:
+            top_items: list[TopFactorResponse] = []
+            for entry in top_features[:limit]:
+                if not isinstance(entry, dict):
+                    continue
+                key = str(entry.get("feature") or entry.get("key") or "")
+                if not key:
+                    continue
+                meta = MonitoringService._FEATURE_META.get(
+                    key,
+                    {"label": key.replace("_", " ").title(), "unit": "", "route_target": ""},
+                )
+                top_items.append(
+                    TopFactorResponse(
+                        key=key,
+                        label=meta["label"],
+                        impact=round(MonitoringService._safe_float(entry.get("impact")), 4),
+                        direction=str(entry.get("direction") or ""),
+                        reason=str(entry.get("reason") or ""),
+                        feature_value=MonitoringService._format_metric_value(
+                            entry.get("feature_value")
+                        ),
+                    )
+                )
+            if top_items:
+                return top_items
+
+        # Fallback: legacy feature_importance map (no direction / reason).
         items = sorted(
             ((key, MonitoringService._safe_float(value)) for key, value in feature_importance.items()),
             key=lambda item: item[1],
             reverse=True,
         )
-        top_items: list[TopFactorResponse] = []
+        legacy_items: list[TopFactorResponse] = []
         for key, _score in items[:limit]:
             meta = MonitoringService._FEATURE_META.get(
                 key,
                 {"label": key.replace("_", " ").title(), "unit": "", "route_target": ""},
             )
-            top_items.append(TopFactorResponse(key=key, label=meta["label"]))
-        return top_items
+            legacy_items.append(TopFactorResponse(key=key, label=meta["label"]))
+        return legacy_items
 
     @staticmethod
     def _format_metric_value(value: Any) -> str:
@@ -232,22 +270,51 @@ class MonitoringService:
         return f"{numeric:.1f}"
 
     @staticmethod
+    def _index_top_features(
+        top_features: list[dict[str, Any]] | None,
+    ) -> dict[str, dict[str, Any]]:
+        """Index model-api top_features by canonical feature key for quick lookup."""
+        if not top_features:
+            return {}
+        indexed: dict[str, dict[str, Any]] = {}
+        for entry in top_features:
+            if not isinstance(entry, dict):
+                continue
+            key = str(entry.get("feature") or entry.get("key") or "")
+            if key:
+                indexed[key] = entry
+        return indexed
+
+    @staticmethod
     def _build_breakdown(
         feature_importance: dict[str, Any],
         feature_snapshot: dict[str, Any],
         raw_vitals: dict[str, Any],
+        top_features: list[dict[str, Any]] | None = None,
     ) -> list[FactorBreakdownResponse]:
+        top_features_index = MonitoringService._index_top_features(top_features)
+
+        # Merge keys: prefer SHAP top_features; fall back to legacy feature_importance.
+        merged_scores: dict[str, float] = {}
+        for key, value in feature_importance.items():
+            merged_scores[key] = MonitoringService._safe_float(value)
+        for key, entry in top_features_index.items():
+            merged_scores[key] = MonitoringService._safe_float(
+                entry.get("impact"), merged_scores.get(key, 0.0)
+            )
+
         breakdown: list[FactorBreakdownResponse] = []
-        for key, value in sorted(
-            feature_importance.items(),
-            key=lambda item: MonitoringService._safe_float(item[1]),
+        for key, contribution_raw in sorted(
+            merged_scores.items(),
+            key=lambda item: item[1],
             reverse=True,
         ):
-            contribution_score = round(MonitoringService._safe_float(value), 4)
+            contribution_score = round(contribution_raw, 4)
             meta = MonitoringService._FEATURE_META.get(
                 key,
                 {"label": key.replace("_", " ").title(), "unit": "", "route_target": ""},
             )
+            shap_entry = top_features_index.get(key, {})
             snapshot_value = feature_snapshot.get(key)
             if snapshot_value is None:
                 if key == "sys_bp":
@@ -260,6 +327,8 @@ class MonitoringService:
                     snapshot_value = raw_vitals.get("respiratory_rate")
                 else:
                     snapshot_value = raw_vitals.get(key)
+            if snapshot_value is None and "feature_value" in shap_entry:
+                snapshot_value = shap_entry.get("feature_value")
 
             if contribution_score >= 0.5:
                 impact_level = "high"
@@ -277,9 +346,35 @@ class MonitoringService:
                     value=MonitoringService._format_metric_value(snapshot_value),
                     unit=meta["unit"],
                     route_target=meta["route_target"],
+                    direction=str(shap_entry.get("direction") or ""),
+                    reason=str(shap_entry.get("reason") or ""),
                 )
             )
         return breakdown
+
+    @staticmethod
+    def _build_ai_explanation(
+        ai_explanation: dict[str, Any],
+        fallback_recommendations: list[str] | None = None,
+    ) -> AiExplanationResponse | None:
+        """Build AiExplanationResponse from stored JSON payload when present."""
+        if not ai_explanation:
+            return None
+        actions_raw = ai_explanation.get("recommended_actions")
+        if not isinstance(actions_raw, list):
+            actions_raw = []
+        actions = [str(item) for item in actions_raw if str(item).strip()]
+        if not actions and fallback_recommendations:
+            actions = list(fallback_recommendations)
+        short_text = str(ai_explanation.get("short_text") or "").strip()
+        clinical_note = str(ai_explanation.get("clinical_note") or "").strip()
+        if not short_text and not clinical_note and not actions:
+            return None
+        return AiExplanationResponse(
+            short_text=short_text,
+            clinical_note=clinical_note,
+            recommended_actions=actions,
+        )
 
     @staticmethod
     def _build_snapshot(feature_snapshot: dict[str, Any], raw_vitals: dict[str, Any]) -> SnapshotMetricsResponse:
@@ -772,10 +867,16 @@ class MonitoringService:
                         rs.algorithm,
                         re.explanation_text,
                         re.feature_importance,
-                        re.recommendations
+                        re.recommendations,
+                        re.top_features_json,
+                        re.ai_explanation_json
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
-                        SELECT explanation_text, feature_importance, recommendations
+                        SELECT explanation_text,
+                               feature_importance,
+                               recommendations,
+                               top_features_json,
+                               ai_explanation_json
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -806,7 +907,10 @@ class MonitoringService:
                 normalized["timestamp"],
                 db,
             )
-            top_factors = MonitoringService._top_factors(normalized["feature_importance"])
+            top_factors = MonitoringService._top_factors(
+                normalized["feature_importance"],
+                top_features=normalized.get("top_features"),
+            )
             reports.append(
                 RiskReportResponse(
                     id=normalized["id"],
@@ -848,10 +952,16 @@ class MonitoringService:
                         rs.algorithm,
                         re.explanation_text,
                         re.feature_importance,
-                        re.recommendations
+                        re.recommendations,
+                        re.top_features_json,
+                        re.ai_explanation_json
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
-                        SELECT explanation_text, feature_importance, recommendations
+                        SELECT explanation_text,
+                               feature_importance,
+                               recommendations,
+                               top_features_json,
+                               ai_explanation_json
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -883,16 +993,25 @@ class MonitoringService:
             normalized["timestamp"],
             db,
         )
+        top_features = normalized.get("top_features") or []
         breakdown = MonitoringService._build_breakdown(
             normalized["feature_importance"],
             normalized["feature_snapshot"],
             normalized["raw_vitals"],
+            top_features=top_features,
         )
         snapshot = MonitoringService._build_snapshot(
             normalized["feature_snapshot"],
             normalized["raw_vitals"],
         )
-        top_factors = MonitoringService._top_factors(normalized["feature_importance"])
+        top_factors = MonitoringService._top_factors(
+            normalized["feature_importance"],
+            top_features=top_features,
+        )
+        ai_explanation = MonitoringService._build_ai_explanation(
+            normalized.get("ai_explanation") or {},
+            fallback_recommendations=normalized["recommendations"],
+        )
 
         return RiskReportDetailResponse(
             id=normalized["id"],
@@ -923,6 +1042,7 @@ class MonitoringService:
             algorithm=str(normalized.get("algorithm") or "unknown"),
             confidence=normalized["confidence"],
             is_stale=normalized["is_stale"],
+            ai_explanation=ai_explanation,
         )
 
     @staticmethod

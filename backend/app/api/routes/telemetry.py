@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json as _json
 import logging
+import os
 from datetime import datetime
 from typing import Any
 
@@ -19,6 +20,27 @@ from app.services.settings_service import SettingsService
 
 router = APIRouter(prefix="/telemetry", tags=["mobile-telemetry"])
 logger = logging.getLogger(__name__)
+
+# Fall detection secondary-validation gate (P0). Confidence reported by the simulator
+# / device must meet this threshold before the backend escalates to a full SOS event.
+# Below threshold the FallEvent is still persisted for audit, plus a soft Alert row is
+# created so caregivers can review without triggering the real-emergency takeover.
+_DEFAULT_FALL_CONFIDENCE_THRESHOLD = 0.7
+
+
+def _fall_confidence_threshold() -> float:
+    raw = os.getenv("FALL_CONFIDENCE_THRESHOLD")
+    if raw is None or not raw.strip():
+        return _DEFAULT_FALL_CONFIDENCE_THRESHOLD
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return _DEFAULT_FALL_CONFIDENCE_THRESHOLD
+    if value < 0.0:
+        return 0.0
+    if value > 1.0:
+        return 1.0
+    return value
 
 
 class VitalIngestVitals(BaseModel):
@@ -308,10 +330,11 @@ def ingest_alert(
         fall_event_id: int | None = None
 
         if payload.event_type == "fall_detected":
+            confidence_value = _pick_float(metadata, "confidence") or 0.0
             fall_event = FallEvent(
                 device_id=payload.db_device_id,
                 detected_at=payload.timestamp,
-                confidence=_pick_float(metadata, "confidence") or 0.0,
+                confidence=confidence_value,
                 model_version=_pick_value(metadata, "model_version"),
                 latitude=_pick_float(metadata, "latitude"),
                 longitude=_pick_float(metadata, "longitude"),
@@ -323,6 +346,43 @@ def ingest_alert(
             db.flush()
             fall_event_id = fall_event.id
             ingested += 1
+
+            threshold = _fall_confidence_threshold()
+            if confidence_value < threshold:
+                # Secondary-validation gate: low-confidence fall stays as soft Alert,
+                # caregivers can review via notifications list without full SOS takeover.
+                logger.warning(
+                    "Fall event below confidence threshold: device=%s confidence=%.3f threshold=%.3f -> soft alert (no SOS)",
+                    payload.db_device_id,
+                    confidence_value,
+                    threshold,
+                )
+                soft_details = dict(metadata)
+                soft_details.update(
+                    {
+                        "confidence": confidence_value,
+                        "fall_confidence_threshold": threshold,
+                        "secondary_validation": "pending_low_confidence",
+                    }
+                )
+                soft_alert = Alert(
+                    device_id=payload.db_device_id,
+                    user_id=resolved_user_id,
+                    fall_event_id=fall_event_id,
+                    alert_type="fall_detection",
+                    severity="high",
+                    title="Phát hiện khả năng té ngã (chờ xác minh)",
+                    message=(
+                        "Phát hiện chuyển động giống té ngã "
+                        f"(độ tin cậy {confidence_value:.0%}, dưới ngưỡng {threshold:.0%}). "
+                        "Vui lòng xác nhận trước khi kích hoạt SOS."
+                    ),
+                    details=soft_details,
+                )
+                db.add(soft_alert)
+                db.commit()
+                ingested += 1
+                return IngestResponse(ingested=ingested, errors=errors)
 
             if resolved_user_id is not None:
                 EmergencyService.trigger_sos(

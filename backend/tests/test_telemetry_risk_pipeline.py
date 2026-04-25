@@ -11,6 +11,7 @@ from app.api.routes.telemetry import (
     ingest_alert,
     ingest_vitals,
 )
+from app.models.sos_event_model import Alert, FallEvent
 from app.services.risk_alert_service import RiskCalculationResult
 
 
@@ -157,3 +158,118 @@ class TestTelemetryRiskPipeline:
             score=97.0,
             risk_score_id=903,
         )
+
+
+class TestFallConfidenceThreshold:
+    """P0 #1 — fall_detected events must clear a confidence gate before SOS escalation."""
+
+    @staticmethod
+    def _fall_payload(*, confidence: float | None) -> AlertIngestRequest:
+        metadata: dict = {}
+        if confidence is not None:
+            metadata["confidence"] = confidence
+        return AlertIngestRequest(
+            db_device_id=44,
+            user_id=88,
+            event_type="fall_detected",
+            severity="critical",
+            timestamp=datetime(2026, 4, 25, tzinfo=UTC),
+            metadata=metadata,
+        )
+
+    def test_high_confidence_fall_triggers_sos(self, monkeypatch) -> None:
+        monkeypatch.delenv("FALL_CONFIDENCE_THRESHOLD", raising=False)
+        db = MagicMock()
+        payload = self._fall_payload(confidence=0.92)
+
+        with patch(
+            "app.api.routes.telemetry.EmergencyService.trigger_sos",
+        ) as trigger_sos:
+            response = ingest_alert(payload, db=db)
+
+        assert response.ingested == 2  # FallEvent + SOS dispatch
+        assert response.errors == []
+        trigger_sos.assert_called_once()
+        kwargs = trigger_sos.call_args.kwargs
+        assert kwargs["user_id"] == 88
+        assert kwargs["trigger_type"] == "auto"
+
+        added_objects = [args[0] for args, _ in db.add.call_args_list]
+        # Exactly one FallEvent persisted; no soft Alert in the high-confidence path.
+        assert sum(1 for obj in added_objects if isinstance(obj, FallEvent)) == 1
+        assert not any(isinstance(obj, Alert) for obj in added_objects)
+
+    def test_low_confidence_fall_creates_soft_alert_no_sos(self, monkeypatch) -> None:
+        monkeypatch.delenv("FALL_CONFIDENCE_THRESHOLD", raising=False)
+        db = MagicMock()
+        payload = self._fall_payload(confidence=0.4)
+
+        with patch(
+            "app.api.routes.telemetry.EmergencyService.trigger_sos",
+        ) as trigger_sos:
+            response = ingest_alert(payload, db=db)
+
+        assert response.ingested == 2  # FallEvent + soft Alert
+        assert response.errors == []
+        trigger_sos.assert_not_called()
+
+        added_objects = [args[0] for args, _ in db.add.call_args_list]
+        falls = [obj for obj in added_objects if isinstance(obj, FallEvent)]
+        soft_alerts = [obj for obj in added_objects if isinstance(obj, Alert)]
+        assert len(falls) == 1
+        assert len(soft_alerts) == 1
+        soft = soft_alerts[0]
+        assert soft.alert_type == "fall_detection"
+        assert soft.severity == "high"
+        assert soft.user_id == 88
+        assert soft.details is not None
+        assert soft.details["secondary_validation"] == "pending_low_confidence"
+        assert soft.details["fall_confidence_threshold"] == 0.7
+        assert soft.details["confidence"] == 0.4
+
+    def test_missing_confidence_treated_as_zero_creates_soft_alert(self, monkeypatch) -> None:
+        monkeypatch.delenv("FALL_CONFIDENCE_THRESHOLD", raising=False)
+        db = MagicMock()
+        payload = self._fall_payload(confidence=None)
+
+        with patch(
+            "app.api.routes.telemetry.EmergencyService.trigger_sos",
+        ) as trigger_sos:
+            response = ingest_alert(payload, db=db)
+
+        assert response.ingested == 2
+        trigger_sos.assert_not_called()
+        added_objects = [args[0] for args, _ in db.add.call_args_list]
+        soft = next(obj for obj in added_objects if isinstance(obj, Alert))
+        assert soft.severity == "high"
+        assert soft.details["confidence"] == 0.0
+
+    def test_threshold_is_overridable_via_env(self, monkeypatch) -> None:
+        monkeypatch.setenv("FALL_CONFIDENCE_THRESHOLD", "0.3")
+        db = MagicMock()
+        payload = self._fall_payload(confidence=0.4)  # below default 0.7, above override 0.3
+
+        with patch(
+            "app.api.routes.telemetry.EmergencyService.trigger_sos",
+        ) as trigger_sos:
+            response = ingest_alert(payload, db=db)
+
+        assert response.ingested == 2
+        trigger_sos.assert_called_once()
+        # No soft alert when threshold is lowered enough to escalate.
+        added_objects = [args[0] for args, _ in db.add.call_args_list]
+        assert not any(isinstance(obj, Alert) for obj in added_objects)
+
+    def test_invalid_threshold_env_falls_back_to_default(self, monkeypatch) -> None:
+        monkeypatch.setenv("FALL_CONFIDENCE_THRESHOLD", "not-a-number")
+        db = MagicMock()
+        payload = self._fall_payload(confidence=0.65)  # below default 0.7
+
+        with patch(
+            "app.api.routes.telemetry.EmergencyService.trigger_sos",
+        ) as trigger_sos:
+            response = ingest_alert(payload, db=db)
+
+        trigger_sos.assert_not_called()
+        added_objects = [args[0] for args, _ in db.add.call_args_list]
+        assert any(isinstance(obj, Alert) for obj in added_objects)

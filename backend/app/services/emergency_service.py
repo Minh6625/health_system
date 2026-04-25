@@ -436,24 +436,12 @@ class EmergencyService:
             is_risk_origin=risk_response is not None,
         )
         
-        # Get fall detection XAI if available
+        # Get fall detection XAI if available — derived from FallEvent (no hardcoded mock).
         fall_xai = None
         if sos.fall_event_id:
             fall_event = EmergencyRepository.get_fall_event_by_id(db, sos.fall_event_id)
-            if fall_event and fall_event.features:
-                # Parse XAI data from features JSONB
-                confidence = float(fall_event.confidence) if fall_event.confidence else 0.95
-                timeline = [
-                    TimelineEvent(time_offset="T+0s", event="Tác động mạnh phát hiện (15.2g)"),
-                    TimelineEvent(time_offset="T+0.25s", event="Thời gian va chạm: 250ms"),
-                    TimelineEvent(time_offset="T+2s", event="Phát hiện tư thế nằm"),
-                    TimelineEvent(time_offset="T+5s", event="Không có chuyển động đứng dậy"),
-                ]
-                fall_xai = FallDetectionXAI(
-                    confidence=confidence,
-                    timeline=timeline,
-                    trigger_reason=" Tác động vượt ngưỡng (15.2g), sau đó phát hiện tư thế nằm kéo dài > 5 giây."
-                )
+            if fall_event is not None:
+                fall_xai = EmergencyService._build_fall_detection_xai(fall_event)
         
         # Get resolution info if resolved
         resolution_info = None
@@ -504,3 +492,91 @@ class EmergencyService:
         return EmergencyRepository.resolve_sos(
             db, sos_id, caregiver_user_id, resolution_status, notes
         )
+
+    @staticmethod
+    def _build_fall_detection_xai(fall_event: Any) -> Optional[FallDetectionXAI]:
+        """Build a :class:`FallDetectionXAI` from a persisted ``FallEvent``.
+
+        Replaces the previous hardcoded ``"15.2g/250ms"`` mock (P1 #4 fix). The
+        output now reflects only what was actually captured:
+
+        - ``confidence`` is the stored value (no fake ``0.95`` default).
+        - ``timeline`` is sourced from ``fall_event.features['timeline']`` when
+          the IoT/IMU pipeline persists one (e.g. when ``fall_service.predict``
+          response is stored). Otherwise it degrades to a single ``T+0s``
+          marker so the UI still shows when the event was detected.
+        - ``trigger_reason`` prefers a stored model-api ``explanation.short_text``
+          if present; otherwise falls back to a transparent Vietnamese
+          description that names confidence + simulator variant + source.
+        """
+        if fall_event is None:
+            return None
+
+        confidence_raw = getattr(fall_event, "confidence", None)
+        try:
+            confidence = float(confidence_raw) if confidence_raw is not None else 0.0
+        except (TypeError, ValueError):
+            confidence = 0.0
+
+        features = getattr(fall_event, "features", None)
+        if not isinstance(features, dict):
+            features = {}
+
+        timeline = EmergencyService._extract_fall_timeline(features, confidence)
+        trigger_reason = EmergencyService._extract_fall_trigger_reason(features, confidence)
+
+        return FallDetectionXAI(
+            confidence=confidence,
+            timeline=timeline,
+            trigger_reason=trigger_reason,
+        )
+
+    @staticmethod
+    def _extract_fall_timeline(
+        features: dict[str, Any],
+        confidence: float,
+    ) -> List[TimelineEvent]:
+        """Return real timeline entries when persisted, else a single detection marker."""
+        persisted = features.get("timeline")
+        if isinstance(persisted, list):
+            entries: list[TimelineEvent] = []
+            for item in persisted:
+                if not isinstance(item, dict):
+                    continue
+                offset = str(item.get("time_offset") or item.get("t") or "").strip()
+                event_text = str(item.get("event") or item.get("description") or "").strip()
+                if offset and event_text:
+                    entries.append(TimelineEvent(time_offset=offset, event=event_text))
+            if entries:
+                return entries
+
+        return [
+            TimelineEvent(
+                time_offset="T+0s",
+                event=f"Phát hiện sự kiện té ngã (độ tin cậy {confidence:.0%})",
+            )
+        ]
+
+    @staticmethod
+    def _extract_fall_trigger_reason(
+        features: dict[str, Any],
+        confidence: float,
+    ) -> str:
+        explanation = features.get("explanation")
+        if isinstance(explanation, dict):
+            short_text = str(explanation.get("short_text") or "").strip()
+            if short_text:
+                return short_text
+
+        parts: list[str] = []
+        if confidence > 0:
+            parts.append(f"Độ tin cậy phát hiện {confidence:.0%}")
+        variant = str(features.get("variant") or features.get("fall_variant") or "").strip()
+        if variant:
+            parts.append(f"biến thể: {variant}")
+        source = str(features.get("source") or "").strip()
+        if source:
+            parts.append(f"nguồn: {source}")
+        if not parts:
+            return "Đã phát hiện sự kiện té ngã từ thiết bị đeo."
+        return ". ".join(parts) + "."

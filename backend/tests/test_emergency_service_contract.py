@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import pytest
 from fastapi import HTTPException
 
 from app.services.emergency_service import EmergencyService
@@ -212,3 +213,91 @@ def test_trigger_sos_rejects_request_without_active_device() -> None:
             assert "thiết bị hoạt động" in error.detail
         else:
             raise AssertionError("Expected HTTPException when no active device exists")
+
+
+# ---------------------------------------------------------------------------
+# P1 #4 — _build_fall_detection_xai derives from real FallEvent (no hardcoded mock)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildFallDetectionXai:
+    @staticmethod
+    def _make_fall_event(*, confidence: float | None, features: dict | None) -> SimpleNamespace:
+        return SimpleNamespace(
+            id=1,
+            confidence=confidence,
+            features=features,
+            detected_at=datetime(2026, 4, 25, tzinfo=UTC),
+        )
+
+    def test_returns_none_for_none_input(self) -> None:
+        assert EmergencyService._build_fall_detection_xai(None) is None
+
+    def test_uses_real_confidence_no_fake_default(self) -> None:
+        fall_event = self._make_fall_event(confidence=0.42, features=None)
+        xai = EmergencyService._build_fall_detection_xai(fall_event)
+        assert xai is not None
+        assert xai.confidence == pytest.approx(0.42)
+
+    def test_zero_confidence_when_missing(self) -> None:
+        fall_event = self._make_fall_event(confidence=None, features=None)
+        xai = EmergencyService._build_fall_detection_xai(fall_event)
+        assert xai is not None
+        assert xai.confidence == 0.0
+
+    def test_no_features_uses_single_detection_marker(self) -> None:
+        fall_event = self._make_fall_event(confidence=0.85, features=None)
+        xai = EmergencyService._build_fall_detection_xai(fall_event)
+        assert xai is not None
+        assert len(xai.timeline) == 1
+        assert xai.timeline[0].time_offset == "T+0s"
+        assert "85%" in xai.timeline[0].event
+
+    def test_persisted_timeline_is_used_when_present(self) -> None:
+        features = {
+            "timeline": [
+                {"time_offset": "T+0s", "event": "Impact 12.4g"},
+                {"time_offset": "T+0.5s", "event": "Posture: prone"},
+                # Invalid entries should be skipped:
+                {"time_offset": "", "event": ""},
+                "not-a-dict",
+            ],
+        }
+        fall_event = self._make_fall_event(confidence=0.8, features=features)
+        xai = EmergencyService._build_fall_detection_xai(fall_event)
+        assert xai is not None
+        assert [e.time_offset for e in xai.timeline] == ["T+0s", "T+0.5s"]
+
+    def test_persisted_explanation_short_text_is_used(self) -> None:
+        features = {
+            "explanation": {
+                "short_text": "Tac dong manh + nam yen 5s. Nguy co cao.",
+                "clinical_note": "...",
+            }
+        }
+        fall_event = self._make_fall_event(confidence=0.91, features=features)
+        xai = EmergencyService._build_fall_detection_xai(fall_event)
+        assert xai is not None
+        assert xai.trigger_reason == "Tac dong manh + nam yen 5s. Nguy co cao."
+
+    def test_trigger_reason_falls_back_to_variant_summary(self) -> None:
+        features = {"variant": "fall_1", "source": "tick"}
+        fall_event = self._make_fall_event(confidence=0.78, features=features)
+        xai = EmergencyService._build_fall_detection_xai(fall_event)
+        assert xai is not None
+        assert "78%" in xai.trigger_reason
+        assert "fall_1" in xai.trigger_reason
+        assert "tick" in xai.trigger_reason
+
+    def test_trigger_reason_generic_when_no_metadata(self) -> None:
+        fall_event = self._make_fall_event(confidence=0.0, features=None)
+        xai = EmergencyService._build_fall_detection_xai(fall_event)
+        assert xai is not None
+        assert "thiết bị đeo" in xai.trigger_reason
+
+    def test_invalid_features_ignored_safely(self) -> None:
+        fall_event = self._make_fall_event(confidence=0.7, features="not-a-dict")  # type: ignore[arg-type]
+        xai = EmergencyService._build_fall_detection_xai(fall_event)
+        assert xai is not None
+        assert xai.confidence == pytest.approx(0.7)
+        assert len(xai.timeline) == 1  # fallback marker

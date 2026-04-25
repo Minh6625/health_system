@@ -7,18 +7,32 @@ python-dotenv==1.0.0
 bcrypt==4.1.2
 python-jose[cryptography]==3.3.0
 firebase-admin==6.5.0
-# ML Dependencies (Commented out for Heroku deployment - exceed slug size and lack C++ compile tools)
-# numpy>=1.26.4
-# joblib>=1.4.2
-# lightgbm>=4.5.0
-# onnxruntime>=1.19.0
+# httpx is also used by app/services/model_api_client.py to call
+# healthguard-model-api (configured via HEALTHGUARD_MODEL_API_URL,
+# default http://localhost:8001). When the model-api service is
+# unreachable, ``calculate_device_risk`` gracefully falls back to the
+# local rule-based scorer (see ``risk_alert_service._fallback_inference``).
+httpx==0.27.0
 gunicorn==21.2.0
+
+# ----------------------------------------------------------------------
+# Optional local ML inference (developer only).
+# In production this backend talks to ``healthguard-model-api`` over HTTP,
+# so the heavy ML libraries are NOT required to run the API. They are kept
+# out of the runtime image to avoid Heroku slug bloat + Windows C++ build
+# pain. To enable the legacy local-ONNX/LightGBM path in
+# ``app/services/risk_inference_service.py``, install:
+#     numpy>=1.26.4
+#     joblib>=1.4.2
+#     lightgbm>=4.5.0
+#     onnxruntime>=1.19.0
+# (Or: pip install -r requirements-dev.txt — if added.)
+# ----------------------------------------------------------------------
 
 # Testing
 pytest==8.0.0
 pytest-asyncio==0.23.5
 pytest-cov==4.1.0
-httpx==0.27.0
 
 # Code Quality
 black==24.3.0

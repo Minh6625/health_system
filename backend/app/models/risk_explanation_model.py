@@ -35,6 +35,11 @@ class RiskExplanation(Base):
         ARRAY(Text), nullable=True,
     )
 
+    # Structured SHAP payloads from healthguard-model-api (Phase A)
+    top_features_json: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)
+    ai_explanation_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    shap_details_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
     # Timestamps
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=get_current_time, nullable=True,

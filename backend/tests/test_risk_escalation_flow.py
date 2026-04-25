@@ -10,12 +10,15 @@ from app.services.emergency_service import EmergencyService
 
 
 class TestRiskEscalationFlow:
-    def test_dispatch_targets_patient_only_and_enriches_payload(self) -> None:
+    def test_dispatch_targets_patient_only_when_no_caregivers(self) -> None:
         db = Mock()
 
         with patch(
             "app.services.risk_alert_service.NotificationService.is_risk_alert_in_cooldown",
             return_value=False,
+        ), patch(
+            "app.services.risk_alert_service.EmergencyRepository.get_alert_recipient_user_ids",
+            return_value=[],
         ), patch(
             "app.services.risk_alert_service.NotificationService.create_risk_alerts",
             return_value={77: 1001},
@@ -49,6 +52,92 @@ class TestRiskEscalationFlow:
         assert push_kwargs["auto_escalate_after_seconds"] == RISK_ALERT_AUTO_ESCALATE_AFTER_SECONDS
         assert push_kwargs["alert_type"] == "risk_high"
         assert push_kwargs["device_id"] == 12
+
+    def test_dispatch_fans_out_to_caregivers_when_relationship_present(self) -> None:
+        """P1 #6 — risk push must reach caregivers with ``can_receive_alerts``."""
+        db = Mock()
+
+        with patch(
+            "app.services.risk_alert_service.NotificationService.is_risk_alert_in_cooldown",
+            return_value=False,
+        ), patch(
+            "app.services.risk_alert_service.EmergencyRepository.get_alert_recipient_user_ids",
+            return_value=[88, 99],
+        ), patch(
+            "app.services.risk_alert_service.NotificationService.create_risk_alerts",
+            return_value={77: 1001, 88: 1002, 99: 1003},
+        ) as create_risk_alerts, patch(
+            "app.services.risk_alert_service.PushNotificationService.send_risk_push_alerts"
+        ) as send_risk_push_alerts:
+            _dispatch_risk_alerts(
+                db,
+                device_id=12,
+                user_id=77,
+                risk_level="critical",
+                score=92.0,
+                risk_score_id=1010,
+            )
+
+        create_kwargs = create_risk_alerts.call_args.kwargs
+        assert create_kwargs["recipient_user_ids"] == [77, 88, 99]
+        push_kwargs = send_risk_push_alerts.call_args.kwargs
+        assert push_kwargs["recipient_user_ids"] == [77, 88, 99]
+        assert push_kwargs["alert_type"] == "risk_critical"
+
+    def test_dispatch_dedupes_caregiver_when_repository_returns_patient_id(self) -> None:
+        """Defensive: caregiver repo accidentally including patient_id must not duplicate."""
+        db = Mock()
+
+        with patch(
+            "app.services.risk_alert_service.NotificationService.is_risk_alert_in_cooldown",
+            return_value=False,
+        ), patch(
+            "app.services.risk_alert_service.EmergencyRepository.get_alert_recipient_user_ids",
+            return_value=[77, 88, 88],  # patient duplicate + caregiver duplicate
+        ), patch(
+            "app.services.risk_alert_service.NotificationService.create_risk_alerts",
+            return_value={77: 1, 88: 2},
+        ) as create_risk_alerts, patch(
+            "app.services.risk_alert_service.PushNotificationService.send_risk_push_alerts"
+        ):
+            _dispatch_risk_alerts(
+                db,
+                device_id=12,
+                user_id=77,
+                risk_level="medium",
+                score=80.0,
+                risk_score_id=1,
+            )
+
+        recipients = create_risk_alerts.call_args.kwargs["recipient_user_ids"]
+        assert recipients == [77, 88]
+
+    def test_dispatch_falls_back_to_patient_when_caregiver_lookup_raises(self) -> None:
+        """Resilience: a relationship-table failure must not break the patient's own alert."""
+        db = Mock()
+
+        with patch(
+            "app.services.risk_alert_service.NotificationService.is_risk_alert_in_cooldown",
+            return_value=False,
+        ), patch(
+            "app.services.risk_alert_service.EmergencyRepository.get_alert_recipient_user_ids",
+            side_effect=RuntimeError("relationship-table down"),
+        ), patch(
+            "app.services.risk_alert_service.NotificationService.create_risk_alerts",
+            return_value={77: 1},
+        ) as create_risk_alerts, patch(
+            "app.services.risk_alert_service.PushNotificationService.send_risk_push_alerts"
+        ):
+            _dispatch_risk_alerts(
+                db,
+                device_id=12,
+                user_id=77,
+                risk_level="medium",
+                score=80.0,
+                risk_score_id=1,
+            )
+
+        assert create_risk_alerts.call_args.kwargs["recipient_user_ids"] == [77]
 
     def test_safe_response_persists_ack_only(self) -> None:
         db = Mock()

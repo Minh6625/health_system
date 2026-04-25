@@ -49,6 +49,10 @@ class HealthReportResponse(BaseModel):
 class TopFactorResponse(BaseModel):
     key: str
     label: str
+    impact: float = 0.0
+    direction: str = ""
+    reason: str = ""
+    feature_value: str = ""
 
 
 class FactorBreakdownResponse(BaseModel):
@@ -59,6 +63,14 @@ class FactorBreakdownResponse(BaseModel):
     value: str
     unit: str
     route_target: str
+    direction: str = ""
+    reason: str = ""
+
+
+class AiExplanationResponse(BaseModel):
+    short_text: str = ""
+    clinical_note: str = ""
+    recommended_actions: list[str] = Field(default_factory=list)
 
 
 class SnapshotMetricsResponse(BaseModel):
@@ -117,6 +129,7 @@ class RiskReportDetailResponse(BaseModel):
     algorithm: str = "unknown"
     confidence: float = 0.0
     is_stale: bool = True
+    ai_explanation: AiExplanationResponse | None = None
 
 
 class RiskHistorySummaryResponse(BaseModel):

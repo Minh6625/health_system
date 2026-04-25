@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 from app.core.alert_constants import get_escalation_rule
 from app.models.risk_explanation_model import RiskExplanation
 from app.models.risk_score_model import RiskScore
+from app.repositories.emergency_repository import EmergencyRepository
+from app.services.model_api_client import get_model_api_client
 from app.services.notification_service import NotificationService
 from app.services.push_notification_service import PushNotificationService
 from app.services.risk_inference_service import (
@@ -33,6 +35,29 @@ logger = logging.getLogger(__name__)
 
 RISK_COOLDOWN_SECONDS = int(os.getenv("RISK_COOLDOWN_SECONDS", "60"))
 RISK_ALERT_AUTO_ESCALATE_AFTER_SECONDS = 60
+
+# Mapping from model-api feature names (HealthGuard schema) to backend / UI canonical keys.
+_MODEL_API_FEATURE_ALIASES: dict[str, str] = {
+    "respiratory_rate": "resp_rate",
+    "body_temperature": "body_temp",
+    "systolic_blood_pressure": "sys_bp",
+    "diastolic_blood_pressure": "dia_bp",
+    "derived_hrv": "hrv",
+    "derived_pulse_pressure": "pulse_pressure",
+    "derived_bmi": "bmi",
+    "derived_map": "map_val",
+}
+
+# Mapping model-api `risk_level` (normal|warning|critical) to backend canonical (low|medium|critical).
+_MODEL_API_RISK_LEVEL_MAP: dict[str, str] = {
+    "normal": "low",
+    "warning": "medium",
+    "high": "medium",
+    "moderate": "medium",
+    "medium": "medium",
+    "critical": "critical",
+    "low": "low",
+}
 
 
 @dataclass(frozen=True)
@@ -223,6 +248,181 @@ def _build_feature_importance(feature_snapshot: dict[str, float]) -> dict[str, f
     return importance
 
 
+def _build_model_api_record(payload: dict[str, Any]) -> dict[str, Any]:
+    """Map ``risk_inference_service`` payload schema to the model-api ``VitalSignsRecord``.
+
+    Computes the four derived features (HRV / pulse-pressure / BMI / MAP) so that
+    `health_service.prepare_inference_frame` accepts the record without falling back
+    to its own ``ValueError("Missing required keys")`` path.
+    """
+    sys_bp = float(payload.get("sys_bp") or 120.0)
+    dia_bp = float(payload.get("dia_bp") or 80.0)
+    height_cm = float(payload.get("height_cm") or 165.0)
+    height_m = height_cm / 100.0 if height_cm > 3.5 else height_cm
+    if height_m <= 0:
+        height_m = 1.65
+    weight_kg = float(payload.get("weight_kg") or 65.0)
+    hrv = float(payload.get("hrv") or 50.0)
+    gender_norm = str(payload.get("gender") or "").strip().lower()
+    gender_int = 1 if gender_norm in {"m", "male", "man", "nam", "1", "true"} else 0
+
+    return {
+        "heart_rate": float(payload.get("heart_rate") or 75.0),
+        "respiratory_rate": float(payload.get("resp_rate") or 16.0),
+        "body_temperature": float(payload.get("body_temp") or 36.6),
+        "spo2": float(payload.get("spo2") or 98.0),
+        "systolic_blood_pressure": sys_bp,
+        "diastolic_blood_pressure": dia_bp,
+        "age": int(round(float(payload.get("age") or 35.0))),
+        "gender": gender_int,
+        "weight_kg": weight_kg,
+        "height_m": round(height_m, 4),
+        "derived_hrv": hrv,
+        "derived_pulse_pressure": round(sys_bp - dia_bp, 4),
+        "derived_bmi": round(weight_kg / (height_m * height_m), 4),
+        "derived_map": round((sys_bp + 2.0 * dia_bp) / 3.0, 4),
+    }
+
+
+def _map_model_api_risk_level(raw_level: str | None) -> str | None:
+    if not raw_level:
+        return None
+    return _MODEL_API_RISK_LEVEL_MAP.get(str(raw_level).strip().lower())
+
+
+def _alias_feature_name(feature_name: str) -> str:
+    return _MODEL_API_FEATURE_ALIASES.get(feature_name, feature_name)
+
+
+def _normalize_model_api_top_features(
+    top_features: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    """Rewrite ``feature`` keys to backend/UI canonical names; drop invalid entries."""
+    if not top_features:
+        return []
+    normalized: list[dict[str, Any]] = []
+    for entry in top_features:
+        if not isinstance(entry, dict):
+            continue
+        feature_name = str(entry.get("feature") or "").strip()
+        if not feature_name:
+            continue
+        item = dict(entry)
+        item["feature"] = _alias_feature_name(feature_name)
+        normalized.append(item)
+    return normalized
+
+
+def _normalize_model_api_shap(
+    shap_payload: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Alias feature names inside ``shap.values`` so UI can match them to vitals."""
+    if not isinstance(shap_payload, dict):
+        return None
+    values = shap_payload.get("values")
+    if not isinstance(values, list):
+        return shap_payload
+    aliased_values: list[dict[str, Any]] = []
+    for entry in values:
+        if not isinstance(entry, dict):
+            continue
+        feature_name = str(entry.get("feature") or "").strip()
+        if not feature_name:
+            continue
+        new_entry = dict(entry)
+        new_entry["feature"] = _alias_feature_name(feature_name)
+        aliased_values.append(new_entry)
+    return {**shap_payload, "values": aliased_values}
+
+
+def _feature_importance_from_top_features(
+    top_features: list[dict[str, Any]] | None,
+) -> dict[str, float]:
+    """Build legacy ``feature_importance`` dict (key -> impact) from SHAP top_features."""
+    if not top_features:
+        return {}
+    out: dict[str, float] = {}
+    for entry in top_features:
+        if not isinstance(entry, dict):
+            continue
+        key = str(entry.get("feature") or "").strip()
+        if not key:
+            continue
+        try:
+            out[key] = round(float(entry.get("impact") or 0.0), 4)
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
+def _resolve_risk_alert_recipients(db: Session, patient_user_id: int) -> list[int]:
+    """Patient + caregivers (with ``can_receive_alerts``) for a risk push fan-out.
+
+    Wraps :func:`EmergencyRepository.get_alert_recipient_user_ids` defensively so
+    a transient relationship-table error never blocks the patient from getting
+    their own alert.
+    """
+    recipients: list[int] = [int(patient_user_id)]
+    try:
+        caregiver_ids = EmergencyRepository.get_alert_recipient_user_ids(db, patient_user_id)
+    except Exception:  # noqa: BLE001 - never let caregiver lookup break risk pipeline
+        logger.exception(
+            "Failed to fan-out risk alert to caregivers for user %s; using patient-only",
+            patient_user_id,
+        )
+        return recipients
+
+    seen = {int(patient_user_id)}
+    for caregiver_id in caregiver_ids or []:
+        try:
+            cid = int(caregiver_id)
+        except (TypeError, ValueError):
+            continue
+        if cid in seen:
+            continue
+        seen.add(cid)
+        recipients.append(cid)
+    return recipients
+
+
+def _default_recommendations(risk_level: str) -> list[str]:
+    """Risk-level aware recommendations used when model-api explanation is unavailable."""
+    normalized = (risk_level or "").strip().lower()
+    if normalized == "critical":
+        return [
+            "Đo lại chỉ số để xác nhận",
+            "Đối chiếu triệu chứng hiện tại",
+            "Liên hệ nhân viên y tế nếu cần",
+        ]
+    if normalized in {"medium", "moderate", "high", "warning"}:
+        return [
+            "Đo lại chỉ số sau 30-60 phút",
+            "Theo dõi triệu chứng bất thường",
+        ]
+    return [
+        "Tiếp tục theo dõi định kỳ",
+        "Duy trì lịch đo đều đặn",
+    ]
+
+
+def _build_ai_explanation_payload(
+    *,
+    explanation_text: str,
+    risk_level: str,
+    recommendations: list[str],
+) -> dict[str, Any]:
+    """Build minimal AI explanation payload consumed by Flutter.
+
+    Phase A: synthesized from existing explanation_text + rule-based actions so the
+    new column is populated even before model-api integration (Phase 3) lands.
+    """
+    return {
+        "short_text": explanation_text,
+        "clinical_note": "",
+        "recommended_actions": list(recommendations or []),
+    }
+
+
 def dispatch_risk_alerts(
     db: Session,
     *,
@@ -256,7 +456,7 @@ def dispatch_risk_alerts(
         return False
 
     try:
-        recipient_user_ids = [int(user_id)]
+        recipient_user_ids = _resolve_risk_alert_recipients(db, int(user_id))
         title = rule.title_template
         body = rule.message_template.format(score=score)
         alert_details: dict[str, Any] = {
@@ -364,22 +564,130 @@ def calculate_device_risk(
         )
 
     inference_payload, defaults_applied = _build_inference_payload(vitals_row, context)
-    inference_result = infer_risk(inference_payload)
     feature_snapshot = describe_feature_vector(inference_payload)
-    risk_level = canonicalize_risk_level(inference_result.label) or "medium"
-    risk_score = normalize_risk_score(
-        level=risk_level,
-        confidence=inference_result.confidence,
-        raw_score=inference_result.score,
-        backend=inference_result.backend,
-    )
-    explanation_text = _build_explanation_text(
-        risk_level=risk_level,
-        backend=inference_result.backend,
-        defaults_applied=defaults_applied,
-        fallback_reason=inference_result.fallback_reason,
-    )
-    feature_importance = _build_feature_importance(feature_snapshot)
+
+    # ------------------------------------------------------------------
+    # Phase A: try the external healthguard-model-api (real SHAP + LightGBM).
+    # If unavailable / disabled / errored -> fall back to local infer_risk()
+    # which already covers ONNX, LightGBM and rule_based pipelines.
+    # ------------------------------------------------------------------
+    model_api_response: dict[str, Any] | None = None
+    try:
+        model_record = _build_model_api_record(inference_payload)
+        model_api_response = get_model_api_client().predict_health_risk(
+            model_record,
+            user_id=context.get("user_id"),
+            device_id=context.get("device_id"),
+        )
+    except Exception:  # noqa: BLE001 - never let model-api errors break risk calc
+        logger.exception(
+            "Model-api health predict raised; falling back to local rule_based for device %s",
+            device_id,
+        )
+        model_api_response = None
+
+    if model_api_response is not None:
+        backend_label = "model_api_health"
+        meta = model_api_response.get("meta") if isinstance(model_api_response.get("meta"), dict) else {}
+        # `model_version` column is varchar(20). Prefer the model-api ``meta.model_version``
+        # (e.g. "v_current") which fits; otherwise short-form "model_api_v1".
+        model_version_label = str(meta.get("model_version") or "model_api_v1")[:20]
+        raw_level = (
+            model_api_response.get("risk_level")
+            or (model_api_response.get("prediction") or {}).get("prediction_band")
+        )
+        risk_level = _map_model_api_risk_level(raw_level) or "medium"
+        try:
+            probability = float(
+                model_api_response.get("predicted_health_risk_probability")
+                or (model_api_response.get("prediction") or {}).get("prediction_score")
+                or 0.0
+            )
+        except (TypeError, ValueError):
+            probability = 0.0
+        confidence_value = max(0.0, min(1.0, probability))
+        risk_score = normalize_risk_score(
+            level=risk_level,
+            confidence=confidence_value,
+            raw_score=None,
+            backend=backend_label,
+        )
+        prediction_label = str(
+            (model_api_response.get("prediction") or {}).get("prediction_label")
+            or model_api_response.get("predicted_health_risk_label")
+            or risk_level
+        )
+        label_id = None
+        fallback_reason = None
+
+        top_features = _normalize_model_api_top_features(
+            model_api_response.get("top_features")
+        )
+        shap_details = _normalize_model_api_shap(model_api_response.get("shap"))
+        ai_explanation = model_api_response.get("explanation") or {}
+        if not isinstance(ai_explanation, dict):
+            ai_explanation = {}
+
+        feature_importance = _feature_importance_from_top_features(top_features)
+        if not feature_importance:
+            feature_importance = _build_feature_importance(feature_snapshot)
+
+        recommendations_raw = ai_explanation.get("recommended_actions") or []
+        recommendations = [
+            str(item).strip() for item in recommendations_raw if str(item).strip()
+        ] or _default_recommendations(risk_level)
+
+        explanation_text = (
+            str(ai_explanation.get("short_text") or "").strip()
+            or _build_explanation_text(
+                risk_level=risk_level,
+                backend=backend_label,
+                defaults_applied=defaults_applied,
+                fallback_reason=None,
+            )
+        )
+        ai_explanation_payload = {
+            "short_text": explanation_text,
+            "clinical_note": str(ai_explanation.get("clinical_note") or "").strip(),
+            "recommended_actions": recommendations,
+        }
+        xai_method = "shap" if isinstance(shap_details, dict) and shap_details.get("available") else "rule_based"
+        artifact_path = (
+            (model_api_response.get("meta") or {}).get("artifact_path") if isinstance(model_api_response.get("meta"), dict) else None
+        )
+    else:
+        inference_result = infer_risk(inference_payload)
+        risk_level = canonicalize_risk_level(inference_result.label) or "medium"
+        confidence_value = float(inference_result.confidence)
+        risk_score = normalize_risk_score(
+            level=risk_level,
+            confidence=inference_result.confidence,
+            raw_score=inference_result.score,
+            backend=inference_result.backend,
+        )
+        backend_label = inference_result.backend
+        prediction_label = inference_result.label
+        label_id = inference_result.label_id
+        fallback_reason = inference_result.fallback_reason
+        top_features = []
+        shap_details = None
+        feature_importance = _build_feature_importance(feature_snapshot)
+        explanation_text = _build_explanation_text(
+            risk_level=risk_level,
+            backend=backend_label,
+            defaults_applied=defaults_applied,
+            fallback_reason=fallback_reason,
+        )
+        recommendations = _default_recommendations(risk_level)
+        ai_explanation_payload = _build_ai_explanation_payload(
+            explanation_text=explanation_text,
+            risk_level=risk_level,
+            recommendations=recommendations,
+        )
+        xai_method = "rule_based"
+        artifact_path = None
+        # `model_version` column is varchar(20); local backend labels keep "-v1.0" suffix.
+        model_version_label = f"{backend_label}-v1.0"[:20]
 
     features_json = {
         "model_features": feature_snapshot,
@@ -393,16 +701,17 @@ def calculate_device_risk(
             "hrv": vitals_row.get("hrv"),
         },
         "defaults_applied": defaults_applied,
-        "backend": inference_result.backend,
-        "label_id": inference_result.label_id,
-        "label": inference_result.label,
+        "backend": backend_label,
+        "label_id": label_id,
+        "label": prediction_label,
         "risk_level": risk_level,
         "risk_score": risk_score,
         "health_score": derive_health_score(risk_score),
         "health_level": derive_health_level(risk_level),
         "health_summary": derive_health_summary(risk_level),
-        "confidence": inference_result.confidence,
-        "fallback_reason": inference_result.fallback_reason,
+        "confidence": confidence_value,
+        "fallback_reason": fallback_reason,
+        "artifact_path": artifact_path,
     }
     features_json = json.loads(json.dumps(features_json, cls=_DecimalEncoder))
 
@@ -415,8 +724,8 @@ def calculate_device_risk(
             score=round(float(risk_score), 2),
             risk_level=risk_level,
             features=features_json,
-            model_version=f"{inference_result.backend}-v1.0",
-            algorithm=inference_result.backend,
+            model_version=model_version_label,
+            algorithm=backend_label,
         )
         db.add(risk_score_row)
         db.flush()
@@ -425,11 +734,11 @@ def calculate_device_risk(
             risk_score_id=risk_score_row.id,
             explanation_text=explanation_text,
             feature_importance=feature_importance,
-            xai_method="rule_based" if inference_result.backend == "rule_based" else "shap",
-            recommendations=[
-                "Review recent vitals and repeat the measurement if symptoms persist.",
-                "Escalate to medical review for CRITICAL results.",
-            ],
+            xai_method=xai_method,
+            recommendations=recommendations,
+            top_features_json=top_features or None,
+            ai_explanation_json=ai_explanation_payload,
+            shap_details_json=shap_details if isinstance(shap_details, dict) else None,
         )
         db.add(risk_explanation)
         db.commit()
@@ -446,7 +755,7 @@ def calculate_device_risk(
         risk_score_id=risk_score_row.id,
         score=round(float(risk_score), 2),
         risk_level=risk_level,
-        model=inference_result.backend,
+        model=backend_label,
         calculated_at=risk_score_row.calculated_at,
     )
 
