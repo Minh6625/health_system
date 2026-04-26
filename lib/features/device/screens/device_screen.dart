@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/mock/device_mock_data.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
@@ -75,7 +76,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
           foregroundColor: Colors.white,
           actions: [
           // ── Debug menu để test các State Mock ──
-          if (DeviceMockConfig.useMockData)
+          // `kDebugMode` is a `const bool` that is `false` in profile and
+          // release builds, so the entire PopupMenuButton tree is
+          // tree-shaken out of any non-debug binary. This guarantees the
+          // mock-scenarios menu cannot leak into a production app even if
+          // the runtime `DeviceMockConfig.useMockData` flag is
+          // misconfigured.
+          if (kDebugMode && DeviceMockConfig.useMockData)
             PopupMenuButton<MockListScenario>(
               icon: const Icon(Icons.bug_report),
               tooltip: 'Mock Scenarios',
