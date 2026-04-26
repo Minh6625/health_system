@@ -21,7 +21,13 @@ class FamilyShellScreen extends StatefulWidget {
     super.key,
     this.initialTab = 0,
     this.enableAutoRefresh = true,
-    this.badgeRefreshInterval = const Duration(seconds: 2),
+    // Tab badges (relationship requests + SOS unread counts) only ever
+    // change when the caregiver receives a server-pushed event or
+    // navigates between tabs, both of which already trigger an explicit
+    // refresh. Polling every 2 seconds was therefore pure overhead.
+    // 30 seconds is enough to recover from a missed push without
+    // dominating the request budget.
+    this.badgeRefreshInterval = const Duration(seconds: 30),
   });
 
   /// 0 = Theo dõi, 1 = Liên hệ, 2 = SOS
