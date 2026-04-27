@@ -15,6 +15,8 @@ direction.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -81,6 +83,129 @@ class ImuWindowRequest(BaseModel):
             "default 50 Hz)."
         ),
     )
+
+
+class FallEventResponse(BaseModel):
+    """One row from the mobile-facing ``GET /mobile/fall-events*`` surface.
+
+    Phase 4B-full slice 2c (see ``backend/docs/risk-contract-baseline.md``
+    §7j). Mirrors the columns the Flutter ``fall_alert_screen`` and
+    ``fall_history_screen`` actually consume; deliberately leaves out
+    GPS noise (``location_accuracy`` is internal — the address string is
+    enough for the user) and internal SOS plumbing (``sos_triggered_at``
+    surfaces as a derived boolean only).
+    """
+
+    id: int
+    uuid: str
+    device_id: int = Field(..., description="``devices.id`` that produced the event.")
+    detected_at: datetime
+    confidence: float = Field(..., ge=0.0, le=1.0)
+    model_version: str | None = None
+
+    # Location — present when the simulator / watch carried GPS at the time.
+    latitude: float | None = None
+    longitude: float | None = None
+    address: str | None = None
+
+    # User response workflow.
+    user_notified_at: datetime | None = Field(
+        default=None,
+        description="When the push notification was delivered.",
+    )
+    user_responded_at: datetime | None = Field(
+        default=None,
+        description="When the user tapped dismiss / confirm.",
+    )
+    user_cancelled: bool = Field(
+        default=False,
+        description="``True`` when the user explicitly dismissed the alert.",
+    )
+    cancel_reason: str | None = Field(
+        default=None,
+        description="Free-form text the user supplied with a dismiss.",
+    )
+    sos_triggered: bool = Field(
+        default=False,
+        description=(
+            "``True`` when the auto-SOS escalation fired (i.e. the user did "
+            "NOT respond within the configured window)."
+        ),
+    )
+
+    # Status helper — derived from the workflow timestamps so mobile
+    # doesn't have to recompute the state machine.
+    status: str = Field(
+        ...,
+        description=(
+            "Derived state: ``detected`` (no user action yet, no SOS), "
+            "``dismissed`` (user cancelled), ``confirmed`` (user responded "
+            "without cancelling), or ``escalated`` (auto-SOS fired)."
+        ),
+    )
+
+    # Explainability + traceability bundle — JSONB on the row, surfaced
+    # verbatim so a future clinician audience can read SHAP without a
+    # second query. Patient surfaces ignore it.
+    features: dict | None = Field(
+        default=None,
+        description=(
+            "Snapshot of upstream model-api ``meta`` + ``shap`` payload, "
+            "plus ``meta.request_id`` lifted to the top level for log "
+            "correlation."
+        ),
+    )
+
+    model_config = {
+        # Allow construction directly from a SQLAlchemy ORM instance
+        # so the service can ``FallEventResponse.model_validate(row)``.
+        "from_attributes": True,
+        # ``model_version`` would otherwise trip Pydantic's protected
+        # namespace warning; it's a real DB column we deliberately keep.
+        "protected_namespaces": (),
+    }
+
+
+class FallEventListResponse(BaseModel):
+    """Paginated wrapper around ``FallEventResponse``.
+
+    Matches the existing list-shape conventions on
+    :class:`~app.schemas.monitoring.RiskHistoryResponse` so the Flutter
+    client can reuse its pagination widgets.
+    """
+
+    items: list[FallEventResponse]
+    total: int = Field(
+        ...,
+        description="Total fall events for the current user (across all pages).",
+    )
+    limit: int
+    offset: int
+
+
+class FallEventDismissRequest(BaseModel):
+    """Body for ``POST /mobile/fall-events/{id}/dismiss``.
+
+    A single optional reason string. The mobile UI usually offers
+    two-three preset chips ("Tôi ổn", "Báo nhầm", ...) plus a free-text
+    field; whichever the user picked lands here verbatim.
+    """
+
+    reason: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Optional free-form reason; persisted to ``cancel_reason``.",
+    )
+
+
+class FallEventDismissResponse(BaseModel):
+    """Success body for ``POST /mobile/fall-events/{id}/dismiss``.
+
+    Echoes back the updated event so the Flutter client doesn't need a
+    second GET to refresh its local state.
+    """
+
+    fall_event: FallEventResponse
 
 
 class ImuWindowResponse(BaseModel):

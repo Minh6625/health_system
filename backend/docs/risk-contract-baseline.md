@@ -7,14 +7,16 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v1.2` (Phase 4B-full slice 2a — fall confusion-matrix harness) |
-| Wire version | `0.5.0` (unchanged — harness is offline test gate; no shape change) |
-| Captured from branch | `refactor/risk-core-phase4b-confusion-matrix` |
+| Baseline version | `v1.3` (Phase 4B-full slice 2c — mobile fall-events read surface) |
+| Wire version | `0.5.0` (unchanged — new routes outside the risk-DTO surface; no contract bump) |
+| Captured from branch | `refactor/risk-core-phase4b-mobile-fall-events` |
 | Pending DBA migrations | `backend/migrations/20260427_model_request_id.sql`, `backend/migrations/20260427_sleep_risk_type.sql`, `backend/migrations/20260427_audience_payload_json.sql` |
 | Audience helper | `backend/app/core/audience.py` |
 | Audience cache helpers | `MonitoringService._read_audience_cache` / `_write_audience_cache` |
 | Clinician schema | `backend/app/schemas/monitoring.py::RiskReportClinicianResponse` |
 | Fall quality harness | `backend/tests/eval/test_fall_classifier_quality.py` (gated by `RUN_EVAL=1`) |
+| Fall events read service | `backend/app/services/fall_event_service.py` |
+| Fall events routes | `backend/app/api/routes/fall_events.py` (`GET /mobile/fall-events`, `GET /{id}`, `POST /{id}/dismiss`) |
 | Fall persistence adapter | `backend/app/adapters/fall_persistence_adapter.py` |
 | Sleep risk adapter | `backend/app/adapters/sleep_risk_adapter.py` |
 | IMU window route | `POST /mobile/telemetry/imu-window` (`backend/app/api/routes/telemetry.py`) |
@@ -68,6 +70,7 @@
 | `v1.0` | 2026-04-27 | `refactor/risk-core-phase5-audience-profiles` | **Plan's Phase 5 — audience profiles + clinician role gate**: added `AudienceEnum` + `require_clinician_audience` in `app/core/audience.py`. Audit revealed `users.role` already exists (no RBAC migration needed) — `CLINICIAN_ROLES = {"clinician", "admin"}`. New `RiskReportClinicianResponse` extends the existing `RiskReportDetailResponse` with two clinical-only fields: `shap_details` (raw SHAP waterfall) + `model_request_id` (Phase 2 traceability surfaced on the read path). The detail route's `response_model` is now `RiskReportDetailResponse \| RiskReportClinicianResponse` (FastAPI emits an `anyOf` in OpenAPI). `audience=patient` is the default, so existing Flutter binaries are unaffected. `audience=clinician` from a non-clinician role returns HTTP 403. Read-path SQL extended to include `shap_details_json` + `model_request_id` from `risk_explanations`; `NormalizedRiskRow` carries both. Wire version bumped `0.4.0 -> 0.5.0` (minor — additive optional fields). 8 new tests (7 audience-gating + 1 anyOf-OpenAPI). No mobile wire-format change for patient surface. |
 | `v1.1` | 2026-04-27 | `refactor/risk-core-phase7-audience-cache` | **Plan's Phase 7 — audience-payload DTO cache**: added `risk_explanations.audience_payload_json` JSONB column (`backend/migrations/20260427_audience_payload_json.sql`) + nullable column on the ORM. Read-path detail handlers (`MonitoringService.get_risk_report_detail` / `get_risk_report_clinician_detail`) now follow a **lazy write-through cache** pattern: cache-first lookup keyed by `(audience, RISK_CONTRACT_VERSION)`; on miss, build via the existing assembly path then UPDATE the row. Cache writes are **best-effort** (failures are logged + rolled back but the request still returns the freshly-built DTO). Cache invalidation is automatic on contract-version bump (the version is the cache key suffix) so a future Phase doesn't need a manual flush job. New observability: `record_timing("build_dto", ..., cache="hit"\|"miss", reason=...)` so cache hit-rate can be charted. **No wire-format change** — cache is server-internal; the assembled DTOs are byte-for-byte identical to v1.0. 6 new tests (cache miss build, cache hit short-circuit, version invalidation, partial dict append, write-failure tolerance, timing tags). |
 | `v1.2` | 2026-04-27 | `refactor/risk-core-phase4b-confusion-matrix` | **Plan's Phase 4B-full slice 2a — fall classifier confusion-matrix harness**: added `backend/tests/eval/` package with three modules: `etl_up_fall.py` (deterministic UP-Fall raw CSV → labelled JSONL), `test_etl_up_fall.py` (21 always-on unit tests pinning peak detection / window extraction / pre-pad-with-first-sample / orientation derivation / CSV parsing / committed-fixture sanity), and `test_fall_classifier_quality.py` (gated harness POSTing each labelled window to `/api/v1/fall/predict` and computing TP/TN/FP/FN → sensitivity / specificity / F1 → dated JSON report under `reports/`). Acceptance gates from plan §4B.3 §I: **sensitivity ≥ 0.90, specificity ≥ 0.85, F1 ≥ 0.87**. Audit found UP-Fall trials are 40 samples (model-api requires 50) so the ETL pre-pads with the first sample to simulate pre-event stillness — same shape a production sliding window catches. **PAMAP2 not used** because the dataset directory is empty in the simulator repo; UP-Fall already provides both classes (A01–A05 falls + A06–A11 ADLs). Wire version unchanged. Fixture: 126 windows (57 falls + 69 ADLs), checked into git. 24 new always-on tests + 3 confusion-matrix maths tests + 1 properly gated live-harness test. |
+| `v1.3` | 2026-04-27 | `refactor/risk-core-phase4b-mobile-fall-events` | **Plan's Phase 4B-full slice 2c (backend half) — mobile fall-events read surface**: added three routes the Flutter `lib/features/fall/` module consumes: `GET /mobile/fall-events` (paginated list, newest-first, ``limit≤100``), `GET /mobile/fall-events/{id}` (one event), `POST /mobile/fall-events/{id}/dismiss` (mark as user-cancelled). Owner-scoped through ``X-Target-Profile-Id`` + JOIN ``devices.user_id``; non-owned ids return **HTTP 404, not 403** (no enumeration leak). New `FallEventService` projects raw rows to ``FallEventResponse`` and derives a single ``status`` string (``detected`` → ``dismissed`` / ``confirmed`` / ``escalated``) so Flutter doesn't reproduce the state machine. Dismiss is idempotent and locks the row with ``SELECT FOR UPDATE`` to prevent concurrent-tap races. New schemas (`FallEventResponse`, `FallEventListResponse`, `FallEventDismissRequest`, `FallEventDismissResponse`) added to `app/schemas/fall_telemetry.py`. Wire-version unchanged — routes outside the risk-DTO surface so the contract version doesn't apply. 23 new tests (11 service + 12 HTTP). |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -503,6 +506,77 @@ Behaviour is **verbatim-preserved**:
   `0.0` and rounds to 4 decimals.
 - `_build_feature_importance` (snapshot path) takes `abs(value)` and
   rounds to 4 decimals.
+
+---
+
+## 7j. Mobile fall-events read surface — Phase 4B-full slice 2c (backend half)
+
+The simulator (slice 2b) and the v0.8 ingest route already create
+``fall_events`` rows on disk; this slice exposes them on the
+mobile-facing read path so the Flutter ``lib/features/fall/`` module
+(slice 2c mobile half) can render the alert + history screens.
+
+### Routes
+
+| Method | Path | Behaviour | Slice |
+|---|---|---|---|
+| `GET`  | `/mobile/fall-events` | Paginated list, newest-first. ``limit≤100``, ``offset≥0``. | 2c |
+| `GET`  | `/mobile/fall-events/{id}` | One event by id. **404 on either "doesn't exist" or "not yours"** to avoid the enumeration leak. | 2c |
+| `POST` | `/mobile/fall-events/{id}/dismiss` | Mark as user-cancelled with optional ``reason`` (``≤255`` chars). Idempotent. | 2c |
+
+All three routes resolve the user via ``X-Target-Profile-Id`` (existing
+relationship resolver) and JOIN through ``devices.user_id`` so a
+caregiver fetching the elder's fall events Just Works without any new
+auth code.
+
+### Why ``status`` is derived server-side
+
+``fall_events`` stores four raw workflow columns (``user_responded_at``,
+``user_cancelled``, ``sos_triggered``, ``user_notified_at``); the
+mobile ``FallEventResponse`` carries a single ``status`` string the
+state-machine projection of those columns:
+
+| Precedence | Condition | ``status`` |
+|---|---|---|
+| 1 | ``sos_triggered=True`` | ``escalated`` |
+| 2 | ``user_cancelled=True`` | ``dismissed`` |
+| 3 | ``user_responded_at IS NOT NULL`` | ``confirmed`` |
+| 4 | otherwise | ``detected`` |
+
+Order matters because a single row can have multiple booleans set
+(e.g. user dismissed *after* auto-SOS already fired); the most decisive
+state wins. Done server-side so a future contract bump that reorders
+the precedence doesn't require a Flutter binary update.
+
+### Why dismiss locks the row
+
+``POST .../dismiss`` uses ``SELECT FOR UPDATE`` so a Flutter client
+that double-taps "Tôi ổn" doesn't produce two conflicting writes.
+Idempotent in spirit: re-dismissing refreshes ``user_responded_at``
+and overwrites ``cancel_reason`` if a new one was supplied. The
+service raises :class:`SQLAlchemyError` on DB failure (route layer
+returns 500) rather than swallowing — silently keeping the alert
+active in the UI would be a safety regression.
+
+### Why no contract version bump
+
+The risk-DTO contract version applies to the `/risk-reports*` +
+`/risk-history` + `/health-report` surfaces (see
+``RISK_CONTRACT_ROUTE_PREFIXES``). Fall events are a separate surface
+with its own evolving shape; bumping ``RISK_CONTRACT_VERSION`` for an
+addition outside that surface would falsely signal a risk-DTO change
+to mobile clients. The fall-events contract is pinned by the snapshot
+tests in ``tests/test_fall_events_routes_http.py`` instead.
+
+### What's deferred to slice 2c (mobile half) and slice 2d
+
+- **Mobile UI** (slice 2c mobile): ``lib/features/fall/`` module —
+  entities, repository, provider, ``FallAlertScreen`` (full-screen
+  countdown + dismiss / confirm), ``FallHistoryScreen`` (timeline
+  list).
+- **Push channel** (slice 2d): ``fall_critical`` FCM channel that
+  wakes the screen on incoming fall events. Wires into the existing
+  ``notification_runtime_service.dart`` foreground/opened handlers.
 
 ---
 
@@ -1219,7 +1293,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 472 passed, 2 skipped (was 448 before Phase 4B slice 2a's 24 added ETL + maths tests; the +1 skipped is the gated `RUN_EVAL=1` harness).
+Expected: 495 passed, 2 skipped (was 472 before Phase 4B slice 2c's 23 added fall-events tests).
 
 Mobile parser smoke (after Phase 6):
 
