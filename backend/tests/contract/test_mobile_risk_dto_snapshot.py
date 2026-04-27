@@ -59,6 +59,25 @@ def _build_top_factor() -> TopFactorResponse:
     )
 
 
+def _build_top_factors() -> list[TopFactorResponse]:
+    """Top-factors list aligned with ``key_features`` and ``feature_importance``.
+
+    Phase 1 invariant: ``key_features`` must equal ``[f.key for f in top_factors]``,
+    so the fixture exposes the same two factors that ``key_features`` carries.
+    """
+    return [
+        _build_top_factor(),
+        TopFactorResponse(
+            key="spo2",
+            label="SpO₂",
+            impact=0.31,
+            direction="risk_up",
+            reason="SpO2 dưới 95% kéo dài",
+            feature_value="94 %",
+        ),
+    ]
+
+
 def _build_breakdown_item() -> FactorBreakdownResponse:
     return FactorBreakdownResponse(
         key="spo2",
@@ -71,6 +90,29 @@ def _build_breakdown_item() -> FactorBreakdownResponse:
         direction="risk_up",
         reason="SpO2 dưới 95% kéo dài",
     )
+
+
+def _build_breakdown_items() -> list[FactorBreakdownResponse]:
+    """Detail-level breakdown that covers every key in ``feature_importance``.
+
+    Phase 1 deprecation guarantees that ``feature_importance.keys()`` is a
+    subset of ``{b.key for b in breakdown}`` so removing ``feature_importance``
+    in Phase 6 cannot lose data.
+    """
+    return [
+        FactorBreakdownResponse(
+            key="heart_rate",
+            label="Nhịp tim",
+            contribution_score=0.42,
+            impact_level="high",
+            value="112",
+            unit="bpm",
+            route_target="vitals/heart_rate",
+            direction="risk_up",
+            reason="Nhịp tim cao hơn bình thường",
+        ),
+        _build_breakdown_item(),
+    ]
 
 
 def _build_ai_explanation() -> AiExplanationResponse:
@@ -111,7 +153,7 @@ def _build_risk_report() -> RiskReportResponse:
         previous_score=55.0,
         trend_7d=[55, 56, 57, 58, 59, 58, 58],
         key_features=["heart_rate", "spo2"],
-        top_factors=[_build_top_factor()],
+        top_factors=_build_top_factors(),
         recommendation_preview=["Đo lại chỉ số sau 15 phút"],
         confidence=0.82,
         is_stale=False,
@@ -136,13 +178,13 @@ def _build_risk_report_detail() -> RiskReportDetailResponse:
         xai_explanation="Nhịp tim cao và SpO2 thấp đang đẩy mức rủi ro lên.",
         features={"heart_rate": 112, "spo2": 94},
         feature_importance={"heart_rate": 0.42, "spo2": 0.31},
-        breakdown=[_build_breakdown_item()],
+        breakdown=_build_breakdown_items(),
         recommendations=[
             "Đo lại chỉ số sau 15 phút",
             "Nghỉ ngơi tại chỗ",
         ],
         recommendation_preview=["Đo lại chỉ số sau 15 phút"],
-        top_factors=[_build_top_factor()],
+        top_factors=_build_top_factors(),
         snapshot=_build_snapshot_metrics(),
         model_version="model_api_v1",
         algorithm="model_api_health",
@@ -439,3 +481,78 @@ class TestMobileRiskDtoJsonRoundtrip:
         json_text = original.model_dump_json()
         rebuilt = type(original).model_validate_json(json_text)
         assert rebuilt.model_dump() == original.model_dump()
+
+
+# ---------------------------------------------------------------------------
+# Tests — Phase 1 deprecation invariants
+# ---------------------------------------------------------------------------
+
+
+class TestDeprecatedFieldInvariants:
+    """Phase 1 invariants — every deprecated alias must mirror its canonical source.
+
+    These guarantees are what make the Phase 6 removal safe: as long as the
+    deprecated field's value is reconstructible from the canonical field, the
+    backend can stop emitting it without losing data.
+
+    The tests deliberately access deprecated attributes; the corresponding
+    ``DeprecationWarning`` is filtered so the suite stays quiet on the
+    expected warnings while still failing loudly on real invariant breaks.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _silence_expected_deprecation_warnings(self):
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                category=DeprecationWarning,
+                message=r".*scheduled for Phase 6.*",
+            )
+            yield
+
+    def test_risk_score_mirrors_score_in_report(self) -> None:
+        report = _build_risk_report()
+        assert report.risk_score == report.score
+
+    def test_risk_score_mirrors_score_in_detail(self) -> None:
+        detail = _build_risk_report_detail()
+        assert detail.risk_score == detail.score
+
+    def test_risk_score_mirrors_score_in_history_items(self) -> None:
+        history = _build_risk_history()
+        assert history.items, "fixture must contain at least one history item"
+        for item in history.items:
+            assert item.risk_score == item.score, (
+                f"risk_score {item.risk_score} != score {item.score} on item "
+                f"{item.report_id}"
+            )
+
+    def test_xai_explanation_mirrors_explanation(self) -> None:
+        detail = _build_risk_report_detail()
+        assert detail.xai_explanation == detail.explanation
+
+    def test_key_features_derive_from_top_factors(self) -> None:
+        report = _build_risk_report()
+        assert report.key_features == [factor.key for factor in report.top_factors]
+
+    def test_feature_importance_keys_are_subset_of_breakdown_keys(self) -> None:
+        detail = _build_risk_report_detail()
+        breakdown_keys = {factor.key for factor in detail.breakdown}
+        importance_keys = set(detail.feature_importance.keys())
+        assert importance_keys.issubset(breakdown_keys), (
+            "feature_importance carries keys missing from breakdown — "
+            "Phase 6 removal would lose data.\n"
+            f"  feature_importance keys: {sorted(importance_keys)}\n"
+            f"  breakdown keys:          {sorted(breakdown_keys)}\n"
+            f"  missing from breakdown:  {sorted(importance_keys - breakdown_keys)}"
+        )
+
+    def test_health_level_is_optional_when_display_status_present(self) -> None:
+        # ``display_status`` is canonical and must never be empty; ``health_level``
+        # may be ``None`` (since Phase 1 it is purely optional).
+        report = _build_risk_report()
+        detail = _build_risk_report_detail()
+        for dto in (report, detail):
+            assert dto.display_status, "display_status must be populated"

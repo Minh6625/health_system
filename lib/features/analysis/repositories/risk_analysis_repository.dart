@@ -137,7 +137,9 @@ class RiskAnalysisRepository {
     return RiskReportEntity(
       reportId: json['id'] as int? ?? 0,
       profileId: profileId ?? 'self',
-      score: _parseScore(json['risk_score'] ?? json['score']),
+      // Phase 1: prefer canonical `score`; fall back to deprecated `risk_score`
+      // for older backends. The deprecated alias will be removed in Phase 6.
+      score: _parseScore(json['score'] ?? json['risk_score']),
       level: _parseRiskLevel(json['risk_level'] as String?),
       displayStatus: json['display_status'] as String? ?? 'Không xác định',
       summary: json['summary'] as String? ?? '',
@@ -179,7 +181,8 @@ class RiskAnalysisRepository {
     return RiskReportDetailEntity(
       reportId: json['id'] as int? ?? reportId,
       profileId: profileId ?? 'self',
-      score: _parseScore(json['risk_score'] ?? json['score']),
+      // Phase 1: prefer canonical `score`; fall back to deprecated `risk_score`.
+      score: _parseScore(json['score'] ?? json['risk_score']),
       healthScore: _parseDouble(json['health_score']),
       level: _parseRiskLevel(json['risk_level'] as String?),
       displayStatus: json['display_status'] as String? ?? 'Không xác định',
@@ -193,9 +196,11 @@ class RiskAnalysisRepository {
                 _parseBreakdownItem(Map<String, dynamic>.from(item as Map)),
           )
           .toList(),
+      // Phase 1: prefer canonical `explanation`; fall back to deprecated
+      // `xai_explanation`. The deprecated alias will be removed in Phase 6.
       xaiExplanation:
-          json['xai_explanation'] as String? ??
           json['explanation'] as String? ??
+          json['xai_explanation'] as String? ??
           '',
       recommendations: List<String>.from(
         json['recommendations'] as List? ?? const [],
@@ -247,7 +252,9 @@ class RiskAnalysisRepository {
           .map(
             (item) => RiskHistoryItemEntity(
               reportId: item['report_id'] as int? ?? 0,
-              score: _parseScore(item['risk_score'] ?? item['score']),
+              // Phase 1: prefer canonical `score`; fall back to deprecated
+              // `risk_score` so older backends still parse.
+              score: _parseScore(item['score'] ?? item['risk_score']),
               healthScore: _parseDouble(item['health_score']),
               level: _parseRiskLevel(item['risk_level'] as String?),
               displayStatus:

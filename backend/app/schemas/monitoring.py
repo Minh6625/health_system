@@ -84,19 +84,44 @@ class SnapshotMetricsResponse(BaseModel):
 
 
 class RiskReportResponse(BaseModel):
+    """Mobile risk-report list item.
+
+    Phase 1 canonicalisation (see ``backend/docs/risk-contract-baseline.md``):
+
+    - ``score`` is the canonical risk score; ``risk_score`` is a deprecated alias.
+    - ``display_status`` is the canonical UI label; ``health_level`` is a
+      deprecated view kept for back-compat with older Flutter binaries.
+    - ``top_factors[].key`` is the canonical key list; ``key_features`` is a
+      deprecated convenience derived from it.
+
+    All deprecated fields remain on the wire until Phase 6 introduces the
+    ``X-Risk-Contract-Version`` header so dual-emit can be retired safely.
+    """
+
     id: int
     risk_type: str
-    risk_score: float
+    risk_score: float = Field(
+        deprecated="Use `score` instead. Removal scheduled for Phase 6.",
+    )
     score: float
     health_score: float
     risk_level: str
-    health_level: str | None = None
+    health_level: str | None = Field(
+        default=None,
+        deprecated="Use `display_status` instead. Removal scheduled for Phase 6.",
+    )
     display_status: str
     summary: str
     timestamp: datetime
     previous_score: float | None = None
     trend_7d: list[int] = Field(default_factory=list)
-    key_features: list[str] = Field(default_factory=list)
+    key_features: list[str] = Field(
+        default_factory=list,
+        deprecated=(
+            "Derivable from `top_factors[].key`. Kept for back-compat; "
+            "removal scheduled for Phase 6."
+        ),
+    )
     top_factors: list[TopFactorResponse] = Field(default_factory=list)
     recommendation_preview: list[str] = Field(default_factory=list)
     confidence: float = 0.0
@@ -104,22 +129,50 @@ class RiskReportResponse(BaseModel):
 
 
 class RiskReportDetailResponse(BaseModel):
+    """Mobile risk-report detail payload.
+
+    Phase 1 canonicalisation (see ``backend/docs/risk-contract-baseline.md``):
+
+    - ``score`` is canonical; ``risk_score`` is a deprecated alias.
+    - ``display_status`` is canonical; ``health_level`` is a deprecated view.
+    - ``explanation`` is canonical; ``xai_explanation`` is a deprecated alias.
+    - ``breakdown`` is canonical; ``feature_importance`` is a deprecated subset.
+
+    Deprecated fields are still emitted with the same value as their canonical
+    counterpart and are guarded by invariance tests in
+    ``backend/tests/contract/test_mobile_risk_dto_snapshot.py``.
+    """
+
     id: int
     risk_type: str
-    risk_score: float
+    risk_score: float = Field(
+        deprecated="Use `score` instead. Removal scheduled for Phase 6.",
+    )
     score: float
     health_score: float
     risk_level: str
-    health_level: str | None = None
+    health_level: str | None = Field(
+        default=None,
+        deprecated="Use `display_status` instead. Removal scheduled for Phase 6.",
+    )
     display_status: str
     summary: str
     timestamp: datetime
     previous_score: float | None = None
     trend_7d: list[int] = Field(default_factory=list)
     explanation: str = ""
-    xai_explanation: str = ""
+    xai_explanation: str = Field(
+        default="",
+        deprecated="Use `explanation` instead. Removal scheduled for Phase 6.",
+    )
     features: dict[str, object] = Field(default_factory=dict)
-    feature_importance: dict[str, float] = Field(default_factory=dict)
+    feature_importance: dict[str, float] = Field(
+        default_factory=dict,
+        deprecated=(
+            "Derivable from `breakdown[*].contribution_score`. Kept for "
+            "back-compat; removal scheduled for Phase 6."
+        ),
+    )
     breakdown: list[FactorBreakdownResponse] = Field(default_factory=list)
     recommendations: list[str] = Field(default_factory=list)
     recommendation_preview: list[str] = Field(default_factory=list)
@@ -141,8 +194,16 @@ class RiskHistorySummaryResponse(BaseModel):
 
 
 class RiskHistoryItemResponse(BaseModel):
+    """Mobile risk-history list row.
+
+    Phase 1: ``score`` is canonical; ``risk_score`` is a deprecated alias kept
+    for back-compat with older Flutter binaries. Removal scheduled for Phase 6.
+    """
+
     report_id: int
-    risk_score: float
+    risk_score: float = Field(
+        deprecated="Use `score` instead. Removal scheduled for Phase 6.",
+    )
     score: float
     health_score: float
     risk_level: str

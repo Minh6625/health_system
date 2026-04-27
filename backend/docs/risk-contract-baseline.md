@@ -1,16 +1,25 @@
-# Risk Contract Baseline — Phase 0
+# Risk Contract Baseline
 
-> Frozen snapshot of the **mobile-facing risk DTOs** produced by the backend
-> before the Phase 1 cleanup begins. Treat this file as the source of truth
-> the Flutter app is currently parsing in production.
+> Source of truth for the **mobile-facing risk DTOs** produced by the backend
+> and consumed by the Flutter app. Always reflects the contract at the
+> baseline version listed below. Each Phase update bumps the version and
+> appends an entry to the [Version history](#version-history) table.
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.0` (pre-cleanup) |
-| Captured from branch | `refactor/risk-core-phase0-audit` |
+| Baseline version | `v0.1` (Phase 1 — canonicalisation + deprecation marking) |
+| Captured from branch | `refactor/risk-core-phase1-canonicalize` |
 | Schema source | `backend/app/schemas/monitoring.py` |
 | Snapshot test | `backend/tests/contract/test_mobile_risk_dto_snapshot.py` |
+| Mobile parser | `lib/features/analysis/repositories/risk_analysis_repository.dart` |
 | Risk plan | `.windsurf/plans/risk-core-architecture-refactor-9ea607.md` |
+
+## Version history
+
+| Version | Date | Branch | Change |
+| --- | --- | --- | --- |
+| `v0.0` | 2026-04-27 | `refactor/risk-core-phase0-audit` | Initial baseline pinned by snapshot tests. |
+| `v0.1` | 2026-04-27 | `refactor/risk-core-phase1-canonicalize` | Phase 1: marked duplicate fields `deprecated=True` (no wire-format change), added invariance tests, flipped mobile parser to prefer canonical keys. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -79,17 +88,17 @@ Returned as elements of `GET /mobile/analysis/risk-reports`.
 | --- | --- | --- |
 | `id` | `int` | Primary key of `risk_scores` row. |
 | `risk_type` | `string` | Currently always `"general"` for the rolled-up score. Sleep/fall use the same DTO with their own type strings. |
-| `risk_score` | `float` | **Duplicate of `score`.** Phase 1 candidate to drop. |
-| `score` | `float` | Canonical risk value (0..100). |
+| `risk_score` | `float` | **Deprecated alias of `score`** since `v0.1`. Removal scheduled for Phase 6. |
+| `score` | `float` | **Canonical** risk value (0..100). |
 | `health_score` | `float` | `100 - score`. UI surfaces this as the "good news" framing. |
 | `risk_level` | `string` | `low` \| `medium` \| `high` \| `critical`. |
-| `health_level` | `string \| null` | Optional UI tag (`good`, `watch`, …). **Phase 1 candidate to drop** — overlaps with `display_status`. |
-| `display_status` | `string` | Localized label rendered on the dashboard chip. |
+| `health_level` | `string \| null` | **Deprecated** since `v0.1` — overlaps with `display_status`. Removal scheduled for Phase 6. |
+| `display_status` | `string` | **Canonical** localized label rendered on the dashboard chip. |
 | `summary` | `string` | One-line Vietnamese narrative. |
 | `timestamp` | `datetime` | ISO-8601 UTC. |
 | `previous_score` | `float \| null` | Score of the immediately prior report. |
 | `trend_7d` | `int[]` | Up to 7 daily samples used by the dashboard sparkline. |
-| `key_features` | `string[]` | **Derivable from `top_factors[].key`.** Phase 1 candidate to drop. |
+| `key_features` | `string[]` | **Deprecated** since `v0.1` — derivable from `top_factors[].key`. Removal scheduled for Phase 6. |
 | `top_factors` | `TopFactorResponse[]` | See section 5. |
 | `recommendation_preview` | `string[]` | First 2 recommendations, used in list rows. |
 | `confidence` | `float` | Model confidence (0..1). |
@@ -176,9 +185,9 @@ Detail-only keys (in addition to the list-item keys):
 | Key | Type | Notes |
 | --- | --- | --- |
 | `explanation` | `string` | Free-text rationale shown in the detail header. |
-| `xai_explanation` | `string` | **Duplicate of `explanation`.** Phase 1 candidate to drop. |
+| `xai_explanation` | `string` | **Deprecated alias of `explanation`** since `v0.1`. Removal scheduled for Phase 6. |
 | `features` | `dict[str, any]` | Raw feature values fed into the model. |
-| `feature_importance` | `dict[str, float]` | **Subset of `breakdown[*].contribution_score`.** Phase 1 candidate to drop. |
+| `feature_importance` | `dict[str, float]` | **Deprecated** since `v0.1` — subset of `breakdown[*].contribution_score`. Removal scheduled for Phase 6. |
 | `breakdown` | `FactorBreakdownResponse[]` | Per-feature drill-down — see section 5. |
 | `recommendations` | `string[]` | Full list of recommendations. |
 | `recommendation_preview` | `string[]` | First 2 recommendations (for collapsed view). |
@@ -314,32 +323,49 @@ also carries the `risk_score` + `score` duplication that Phase 1 will resolve.
 
 ---
 
-## 6. Phase 1 cleanup candidates
+## 6. Deprecated fields — Phase 1 status
 
-Captured here so Phase 1 has an explicit checklist instead of re-deriving it
-from the schema. Each candidate must:
+Phase 1 has formalised the canonical / deprecated split below. Each
+deprecated field still ships on the wire (no breaking change for older
+Flutter binaries) but is now:
 
-1. Update the schema in `backend/app/schemas/monitoring.py`.
-2. Update the producer in `backend/app/services/monitoring_service.py`.
-3. Update the matching `EXPECTED_*_KEYS` set in
+- Marked `deprecated=True` in the Pydantic schema, so OpenAPI surfaces it.
+- Guarded by a [`TestDeprecatedFieldInvariants`](../tests/contract/test_mobile_risk_dto_snapshot.py)
+  invariant test that asserts the deprecated value is fully reconstructible
+  from the canonical source.
+- Read with a canonical-first fallback in the Flutter parser
+  (`risk_analysis_repository.dart`), so a future canonical-only payload
+  parses cleanly.
+
+| Deprecated field | Canonical source | Owner DTO | Invariant guard |
+| --- | --- | --- | --- |
+| `risk_score` | `score` | `RiskReportResponse`, `RiskReportDetailResponse`, `RiskHistoryItemResponse` | `risk_score == score` |
+| `health_level` | `display_status` | `RiskReportResponse`, `RiskReportDetailResponse` | `display_status` is required and non-empty |
+| `key_features` | `top_factors[].key` | `RiskReportResponse` | `key_features == [f.key for f in top_factors]` |
+| `xai_explanation` | `explanation` | `RiskReportDetailResponse` | `xai_explanation == explanation` |
+| `feature_importance` | `breakdown[*].contribution_score` | `RiskReportDetailResponse` | `set(feature_importance) ⊆ {b.key for b in breakdown}` |
+
+### Why we did not drop the fields in Phase 1
+
+Removing a key is a **breaking change** for any older Flutter binary still
+parsing the deprecated alias. Phase 6 will introduce the
+`X-Risk-Contract-Version` header so the backend can:
+
+1. Inspect the inbound version header.
+2. Skip emitting the deprecated alias when the client opts in to the new
+   version.
+3. Continue dual-emitting for older clients during the deprecation window.
+
+When that infrastructure lands, dropping the deprecated keys becomes a
+single-PR change driven by the invariant tests above:
+
+1. Remove the deprecated field from `backend/app/schemas/monitoring.py`.
+2. Remove the matching `EXPECTED_*_KEYS` entry in
    `backend/tests/contract/test_mobile_risk_dto_snapshot.py`.
-4. Update the matching mobile parser
-   (`lib/features/analysis/repositories/risk_analysis_repository.dart` and
-   the analysis DTOs).
-5. Bump the **Baseline version** at the top of this file.
-
-| Field | Owner DTO | Reason |
-| --- | --- | --- |
-| `risk_score` | `RiskReportResponse`, `RiskReportDetailResponse`, `RiskHistoryItemResponse` | Duplicate of `score`. Mobile already has fallback parsing. |
-| `health_level` | `RiskReportResponse`, `RiskReportDetailResponse` | Overlaps with `display_status`. |
-| `key_features` | `RiskReportResponse` | Derivable from `top_factors[].key`. |
-| `xai_explanation` | `RiskReportDetailResponse` | Duplicate of `explanation`. |
-| `feature_importance` | `RiskReportDetailResponse` | Subset of `breakdown[*].contribution_score`. |
-
-> Removing duplicates is a breaking change for any binary still consuming
-> only the duplicate field. Phase 6 introduces `X-Risk-Contract-Version` so
-> the backend can dual-emit during a deprecation window before the duplicate
-> keys are dropped here.
+3. Remove the matching invariant test (it would otherwise fail because the
+   field no longer exists).
+4. Drop the canonical-first fallback in `risk_analysis_repository.dart`.
+5. Bump the **Baseline version** at the top of this file (`v0.1` → `v1.0`).
 
 ---
 
@@ -366,6 +392,11 @@ cd backend
 python -m pytest tests/contract -v --tb=short
 ```
 
-Expected output: 12 tests passing, 0 failing, 0 warnings related to the
-contract — drift triggers a `Mobile contract drift detected on ...` failure
-with the exact set of added / removed keys.
+Expected output (`v0.1`): **19 tests passing**, 0 failing.
+
+- 9 snapshot tests pin the JSON keys of every mobile DTO (drift triggers a
+  `Mobile contract drift detected on ...` failure with the exact set of
+  added / removed keys).
+- 3 round-trip tests catch silent drift caused by `model_config` changes.
+- 7 invariant tests assert every deprecated alias mirrors its canonical
+  source so Phase 6 removal cannot lose data.
