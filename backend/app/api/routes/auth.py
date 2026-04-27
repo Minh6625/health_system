@@ -1,3 +1,5 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, Request, HTTPException, status, BackgroundTasks
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -30,12 +32,16 @@ from app.core.dependencies import get_current_user
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
-def get_client_ip(request: Request) -> str:
-    """Extract client IP address from request."""
+def get_client_ip(request: Request) -> Optional[str]:
+    """Extract client IP address from request.
+
+    Returns None when no client info is available; AuditLogRepository will
+    store this as NULL (Postgres `inet` cannot accept "" or "unknown").
+    """
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return request.client.host if request.client else None
 
 
 def get_user_agent(request: Request) -> str:

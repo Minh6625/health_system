@@ -22,7 +22,7 @@ def update_profile(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ProfileResponse:
-    ip = request.client.host if request.client else ""
+    ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent", "")
     return ProfileService.update_profile(current_user, payload, db, ip_address=ip, user_agent=ua)
 
@@ -34,6 +34,6 @@ def delete_account(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> None:
-    ip = request.client.host if request.client else ""
+    ip = request.client.host if request.client else None
     ua = request.headers.get("user-agent", "")
     ProfileService.delete_account(current_user, payload, db, ip_address=ip, user_agent=ua)

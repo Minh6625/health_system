@@ -1,9 +1,31 @@
+import ipaddress
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
 from app.models.audit_log_model import AuditLog
 from app.utils.datetime_helper import get_current_time
+
+
+def _coerce_ip(value: Optional[str]) -> Optional[str]:
+    """Coerce caller-provided IP to a value Postgres `inet` accepts.
+
+    The `audit_logs.ip_address` column has Postgres type `inet`. Inserting
+    an empty string or non-IP placeholder (e.g. "", "unknown") raises
+    `psycopg2.errors.InvalidTextRepresentation` and crashes the whole
+    request with HTTP 500. Defensive coercion: empty/whitespace/invalid
+    inputs become NULL.
+    """
+    if not value:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    try:
+        ipaddress.ip_address(cleaned)
+    except ValueError:
+        return None
+    return cleaned
 
 
 class AuditLogRepository:
@@ -28,7 +50,7 @@ class AuditLogRepository:
             user_id: User ID if applicable
             resource_type: Resource type (e.g., "user", "alert")
             resource_id: Resource ID
-            ip_address: Client IP address
+            ip_address: Client IP address (empty/invalid → stored as NULL)
             user_agent: Client user agent
             details: Additional details as JSON
         """
@@ -39,7 +61,7 @@ class AuditLogRepository:
             resource_type=resource_type,
             resource_id=resource_id,
             status=status,
-            ip_address=ip_address,
+            ip_address=_coerce_ip(ip_address),
             user_agent=user_agent,
             details=details,
         )
