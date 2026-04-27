@@ -7,13 +7,16 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.8` (Phase 4B-thin — IMU window ingest route) |
+| Baseline version | `v0.9` (Phase 4A-thin — sleep risk ingest route) |
 | Wire version | `0.4.0` (`X-Risk-Contract-Version` header value, unchanged) |
-| Captured from branch | `refactor/risk-core-phase4b-thin-imu-window` |
-| Pending DBA migration | `backend/migrations/20260427_model_request_id.sql` |
+| Captured from branch | `refactor/risk-core-phase4a-thin-sleep-risk` |
+| Pending DBA migrations | `backend/migrations/20260427_model_request_id.sql`, `backend/migrations/20260427_sleep_risk_type.sql` |
 | Fall persistence adapter | `backend/app/adapters/fall_persistence_adapter.py` |
+| Sleep risk adapter | `backend/app/adapters/sleep_risk_adapter.py` |
 | IMU window route | `POST /mobile/telemetry/imu-window` (`backend/app/api/routes/telemetry.py`) |
+| Sleep risk route | `POST /mobile/telemetry/sleep-risk` (`backend/app/api/routes/telemetry.py`) |
 | IMU window schemas | `backend/app/schemas/fall_telemetry.py` |
+| Sleep risk schemas | `backend/app/schemas/sleep_telemetry.py` |
 | Schema source | `backend/app/schemas/monitoring.py` |
 | Version constant | `backend/app/core/risk_contract.py` |
 | Circuit breaker | `backend/app/services/circuit_breaker.py` |
@@ -57,6 +60,7 @@
 | `v0.6` | 2026-04-27 | `refactor/risk-core-phase7-resilience` | **Plan's Phase 7 (reduced) — resilience + observability**: added a 3-state `CircuitBreaker` (CLOSED → OPEN → HALF_OPEN) and wired it into `ModelApiClient.predict_health_risk` + `predict_fall` with **separate per-endpoint breakers** so health and fall outages cannot mask one another. Network / timeout / 5xx errors trip the breaker after `MODEL_API_BREAKER_FAILURES` (default 5) consecutive failures; malformed-JSON does NOT trip (it's a contract bug, not an outage). Added `app/observability/timing.py` with `StageTimer` context manager + `record_timing` log emitter for the four canonical stages (`build_record`, `model_api_call`, `persist`, `build_dto`). Stage timings now flow on every `calculate_device_risk` call. 26 new tests (12 breaker state-machine, 7 timing helpers, 7 breaker-on-client integration). The plan's cache (`audience_payload_json`) is **deferred** — depends on Phase 2 (alembic) and Phase 5 (audience profiles), neither landed. No wire-format change. |
 | `v0.7` | 2026-04-27 | `refactor/risk-core-phase2-model-request-id` | **Plan's Phase 2 (focused subset) — `model_request_id` traceability**: added `backend/migrations/20260427_model_request_id.sql` (raw SQL — project does not use alembic) to add a nullable `VARCHAR(36)` column on `risk_explanations` with a partial index on `IS NOT NULL` rows. `ModelApiHealthAdapter.from_response` extracts `meta.request_id` (defensive: `str()`-coerces, trims whitespace, truncates to 36 chars, normalises blanks to `NULL`). `NormalizedExplanation` carries the field; `RiskPersistenceAdapter.persist` writes it. Rule-based / ONNX / LightGBM fallback rows keep `NULL` (no upstream request to correlate with). Backfill is intentionally NOT done — historical rows have no recoverable request_id. **Migration is pending DBA application; the column write is forward-compatible until then.** Plan's `audience_payload_json` column deliberately deferred — purely Phase 5 prep, no consumer yet. 9 new tests. No wire-format change. |
 | `v0.8` | 2026-04-27 | `refactor/risk-core-phase4b-thin-imu-window` | **Plan's Phase 4B (focused subset) — backend IMU window ingest**: added `POST /mobile/telemetry/imu-window` accepting an `ImuWindowRequest` (verbatim port of model-api `FallPredictionRequest` + `db_device_id`). The route forwards to `ModelApiClient.predict_fall` (already breaker-wrapped + timed by Phase 7), persists a `fall_events` row via the new `FallPersistenceAdapter`, and returns the `fall_event_id` + `model_request_id` for log correlation. **On `predict_fall` returning `None`** (breaker open / transport / 5xx / malformed body), no row is written and the response carries `status="model_unavailable"` — false-negatives on real falls are dangerous, so the route surfaces uncertainty rather than guessing. Confusion-matrix harness, simulator-side IMU window dispatch, mobile fall alert UI, and rule-based fall fallback all **deliberately deferred** to Phase 4B-full (needs UP-Fall + PAMAP2 datasets + push channel + mobile UI work). 23 new tests (11 adapter unit, 5 HTTP route, 7 helper). No wire-format change to existing risk DTOs. |
+| `v0.9` | 2026-04-27 | `refactor/risk-core-phase4a-thin-sleep-risk` | **Plan's Phase 4A (focused subset) — backend sleep risk ingest**: added `POST /mobile/telemetry/sleep-risk` accepting a `SleepRiskRequest` (verbatim port of model-api `SleepRecord` + `db_device_id` + `db_user_id`). New `ModelApiClient.predict_sleep` with its own `model_api_sleep` breaker (independent of health + fall), forwarding to `/api/v1/sleep/predict`. New `SleepRiskAdapter` projects results into `NormalizedExplanation` with **score inversion** — model-api sleep_score 0–100 (high=good) becomes `risk_score = 100 - sleep_score` (high=worse) so sleep rows share the same axis as vitals risk rows. Persisted via existing `RiskPersistenceAdapter` with `risk_type='sleep'` (allowed by new SQL migration `20260427_sleep_risk_type.sql` relaxing the `check_risk_type` CHECK constraint). `model_unavailable` semantics mirror the IMU window route — no row written when `predict_sleep` returns `None`. Simulator-side dispatch (the dead `SleepAIClient` path), the 40-field mobile mapper, and mobile sleep risk surface all **deliberately deferred** to Phase 4A-full. 36 new tests (31 adapter + 5 route). No wire-format change to existing risk DTOs. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -495,6 +499,92 @@ Behaviour is **verbatim-preserved**:
 
 ---
 
+## 7f. Sleep risk ingest — Phase 4A-thin architecture
+
+Phase 4A in the plan is a full sleep pipeline alignment: backend route +
+simulator dispatch + mobile sleep-risk surface. The version landed
+under `v0.9` is **only the backend slice**, completing the symmetry
+with Phase 4B-thin so all three model-api endpoints (health, fall,
+sleep) have backend orchestration + breaker-wrapped clients.
+
+### Why "thin" subset
+
+The audit (this branch's `git log -p` against `develop`) found that
+the plan's claim "simulator bypasses backend → port 8001 direct" was
+**partially stale**: the simulator's `SleepAIClient` is dead code (the
+hard-coded path `/predict` doesn't match model-api's
+`/api/v1/sleep/predict`, so the call always 404s and the heuristic
+fallback in `SleepService._compute_sleep_score_from_summary` is what
+actually runs in production). Adding the backend slice now means:
+
+- A future simulator update that wants AI-backed sleep scoring has a
+  stable, tested route to call.
+- A future `lib/features/sleep_risk/` mobile feature module can read
+  sleep risk from the existing `MonitoringService.get_risk_history`
+  surface (filtered by `risk_type='sleep'`) without the route's
+  shape needing to change.
+- Bridging the dead-code gap exposes that the heuristic path is the
+  authoritative one until further notice; product can decide if the
+  AI path should be enabled at all.
+
+### Route — `POST /mobile/telemetry/sleep-risk`
+
+| Concern | Behaviour |
+| --- | --- |
+| Auth | Internal-service (no JWT); same trust model as `/imu-window` and `/alert`. Caller passes `db_device_id` + `db_user_id` for FK resolution. |
+| Payload | `SleepRiskRequest` (`backend/app/schemas/sleep_telemetry.py`) — wraps a verbatim `SleepRecord` (40+ fields). Caller responsibility: every field must be populated; silently defaulting to 0 would bias the model toward "perfect sleep". |
+| Upstream call | `ModelApiClient.predict_sleep(...)` — own `model_api_sleep` breaker so a degraded sleep model can't silence health or fall. |
+| Score inversion | `SleepRiskAdapter.from_response` writes `risk_score = 100 - predicted_sleep_score`. A great-sleep night (sleep_score=85) lands as risk_score=15; a bad-sleep night (sleep_score=20) lands as risk_score=80. |
+| Persistence | Existing `RiskPersistenceAdapter.persist` with `risk_type='sleep'` — same code path as vitals risk. The migration `20260427_sleep_risk_type.sql` relaxes the `check_risk_type` CHECK to include `'sleep'`. |
+| Failure | `predict_sleep` returns `None` → `status="model_unavailable"`, no row written. Sleep risk is not worth guessing at when the model is down. |
+
+### Score inversion rationale
+
+Model-api uses sleep_score 0–100 where **high=good**. The
+`risk_scores` table uses score 0–100 where **high=worse** (so the
+existing risk-trend chart can plot vitals risk and sleep risk on the
+same axis without per-domain branching). The inversion happens at the
+adapter boundary so the persistence layer never has to know about
+domain-specific score conventions.
+
+Concrete cases (pinned by `tests/test_sleep_risk_adapter.py::TestScoreInversion`):
+
+| `predicted_sleep_score` | Persisted `risk_score` | Risk level |
+| --- | --- | --- |
+| `100.0` (perfect) | `0.0` | low |
+| `85.0` (good) | `15.0` | low |
+| `50.0` (boundary) | `50.0` | medium |
+| `20.0` (poor) | `80.0` | critical |
+| `0.0` (no sleep) | `100.0` | critical |
+| missing / unparseable | `100.0` | medium (default) |
+
+Defaulting a missing score to `risk_score=100` is deliberate: it
+surfaces "we got nothing useful from the model" as critical risk
+rather than silently treating it as healthy sleep. The accompanying
+`risk_level` defaults to `medium` (the only level that doesn't claim
+strong knowledge in either direction).
+
+### What's deferred to Phase 4A-full
+
+- **Mobile sleep-risk surface**: the existing `lib/features/sleep_analysis/`
+  module reads from `/mobile/telemetry/sleep` (heuristic-scored
+  persistence). A new sleep-risk surface (or `riskType='sleep'`
+  filtering on the existing risk-history view) is product-shaped
+  work — mobile UX needs to decide whether sleep risk lives in the
+  same risk timeline as vitals or gets its own card.
+- **40-field SleepRecord mapper on the simulator side**: today's
+  simulator only tracks ~10 of the 40+ fields the model-api expects.
+  A safe mapper (no zero-defaults that bias the model) needs sleep
+  domain expertise.
+- **Cut-over diff-log**: plan §4A.2 calls for running the new path
+  parallel to the existing heuristic for ~100 sessions and cutting
+  over once the diff < 1%. Operational work.
+- **Killing the dead `SleepAIClient` path on the simulator**: now
+  that the backend slice is in place, the dead port-8001 client can
+  be removed. Cross-repo work, deferred for the same session.
+
+---
+
 ## 7e. IMU window ingest — Phase 4B-thin architecture
 
 Phase 4B in the original plan is a full fall pipeline: backend route +
@@ -830,7 +920,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 398 passed, 1 skipped (was 375 before Phase 4B-thin's 23 added tests).
+Expected: 434 passed, 1 skipped (was 398 before Phase 4A-thin's 36 added tests).
 
 Mobile parser smoke (after Phase 6):
 

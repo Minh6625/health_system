@@ -15,7 +15,7 @@ class RiskScore(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "risk_type IN ('stroke', 'heartattack', 'afib', 'general')",
+            "risk_type IN ('stroke', 'heartattack', 'afib', 'general', 'sleep')",
             name="check_risk_type",
         ),
         CheckConstraint(

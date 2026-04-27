@@ -51,6 +51,7 @@ class ModelApiClient:
         timeout_seconds: float | None = None,
         health_breaker: CircuitBreaker | None = None,
         fall_breaker: CircuitBreaker | None = None,
+        sleep_breaker: CircuitBreaker | None = None,
     ) -> None:
         self._base_url = (base_url or os.getenv("HEALTHGUARD_MODEL_API_URL", _DEFAULT_BASE_URL)).rstrip("/")
         timeout_value = timeout_seconds
@@ -61,11 +62,12 @@ class ModelApiClient:
                 timeout_value = _DEFAULT_TIMEOUT_SECONDS
         self._timeout = httpx.Timeout(timeout_value)
         self._client: httpx.Client | None = None
-        # Two breakers because a healthy fall endpoint should keep
-        # accepting traffic even when health predictions are degraded
-        # (and vice versa).
+        # Three independent breakers — health, fall and sleep endpoints
+        # all degrade independently. A failing sleep model must not
+        # silence health alerts, and vice versa.
         self._health_breaker = health_breaker or CircuitBreaker("model_api_health")
         self._fall_breaker = fall_breaker or CircuitBreaker("model_api_fall")
+        self._sleep_breaker = sleep_breaker or CircuitBreaker("model_api_sleep")
 
     @property
     def health_breaker(self) -> CircuitBreaker:
@@ -74,6 +76,10 @@ class ModelApiClient:
     @property
     def fall_breaker(self) -> CircuitBreaker:
         return self._fall_breaker
+
+    @property
+    def sleep_breaker(self) -> CircuitBreaker:
+        return self._sleep_breaker
 
     @property
     def base_url(self) -> str:
@@ -243,6 +249,79 @@ class ModelApiClient:
         if not isinstance(first, dict) or first.get("status") != "ok":
             return None
         self._fall_breaker.record_success()
+        return first
+
+    # ------------------------------------------------------------------
+    # Sleep score
+    # ------------------------------------------------------------------
+
+    def predict_sleep(
+        self,
+        record: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """POST a single ``SleepRecord`` and return the first result.
+
+        Same breaker / timing semantics as :meth:`predict_health_risk` and
+        :meth:`predict_fall`, but on its own ``model_api_sleep`` breaker
+        so a failing sleep model cannot mask health or fall outages.
+
+        ``record`` must already follow the model-api ``SleepRecord``
+        shape (40+ fields including ``user_id``, ``date_recorded``, the
+        sleep stage percentages, vitals means, and lifestyle inputs).
+        Caller responsibility — there is no safe default for most of
+        these fields, and silently filling them in would bias the model.
+        """
+        if self.is_disabled():
+            logger.debug("Model-api sleep predict skipped: HEALTHGUARD_MODEL_API_DISABLED=1")
+            return None
+        if self._sleep_breaker.should_skip_call():
+            logger.warning(
+                "Model-api sleep predict short-circuited: breaker %s open",
+                self._sleep_breaker.name,
+            )
+            return None
+
+        payload = {"records": [record]}
+        with StageTimer("model_api_call", endpoint="sleep_predict"):
+            try:
+                response = self._ensure_client().post("/api/v1/sleep/predict", json=payload)
+            except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
+                self._sleep_breaker.record_failure()
+                logger.warning("Model-api sleep predict connection failed: %s", exc)
+                return None
+            except httpx.TimeoutException as exc:
+                self._sleep_breaker.record_failure()
+                logger.warning("Model-api sleep predict timeout: %s", exc)
+                return None
+            except httpx.HTTPError as exc:
+                self._sleep_breaker.record_failure()
+                logger.warning("Model-api sleep predict transport error: %s", exc)
+                return None
+
+        if response.status_code != 200:
+            self._sleep_breaker.record_failure()
+            logger.warning(
+                "Model-api sleep predict non-200: status=%s body=%s",
+                response.status_code,
+                response.text[:200] if response.text else "",
+            )
+            return None
+
+        try:
+            body = response.json()
+        except ValueError as exc:
+            logger.warning("Model-api sleep predict malformed JSON: %s", exc)
+            return None
+
+        if not isinstance(body, dict):
+            return None
+        results = body.get("results") or []
+        if not results or not isinstance(results, list):
+            return None
+        first = results[0]
+        if not isinstance(first, dict) or first.get("status") != "ok":
+            return None
+        self._sleep_breaker.record_success()
         return first
 
     # ------------------------------------------------------------------

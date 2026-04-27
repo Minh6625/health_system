@@ -20,10 +20,12 @@ from app.adapters.fall_persistence_adapter import FallPersistenceAdapter
 from app.adapters.model_api_health_adapter import ModelApiHealthAdapter
 from app.adapters.normalized_explanation import NormalizedExplanation
 from app.adapters.risk_persistence_adapter import RiskPersistenceAdapter
+from app.adapters.sleep_risk_adapter import SleepRiskAdapter
 
 __all__ = [
     "FallPersistenceAdapter",
     "ModelApiHealthAdapter",
     "NormalizedExplanation",
     "RiskPersistenceAdapter",
+    "SleepRiskAdapter",
 ]

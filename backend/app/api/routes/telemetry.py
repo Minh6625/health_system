@@ -11,11 +11,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.adapters import FallPersistenceAdapter
+from app.adapters import (
+    FallPersistenceAdapter,
+    RiskPersistenceAdapter,
+    SleepRiskAdapter,
+)
 from app.db.database import get_db
 from app.models.device_model import Device
 from app.models.sos_event_model import Alert, FallEvent
 from app.schemas.fall_telemetry import ImuWindowRequest, ImuWindowResponse
+from app.schemas.sleep_telemetry import SleepRiskRequest, SleepRiskResponse
 from app.services.emergency_service import EmergencyService
 from app.services.model_api_client import get_model_api_client
 from app.services.risk_alert_service import calculate_device_risk, dispatch_risk_alerts
@@ -613,4 +618,72 @@ def ingest_imu_window(
         predicted_fall=predicted_fall,
         requires_attention=requires_attention,
         model_request_id=model_request_id,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Phase 4A-thin — sleep risk ingest
+# ---------------------------------------------------------------------------
+
+
+@router.post("/sleep-risk", response_model=SleepRiskResponse)
+def ingest_sleep_risk(
+    payload: SleepRiskRequest,
+    db: Session = Depends(get_db),
+) -> SleepRiskResponse:
+    """Ingest a canonical sleep session, run model-api inference, persist on success.
+
+    Phase 4A-thin (see ``backend/docs/risk-contract-baseline.md`` §7f):
+
+    1. The mobile / simulator client posts a ``SleepRecord`` (verbatim
+       model-api shape) plus ``db_device_id`` + ``db_user_id``.
+    2. Backend forwards to ``ModelApiClient.predict_sleep`` (already
+       breaker-wrapped + StageTimer-instrumented by Phase 7 + 4A-thin).
+    3. ``SleepRiskAdapter.from_response`` projects the result into a
+       :class:`NormalizedExplanation`, **inverting the score** so a
+       sleep_score of 85 (good sleep) lands as risk_score 15 in the
+       ``risk_scores`` table — same axis convention as vitals risk rows.
+    4. ``RiskPersistenceAdapter.persist`` writes the row with
+       ``risk_type='sleep'`` (allowed by the migration in
+       ``backend/migrations/20260427_sleep_risk_type.sql``).
+    5. ``model_unavailable`` semantics mirror the IMU window route — no
+       row is written when ``predict_sleep`` returns ``None`` (breaker
+       open / transport / 5xx / malformed body); sleep risk is not
+       worth guessing at when the model is down.
+    """
+    # Inner record is already in the model-api shape — just dump it.
+    record_dict = SleepRiskAdapter.to_record(payload.record.model_dump())
+
+    prediction = get_model_api_client().predict_sleep(record_dict)
+    if prediction is None:
+        return SleepRiskResponse(status="model_unavailable")
+
+    inference = SleepRiskAdapter.from_response(
+        prediction,
+        sleep_record=record_dict,
+    )
+
+    # Sleep is not a point-in-time vitals snapshot, so vitals_row /
+    # feature_snapshot are empty. The interesting payload (top_features,
+    # ai_explanation, request_id) all lands via NormalizedExplanation.
+    risk_score_row = RiskPersistenceAdapter.persist(
+        db,
+        user_id=int(payload.db_user_id),
+        device_id=int(payload.db_device_id),
+        inference=inference,
+        vitals_row={},
+        feature_snapshot={},
+        defaults_applied=[],
+        risk_type="sleep",
+    )
+
+    predicted_sleep_score = SleepRiskAdapter._extract_sleep_score(prediction)
+
+    return SleepRiskResponse(
+        status="ok",
+        risk_score_id=risk_score_row.id,
+        risk_score=inference.risk_score,
+        risk_level=inference.risk_level,
+        predicted_sleep_score=predicted_sleep_score,
+        model_request_id=inference.model_request_id,
     )
