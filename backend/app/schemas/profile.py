@@ -4,7 +4,12 @@ import re
 from pydantic import BaseModel, Field, field_validator
 
 VALID_BLOOD_TYPES = {'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'}
-VALID_GENDERS = {'Nam', 'Nữ', 'Khác'}
+
+# DB CHECK constraint `users_gender_check` only accepts canonical English
+# values. UI/API speaks Vietnamese; we map at the schema/service boundary.
+GENDER_VI_TO_EN = {'Nam': 'male', 'Nữ': 'female', 'Khác': 'other'}
+GENDER_EN_TO_VI = {v: k for k, v in GENDER_VI_TO_EN.items()}
+VALID_GENDERS = set(GENDER_VI_TO_EN.keys())
 
 
 class ProfileResponse(BaseModel):
@@ -38,7 +43,8 @@ class ProfileUpdateRequest(BaseModel):
     gender: str | None = None
     blood_type: str | None = None
     height_cm: float | None = Field(default=None, ge=50, le=250)
-    weight_kg: float | None = Field(default=None, ge=2, le=500)
+    # DB CHECK: weight_kg < 500 (strict). Pydantic must mirror.
+    weight_kg: float | None = Field(default=None, ge=2, lt=500)
     medications: list[str] | None = None
     allergies: list[str] | None = None
     medical_conditions: list[str] | None = None
@@ -80,11 +86,12 @@ class ProfileUpdateRequest(BaseModel):
     @field_validator('gender')
     @classmethod
     def validate_gender(cls, value: str | None) -> str | None:
+        """Accept Vietnamese label from UI; persist canonical English to DB."""
         if value is None:
             return None
         if value not in VALID_GENDERS:
             raise ValueError(f'Giới tính không hợp lệ. Các giá trị hợp lệ: {", ".join(VALID_GENDERS)}')
-        return value
+        return GENDER_VI_TO_EN[value]
 
 
 class DeleteAccountRequest(BaseModel):
