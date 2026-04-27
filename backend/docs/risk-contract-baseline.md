@@ -7,11 +7,13 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.5` (Phase 6 — contract versioning + OpenAPI guard) |
+| Baseline version | `v0.6` (Phase 7 — circuit breaker + timing observability) |
 | Wire version | `0.4.0` (`X-Risk-Contract-Version` header value) |
-| Captured from branch | `refactor/risk-core-phase6-versioning` |
+| Captured from branch | `refactor/risk-core-phase7-resilience` |
 | Schema source | `backend/app/schemas/monitoring.py` |
 | Version constant | `backend/app/core/risk_contract.py` |
+| Circuit breaker | `backend/app/services/circuit_breaker.py` |
+| Timing observability | `backend/app/observability/timing.py` |
 | Mobile version inspector | `lib/core/network/risk_contract_version.dart` |
 | Normalized row (read path) | `backend/app/services/normalized_risk_row.py` |
 | Normalized explanation (write path) | `backend/app/adapters/normalized_explanation.py` |
@@ -20,6 +22,9 @@
 | Mobile DTO builder | `backend/app/services/risk_report_builder.py` |
 | DTO snapshot test | `backend/tests/contract/test_mobile_risk_dto_snapshot.py` |
 | Versioning + OpenAPI test | `backend/tests/contract/test_mobile_risk_versioning.py` |
+| Breaker unit test | `backend/tests/test_circuit_breaker.py` |
+| Timing unit test | `backend/tests/test_observability_timing.py` |
+| Breaker integration test | `backend/tests/test_model_api_client_breaker.py` |
 | Builder unit test | `backend/tests/test_risk_report_builder.py` |
 | Persistence adapter test | `backend/tests/test_risk_persistence_adapter.py` |
 | Mobile parser | `lib/features/analysis/repositories/risk_analysis_repository.dart` |
@@ -45,6 +50,7 @@
 | `v0.3` | 2026-04-27 | `refactor/risk-core-phase3-typed-normalized-row` | **Phase 3a — prep**: replaced the `dict[str, Any]` returned by `MonitoringService._normalize_risk_row` with a frozen `NormalizedRiskRow` dataclass. All 7 internal call sites + builders + builder tests migrated. No wire-format change. Sets up the typed input layer the plan's Phase 3 adapter extraction will produce. |
 | `v0.4` | 2026-04-27 | `refactor/risk-core-phase3b-adapters` | **Plan's Phase 3 — adapter formalisation**: extracted `ModelApiHealthAdapter` (`to_record` / `from_response` / `from_local_inference` + 7 private helpers) and `RiskPersistenceAdapter` (`build_features_json` / `persist`) under `backend/app/adapters/`. `risk_alert_service.calculate_device_risk` shrank from 263 LOC to 99 LOC; the file as a whole went from 773 to 393 LOC. Verbatim behaviour: medical defaults (75 bpm / 120-80 / 165 cm / 65 kg / 50 ms HRV), recommendations copy, explanation text format, and `feature_importance` rounding are all unchanged. |
 | `v0.5` | 2026-04-27 | `refactor/risk-core-phase6-versioning` | **Plan's Phase 6 — versioning + OpenAPI guard**: added `RISK_CONTRACT_VERSION = "0.4.0"` constant + `RiskContractVersionMiddleware` so every response on the mobile risk surface (`/mobile/analysis/risk-reports`, `/risk-reports/{id}`, `/risk-history`, `/mobile/metrics/health-report`) carries `X-Risk-Contract-Version`. Mobile `ApiClient` reads + debug-warns once per distinct mismatch via the new `RiskContractVersion` singleton. New `tests/contract/test_mobile_risk_versioning.py` (23 tests) pins the route surface, the header presence, the header scope (off-surface routes do NOT get the header) and the OpenAPI components shape. No wire-format change. |
+| `v0.6` | 2026-04-27 | `refactor/risk-core-phase7-resilience` | **Plan's Phase 7 (reduced) — resilience + observability**: added a 3-state `CircuitBreaker` (CLOSED → OPEN → HALF_OPEN) and wired it into `ModelApiClient.predict_health_risk` + `predict_fall` with **separate per-endpoint breakers** so health and fall outages cannot mask one another. Network / timeout / 5xx errors trip the breaker after `MODEL_API_BREAKER_FAILURES` (default 5) consecutive failures; malformed-JSON does NOT trip (it's a contract bug, not an outage). Added `app/observability/timing.py` with `StageTimer` context manager + `record_timing` log emitter for the four canonical stages (`build_record`, `model_api_call`, `persist`, `build_dto`). Stage timings now flow on every `calculate_device_risk` call. 26 new tests (12 breaker state-machine, 7 timing helpers, 7 breaker-on-client integration). The plan's cache (`audience_payload_json`) is **deferred** — depends on Phase 2 (alembic) and Phase 5 (audience profiles), neither landed. No wire-format change. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -483,6 +489,88 @@ Behaviour is **verbatim-preserved**:
 
 ---
 
+## 7c. Resilience + observability — Phase 7 architecture
+
+Phase 7 (reduced scope — see plan section E.7) adds two production
+safety nets around the external model-api call site without changing
+the wire format or the read-path DTOs.
+
+### Circuit breaker — `backend/app/services/circuit_breaker.py`
+
+A 70-line, hand-rolled, sync-only `CircuitBreaker` class with three
+states:
+
+```
+CLOSED  --(N consecutive failures)-->  OPEN
+OPEN    --(reset_timeout elapsed)-->   HALF_OPEN
+HALF_OPEN --(success)-->               CLOSED
+HALF_OPEN --(failure)-->               OPEN  (fresh window)
+```
+
+`ModelApiClient` instantiates **two** independent breakers:
+`model_api_health` for `predict_health_risk` and `model_api_fall` for
+`predict_fall`. A fall-endpoint outage must not silence health
+predictions and vice versa.
+
+Failure classification:
+
+| Outcome | Trip breaker? | Why |
+| --- | --- | --- |
+| `httpx.ConnectError` / `ConnectTimeout` / `TimeoutException` | Yes | Outage symptoms — exactly what the breaker is for. |
+| Other `httpx.HTTPError` | Yes | Transport-level error from a reachable but unhealthy upstream. |
+| `response.status_code != 200` (4xx / 5xx) | Yes | A 5xx storm would otherwise drain the request thread pool. |
+| Malformed JSON in 200 response | **No** | Reachable but speaking the wrong dialect; skipping won't help — fix the contract instead. |
+| `results[0].status != "ok"` | No | Same — application-level no-data, not an outage. |
+
+Configuration via env (with sensible defaults):
+
+- `MODEL_API_BREAKER_FAILURES` — consecutive-failure threshold, default `5`.
+- `MODEL_API_BREAKER_RESET_SECONDS` — reset-window duration, default `60`.
+
+Process scope: each gunicorn / uvicorn worker tracks its own breaker
+state. With ~5 failures per worker before tripping, an outage
+amortises across the cluster within a handful of requests rather than
+per-worker timeouts on every incoming request.
+
+### Stage timing — `backend/app/observability/timing.py`
+
+A tiny helper that emits one structured log line per timed block:
+
+```python
+with StageTimer("model_api_call", endpoint="health_predict"):
+    response = client.post(...)
+```
+
+Four canonical stages are wired today:
+
+| Stage | Where it's timed | Tags |
+| --- | --- | --- |
+| `build_record` | `risk_alert_service.calculate_device_risk` (around `ModelApiHealthAdapter.to_record`) | `device_id` |
+| `model_api_call` | `ModelApiClient.predict_health_risk` and `predict_fall` | `endpoint` ∈ `{health_predict, fall_predict}` |
+| `persist` | `risk_alert_service.calculate_device_risk` (around `RiskPersistenceAdapter.persist`) | `device_id`, `backend` |
+| `build_dto` | (Reserved for Phase 7+: when audience-profiled DTO assembly lands.) | n/a |
+
+Every event lands as an `INFO` log line with prefix `risk.timing` so a
+downstream aggregator (cloud logging, Loki, ELK) can build histograms
+and percentile dashboards without the backend carrying a metrics
+runtime dependency. Tests subscribe via `subscribe_for_tests` for
+deterministic capture.
+
+The timer always fires, even when the wrapped block raises — outage
+timing dashboards depend on the failing call still being measured (the
+elapsed_ms is exactly the cost of the timeout, which is what you want
+to chart).
+
+### What's deferred from plan's Phase 7
+
+- **Cached profiled DTOs** (`audience_payload_json` column): blocked by
+  Phase 2 (alembic migration to add the column) and Phase 5 (audience
+  profiles to know what to cache).
+- **Locust / k6 baseline harness**: requires running infrastructure,
+  better as a separate ops task than an interactive code change.
+
+---
+
 ## 7b. Contract versioning — Phase 6 architecture
 
 Phase 6 introduces a wire-level signal so an older Flutter binary can
@@ -625,7 +713,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 340 passed, 1 skipped (was 317 before Phase 6's 23 added tests).
+Expected: 366 passed, 1 skipped (was 340 before Phase 7's 26 added tests).
 
 Mobile parser smoke (after Phase 6):
 

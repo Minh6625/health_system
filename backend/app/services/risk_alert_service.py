@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from app.adapters import ModelApiHealthAdapter, RiskPersistenceAdapter
 from app.core.alert_constants import get_escalation_rule
 from app.models.risk_score_model import RiskScore
+from app.observability.timing import StageTimer
 from app.repositories.emergency_repository import EmergencyRepository
 from app.services.model_api_client import get_model_api_client
 from app.services.notification_service import NotificationService
@@ -343,9 +344,14 @@ def calculate_device_risk(
     # Try the external healthguard-model-api first (real SHAP + LightGBM).
     # On any failure fall back to local ``infer_risk`` (ONNX / LightGBM /
     # rule_based) so risk calc never breaks because of model-api outages.
+    # Phase 7: ``build_record`` and ``model_api_call`` are timed
+    # separately so the timing dashboard can distinguish payload
+    # construction from upstream latency. The model-api client itself
+    # owns the ``model_api_call`` StageTimer (see ``ModelApiClient``).
     model_api_response: dict[str, Any] | None = None
     try:
-        model_record = ModelApiHealthAdapter.to_record(inference_payload)
+        with StageTimer("build_record", device_id=int(device_id)):
+            model_record = ModelApiHealthAdapter.to_record(inference_payload)
         model_api_response = get_model_api_client().predict_health_risk(
             model_record,
             user_id=context.get("user_id"),
@@ -371,16 +377,21 @@ def calculate_device_risk(
             feature_snapshot=feature_snapshot,
         )
 
-    risk_score_row = RiskPersistenceAdapter.persist(
-        db,
-        user_id=int(user_id),
+    with StageTimer(
+        "persist",
         device_id=int(device_id),
-        inference=inference,
-        vitals_row=vitals_row,
-        feature_snapshot=feature_snapshot,
-        defaults_applied=defaults_applied,
-        risk_type=risk_type,
-    )
+        backend=inference.backend_label,
+    ):
+        risk_score_row = RiskPersistenceAdapter.persist(
+            db,
+            user_id=int(user_id),
+            device_id=int(device_id),
+            inference=inference,
+            vitals_row=vitals_row,
+            feature_snapshot=feature_snapshot,
+            defaults_applied=defaults_applied,
+            risk_type=risk_type,
+        )
 
     result = RiskCalculationResult(
         risk_score_id=risk_score_row.id,
