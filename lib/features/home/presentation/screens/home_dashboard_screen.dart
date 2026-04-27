@@ -13,6 +13,7 @@ import '../../providers/home_dashboard_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../../device/models/device_model.dart';
 import '../../../device/providers/device_provider.dart';
+import '../../../profile/providers/profile_provider.dart';
 import '../../../health_monitoring/models/vital_signs.dart';
 import '../models/home_dashboard_view_model.dart';
 import '../widgets/connection_status_strip.dart'
@@ -283,6 +284,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
 
     // Gọi sau khi build xong (an toàn context)
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _refreshDashboard();
       _fetchUnreadNotificationCount();
       if (widget.enableAutoRefresh) {
@@ -293,6 +295,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       if (_deviceProvider.devices.isEmpty && !_deviceProvider.isLoading) {
         _deviceProvider.fetchDevices();
       }
+
+      // Fetch the profile so the greeting header avatar resolves on
+      // first launch (the "Tôi" tab may not have been visited yet).
+      // ProfileProvider has a 5-minute cache, so this call is a no-op
+      // when the user has already viewed the profile tab.
+      context.read<ProfileProvider>().fetchProfile();
     });
   }
 
@@ -405,11 +413,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     HomeDashboardProvider provider,
   ) {
     final authProvider = context.read<AuthProvider>();
+    // Watch ProfileProvider so a successful avatar update on another
+    // screen rebuilds this header automatically.
+    final profileProvider = context.watch<ProfileProvider>();
     final isLinkedProfile =
         widget.profileId != null && widget.profileId != 'self';
     final displayName = isLinkedProfile
         ? 'Hồ sơ người thân'
         : authProvider.currentUser?.fullName ?? 'Người dùng';
+    // Linked-profile screens don't have access to the relative's
+    // avatar via ProfileProvider (which holds the logged-in user's
+    // profile only); leave avatar null in that case so the fallback
+    // icon shows.
+    final avatarUrl =
+        isLinkedProfile ? null : profileProvider.profile?.avatarUrl;
 
     final heartRateStr = provider.heartRate != null
         ? '${provider.heartRate!.toStringAsFixed(0)} BPM'
@@ -466,6 +483,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
         await provider.refreshDashboard();
       },
       displayName: displayName,
+      avatarUrl: avatarUrl,
       latestUpdatedLabel: _buildLatestUpdatedLabel(provider),
       overallStatus: overallStatus,
       heroTitle: _heroTitleForStatus(overallStatus),
