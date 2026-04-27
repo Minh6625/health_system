@@ -89,7 +89,17 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
     final report = provider.report;
     if (provider.isEmpty) {
       return Center(
-        child: Text(provider.emptyMessage ?? 'Chưa có dữ liệu đánh giá'),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.gapLg),
+          child: Text(
+            provider.emptyMessage ??
+                'Chưa có báo cáo rủi ro. Hãy đeo thiết bị thêm vài giờ để hệ thống tạo báo cáo đầu tiên.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
       );
     }
 

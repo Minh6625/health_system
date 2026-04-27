@@ -129,7 +129,10 @@ void main() {
         expect(provider.report, isNull);
         expect(provider.error, isNull);
         expect(provider.isEmpty, isTrue);
-        expect(provider.emptyMessage, 'Chưa có dữ liệu đánh giá');
+        expect(
+          provider.emptyMessage,
+          'Chưa có báo cáo rủi ro. Hãy đeo thiết bị thêm vài giờ để hệ thống tạo báo cáo đầu tiên.',
+        );
       },
     );
 

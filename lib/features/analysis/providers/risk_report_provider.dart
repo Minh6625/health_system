@@ -42,7 +42,8 @@ class RiskReportProvider extends ChangeNotifier {
     } catch (e) {
       if (e.toString().contains('Chưa có dữ liệu đánh giá')) {
         _report = null;
-        _emptyMessage = 'Chưa có dữ liệu đánh giá';
+        _emptyMessage =
+            'Chưa có báo cáo rủi ro. Hãy đeo thiết bị thêm vài giờ để hệ thống tạo báo cáo đầu tiên.';
       } else {
         _error = 'Không thể tải dữ liệu: $e';
       }

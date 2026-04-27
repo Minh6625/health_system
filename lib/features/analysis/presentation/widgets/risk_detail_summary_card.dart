@@ -80,7 +80,7 @@ class RiskDetailSummaryCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.gapMd),
           Text(
             detail.previousScore == null
-                ? 'Chưa có mốc so sánh trước đó'
+                ? 'Chưa có lần đo trước để so sánh'
                 : '${detail.score - detail.previousScore! >= 0 ? '+' : ''}${detail.score - detail.previousScore!} so với lần trước',
             style: AppTextStyles.caption,
           ),

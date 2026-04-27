@@ -88,7 +88,7 @@ class RiskScoreHeroCard extends StatelessWidget {
                     const SizedBox(height: AppSpacing.gapXs),
                     Text(
                       report.previousScore == null
-                          ? 'Chưa có mốc so sánh trước đó'
+                          ? 'Chưa có lần đo trước để so sánh'
                           : '${report.score - report.previousScore! >= 0 ? '+' : ''}${report.score - report.previousScore!} so với lần trước',
                       style: AppTextStyles.caption,
                     ),

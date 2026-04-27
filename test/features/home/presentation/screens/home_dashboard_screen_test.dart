@@ -300,15 +300,19 @@ void main() {
     test('dashboardRiskSummary and visual state match normalized levels', () {
       expect(
         dashboardRiskSummary('low'),
-        'Các chỉ số sức khỏe hôm nay đang ở mức ổn định.',
+        'Các chỉ số đang ổn định. Tiếp tục duy trì thói quen hiện tại nhé.',
       );
       expect(
         dashboardRiskSummary('medium'),
-        'Một vài chỉ số đang ở mức cảnh báo, bạn nên theo dõi thêm.',
+        'Một vài chỉ số đang lệch ngưỡng. Hãy nghỉ ngơi và đo lại sau ít giờ.',
       );
       expect(
         dashboardRiskSummary('critical'),
-        'Một vài chỉ số đang ở mức nguy hiểm, bạn cần theo dõi sát hơn.',
+        'Có chỉ số vượt ngưỡng nguy hiểm. Hãy nghỉ ngơi ngay và liên hệ bác sĩ nếu thấy bất thường.',
+      );
+      expect(
+        dashboardRiskSummary(null),
+        'Đang chờ dữ liệu mới từ thiết bị của bạn.',
       );
       expect(dashboardRiskVisualState('low'), RiskVisualState.low);
       expect(dashboardRiskVisualState('medium'), RiskVisualState.moderate);
@@ -362,7 +366,7 @@ void main() {
             isStale: true,
             riskLevel: 'critical',
           ),
-          'Dữ liệu đánh giá sức khỏe đã cũ, vui lòng đồng bộ lại thiết bị.',
+          'Dữ liệu đã cũ. Hãy đồng bộ thiết bị để xem đánh giá mới nhất.',
         );
       },
     );

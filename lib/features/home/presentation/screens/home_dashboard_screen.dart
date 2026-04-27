@@ -57,13 +57,13 @@ String dashboardRiskDisplayLabel(String? level) {
 String dashboardRiskSummary(String? level) {
   switch (normalizeRiskLevelLabel(level)) {
     case 'low':
-      return 'Các chỉ số sức khỏe hôm nay đang ở mức ổn định.';
+      return 'Các chỉ số đang ổn định. Tiếp tục duy trì thói quen hiện tại nhé.';
     case 'medium':
-      return 'Một vài chỉ số đang ở mức cảnh báo, bạn nên theo dõi thêm.';
+      return 'Một vài chỉ số đang lệch ngưỡng. Hãy nghỉ ngơi và đo lại sau ít giờ.';
     case 'critical':
-      return 'Một vài chỉ số đang ở mức nguy hiểm, bạn cần theo dõi sát hơn.';
+      return 'Có chỉ số vượt ngưỡng nguy hiểm. Hãy nghỉ ngơi ngay và liên hệ bác sĩ nếu thấy bất thường.';
     default:
-      return 'Cập nhật dữ liệu...';
+      return 'Đang chờ dữ liệu mới từ thiết bị của bạn.';
   }
 }
 
@@ -73,7 +73,7 @@ String dashboardHealthSummary({
   required String? riskLevel,
 }) {
   if (isStale) {
-    return 'Dữ liệu đánh giá sức khỏe đã cũ, vui lòng đồng bộ lại thiết bị.';
+    return 'Dữ liệu đã cũ. Hãy đồng bộ thiết bị để xem đánh giá mới nhất.';
   }
   if (backendSummary != null && backendSummary.trim().isNotEmpty) {
     return backendSummary;
