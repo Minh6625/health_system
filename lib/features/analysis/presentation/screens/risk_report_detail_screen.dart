@@ -8,6 +8,7 @@ import '../../../../shared/presentation/feedback/inline_error_block.dart';
 import '../../../../shared/presentation/feedback/inline_status_banner.dart';
 import '../../providers/risk_report_provider.dart';
 import '../widgets/factor_contribution_section.dart';
+import '../widgets/first_aid_action_card.dart';
 import '../widgets/medical_disclaimer_card.dart';
 import '../widgets/recommendation_checklist_card.dart';
 import '../widgets/related_drilldown_section.dart';
@@ -125,6 +126,23 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
                   aiExplanation: detail.aiExplanation.isNotEmpty
                       ? detail.aiExplanation
                       : null,
+                ),
+                const SizedBox(height: AppSpacing.gapLg),
+                FirstAidActionCard(
+                  level: detail.level,
+                  onMeasureAgain: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.vitalDetail,
+                      arguments: {
+                        'vitalType': 'hr',
+                        'profileId': widget.profileId,
+                      },
+                    );
+                  },
+                  onContactFamily: () {
+                    Navigator.pushNamed(context, AppRouter.familyDashboard);
+                  },
                 ),
                 const SizedBox(height: AppSpacing.gapLg),
                 FactorContributionSection(
