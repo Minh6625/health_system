@@ -137,7 +137,9 @@ class RiskAnalysisRepository {
     return RiskReportEntity(
       reportId: json['id'] as int? ?? 0,
       profileId: profileId ?? 'self',
-      score: _parseScore(json['risk_score'] ?? json['score']),
+      // Phase 1: prefer canonical `score`; fall back to deprecated `risk_score`
+      // for older backends. The deprecated alias will be removed in Phase 6.
+      score: _parseScore(json['score'] ?? json['risk_score']),
       level: _parseRiskLevel(json['risk_level'] as String?),
       displayStatus: json['display_status'] as String? ?? 'Không xác định',
       summary: json['summary'] as String? ?? '',
@@ -157,12 +159,25 @@ class RiskAnalysisRepository {
 
   Future<RiskReportDetailEntity> fetchReportDetail(
     int reportId,
-    String? profileId,
-  ) async {
+    String? profileId, {
+    // Phase 8 / Phase 4B-full slice 4a. Optional ``audience`` lets a
+    // clinician role flip the response shape from the lean
+    // ``RiskReportDetailResponse`` to ``RiskReportClinicianResponse``
+    // (adds ``shap_details`` + ``model_request_id``). The mobile
+    // ``ClinicianAudienceProvider`` decides when to set this; the
+    // repository just forwards verbatim. ``null`` (default) keeps
+    // the legacy patient flow.
+    String? audience,
+  }) async {
     final targetProfileId = _resolveTargetProfileId(profileId);
+    final queryParams = <String, dynamic>{};
+    if (audience != null && audience.trim().isNotEmpty) {
+      queryParams['audience'] = audience.trim();
+    }
     final result = await _apiClient.get(
       '/analysis/risk-reports/$reportId',
       requiresAuth: true,
+      queryParams: queryParams.isEmpty ? null : queryParams,
       targetProfileId: targetProfileId,
     );
     final json = Map<String, dynamic>.from(result as Map);
@@ -179,7 +194,8 @@ class RiskAnalysisRepository {
     return RiskReportDetailEntity(
       reportId: json['id'] as int? ?? reportId,
       profileId: profileId ?? 'self',
-      score: _parseScore(json['risk_score'] ?? json['score']),
+      // Phase 1: prefer canonical `score`; fall back to deprecated `risk_score`.
+      score: _parseScore(json['score'] ?? json['risk_score']),
       healthScore: _parseDouble(json['health_score']),
       level: _parseRiskLevel(json['risk_level'] as String?),
       displayStatus: json['display_status'] as String? ?? 'Không xác định',
@@ -193,9 +209,11 @@ class RiskAnalysisRepository {
                 _parseBreakdownItem(Map<String, dynamic>.from(item as Map)),
           )
           .toList(),
+      // Phase 1: prefer canonical `explanation`; fall back to deprecated
+      // `xai_explanation`. The deprecated alias will be removed in Phase 6.
       xaiExplanation:
-          json['xai_explanation'] as String? ??
           json['explanation'] as String? ??
+          json['xai_explanation'] as String? ??
           '',
       recommendations: List<String>.from(
         json['recommendations'] as List? ?? const [],
@@ -210,6 +228,63 @@ class RiskAnalysisRepository {
       confidence: _parseDouble(json['confidence']),
       isStale: json['is_stale'] as bool? ?? true,
       aiExplanation: aiExplanation,
+      // Phase 8 slice 4b — only the clinician audience response carries
+      // these fields; patient responses leave them as ``null`` so the
+      // detail screen knows not to surface the SHAP link.
+      shapDetails: _parseShapDetails(json['shap_details']),
+      modelRequestId: (json['model_request_id'] as String?)?.trim().isNotEmpty == true
+          ? (json['model_request_id'] as String).trim()
+          : null,
+    );
+  }
+
+  /// Parse the ``shap_details`` block from a clinician detail response.
+  ///
+  /// Returns ``null`` when the field is absent (patient response) or
+  /// not an object. A ``"available": false`` payload is preserved as
+  /// :data:`ShapWaterfall.empty`-shaped so the screen can render the
+  /// "rule-based fallback" empty state with context rather than
+  /// vanishing.
+  ShapWaterfall? _parseShapDetails(Object? raw) {
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final available = map['available'] as bool? ?? false;
+    final baseValue = _parseDouble(map['base_value']);
+    final rawValues = map['values'];
+    final contributions = <ShapContribution>[];
+    if (rawValues is List) {
+      for (final item in rawValues) {
+        if (item is! Map) continue;
+        final entry = Map<String, dynamic>.from(item);
+        final feature = entry['feature'] as String? ?? '';
+        if (feature.isEmpty) continue;
+        final shapValue = _parseDouble(entry['shap_value']);
+        // Backend ships ``impact`` as ``abs(shap_value)`` for
+        // pre-sorted bars; fall back to ``abs(shapValue)`` if missing
+        // so a future schema simplification doesn't break the screen.
+        final impact = entry['impact'] != null
+            ? _parseDouble(entry['impact'])
+            : shapValue.abs();
+        contributions.add(
+          ShapContribution(
+            feature: feature, shapValue: shapValue, impact: impact,
+          ),
+        );
+      }
+    }
+    return ShapWaterfall(
+      available: available,
+      baseValue: baseValue,
+      values: contributions,
+    );
+  }
+
+  Future<void> recalculateRisk(String? profileId) async {
+    final targetProfileId = _resolveTargetProfileId(profileId);
+    await _apiClient.post(
+      '/risk/recalculate',
+      requiresAuth: true,
+      targetProfileId: targetProfileId,
     );
   }
 
@@ -218,12 +293,26 @@ class RiskAnalysisRepository {
     String range = '7d',
     int page = 1,
     int limit = 20,
+    // Phase 4A-full slice 3b: optional filter for the chip row on
+    // ``RiskHistoryScreen``. ``null`` (default) returns every type;
+    // canonical values are ``general`` / ``sleep`` / ``fall``.
+    // Unknown values are silently dropped server-side
+    // (forward-compatible with future risk types).
+    String? riskType,
   }) async {
     final targetProfileId = _resolveTargetProfileId(profileId);
+    final queryParams = <String, dynamic>{
+      'range': range,
+      'page': page,
+      'limit': limit,
+    };
+    if (riskType != null && riskType.trim().isNotEmpty) {
+      queryParams['risk_type'] = riskType.trim();
+    }
     final result = await _apiClient.get(
       '/analysis/risk-history',
       requiresAuth: true,
-      queryParams: {'range': range, 'page': page, 'limit': limit},
+      queryParams: queryParams,
       targetProfileId: targetProfileId,
     );
     final json = Map<String, dynamic>.from(result as Map);
@@ -247,7 +336,9 @@ class RiskAnalysisRepository {
           .map(
             (item) => RiskHistoryItemEntity(
               reportId: item['report_id'] as int? ?? 0,
-              score: _parseScore(item['risk_score'] ?? item['score']),
+              // Phase 1: prefer canonical `score`; fall back to deprecated
+              // `risk_score` so older backends still parse.
+              score: _parseScore(item['score'] ?? item['risk_score']),
               healthScore: _parseDouble(item['health_score']),
               level: _parseRiskLevel(item['risk_level'] as String?),
               displayStatus:

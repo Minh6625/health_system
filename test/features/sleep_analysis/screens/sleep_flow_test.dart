@@ -240,32 +240,32 @@ void main() {
   });
 
   testWidgets(
-    'SleepSettingsScreen updates local state for toggle and injected time picker',
+    'SleepSettingsScreen shows coming-soon disclosure and disables controls',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          home: SleepSettingsScreen(
-            timePicker: (context, initialTime) async =>
-                const TimeOfDay(hour: 23, minute: 15),
-          ),
-        ),
+        const MaterialApp(home: SleepSettingsScreen()),
       );
       await tester.pumpAndSettle();
 
+      // Disclosure banner is visible.
+      expect(find.text('Tính năng đang phát triển'), findsOneWidget);
+
+      // Preview shell still shows both cards regardless of switch state.
+      expect(find.text('Theo dõi tự động'), findsOneWidget);
       expect(find.text('Mục tiêu đi ngủ'), findsOneWidget);
+      expect(find.text('Nhắc nhở giờ ngủ'), findsOneWidget);
 
-      await tester.tap(find.byType(Switch).first);
+      // Switches are wired with onChanged: null → Material renders them disabled.
+      final switches = tester.widgetList<Switch>(find.byType(Switch)).toList();
+      expect(switches, hasLength(2));
+      expect(switches.every((s) => s.onChanged == null), isTrue);
+
+      // No time picker dialog should open when the disabled bedtime tile is
+      // tapped. warnIfMissed: false because the IgnorePointer wrapper is the
+      // contract under test — the tap is *expected* to miss its hit target.
+      await tester.tap(find.text('Mục tiêu đi ngủ'), warnIfMissed: false);
       await tester.pumpAndSettle();
-      expect(find.text('Mục tiêu đi ngủ'), findsNothing);
-
-      await tester.tap(find.byType(Switch).first);
-      await tester.pumpAndSettle();
-      expect(find.text('Mục tiêu đi ngủ'), findsOneWidget);
-
-      await tester.tap(find.text('Mục tiêu đi ngủ'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('11:15 PM'), findsOneWidget);
+      expect(find.byType(TimePickerDialog), findsNothing);
     },
   );
 }

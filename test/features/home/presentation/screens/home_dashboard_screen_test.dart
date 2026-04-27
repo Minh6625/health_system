@@ -11,6 +11,7 @@ import 'package:healthguard/features/device/models/device_model.dart';
 import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
 import 'package:healthguard/features/home/presentation/widgets/connection_status_strip.dart';
 import 'package:healthguard/features/home/presentation/widgets/sleep_insight_card.dart';
+import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:healthguard/features/sleep_analysis/repositories/sleep_repository.dart';
@@ -73,6 +74,13 @@ class _StubHomeDashboardProvider extends HomeDashboardProvider {
 
   @override
   Future<void> refreshDashboard() async {}
+}
+
+/// No-op stub so the dashboard's `context.read<ProfileProvider>().fetchProfile()`
+/// call in initState doesn't try to hit the network during tests.
+class _StubProfileProvider extends ProfileProvider {
+  @override
+  Future<void> fetchProfile({bool force = false}) async {}
 }
 
 class _StubDeviceProvider extends DeviceProvider {
@@ -175,6 +183,9 @@ Widget _buildDashboardApp() {
         create: (_) => _StubDeviceProvider(),
       ),
       ChangeNotifierProvider<SleepProvider>.value(value: sleepProvider),
+      ChangeNotifierProvider<ProfileProvider>(
+        create: (_) => _StubProfileProvider(),
+      ),
     ],
     child: MaterialApp(
       home: const HomeDashboardScreen(
@@ -300,15 +311,19 @@ void main() {
     test('dashboardRiskSummary and visual state match normalized levels', () {
       expect(
         dashboardRiskSummary('low'),
-        'Các chỉ số sức khỏe hôm nay đang ở mức ổn định.',
+        'Các chỉ số đang ổn định. Tiếp tục duy trì thói quen hiện tại nhé.',
       );
       expect(
         dashboardRiskSummary('medium'),
-        'Một vài chỉ số đang ở mức cảnh báo, bạn nên theo dõi thêm.',
+        'Một vài chỉ số đang lệch ngưỡng. Hãy nghỉ ngơi và đo lại sau ít giờ.',
       );
       expect(
         dashboardRiskSummary('critical'),
-        'Một vài chỉ số đang ở mức nguy hiểm, bạn cần theo dõi sát hơn.',
+        'Có chỉ số vượt ngưỡng nguy hiểm. Hãy nghỉ ngơi ngay và liên hệ bác sĩ nếu thấy bất thường.',
+      );
+      expect(
+        dashboardRiskSummary(null),
+        'Đang chờ dữ liệu mới từ thiết bị của bạn.',
       );
       expect(dashboardRiskVisualState('low'), RiskVisualState.low);
       expect(dashboardRiskVisualState('medium'), RiskVisualState.moderate);
@@ -362,7 +377,7 @@ void main() {
             isStale: true,
             riskLevel: 'critical',
           ),
-          'Dữ liệu đánh giá sức khỏe đã cũ, vui lòng đồng bộ lại thiết bị.',
+          'Dữ liệu đã cũ. Hãy đồng bộ thiết bị để xem đánh giá mới nhất.',
         );
       },
     );

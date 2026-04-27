@@ -67,6 +67,29 @@ Widget _buildShell(FakeFamilyRepository repository) {
 }
 
 void main() {
+  // Phase 10 (W6) regression: pin the badge polling cadence default so a
+  // future contributor cannot quietly drop it back to 2 seconds. Tab badges
+  // already refresh on tab change and on push events; this timer is just
+  // the recovery fallback.
+  group('FamilyShellScreen badge cadence', () {
+    test('default badgeRefreshInterval is 30 seconds', () {
+      const screen = FamilyShellScreen();
+      expect(screen.badgeRefreshInterval, const Duration(seconds: 30));
+    });
+
+    test('enableAutoRefresh defaults to true', () {
+      const screen = FamilyShellScreen();
+      expect(screen.enableAutoRefresh, isTrue);
+    });
+
+    test('badgeRefreshInterval is overridable through the ctor', () {
+      const screen = FamilyShellScreen(
+        badgeRefreshInterval: Duration(milliseconds: 50),
+      );
+      expect(screen.badgeRefreshInterval, const Duration(milliseconds: 50));
+    });
+  });
+
   testWidgets(
     'family shell hides SOS tab when no linked profile can receive alerts',
     (tester) async {

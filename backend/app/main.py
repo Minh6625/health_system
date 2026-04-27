@@ -1,8 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.router import api_router
+from app.core.risk_contract import (
+    RISK_CONTRACT_VERSION,
+    RISK_CONTRACT_VERSION_HEADER,
+    applies_to_path,
+)
 from app.db.database import Base, engine
 from app.models.audit_log_model import AuditLog  # noqa: F401 - needed for table creation
 from app.models.user_model import User  # noqa: F401 - needed for table creation
@@ -33,7 +39,30 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # Expose the contract version header so browser clients (e.g. the
+    # Swagger UI on /mobile-docs) can read it. Without this CORS strips
+    # custom response headers from JS contexts.
+    expose_headers=[RISK_CONTRACT_VERSION_HEADER],
 )
+
+
+class RiskContractVersionMiddleware(BaseHTTPMiddleware):
+    """Inject ``X-Risk-Contract-Version`` on the mobile risk surface.
+
+    Phase 6: tags every response from
+    :data:`app.core.risk_contract.RISK_CONTRACT_ROUTE_PREFIXES` with the
+    current contract version so the mobile ``ApiClient`` can detect a
+    binary-vs-backend mismatch and surface a debug warning.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if applies_to_path(request.url.path):
+            response.headers[RISK_CONTRACT_VERSION_HEADER] = RISK_CONTRACT_VERSION
+        return response
+
+
+app.add_middleware(RiskContractVersionMiddleware)
 
 app.include_router(api_router)
 

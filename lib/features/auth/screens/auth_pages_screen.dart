@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:healthguard/shared/presentation/theme/app_colors.dart';
-import 'package:healthguard/shared/presentation/theme/app_radii.dart';
-import 'package:healthguard/features/auth/screens/start_screen.dart';
 import 'package:healthguard/features/auth/screens/login_screen.dart';
+import 'package:healthguard/features/auth/screens/start_screen.dart';
+import 'package:healthguard/features/auth/widgets/auth_pages/auth_get_started_cta.dart';
+import 'package:healthguard/features/auth/widgets/auth_pages/auth_page_indicator.dart';
 
+/// Two-page on-boarding flow: welcome (Start) + login form.
+///
+/// The screen owns the `PageController` and the `_currentPage` index used
+/// for the dot indicator + the welcome-page CTA. The CTA visuals and the
+/// dot indicator both live in their own widgets so this file stays
+/// focused on the page wiring.
 class AuthPagesScreen extends StatefulWidget {
   const AuthPagesScreen({super.key});
 
@@ -12,8 +18,12 @@ class AuthPagesScreen extends StatefulWidget {
 }
 
 class _AuthPagesScreenState extends State<AuthPagesScreen> {
+  static const int _pageCount = 2;
+  static const int _welcomePageIndex = 0;
+  static const int _loginPageIndex = 1;
+
   final PageController _pageController = PageController();
-  int _currentPage = 0;
+  int _currentPage = _welcomePageIndex;
 
   @override
   void dispose() {
@@ -21,13 +31,21 @@ class _AuthPagesScreenState extends State<AuthPagesScreen> {
     super.dispose();
   }
 
+  void _slideToLogin() {
+    _pageController.animateToPage(
+      _loginPageIndex,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final showCta = _currentPage == _welcomePageIndex;
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // PageView with Start and Login screens
           PageView(
             controller: _pageController,
             onPageChanged: (index) {
@@ -35,104 +53,25 @@ class _AuthPagesScreenState extends State<AuthPagesScreen> {
                 _currentPage = index;
               });
             },
-            children: const [StartScreen(isInPageView: true), LoginScreen()],
+            children: const [
+              StartScreen(isInPageView: true),
+              LoginScreen(),
+            ],
           ),
-
-          // Guide hint - Only show on first page
-          if (_currentPage == 0)
+          if (showCta)
             Positioned(
               bottom: 120,
               left: 0,
               right: 0,
-              child: AnimatedOpacity(
-                opacity: _currentPage == 0 ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        _pageController.animateToPage(
-                          1,
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeInOut,
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.brandPrimary,
-                          borderRadius: AppRadii.pillRadius,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.15),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Bắt đầu ngay',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.bgSurface,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Icon(
-                              Icons.arrow_forward,
-                              color: AppColors.bgSurface,
-                              size: 22,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              child: AuthGetStartedCta(onTap: _slideToLogin),
             ),
-
-          // Page Indicator
           Positioned(
             bottom: 50,
             left: 0,
             right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(
-                  2,
-                  (index) => AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    width: _currentPage == index ? 32 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _currentPage == index
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.5),
-                      borderRadius: BorderRadius.circular(4),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
+            child: AuthPageIndicator(
+              pageCount: _pageCount,
+              currentPage: _currentPage,
             ),
           ),
         ],

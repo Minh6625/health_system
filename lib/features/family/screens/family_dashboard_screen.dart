@@ -20,7 +20,13 @@ class FamilyDashboardScreen extends StatefulWidget {
   const FamilyDashboardScreen({
     super.key,
     this.enableAutoRefresh = true,
-    this.autoRefreshInterval = const Duration(seconds: 1),
+    // Caregiver dashboard polling: 1-second was draining battery and
+    // spamming the network for what is effectively a list of patient
+    // status cards. 15 seconds is the smallest interval that still feels
+    // "live" to a caregiver scanning a list, while letting the device
+    // sleep between cycles. Tests can still override this through the
+    // ctor argument.
+    this.autoRefreshInterval = const Duration(seconds: 15),
   });
 
   final bool enableAutoRefresh;

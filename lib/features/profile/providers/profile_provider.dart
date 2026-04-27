@@ -60,7 +60,7 @@ class ProfileProvider extends ChangeNotifier {
     String? avatarUrl,
     String? gender,
     String? bloodType,
-    double? heightCm,
+    int? heightCm,
     double? weightKg,
     List<dynamic>? medications,
     List<dynamic>? allergies,

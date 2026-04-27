@@ -1,18 +1,52 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
-import 'package:healthguard/features/device/mock/device_mock_data.dart';
 import 'package:healthguard/features/device/repositories/device_repository.dart';
 
 class DeviceConfigureProvider extends ChangeNotifier {
   final DeviceModel device;
-  final DeviceRepository _repository = DeviceRepository();
-  
-  // Local state for the form
+  final DeviceRepository _repository;
+
+  DeviceConfigureProvider(this.device, {DeviceRepository? repository})
+      : _repository = repository ?? DeviceRepository() {
+    deviceName = device.displayName;
+    // Seed the three notification toggles from the device's persisted
+    // calibration_data so the screen opens with whatever the user previously
+    // saved. Falls back to the backend defaults (`true`) for keys that are
+    // missing or for devices that have never been configured.
+    final calibration = device.calibrationData;
+    notifyHighHr = _readBool(calibration, 'notify_high_hr', defaultValue: true);
+    notifyLowSpo2 =
+        _readBool(calibration, 'notify_low_spo2', defaultValue: true);
+    notifyHighBp = _readBool(calibration, 'notify_high_bp', defaultValue: true);
+  }
+
+  static bool _readBool(
+    Map<String, dynamic>? source,
+    String key, {
+    required bool defaultValue,
+  }) {
+    if (source == null) return defaultValue;
+    final raw = source[key];
+    if (raw is bool) return raw;
+    return defaultValue;
+  }
+
+  // Tracks whether the user explicitly typed a different name in the
+  // TextField. We need this separate from `_isDirty` because the initial
+  // `deviceName` is `device.displayName`, which is a synthetic fallback for
+  // devices whose backend `device_name` is null. Saving the synthetic
+  // fallback as the real name without explicit user intent would be a
+  // regression, so we only PATCH when this flag is true.
+  bool _nameDirty = false;
+
+  // Local state for the form. The three notify_* booleans correspond 1:1
+  // to the backend `DeviceSettingsRequest` schema
+  // (`backend/app/schemas/device.py`) and are seeded from the device's
+  // persisted `calibration_data` in the constructor.
   late String deviceName;
-  bool vibrationAlert = true;
-  bool sleepTracking = true;
-  double lowBatteryThreshold = 20.0;
-  String syncInterval = '1h';
+  late bool notifyHighHr;
+  late bool notifyLowSpo2;
+  late bool notifyHighBp;
 
   // Dirty state tracking
   bool _isDirty = false;
@@ -27,43 +61,31 @@ class DeviceConfigureProvider extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
-  DeviceConfigureProvider(this.device) {
-    deviceName = device.displayName;
-    // In a real app, you would fetch actual config from an endpoint here.
-    // For now we use the initial values.
-  }
-
   void updateName(String name) {
     if (deviceName != name) {
       deviceName = name;
+      _nameDirty = true;
       _markDirty();
     }
   }
 
-  void updateVibration(bool value) {
-    if (vibrationAlert != value) {
-      vibrationAlert = value;
+  void updateNotifyHighHr(bool value) {
+    if (notifyHighHr != value) {
+      notifyHighHr = value;
       _markDirty();
     }
   }
 
-  void updateSleepTracking(bool value) {
-    if (sleepTracking != value) {
-      sleepTracking = value;
+  void updateNotifyLowSpo2(bool value) {
+    if (notifyLowSpo2 != value) {
+      notifyLowSpo2 = value;
       _markDirty();
     }
   }
 
-  void updateBatteryThreshold(double value) {
-    if (lowBatteryThreshold != value) {
-      lowBatteryThreshold = value;
-      _markDirty();
-    }
-  }
-
-  void updateSyncInterval(String value) {
-    if (syncInterval != value) {
-      syncInterval = value;
+  void updateNotifyHighBp(bool value) {
+    if (notifyHighBp != value) {
+      notifyHighBp = value;
       _markDirty();
     }
   }
@@ -80,14 +102,39 @@ class DeviceConfigureProvider extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
 
+    // Reject empty names up front so the user gets a clear Vietnamese
+    // message instead of a 422 from the backend Pydantic validator.
+    if (_nameDirty && deviceName.trim().isEmpty) {
+      _isSaving = false;
+      _errorMessage = 'Tên thiết bị không được để trống.';
+      notifyListeners();
+      return false;
+    }
+
     try {
-      // Call live API to update device settings
+      // 1) PATCH the device name when the user actually edited it. We do
+      //    this first so a server-side validation error (e.g. duplicate /
+      //    too long) surfaces before we touch settings.
+      if (_nameDirty) {
+        await _repository.updateDeviceName(
+          deviceId: device.id,
+          deviceName: deviceName.trim(),
+        );
+        _nameDirty = false;
+      }
+
+      // 2) PUT the three notify flags using backend keys directly.
+      //    Previously saveChanges aliased UI fields onto wrong keys
+      //    (vibrationAlert -> notify_high_hr AND notify_high_bp,
+      //    sleepTracking -> notify_low_spo2) and silently dropped a battery
+      //    slider and a sync dropdown. The new payload matches
+      //    DeviceSettingsRequest 1:1.
       await _repository.updateDeviceSettings(
         deviceId: device.id,
         calibrationData: {
-          'notify_high_hr': vibrationAlert,
-          'notify_low_spo2': sleepTracking,
-          'notify_high_bp': vibrationAlert,
+          'notify_high_hr': notifyHighHr,
+          'notify_low_spo2': notifyLowSpo2,
+          'notify_high_bp': notifyHighBp,
         },
       );
 
@@ -103,15 +150,27 @@ class DeviceConfigureProvider extends ChangeNotifier {
     }
   }
 
+  /// Unpair device against the live backend (`DELETE /devices/{id}`).
+  ///
+  /// Replaces a previous fake-delay-only implementation that always returned
+  /// `true`, leaving the device record on the server while the UI showed a
+  /// success message. We now propagate failure via [errorMessage] so the
+  /// danger-zone dialog can surface a real error.
   Future<bool> unpairDevice() async {
     _isUnpairing = true;
+    _errorMessage = null;
     notifyListeners();
 
-    // Simulate API call
-    await Future.delayed(const Duration(milliseconds: DeviceMockConfig.fakeApiDelayMs));
-
-    _isUnpairing = false;
-    notifyListeners();
-    return true; // Return true to indicate it was unpaired
+    try {
+      await _repository.unpairDevice(device.id);
+      _isUnpairing = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isUnpairing = false;
+      _errorMessage = e.toString().replaceFirst('Exception: ', '').trim();
+      notifyListeners();
+      return false;
+    }
   }
 }

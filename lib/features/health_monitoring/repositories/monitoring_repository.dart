@@ -1,5 +1,6 @@
 import 'package:healthguard/core/constants/api_endpoints.dart';
 import 'package:healthguard/core/network/api_client.dart';
+import 'package:healthguard/features/health_monitoring/models/health_report.dart';
 import 'package:healthguard/features/health_monitoring/models/vital_signs.dart';
 
 class MonitoringRepository {
@@ -21,5 +22,14 @@ class MonitoringRepository {
       targetProfileId: _resolveTargetProfileId(profileId),
     );
     return VitalSigns.fromJson(response as Map<String, dynamic>);
+  }
+
+  /// Lấy báo cáo sức khoẻ tổng hợp 24h (vitals avg + risk + health score).
+  Future<HealthReport> getHealthReport({String? profileId}) async {
+    final response = await _client.get(
+      ApiEndpoints.healthReport,
+      targetProfileId: _resolveTargetProfileId(profileId),
+    );
+    return HealthReport.fromJson(response as Map<String, dynamic>);
   }
 }

@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:healthguard/core/network/risk_contract_version.dart';
 import 'package:healthguard/features/auth/models/auth_response_model.dart';
 import 'package:healthguard/features/auth/services/auth_session_service.dart';
 import 'package:http/http.dart' as http;
@@ -194,6 +195,13 @@ class ApiClient {
       );
       final response = await send(headers);
 
+      // Phase 6: every response on the mobile risk surface carries
+      // `X-Risk-Contract-Version`. Inspecting on success keeps the
+      // singleton's `latestObserved` fresh for diagnostic logging.
+      // Routes that are NOT on the risk surface simply omit the header
+      // and the inspector returns silently.
+      RiskContractVersion.instance.inspect(response.headers);
+
       if (isSuccess(response)) {
         if (response.body.isEmpty) {
           return <String, dynamic>{};
@@ -301,6 +309,12 @@ class ApiClient {
   }
 
   String _extractServerErrorMessage(http.Response response) {
+    if (kDebugMode) {
+      final method = response.request?.method ?? '?';
+      final url = response.request?.url.toString() ?? '?';
+      debugPrint('[ApiClient] $method $url → ${response.statusCode}');
+      debugPrint('[ApiClient] response body: ${response.body}');
+    }
     try {
       final body = jsonDecode(response.body);
       if (body is Map<String, dynamic>) {

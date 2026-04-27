@@ -397,7 +397,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   controller: confirmPasswordController,
                   obscureText: true,
                   textInputAction: TextInputAction.done,
-                  borderColor: _isConfirmPasswordPristine ? null : (_isConfirmPasswordMatch ? AppColors.success : AppColors.critical),
+                  // Border color provides live feedback while typing
+                  // (red on mismatch, green on match) and the AuthTextField's
+                  // own errorText surfaces the validator message on submit.
+                  // A previous standalone Text widget that re-rendered the
+                  // same "Mật khẩu xác nhận không khớp" copy directly below
+                  // the field has been removed because it duplicated the
+                  // validator output and produced two error rows on submit.
+                  borderColor: _isConfirmPasswordPristine
+                      ? null
+                      : (_isConfirmPasswordMatch
+                            ? AppColors.success
+                            : AppColors.critical),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
                       return 'Vui lòng xác nhận mật khẩu';
@@ -408,17 +419,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     return null;
                   },
                 ),
-                if (!_isConfirmPasswordPristine && !_isConfirmPasswordMatch)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 8.0, left: 12.0),
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Mật khẩu xác nhận không khớp',
-                        style: TextStyle(color: AppColors.critical, fontSize: 12),
-                      ),
-                    ),
-                  ),
 
                 const SizedBox(height: 16),
                 Row(

@@ -31,7 +31,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Chưa có mốc so sánh trước đó'), findsOneWidget);
+      expect(find.text('Chưa có lần đo trước để so sánh'), findsOneWidget);
       expect(find.textContaining('so với lần trước'), findsNothing);
     },
   );

@@ -49,8 +49,9 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
   @override
   Future<RiskReportDetailEntity> fetchReportDetail(
     int reportId,
-    String? profileId,
-  ) async {
+    String? profileId, {
+    String? audience,
+  }) async {
     calls.add(_RepoCall('detail', profileId, reportId: reportId));
     return detailById[reportId]!;
   }
@@ -61,6 +62,7 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
     String range = '7d',
     int page = 1,
     int limit = 20,
+    String? riskType,
   }) async {
     calls.add(_RepoCall('history', profileId, range: range, page: page));
     return historyByRange[range]![page]!;
@@ -230,6 +232,13 @@ void main() {
   testWidgets(
     'self flow uses CTA path from report to detail history and drilldowns',
     (tester) async {
+      // The redesigned trend cards add axis labels, threshold lines and
+      // delta badges, which makes the layout legitimately taller. Bump
+      // the test surface so all rows fit without ad-hoc scroll plumbing.
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
       final repository = _FakeRiskAnalysisRepository(
         latestReport: _report(isStale: true),
         detailById: {
@@ -339,7 +348,7 @@ void main() {
       await tester.tap(find.text('Xem lịch sử'));
       await tester.pumpAndSettle();
       expect(find.text('Lịch sử đánh giá rủi ro'), findsOneWidget);
-      expect(find.text('Điểm trung bình'), findsOneWidget);
+      expect(find.text('Điểm sức khoẻ trung bình'), findsOneWidget);
 
       await tester.tap(find.text('30 ngày'));
       await tester.pumpAndSettle();
@@ -456,7 +465,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Chưa có lịch sử'), findsOneWidget);
-    expect(find.text('Điểm trung bình'), findsNothing);
+    expect(find.text('Điểm sức khoẻ trung bình'), findsNothing);
     expect(find.textContaining('Cao nhất:'), findsNothing);
   });
 }

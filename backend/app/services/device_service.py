@@ -29,6 +29,18 @@ class DeviceService:
             and last_seen_at >= online_threshold
         )
 
+        # ``calibration_data`` is stored as a JSONB column. SQLAlchemy returns
+        # it as a dict already, but admin paths sometimes hand us the raw JSON
+        # string, so accept both shapes defensively.
+        raw_calibration = row.get("calibration_data")
+        if isinstance(raw_calibration, str):
+            try:
+                raw_calibration = json.loads(raw_calibration)
+            except (TypeError, ValueError):
+                raw_calibration = None
+        if not isinstance(raw_calibration, dict):
+            raw_calibration = None
+
         return DeviceItemResponse(
             id=int(row["id"]),
             uuid=str(row["uuid"]),
@@ -46,6 +58,7 @@ class DeviceService:
             last_sync_at=row.get("last_sync_at"),
             mqtt_client_id=row.get("mqtt_client_id"),
             registered_at=row.get("registered_at"),
+            calibration_data=raw_calibration,
         )
 
     @staticmethod
@@ -152,7 +165,8 @@ class DeviceService:
                         last_seen_at,
                         last_sync_at,
                         mqtt_client_id,
-                        registered_at
+                        registered_at,
+                        calibration_data
                     """
                 ),
                 {
@@ -212,7 +226,8 @@ class DeviceService:
                     last_seen_at,
                     last_sync_at,
                     mqtt_client_id,
-                    registered_at
+                    registered_at,
+                    calibration_data
                 """
             ),
             {
@@ -289,7 +304,8 @@ class DeviceService:
                         last_seen_at,
                         last_sync_at,
                         mqtt_client_id,
-                        registered_at
+                        registered_at,
+                        calibration_data
                     FROM devices
                     WHERE user_id = :user_id
                       AND deleted_at IS NULL
@@ -363,7 +379,8 @@ class DeviceService:
                         last_seen_at,
                         last_sync_at,
                         mqtt_client_id,
-                        registered_at
+                        registered_at,
+                        calibration_data
                     FROM devices
                     WHERE id = :device_id
                       AND user_id = :user_id
@@ -450,7 +467,8 @@ class DeviceService:
                     last_seen_at,
                     last_sync_at,
                     mqtt_client_id,
-                    registered_at
+                    registered_at,
+                    calibration_data
                 """
             ),
             {

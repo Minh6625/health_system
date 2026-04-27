@@ -93,7 +93,7 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       key: const ValueKey('sos-confirm-screen'),
-      backgroundColor: AppColors.textPrimary.withValues(alpha: 0.5),
+      backgroundColor: AppColors.bgPrimary,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(

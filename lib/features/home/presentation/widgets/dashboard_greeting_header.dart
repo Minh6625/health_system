@@ -5,6 +5,7 @@ import '../../../../shared/presentation/theme/app_colors.dart';
 import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
+import '../../../../shared/presentation/widgets/remote_avatar.dart';
 
 class DashboardGreetingHeader extends StatefulWidget {
   final String displayName;
@@ -117,18 +118,10 @@ class _DashboardGreetingHeaderState extends State<DashboardGreetingHeader>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
+          RemoteAvatar(
+            url: widget.avatarUrl,
             radius: 24,
-            backgroundColor: AppColors.strokeSoft,
-            backgroundImage: widget.avatarUrl != null
-                ? NetworkImage(widget.avatarUrl!)
-                : null,
-            child: widget.avatarUrl == null
-                ? const Icon(
-                    Icons.person_outline_rounded,
-                    color: AppColors.textSecondary,
-                  )
-                : null,
+            fallbackIcon: Icons.person_outline_rounded,
           ),
           const SizedBox(width: AppSpacing.gapMd),
           Expanded(

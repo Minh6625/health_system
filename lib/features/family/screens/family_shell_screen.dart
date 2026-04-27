@@ -21,7 +21,13 @@ class FamilyShellScreen extends StatefulWidget {
     super.key,
     this.initialTab = 0,
     this.enableAutoRefresh = true,
-    this.badgeRefreshInterval = const Duration(seconds: 2),
+    // Tab badges (relationship requests + SOS unread counts) only ever
+    // change when the caregiver receives a server-pushed event or
+    // navigates between tabs, both of which already trigger an explicit
+    // refresh. Polling every 2 seconds was therefore pure overhead.
+    // 30 seconds is enough to recover from a missed push without
+    // dominating the request budget.
+    this.badgeRefreshInterval = const Duration(seconds: 30),
   });
 
   /// 0 = Theo dõi, 1 = Liên hệ, 2 = SOS
@@ -34,7 +40,11 @@ class FamilyShellScreen extends StatefulWidget {
 }
 
 class _FamilyShellScreenState extends State<FamilyShellScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    // _syncTabController disposes the existing TabController and creates a new
+    // one when the caregiver's `can_receive_alerts` permission flips, so the
+    // state legitimately needs more than one ticker over its lifetime.
+    // SingleTickerProviderStateMixin would assert on the second creation.
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   late FamilyRelationshipProvider _familyProvider;
   late AuthProvider _authProvider;
@@ -179,24 +189,18 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
     _lastRefreshedUserId = user.userId;
 
     _isRefreshingBadges = true;
+    final dashboardProvider = context.read<FamilyDashboardProvider>();
+    final emergencyProvider = context.read<EmergencyCaregiverProvider>();
     try {
       await _familyProvider.load(user.userId, silent: silent);
       _syncTabController(_familyProvider.canReceiveAlerts);
 
       final futures = <Future<void>>[
-        context.read<FamilyDashboardProvider>().loadDashboard(
-              user.userId,
-              silent: silent,
-            ),
+        dashboardProvider.loadDashboard(user.userId, silent: silent),
       ];
 
       if (_canReceiveAlerts && _tabController.index != 2) {
-        futures.add(
-          context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(
-                'all',
-                silent: silent,
-              ),
-        );
+        futures.add(emergencyProvider.fetchSOSAlerts('all', silent: silent));
       }
 
       await Future.wait(futures);

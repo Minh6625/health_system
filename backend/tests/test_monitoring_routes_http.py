@@ -6,6 +6,7 @@ from fastapi import FastAPI, Header, HTTPException, status
 from fastapi.testclient import TestClient
 
 from app.api.routes.monitoring import router as monitoring_router
+from app.core.audience import AudienceEnum, require_clinician_audience
 from app.core.dependencies import get_db, get_target_profile_id
 from app.main import app as main_app
 from app.schemas.monitoring import (
@@ -43,8 +44,15 @@ def _build_test_client() -> TestClient:
     def _override_db():
         yield object()
 
+    # Phase 5 added ``require_clinician_audience`` to the detail route.
+    # This existing test exercises the patient surface only; override the
+    # gate so the auth-less TestClient doesn't 403.
+    def _override_audience() -> AudienceEnum:
+        return AudienceEnum.patient
+
     app.dependency_overrides[get_target_profile_id] = _override_target_profile_id
     app.dependency_overrides[get_db] = _override_db
+    app.dependency_overrides[require_clinician_audience] = _override_audience
     return TestClient(app)
 
 
@@ -107,7 +115,7 @@ def test_mobile_monitoring_routes_use_canonical_shape_and_target_profile(
             lambda patient_id, db: (
                 _record("health", patient_id),
                 HealthReportResponse(
-                    vitals_24h_avg={"avg_hr": 72.0},
+                    vitals_24h_avg={"heart_rate": 72.0},
                     latest_risk_score=18.0,
                     risk_level="low",
                     risk_type="general",
@@ -190,7 +198,10 @@ def test_mobile_monitoring_routes_use_canonical_shape_and_target_profile(
         MonitoringService,
         "get_risk_history",
         staticmethod(
-            lambda patient_id, db, range_key="7d", page=1, limit=20: (
+            # Phase 4A-full slice 3b added the optional ``risk_type``
+            # kwarg; this stub accepts it but the test doesn't assert
+            # on filter behaviour (covered separately).
+            lambda patient_id, db, range_key="7d", page=1, limit=20, risk_type=None: (
                 _record("history", patient_id),
                 RiskHistoryResponse(
                     range=range_key,

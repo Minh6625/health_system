@@ -13,6 +13,7 @@ import 'package:healthguard/features/auth/screens/auth_pages_screen.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
+import 'package:healthguard/features/profile/providers/clinician_audience_provider.dart';
 import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
 import 'package:healthguard/features/home/providers/home_dashboard_provider.dart';
 import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
@@ -194,6 +195,13 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         ChangeNotifierProvider(
           create: (_) =>
               EmergencyCaregiverProvider(EmergencyCaregiverRepository()),
+        ),
+        // Phase 8 / slice 4a: persistent clinician audience toggle.
+        // ``init()`` reads the secure-storage value asynchronously; the
+        // settings screen's switch is disabled until isInitialized is
+        // true so we never flicker the wrong state.
+        ChangeNotifierProvider<ClinicianAudienceProvider>(
+          create: (_) => ClinicianAudienceProvider()..init(),
         ),
       ],
       child: NotificationRuntimeAuthBridge(

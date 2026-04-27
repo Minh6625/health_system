@@ -39,6 +39,28 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
     );
   }
 
+  Future<void> _onRecalculate() async {
+    await context.read<RiskReportProvider>().recalculateRisk(widget.profileId);
+    if (!mounted) return;
+    final provider = context.read<RiskReportProvider>();
+    if (provider.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(provider.error!),
+          backgroundColor: AppColors.critical,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã đánh giá lại thành công!'),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLinkedProfile =
@@ -89,7 +111,17 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
     final report = provider.report;
     if (provider.isEmpty) {
       return Center(
-        child: Text(provider.emptyMessage ?? 'Chưa có dữ liệu đánh giá'),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.gapLg),
+          child: Text(
+            provider.emptyMessage ??
+                'Chưa có báo cáo rủi ro. Hãy đeo thiết bị thêm vài giờ để hệ thống tạo báo cáo đầu tiên.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ),
       );
     }
 
@@ -126,7 +158,10 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                 const SizedBox(height: AppSpacing.gapLg),
                 TopFactorChipsSection(factors: report.topFactors),
                 const SizedBox(height: AppSpacing.gapLg),
-                RiskTrendPreviewCard(trend7d: report.trend7d),
+                RiskTrendPreviewCard(
+                  trend7d: report.healthTrend7d,
+                  healthDelta: report.healthDelta,
+                ),
                 const SizedBox(height: AppSpacing.gapLg),
                 RecommendationPreviewCard(
                   recommendations: report.recommendationPreview,
@@ -187,6 +222,55 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                           color: AppColors.brandPrimary,
                         ),
                       ),
+                    ),
+                    const SizedBox(height: AppSpacing.gapMd),
+                    OutlinedButton(
+                      onPressed: (provider.isLoading || provider.isRecalculating)
+                          ? null
+                          : _onRecalculate,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppSpacing.gapLg,
+                        ),
+                        side: BorderSide(
+                          color: (provider.isLoading || provider.isRecalculating)
+                              ? AppColors.strokeSoft
+                              : AppColors.success,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: AppRadii.cardRadius,
+                        ),
+                      ),
+                      child: provider.isRecalculating
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.success,
+                              ),
+                            )
+                          : Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.refresh_rounded,
+                                  size: 18,
+                                  color: (provider.isLoading || provider.isRecalculating)
+                                      ? AppColors.textSecondary
+                                      : AppColors.success,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Đánh giá lại',
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    color: (provider.isLoading || provider.isRecalculating)
+                                        ? AppColors.textSecondary
+                                        : AppColors.success,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ],
                 ),

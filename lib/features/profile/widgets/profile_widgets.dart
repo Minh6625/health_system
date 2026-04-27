@@ -96,7 +96,7 @@ class ProfileMenuTile extends StatelessWidget {
                       Text(
                         title,
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: FontWeight.w500,
                           color: AppColors.textPrimary,
                         ),
@@ -106,7 +106,7 @@ class ProfileMenuTile extends StatelessWidget {
                         Text(
                           subtitle!,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 14,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -163,7 +163,7 @@ class ProfileSectionLabel extends StatelessWidget {
       child: Text(
         text.toUpperCase(),
         style: const TextStyle(
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.6,
           color: AppColors.textSecondary,
@@ -251,7 +251,7 @@ class DangerMenuTile extends StatelessWidget {
                       Text(
                         title,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 17,
                           fontWeight: FontWeight.w500,
                           color: AppColors.critical,
                         ),
@@ -261,7 +261,7 @@ class DangerMenuTile extends StatelessWidget {
                         Text(
                           subtitle!,
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 14,
                             color: AppColors.critical.withValues(alpha: 0.75),
                           ),
                         ),

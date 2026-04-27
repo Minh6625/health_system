@@ -27,8 +27,9 @@ class FamilyProfileSnapshot {
   final int sleepDurationMinutes; // e.g. 390 = 6h30
   final String sleepQuality; // 'Tốt', 'Trung bình', 'Kém'
 
-  // Health score 7 ngày
-  final int healthScore7Days; // 0–100
+  // Health score 7 ngày — null nghĩa là chưa có health_report (no data),
+  // giá trị int (kể cả 0) nghĩa là score thật từ latest risk row.
+  final int? healthScore7Days; // 0–100 hoặc null
   final String healthScoreLevel; // 'Thấp', 'Trung bình', 'Cao'
 
   FamilyProfileSnapshot({
@@ -51,7 +52,7 @@ class FamilyProfileSnapshot {
     this.specialNote = '',
     this.sleepDurationMinutes = 420,
     this.sleepQuality = 'Tốt',
-    this.healthScore7Days = 70,
+    this.healthScore7Days,
     this.healthScoreLevel = 'Trung bình',
   });
 
@@ -79,7 +80,7 @@ class FamilyProfileSnapshot {
       specialNote: json['special_note'] as String? ?? '',
       sleepDurationMinutes: json['sleep_duration_minutes'] as int? ?? 0,
       sleepQuality: json['sleep_quality'] as String? ?? 'Trung bình',
-      healthScore7Days: json['health_score_7_days'] as int? ?? 0,
+      healthScore7Days: json['health_score_7_days'] as int?,
       healthScoreLevel: json['health_score_level'] as String? ?? 'Trung bình',
     );
   }

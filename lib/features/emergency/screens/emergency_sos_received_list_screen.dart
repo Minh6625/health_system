@@ -14,7 +14,13 @@ import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 class EmergencySOSReceivedListScreen extends StatefulWidget {
   const EmergencySOSReceivedListScreen({
     super.key,
-    this.autoRefreshInterval = const Duration(seconds: 2),
+    // SOS alerts already arrive through the realtime push channel
+    // (`SosRealtimeAlertService`); this periodic poll is a recovery
+    // path for missed pushes. 2 seconds was aggressive enough that
+    // every caregiver phone hammered the backend whenever the screen
+    // was foregrounded. 10 seconds keeps the recovery latency below
+    // the typical user reaction time without spamming the network.
+    this.autoRefreshInterval = const Duration(seconds: 10),
     this.enableAutoRefresh = true,
   });
 

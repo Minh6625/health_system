@@ -1,407 +1,449 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+
+import '../../../core/routes/app_router.dart';
 import '../../../shared/presentation/theme/app_colors.dart';
 import '../../../shared/presentation/theme/app_radii.dart';
 import '../../../shared/presentation/theme/app_spacing.dart';
 import '../../../shared/presentation/theme/app_text_styles.dart';
-import '../widgets/mini_line_chart.dart';
+import '../models/health_report.dart';
+import '../providers/health_report_provider.dart';
+import '../widgets/error_view.dart';
 
-/// Macro-view screen showing a consolidated report of all health events and trends.
-/// Follows Plan §2.2: Combines History and Stats into a single screen with Tabs.
-class HealthReportScreen extends StatelessWidget {
-  const HealthReportScreen({super.key});
+/// 24-hour aggregated health report screen. Wired to `/metrics/health-report`
+/// (vitals 24h avg + latest risk + AI health score). Pull-to-refresh.
+class HealthReportScreen extends StatefulWidget {
+  const HealthReportScreen({super.key, this.profileId});
+
+  final String? profileId;
 
   @override
-  Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        backgroundColor: AppColors.bgPrimary,
-        appBar: AppBar(
-          title: const Text('Báo cáo & Nhật ký'),
-          backgroundColor: AppColors.bgSurface,
-          foregroundColor: AppColors.textPrimary,
-          elevation: 0,
-          centerTitle: true,
-          bottom: TabBar(
-            labelColor: AppColors.brandPrimary,
-            unselectedLabelColor: AppColors.textSecondary,
-            indicatorColor: AppColors.brandPrimary,
-            indicatorWeight: 3,
-            labelStyle: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.bold),
-            tabs: const [
-              Tab(text: 'Nhật ký'),
-              Tab(text: 'Thống kê'),
-            ],
-          ),
-        ),
-        body: const TabBarView(
-          children: [
-            _TimelineTab(),
-            _TrendsTab(),
-          ],
-        ),
-      ),
-    );
-  }
+  State<HealthReportScreen> createState() => _HealthReportScreenState();
 }
 
-// ── Timeline Tab ────────────────────────────────────────────────────────────
-class _TimelineTab extends StatelessWidget {
-  const _TimelineTab();
+class _HealthReportScreenState extends State<HealthReportScreen> {
+  late final HealthReportProvider _provider;
+
+  @override
+  void initState() {
+    super.initState();
+    _provider = HealthReportProvider(profileId: widget.profileId);
+    _provider.load();
+  }
+
+  @override
+  void dispose() {
+    _provider.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // New design: Group by Date
-    final Map<String, List<Map<String, dynamic>>> groupedEvents = {
-      'Hôm nay': [
-        {'time': '10:30 AM', 'title': 'Nhịp tim cao (110 BPM)', 'type': 'alert', 'color': AppColors.warning, 'icon': Icons.warning_rounded, 'desc': 'Phát hiện nhịp tim đập nhanh khi nghỉ ngơi.'},
-        {'time': '09:15 AM', 'title': 'Huyết áp bình thường', 'type': 'info', 'color': AppColors.success, 'icon': Icons.favorite_rounded, 'desc': '120/80 mmHg - Chỉ số an toàn.'},
-        {'time': '08:00 AM', 'title': 'Đo nhịp tim (82 BPM)', 'type': 'info', 'color': AppColors.success, 'icon': Icons.monitor_heart, 'desc': 'Chỉ số trong vùng an toàn.'},
-      ],
-      'Hôm qua': [
-        {'time': '08:45 PM', 'title': 'Mất kết nối cảm biến', 'type': 'error', 'color': AppColors.textSecondary, 'icon': Icons.bluetooth_disabled, 'desc': 'Đồng hồ mất tín hiệu trong 15 phút.'},
-        {'time': '02:10 PM', 'title': 'SpO2 thấp (90%)', 'type': 'critical', 'color': AppColors.critical, 'icon': Icons.water_drop, 'desc': 'Nồng độ oxy xuống thấp, cần theo dõi.'},
-      ],
-    };
-
-    return ListView.builder(
-      padding: AppSpacing.screenHorizontalPadding.copyWith(top: AppSpacing.sectionGapMd, bottom: AppSpacing.sectionGapMd),
-      itemCount: groupedEvents.length,
-      itemBuilder: (context, index) {
-        final dateKey = groupedEvents.keys.elementAt(index);
-        final eventsInDate = groupedEvents[dateKey]!;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Sticky-like Date Header
-            Padding(
-              padding: EdgeInsets.only(bottom: AppSpacing.sectionGapMd, top: index == 0 ? 0 : AppSpacing.sectionGapMd),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gapMd, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppStateColors.infoBg,
-                  borderRadius: AppRadii.cardRadius,
-                ),
-                child: Text(
-                  dateKey,
-                  style: AppTextStyles.caption.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.brandPrimary,
-                  ),
-                ),
-              ),
+    return ListenableBuilder(
+      listenable: _provider,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.bgPrimary,
+          appBar: AppBar(
+            title: const Text('Báo cáo sức khoẻ'),
+            backgroundColor: AppColors.bgSurface,
+            foregroundColor: AppColors.textPrimary,
+            elevation: 0,
+            centerTitle: true,
+          ),
+          body: SafeArea(
+            child: RefreshIndicator(
+              onRefresh: _provider.refresh,
+              child: _buildBody(),
             ),
-            
-            // Events for this date
-            ...eventsInDate.asMap().entries.map((entry) {
-              final evIndex = entry.key;
-              final ev = entry.value;
-              final isLastEventInDate = evIndex == eventsInDate.length - 1;
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Timeline line + dot
-                  Column(
-                    children: [
-                      Container(
-                        width: 14,
-                        height: 14,
-                        margin: const EdgeInsets.only(top: AppSpacing.gapXs),
-                        decoration: BoxDecoration(
-                          color: ev['type'] == 'critical' ? AppColors.critical : (ev['color'] as Color),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.bgSurface, width: 2),
-                          boxShadow: [
-                            BoxShadow(
-                              color: (ev['color'] as Color).withValues(alpha: 0.3),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (!isLastEventInDate)
-                        Container(
-                          width: 2,
-                          height: 70, // Connector line
-                          color: AppColors.strokeSoft,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: AppSpacing.sectionGapMd),
-                  
-                  // Event Card
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.only(bottom: AppSpacing.sectionGapLg),
-                      padding: AppSpacing.cardPadding,
-                      decoration: BoxDecoration(
-                        color: AppColors.bgSurface,
-                        borderRadius: AppRadii.cardRadius,
-                        border: Border.all(
-                          color: ev['type'] == 'critical'
-                              ? AppColors.critical.withValues(alpha: 0.3)
-                              : AppColors.strokeSoft,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.02),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(AppSpacing.gapSm),
-                            decoration: BoxDecoration(
-                              color: (ev['color'] as Color).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
-                            ),
-                            child: Icon(ev['icon'] as IconData, color: ev['color'] as Color, size: 24),
-                          ),
-                          const SizedBox(width: AppSpacing.sectionGapMd),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        ev['title'] as String,
-                                        style: AppTextStyles.bodyMedium.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.textPrimary,
-                                        ),
-                                      ),
-                                    ),
-                                    Text(
-                                      ev['time'] as String,
-                                      style: AppTextStyles.caption,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  ev['desc'] as String,
-                                  style: AppTextStyles.caption.copyWith(
-                                    color: AppColors.textSecondary,
-                                    height: 1.3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            }),
-          ],
+          ),
         );
       },
     );
   }
+
+  Widget _buildBody() {
+    switch (_provider.state) {
+      case HealthReportUIState.initial:
+      case HealthReportUIState.loading:
+        return const Center(child: CircularProgressIndicator());
+      case HealthReportUIState.error:
+        return ErrorView(
+          message:
+              _provider.error ??
+              'Không thể tải báo cáo.\nVui lòng kiểm tra kết nối.',
+          onRetry: _provider.load,
+        );
+      case HealthReportUIState.success:
+        final report = _provider.report;
+        if (report == null) {
+          return const Center(
+            child: Text('Chưa có dữ liệu báo cáo trong 24h qua.'),
+          );
+        }
+        return SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: AppSpacing.screenHorizontalPadding.copyWith(
+            top: AppSpacing.sectionGapMd,
+            bottom: AppSpacing.sectionGapXl,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (report.isStale) _StaleBadge(),
+              if (report.isStale)
+                const SizedBox(height: AppSpacing.sectionGapMd),
+              _HealthScoreHero(report: report),
+              const SizedBox(height: AppSpacing.sectionGapLg),
+              _SectionHeader(title: 'Trung bình 24 giờ qua'),
+              const SizedBox(height: AppSpacing.gapMd),
+              _VitalsAvgGrid(vitals: report.vitals24hAvg),
+              const SizedBox(height: AppSpacing.sectionGapLg),
+              _SectionHeader(title: 'Đánh giá rủi ro'),
+              const SizedBox(height: AppSpacing.gapMd),
+              _RiskInsightCard(
+                report: report,
+                onTap: () => Navigator.pushNamed(
+                  context,
+                  AppRouter.riskReport,
+                  arguments: {'profileId': widget.profileId},
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sectionGapLg),
+              if (report.lastUpdated != null)
+                _LastUpdatedRow(timestamp: report.lastUpdated!),
+            ],
+          ),
+        );
+    }
+  }
 }
 
-// ── Trends Tab ──────────────────────────────────────────────────────────────
-class _TrendsTab extends StatelessWidget {
-  const _TrendsTab();
+// ── Section header ──────────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+  final String title;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: AppSpacing.screenHorizontalPadding.copyWith(top: AppSpacing.sectionGapMd, bottom: AppSpacing.sectionGapMd),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Text(title, style: AppTextStyles.sectionTitle);
+  }
+}
+
+// ── Stale badge ─────────────────────────────────────────────────────────────
+
+class _StaleBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.gapMd,
+        vertical: 10,
+      ),
+      decoration: BoxDecoration(
+        color: AppStateColors.warningBg,
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+        border: Border.all(color: const Color(0xFFF8CF9B)),
+      ),
+      child: Row(
         children: [
-          // Range Selector (Mockup)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _FilterChip(label: 'Hôm nay', isSelected: false),
-                const SizedBox(width: AppSpacing.gapSm),
-                _FilterChip(label: '7 Ngày qua', isSelected: true),
-                const SizedBox(width: AppSpacing.gapSm),
-                _FilterChip(label: '1 Tháng qua', isSelected: false),
-              ],
+          const Icon(
+            Icons.access_time_rounded,
+            size: 18,
+            color: AppColors.warning,
+          ),
+          const SizedBox(width: AppSpacing.gapSm),
+          Expanded(
+            child: Text(
+              'Dữ liệu chưa cập nhật trong 24h qua. Đeo đồng hồ để có báo cáo chính xác.',
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.warning,
+                fontWeight: FontWeight.w600,
+                height: 1.3,
+              ),
             ),
           ),
-          const SizedBox(height: AppSpacing.sectionGapXl),
-          
-          // Thống kê 1: Nhịp tim (Tách riêng để tránh lộn xộn trục Y)
-          _buildMetricSection(
-            context,
-            title: 'Biến động Nhịp tim (BPM)',
-            insightText: 'Nhịp tim trung bình trong tuần là 78 bpm, duy trì vùng an toàn.',
-            avgValue: '78',
-            unit: 'bpm',
-            color: Colors.red,
-            chartHeight: 120,
-            chartData: const [[72, 75, 78, 85, 82, 76, 74, 72]],
-            chartColors: [Colors.red.shade400],
-            xLabels: const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN', 'HN'],
-            legends: [
-              _Legend(Colors.red.shade400, 'Nhịp tim'),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sectionGapXl),
-
-          // Thống kê 2: Huyết áp (Chỉ chứa Tâm thu & Tâm trương vì cùng chung đơn vị mmHg)
-          _buildMetricSection(
-            context,
-            title: 'Huyết áp (mmHg)',
-            insightText: 'Huyết áp có dấu hiệu tăng nhẹ vào buổi sáng, cần chú ý theo dõi.',
-            avgValue: '124 / 82',
-            unit: 'mmHg',
-            color: Colors.purple,
-            chartHeight: 140,
-            chartData: const [
-              [120, 122, 118, 125, 130, 128, 120, 118], // Sys
-              [80, 82, 78, 85, 88, 85, 80, 78], // Dia
-            ],
-            chartColors: [Colors.purple.shade400, Colors.teal.shade400],
-            xLabels: const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN', 'HN'],
-            legends: [
-              _Legend(Colors.purple.shade400, 'Tâm thu'),
-              const SizedBox(width: AppSpacing.sectionGapMd),
-              _Legend(Colors.teal.shade400, 'Tâm trương'),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sectionGapXl),
-          
-          // Thống kê 3: SpO2
-          _buildMetricSection(
-            context,
-            title: 'Khí máu (SpO2)',
-            insightText: 'Oxy trong máu luôn ổn định trên 96%.',
-            avgValue: '98',
-            unit: '%',
-            color: Colors.blue,
-            chartHeight: 100,
-            chartData: const [[98, 97, 98, 99, 98, 97, 96, 98]],
-            chartColors: [Colors.blue.shade400],
-            xLabels: const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN', 'HN'],
-            legends: [], // 1 line, no legend needed
-          ),
-          const SizedBox(height: AppSpacing.sectionGapXl),
         ],
       ),
     );
   }
+}
 
-  Widget _buildMetricSection(
-    BuildContext context, {
-    required String title,
-    required String insightText,
-    required String avgValue,
-    required String unit,
-    required MaterialColor color,
-    required double chartHeight,
-    required List<List<double>> chartData,
-    required List<Color> chartColors,
-    required List<String> xLabels,
-    required List<Widget> legends,
-  }) {
+// ── Health score hero card ──────────────────────────────────────────────────
+
+class _HealthScoreHero extends StatelessWidget {
+  const _HealthScoreHero({required this.report});
+  final HealthReport report;
+
+  Color _levelColor(String? level) {
+    switch (level?.toLowerCase()) {
+      case 'critical':
+      case 'high':
+        return AppColors.critical;
+      case 'medium':
+      case 'moderate':
+        return AppColors.warning;
+      case 'low':
+      case 'good':
+      case 'normal':
+        return AppColors.success;
+      default:
+        return AppColors.brandPrimary;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final score = report.healthScore;
+    final level = report.healthLevel;
+    final summary = report.healthSummary;
+    final accent = _levelColor(level);
+
     return Container(
+      width: double.infinity,
       padding: AppSpacing.cardPadding,
       decoration: BoxDecoration(
-        color: AppColors.bgSurface,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.92), accent.withValues(alpha: 0.7)],
+        ),
         borderRadius: AppRadii.cardRadius,
-        border: Border.all(color: AppColors.strokeSoft),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: accent.withValues(alpha: 0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Title & Average Value
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: AppTextStyles.sectionTitle,
-                ),
+              const Icon(
+                Icons.health_and_safety,
+                color: Colors.white,
+                size: 26,
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Trung bình',
-                    style: AppTextStyles.caption,
-                  ),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        avgValue,
-                        style: AppTextStyles.vitalValue.copyWith(color: color.shade700),
-                      ),
-                      const SizedBox(width: 2),
-                      Text(unit, style: AppTextStyles.caption.copyWith(color: color.shade700)),
-                    ],
-                  ),
-                ],
+              const SizedBox(width: AppSpacing.gapSm),
+              Text(
+                'Điểm sức khoẻ tổng hợp',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.gapMd),
-          
-          // Natural Language Insight (Soothes the user)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.gapMd, vertical: 10),
-            decoration: BoxDecoration(
-              color: color.shade50,
-              borderRadius: BorderRadius.circular(AppRadii.radiusSm),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.insights, size: 20, color: color.shade700),
-                const SizedBox(width: AppSpacing.gapSm),
-                Expanded(
-                  child: Text(
-                    insightText,
-                    style: AppTextStyles.caption.copyWith(
-                      color: color.shade900,
-                      height: 1.3,
-                    ),
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                score != null ? score.toStringAsFixed(0) : '--',
+                style: AppTextStyles.vitalValue.copyWith(
+                  color: Colors.white,
+                  fontSize: 56,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1.5,
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '/ 100',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: Colors.white.withValues(alpha: 0.8),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.sectionGapMd),
-
-          // Legend (if multiple lines)
-          if (legends.isNotEmpty) ...[
-            Row(mainAxisAlignment: MainAxisAlignment.center, children: legends),
-            const SizedBox(height: AppSpacing.gapMd),
+          if (level != null && level.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.gapXs),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.22),
+                borderRadius: AppRadii.pillRadius,
+              ),
+              child: Text(
+                level.toUpperCase(),
+                style: AppTextStyles.caption.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
           ],
+          if (summary != null && summary.trim().isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.gapMd),
+            Text(
+              summary,
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: Colors.white,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
-          // The Chart itself
-          MiniLineChart(
-            height: chartHeight,
-            linesData: chartData,
-            lineColors: chartColors,
-            xLabels: xLabels,
+// ── Vitals 24h average grid ─────────────────────────────────────────────────
+
+class _VitalsAvgGrid extends StatelessWidget {
+  const _VitalsAvgGrid({required this.vitals});
+  final Map<String, num?> vitals;
+
+  @override
+  Widget build(BuildContext context) {
+    final hr = vitals['heart_rate'];
+    final spo2 = vitals['spo2'];
+    final temp = vitals['temperature'];
+    final rr = vitals['respiratory_rate'];
+    final bpSys = vitals['blood_pressure_sys'];
+    final bpDia = vitals['blood_pressure_dia'];
+
+    final cards = <_VitalAvgCardData>[
+      _VitalAvgCardData(
+        icon: Icons.favorite,
+        label: 'Nhịp tim',
+        value: hr != null ? hr.toStringAsFixed(0) : '--',
+        unit: 'bpm',
+        color: Colors.red,
+      ),
+      _VitalAvgCardData(
+        icon: Icons.water_drop,
+        label: 'SpO₂',
+        value: spo2 != null ? spo2.toStringAsFixed(0) : '--',
+        unit: '%',
+        color: Colors.blue,
+      ),
+      _VitalAvgCardData(
+        icon: Icons.monitor_heart_outlined,
+        label: 'Huyết áp',
+        value: (bpSys != null && bpDia != null)
+            ? '${bpSys.toStringAsFixed(0)}/${bpDia.toStringAsFixed(0)}'
+            : '--',
+        unit: 'mmHg',
+        color: Colors.purple,
+      ),
+      _VitalAvgCardData(
+        icon: Icons.thermostat,
+        label: 'Nhiệt độ',
+        value: temp != null ? temp.toStringAsFixed(1) : '--',
+        unit: '°C',
+        color: Colors.orange,
+      ),
+      _VitalAvgCardData(
+        icon: Icons.air,
+        label: 'Nhịp thở',
+        value: rr != null ? rr.toStringAsFixed(0) : '--',
+        unit: 'lần/phút',
+        color: Colors.teal,
+      ),
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: cards.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: AppSpacing.gapMd,
+        crossAxisSpacing: AppSpacing.gapMd,
+        childAspectRatio: 1.5,
+      ),
+      itemBuilder: (_, index) => _VitalAvgCard(data: cards[index]),
+    );
+  }
+}
+
+class _VitalAvgCardData {
+  const _VitalAvgCardData({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.color,
+  });
+  final IconData icon;
+  final String label;
+  final String value;
+  final String unit;
+  final MaterialColor color;
+}
+
+class _VitalAvgCard extends StatelessWidget {
+  const _VitalAvgCard({required this.data});
+  final _VitalAvgCardData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgSurface,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: AppColors.strokeSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: data.color.shade50,
+                  borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                ),
+                child: Icon(data.icon, size: 16, color: data.color.shade700),
+              ),
+              const SizedBox(width: AppSpacing.gapSm),
+              Expanded(
+                child: Text(
+                  data.label,
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: Text(
+                  data.value,
+                  style: AppTextStyles.vitalValue.copyWith(
+                    color: AppColors.textPrimary,
+                    fontSize: 22,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                data.unit,
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -409,46 +451,111 @@ class _TrendsTab extends StatelessWidget {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  const _FilterChip({required this.label, required this.isSelected});
+// ── Risk insight card ───────────────────────────────────────────────────────
+
+class _RiskInsightCard extends StatelessWidget {
+  const _RiskInsightCard({required this.report, required this.onTap});
+  final HealthReport report;
+  final VoidCallback onTap;
+
+  Color _riskColor(String? level) {
+    switch (level?.toLowerCase()) {
+      case 'high':
+      case 'critical':
+        return AppColors.critical;
+      case 'medium':
+      case 'moderate':
+        return AppColors.warning;
+      case 'low':
+        return AppColors.success;
+      default:
+        return AppColors.textSecondary;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapMd, vertical: AppSpacing.gapSm),
-      decoration: BoxDecoration(
-        color: isSelected ? AppColors.brandPrimary : AppColors.bgSurface,
-        borderRadius: AppRadii.pillRadius,
-        border: Border.all(color: isSelected ? AppColors.brandPrimary : AppColors.strokeSoft),
-      ),
-      child: Text(
-        label,
-        style: AppTextStyles.caption.copyWith(
-          color: isSelected ? AppColors.bgSurface : AppColors.textSecondary,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+    final score = report.latestRiskScore;
+    final level = report.riskLevel;
+    final type = report.riskType;
+    final accent = _riskColor(level);
+
+    return Material(
+      color: AppColors.bgSurface,
+      borderRadius: AppRadii.cardRadius,
+      child: InkWell(
+        borderRadius: AppRadii.cardRadius,
+        onTap: onTap,
+        child: Container(
+          padding: AppSpacing.cardPadding,
+          decoration: BoxDecoration(
+            borderRadius: AppRadii.cardRadius,
+            border: Border.all(color: AppColors.strokeSoft),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.shield, color: accent, size: 24),
+              ),
+              const SizedBox(width: AppSpacing.gapMd),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      score != null
+                          ? 'Điểm rủi ro: ${score.toStringAsFixed(1)}'
+                          : 'Chưa có đánh giá',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (level != null && level.isNotEmpty) level,
+                        if (type != null && type.isNotEmpty) type,
+                      ].join(' • '),
+                      style: AppTextStyles.caption.copyWith(color: accent),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// Removed _SummaryCard because it was replaced by the _buildMetricSection with natural language.
+// ── Last updated footer ─────────────────────────────────────────────────────
 
-class _Legend extends StatelessWidget {
-  final Color color;
-  final String label;
-  const _Legend(this.color, this.label);
+class _LastUpdatedRow extends StatelessWidget {
+  const _LastUpdatedRow({required this.timestamp});
+  final DateTime timestamp;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(width: 12, height: 4, color: color),
-        const SizedBox(width: AppSpacing.gapXs),
-        Text(label, style: AppTextStyles.caption),
-      ],
+    final formatted = DateFormat('HH:mm dd/MM/yyyy').format(timestamp);
+    return Center(
+      child: Text(
+        'Cập nhật lần cuối: $formatted',
+        style: AppTextStyles.caption.copyWith(
+          color: AppColors.textSecondary,
+        ),
+      ),
     );
   }
 }

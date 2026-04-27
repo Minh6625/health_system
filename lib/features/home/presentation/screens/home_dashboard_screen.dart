@@ -13,6 +13,8 @@ import '../../providers/home_dashboard_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../../device/models/device_model.dart';
 import '../../../device/providers/device_provider.dart';
+import '../../../analysis/utils/health_level_label.dart';
+import '../../../profile/providers/profile_provider.dart';
 import '../../../health_monitoring/models/vital_signs.dart';
 import '../models/home_dashboard_view_model.dart';
 import '../widgets/connection_status_strip.dart'
@@ -57,13 +59,13 @@ String dashboardRiskDisplayLabel(String? level) {
 String dashboardRiskSummary(String? level) {
   switch (normalizeRiskLevelLabel(level)) {
     case 'low':
-      return 'Các chỉ số sức khỏe hôm nay đang ở mức ổn định.';
+      return 'Các chỉ số đang ổn định. Tiếp tục duy trì thói quen hiện tại nhé.';
     case 'medium':
-      return 'Một vài chỉ số đang ở mức cảnh báo, bạn nên theo dõi thêm.';
+      return 'Một vài chỉ số đang lệch ngưỡng. Hãy nghỉ ngơi và đo lại sau ít giờ.';
     case 'critical':
-      return 'Một vài chỉ số đang ở mức nguy hiểm, bạn cần theo dõi sát hơn.';
+      return 'Có chỉ số vượt ngưỡng nguy hiểm. Hãy nghỉ ngơi ngay và liên hệ bác sĩ nếu thấy bất thường.';
     default:
-      return 'Cập nhật dữ liệu...';
+      return 'Đang chờ dữ liệu mới từ thiết bị của bạn.';
   }
 }
 
@@ -73,7 +75,7 @@ String dashboardHealthSummary({
   required String? riskLevel,
 }) {
   if (isStale) {
-    return 'Dữ liệu đánh giá sức khỏe đã cũ, vui lòng đồng bộ lại thiết bị.';
+    return 'Dữ liệu đã cũ. Hãy đồng bộ thiết bị để xem đánh giá mới nhất.';
   }
   if (backendSummary != null && backendSummary.trim().isNotEmpty) {
     return backendSummary;
@@ -182,8 +184,8 @@ class HomeDashboardScreen extends StatefulWidget {
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     with WidgetsBindingObserver {
-  static const Duration _autoRefreshInterval = Duration(seconds: 30);
-  static const Duration _notificationRefreshInterval = Duration(seconds: 30);
+  static const Duration _autoRefreshInterval = Duration(seconds: 5);
+  static const Duration _notificationRefreshInterval = Duration(seconds: 5);
   static const Duration _utcPlus7Offset = Duration(hours: 7);
 
   final ApiClient _apiClient = ApiClient();
@@ -283,6 +285,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
 
     // Gọi sau khi build xong (an toàn context)
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       _refreshDashboard();
       _fetchUnreadNotificationCount();
       if (widget.enableAutoRefresh) {
@@ -293,6 +296,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       if (_deviceProvider.devices.isEmpty && !_deviceProvider.isLoading) {
         _deviceProvider.fetchDevices();
       }
+
+      // Fetch the profile so the greeting header avatar resolves on
+      // first launch (the "Tôi" tab may not have been visited yet).
+      // ProfileProvider has a 5-minute cache, so this call is a no-op
+      // when the user has already viewed the profile tab.
+      context.read<ProfileProvider>().fetchProfile();
     });
   }
 
@@ -405,11 +414,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     HomeDashboardProvider provider,
   ) {
     final authProvider = context.read<AuthProvider>();
+    // Watch ProfileProvider so a successful avatar update on another
+    // screen rebuilds this header automatically.
+    final profileProvider = context.watch<ProfileProvider>();
     final isLinkedProfile =
         widget.profileId != null && widget.profileId != 'self';
     final displayName = isLinkedProfile
         ? 'Hồ sơ người thân'
         : authProvider.currentUser?.fullName ?? 'Người dùng';
+    // Linked-profile screens don't have access to the relative's
+    // avatar via ProfileProvider (which holds the logged-in user's
+    // profile only); leave avatar null in that case so the fallback
+    // icon shows.
+    final avatarUrl =
+        isLinkedProfile ? null : profileProvider.profile?.avatarUrl;
 
     final heartRateStr = provider.heartRate != null
         ? '${provider.heartRate!.toStringAsFixed(0)} BPM'
@@ -456,7 +474,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       deviceState: deviceConnectionState,
     );
     final sleepData = provider.sleepData;
-    final sleepDate = canonicalSleepDateFromPayload(sleepData);
     final sleepQualityScore = (sleepData?['quality_score'] as num?)?.toInt();
     final sleepInsightSummary = sleepQualityScore != null
         ? 'Chất lượng: $sleepQualityScore% (${sleepQualityLabelVi(qualityScore: sleepQualityScore, qualityLabel: sleepData?['quality_label'] as String?)})'
@@ -467,6 +484,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
         await provider.refreshDashboard();
       },
       displayName: displayName,
+      avatarUrl: avatarUrl,
       latestUpdatedLabel: _buildLatestUpdatedLabel(provider),
       overallStatus: overallStatus,
       heroTitle: _heroTitleForStatus(overallStatus),
@@ -560,14 +578,17 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
         ),
       ],
       sleepDurationLabel: provider.sleepData != null
-          ? '${(provider.sleepData!['in_bed_minutes'] as int?) ?? 0 ~/ 60}h'
+          ? '${((provider.sleepData!['in_bed_minutes'] as int?) ?? 0) ~/ 60}h'
           : '-- h',
       sleepDurationMinutes:
           (provider.sleepData?['in_bed_minutes'] as int?) ?? 0,
       sleepInsightSummary: sleepInsightSummary,
       riskScoreLabel: provider.healthScore?.toStringAsFixed(0) ?? '--',
+      // Translate the backend's `health_level` enum (stable/watch/critical)
+      // before we hand it to the UI. The previous pass-through let the raw
+      // English strings leak into the greeting card.
       riskLevelLabel:
-          provider.healthLevel ??
+          vietnameseHealthLevel(provider.healthLevel) ??
           (normalizedRiskLevel != null ? displayRiskLevel : 'Không xác định'),
       riskSummary: dashboardHealthSummary(
         backendSummary: provider.healthSummary,
@@ -695,6 +716,7 @@ class _DashboardBody extends StatelessWidget {
             padding: AppSpacing.screenHorizontalPadding,
             sliver: SliverList(
               delegate: SliverChildListDelegate.fixed([
+                // ── Vùng A · Trạng thái tổng quan ─────────────────────
                 DashboardGreetingHeader(
                   displayName: vm.displayName,
                   avatarUrl: vm.avatarUrl,
@@ -703,19 +725,33 @@ class _DashboardBody extends StatelessWidget {
                   unreadNotificationCount: unreadNotificationCount,
                   onTapNotifications: () => onOpenNotifications(),
                 ),
-                const SizedBox(height: AppSpacing.sectionGapMd),
+                const SizedBox(height: AppSpacing.gapMd),
                 HealthStatusHeroCard(
                   overallStatus: vm.overallStatus,
                   title: vm.heroTitle,
                   summary: vm.heroSummary,
                 ),
-                const SizedBox(height: AppSpacing.gapMd),
+                const SizedBox(height: AppSpacing.gapSm),
                 ConnectionStatusStrip(
                   deviceConnectionState: vm.deviceConnectionState,
                   batteryPercent: vm.batteryPercent,
                   lastUpdatedLabel: vm.latestUpdatedLabel,
                   onTapDevice: () {
                     Navigator.pushReplacementNamed(context, '/device');
+                  },
+                ),
+                DashboardTopBannerArea(vm: vm),
+
+                // ── Vùng B · Chỉ số hôm nay ───────────────────────────
+                const SizedBox(height: AppSpacing.sectionGapXl),
+                LiveVitalsSection(
+                  items: vm.vitalItems,
+                  onTapHistory: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.healthReport,
+                      arguments: {'profileId': provider.profileId},
+                    );
                   },
                 ),
                 const SizedBox(height: AppSpacing.gapMd),
@@ -732,10 +768,7 @@ class _DashboardBody extends StatelessWidget {
                     );
                   },
                 ),
-                DashboardTopBannerArea(vm: vm),
                 const SizedBox(height: AppSpacing.gapMd),
-                LiveVitalsSection(items: vm.vitalItems, onTapHistory: () {}),
-                const SizedBox(height: AppSpacing.sectionGapMd),
                 SleepInsightCard(
                   sleepDurationMinutes: vm.sleepDurationMinutes,
                   durationLabel: vm.sleepDurationLabel,
@@ -757,9 +790,18 @@ class _DashboardBody extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: AppSpacing.sectionGapMd),
+
+                // ── Vùng C · Thao tác nhanh ───────────────────────────
+                // Title 'Thao tác nhanh' is rendered by DashboardSecondaryLinks itself.
+                const SizedBox(height: AppSpacing.sectionGapXl),
                 DashboardSecondaryLinks(
-                  onTapHistory: () {},
+                  onTapHistory: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.healthReport,
+                      arguments: {'profileId': provider.profileId},
+                    );
+                  },
                   onTapDeviceSettings: () {
                     Navigator.pushReplacementNamed(context, '/device');
                   },
@@ -777,3 +819,4 @@ class _DashboardBody extends StatelessWidget {
     );
   }
 }
+

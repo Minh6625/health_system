@@ -31,9 +31,13 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('Điểm trung bình'), findsOneWidget);
-    expect(find.text('Cao nhất: 61'), findsOneWidget);
-    expect(find.text('Thấp nhất: 23'), findsOneWidget);
+    // The summary now reads in the health domain (high = good): the
+    // backend's lowest risk score (23) maps to the highest health score
+    // (77) and vice versa. Average flips by the same complement.
+    expect(find.text('Điểm sức khoẻ trung bình'), findsOneWidget);
+    expect(find.text('50.5'), findsOneWidget);
+    expect(find.text('Cao nhất: 77'), findsOneWidget);
+    expect(find.text('Thấp nhất: 39'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

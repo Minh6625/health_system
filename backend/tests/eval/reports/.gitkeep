@@ -1,0 +1,2 @@
+# The harness writes confusion_matrix_<UTC-timestamp>.json files here.
+# Reports are gitignored below; this file just keeps the directory in git.

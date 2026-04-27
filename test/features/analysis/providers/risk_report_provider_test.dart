@@ -9,13 +9,11 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
     this.report,
     this.detail,
     this.latestError,
-    this.detailError,
   });
 
   final RiskReportEntity? report;
   final RiskReportDetailEntity? detail;
   final Object? latestError;
-  final Object? detailError;
 
   @override
   Future<RiskReportEntity> fetchLatestReport(String? profileId) async {
@@ -28,11 +26,9 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
   @override
   Future<RiskReportDetailEntity> fetchReportDetail(
     int reportId,
-    String? profileId,
-  ) async {
-    if (detailError != null) {
-      throw detailError!;
-    }
+    String? profileId, {
+    String? audience,
+  }) async {
     return detail!;
   }
 }
@@ -129,7 +125,10 @@ void main() {
         expect(provider.report, isNull);
         expect(provider.error, isNull);
         expect(provider.isEmpty, isTrue);
-        expect(provider.emptyMessage, 'Chưa có dữ liệu đánh giá');
+        expect(
+          provider.emptyMessage,
+          'Chưa có báo cáo rủi ro. Hãy đeo thiết bị thêm vài giờ để hệ thống tạo báo cáo đầu tiên.',
+        );
       },
     );
 

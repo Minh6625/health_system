@@ -29,10 +29,11 @@ class AppShellBottomNav extends StatelessWidget {
         border: Border(top: BorderSide(color: AppColors.strokeSoft, width: 1)),
       ),
       child: SafeArea(
+        top: false,
         child: SizedBox(
           height: AppBottomNavTokens.heightBase,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildTabItem(
                 context,
@@ -101,7 +102,7 @@ class AppShellBottomNav extends StatelessWidget {
                 minWidth: AppBottomNavTokens.minTouchWidth,
                 minHeight: AppBottomNavTokens.minTouchHeight,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
                 color: isActive ? AppColors.brandPrimary.withValues(alpha: 0.1) : Colors.transparent,
                 borderRadius: AppRadii.activeNavIndicatorRadius,

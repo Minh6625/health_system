@@ -10,6 +10,7 @@ import 'package:healthguard/features/home/presentation/screens/home_dashboard_sc
 import 'package:healthguard/features/home/presentation/widgets/risk_insight_card.dart';
 import 'package:healthguard/features/home/presentation/widgets/sleep_insight_card.dart';
 import 'package:healthguard/features/home/providers/home_dashboard_provider.dart';
+import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -96,6 +97,13 @@ class _StubDeviceProvider extends DeviceProvider {
   Future<void> fetchDevices({bool forceRefresh = false}) async {}
 }
 
+/// No-op stub so the dashboard's `context.read<ProfileProvider>().fetchProfile()`
+/// call in initState doesn't try to hit the network during tests.
+class _StubProfileProvider extends ProfileProvider {
+  @override
+  Future<void> fetchProfile({bool force = false}) async {}
+}
+
 class _CountingSleepProvider extends SleepProvider {
   int loadAllCalls = 0;
 
@@ -139,6 +147,9 @@ Widget _buildDashboardApp({
         create: (_) => _StubDeviceProvider(),
       ),
       ChangeNotifierProvider<SleepProvider>.value(value: sleepProvider),
+      ChangeNotifierProvider<ProfileProvider>(
+        create: (_) => _StubProfileProvider(),
+      ),
     ],
     child: MaterialApp(
       home: HomeDashboardScreen(
@@ -171,6 +182,11 @@ void main() {
     );
     await _pumpDashboardFrames(tester);
 
+    await tester.scrollUntilVisible(
+      find.byType(RiskInsightCard),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     tester.widget<RiskInsightCard>(find.byType(RiskInsightCard)).onTap();
     await tester.pumpAndSettle();
     expect(lastRoute?.name, AppRouter.riskReport);

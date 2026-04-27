@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/routes/app_router.dart';
 import '../../../shared/presentation/theme/app_colors.dart';
 import '../../../shared/presentation/theme/app_radii.dart';
 import '../../../shared/presentation/theme/app_spacing.dart';
@@ -11,6 +12,9 @@ import '../widgets/mini_line_chart.dart';
 import '../widgets/vital_detail_skeleton.dart';
 import '../widgets/empty_chart_placeholder.dart';
 import '../widgets/error_view.dart';
+import '../widgets/vital_education_card.dart';
+import '../widgets/vital_safe_range.dart';
+import '../widgets/vital_safe_range_bar.dart';
 
 class VitalDetailScreen extends StatefulWidget {
   final String vitalType;
@@ -119,6 +123,11 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     final isCritical = provider.vitalStatus == VitalStatus.critical;
     final isEmpty = provider.state == VitalsUIState.empty;
 
+    final safeRange = vitalSafeRangeFor(widget.vitalType);
+    final gaugeValue = safeRange != null
+        ? extractGaugeValue(widget.vitalType, provider.value)
+        : null;
+
     return Column(
       children: [
         Expanded(
@@ -129,29 +138,31 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
               children: [
                 // 1. Nổi bật hiện tại (Huge latest value)
                 _buildVitalValueCard(provider, statusColor),
-                
+
+                if (safeRange != null) ...[
+                  SizedBox(height: AppSpacing.sectionGapLg),
+                  // 1b. Khoảng an toàn (5-zone gauge — W3.1)
+                  VitalSafeRangeBar(
+                    range: safeRange,
+                    currentValue: gaugeValue,
+                  ),
+                ],
+
                 SizedBox(height: AppSpacing.sectionGapXl),
 
-                // 2. Biểu đồ chuyên biệt (Mini chart - 24h trend)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Biến động 24h qua',
-                      style: AppTextStyles.sectionTitle.copyWith(
-                        fontSize: 18,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                         // TODO: navigate to history
-                      },
-                      child: Text(
-                        'Xem xu hướng',
-                        style: AppTextStyles.body,
-                      ),
-                    ),
-                  ],
+                // 2. Biểu đồ chuyên biệt (Mini chart - 24h trend).
+                // The previous header rendered a "Xem xu hướng" TextButton
+                // whose onPressed body was just `// TODO: navigate to history`
+                // — there is no per-vital history screen wired into AppRouter
+                // today (only sleep-history and health-report exist). The
+                // mini chart underneath already shows the 24h trend the
+                // section title promises, so we drop the dead CTA instead of
+                // hiding the lie behind a disabled state.
+                Text(
+                  'Biến động 24h qua',
+                  style: AppTextStyles.sectionTitle.copyWith(
+                    fontSize: 18,
+                  ),
                 ),
                 SizedBox(height: AppSpacing.gapSm),
 
@@ -176,31 +187,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
 
                 SizedBox(height: AppSpacing.sectionGapXl),
 
-                // 3. Kiến thức y khoa (Education Text)
-                Container(
-                  padding: AppSpacing.cardPadding,
-                  decoration: BoxDecoration(
-                    color: AppStateColors.infoBg,
-                    borderRadius: AppRadii.cardRadius,
-                    border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.info_outline, color: AppColors.info),
-                      SizedBox(width: AppSpacing.gapMd),
-                      Expanded(
-                        child: Text(
-                          provider.educationText,
-                          style: AppTextStyles.body.copyWith(
-                            height: 1.4,
-                            color: AppColors.info,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                // 3. Kiến thức y khoa (collapsible — W3.2)
+                VitalEducationCard(text: provider.educationText),
               ],
             ),
           ),
@@ -303,7 +291,7 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
           label: 'Gọi bác sĩ hoặc người thân ngay lập tức',
           child: ElevatedButton.icon(
             onPressed: () {
-               // navigate to SOS trigger (left as TODO pending exact route)
+              Navigator.pushNamed(context, AppRouter.manualSos);
             },
             icon: const Icon(Icons.emergency, size: 28),
             label: Text(

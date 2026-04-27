@@ -18,12 +18,18 @@ from __future__ import annotations
 
 import pytest
 
-from app.services.risk_alert_service import (
-    _build_model_api_record,
-    _feature_importance_from_top_features,
-    _map_model_api_risk_level,
-    _normalize_model_api_shap,
-    _normalize_model_api_top_features,
+from app.adapters.model_api_health_adapter import ModelApiHealthAdapter
+
+# Phase 3b: these helpers were extracted from ``risk_alert_service`` into the
+# ``ModelApiHealthAdapter`` boundary class. Module-level aliases keep this
+# unit-test file pinned to the same exposed surface so the existing call
+# sites stay readable.
+_build_model_api_record = ModelApiHealthAdapter.to_record
+_map_model_api_risk_level = ModelApiHealthAdapter._map_risk_level
+_normalize_model_api_top_features = ModelApiHealthAdapter._normalize_top_features
+_normalize_model_api_shap = ModelApiHealthAdapter._normalize_shap
+_feature_importance_from_top_features = (
+    ModelApiHealthAdapter._feature_importance_from_top_features
 )
 
 

@@ -1,8 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+
+import 'package:healthguard/core/services/avatar_storage_service.dart';
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
+import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
-import 'package:healthguard/features/profile/providers/profile_provider.dart';
-import 'package:provider/provider.dart';
 
 // Thông tin y tế và tiền sử bệnh lý đã được tách sang MedicalInfoScreen.
 // EditProfileScreen chỉ quản lý thông tin cá nhân cơ bản.
@@ -20,10 +27,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _avatarController = TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
+  final AvatarStorageService _avatarStorage = AvatarStorageService();
 
   DateTime? _selectedDate;
   String? _selectedGender;
   bool _initialized = false;
+  File? _pickedAvatarFile;
+  bool _isUploadingAvatar = false;
 
   static const _genders = ['Nam', 'Nữ', 'Khác'];
 
@@ -185,18 +196,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     _buildField(
                       child: TextFormField(
                         controller: _phoneController,
-                        keyboardType: TextInputType.phone,
+                        keyboardType: TextInputType.number,
                         textInputAction: TextInputAction.next,
                         style: const TextStyle(fontSize: 16),
+                        // Chặn ngay từ bàn phím: chỉ cho nhập số, tối đa 11 ký tự.
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(11),
+                        ],
                         decoration: _inputDecoration(
                             'Số điện thoại', Icons.phone_outlined),
                         validator: (v) {
-                          final text =
-                              v?.replaceAll(RegExp(r'[\s-]'), '').trim() ?? '';
+                          final text = v?.trim() ?? '';
                           if (text.isEmpty) return null;
-                          if (!RegExp(r'^\d+$').hasMatch(text)) {
-                            return 'Số điện thoại chỉ được chứa chữ số';
-                          }
                           if (text.length < 10 || text.length > 11) {
                             return 'Số điện thoại phải có 10-11 chữ số';
                           }
@@ -230,61 +242,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   _buildSectionTitle('Ảnh đại diện'),
                   const SizedBox(height: 12),
                   _buildCard([
-                    _buildField(
-                      child: TextFormField(
-                        controller: _avatarController,
-                        keyboardType: TextInputType.url,
-                        textInputAction: TextInputAction.done,
-                        style: const TextStyle(fontSize: 16),
-                        decoration: _inputDecoration(
-                            'Đường dẫn ảnh (URL)', Icons.image_outlined),
-                        onChanged: (_) => setState(() {}),
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return null;
-                          final uri = Uri.tryParse(v.trim());
-                          if (uri == null ||
-                              !uri.hasScheme ||
-                              !['http', 'https'].contains(uri.scheme)) {
-                            return 'URL không hợp lệ (cần bắt đầu bằng http/https)';
-                          }
-                          return null;
-                        },
-                      ),
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: _buildAvatarPicker(),
                     ),
-                    if (_avatarController.text.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(AppRadii.radiusMd),
-                          child: Image.network(
-                            _avatarController.text.trim(),
-                            height: 100,
-                            width: 100,
-                            fit: BoxFit.cover,
-                            cacheWidth: 300,
-                            cacheHeight: 300,
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Container(
-                                height: 100,
-                                width: 100,
-                                alignment: Alignment.center,
-                                child: const CircularProgressIndicator(strokeWidth: 2),
-                              );
-                            },
-                            errorBuilder: (_, _, _) => Container(
-                              height: 100,
-                              width: 100,
-                              decoration: BoxDecoration(
-                                color: AppColors.strokeSoft,
-                                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
-                              ),
-                              child: Icon(Icons.broken_image_outlined,
-                                  color: AppColors.textSecondary),
-                            ),
-                          ),
-                        ),
-                      ),
                   ]),
 
                   if (provider.errorMessage != null)
@@ -346,6 +307,198 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         letterSpacing: 0.3,
       ),
     );
+  }
+
+  Widget _buildAvatarPicker() {
+    final hasPicked = _pickedAvatarFile != null;
+    final currentUrl = _avatarController.text.trim();
+    final hasUrl = currentUrl.isNotEmpty;
+
+    ImageProvider? avatarImage;
+    if (hasPicked) {
+      avatarImage = FileImage(_pickedAvatarFile!);
+    } else if (hasUrl) {
+      avatarImage = NetworkImage(currentUrl);
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 56,
+                backgroundColor: AppColors.strokeSoft,
+                backgroundImage: avatarImage,
+                child: avatarImage == null
+                    ? Icon(
+                        Icons.person_outline_rounded,
+                        size: 56,
+                        color: AppColors.textSecondary,
+                      )
+                    : null,
+              ),
+              if (_isUploadingAvatar)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(
+                        color: AppColors.bgSurface,
+                        strokeWidth: 3,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Material(
+                  color: AppColors.brandPrimary,
+                  shape: const CircleBorder(),
+                  elevation: 2,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: _showAvatarPickerSheet,
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.camera_alt_outlined,
+                        size: 18,
+                        color: AppColors.bgSurface,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            hasPicked
+                ? 'Ảnh mới đã chọn — bấm "Lưu thay đổi" để cập nhật.'
+                : (hasUrl
+                    ? 'Bấm biểu tượng máy ảnh để đổi ảnh đại diện.'
+                    : 'Chưa có ảnh đại diện. Bấm máy ảnh để tải lên.'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAvatarPickerSheet() async {
+    if (_isUploadingAvatar) return;
+    final source = await showModalBottomSheet<ImageSource?>(
+      context: context,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined,
+                    color: AppColors.brandPrimary),
+                title: const Text('Chụp ảnh'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined,
+                    color: AppColors.brandPrimary),
+                title: const Text('Chọn từ thư viện'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(ImageSource.gallery),
+              ),
+              if (_avatarController.text.trim().isNotEmpty ||
+                  _pickedAvatarFile != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline,
+                      color: AppColors.critical),
+                  title: const Text('Xóa ảnh hiện tại',
+                      style: TextStyle(color: AppColors.critical)),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    setState(() {
+                      _pickedAvatarFile = null;
+                      _avatarController.text = '';
+                    });
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (source == null || !mounted) return;
+    await _pickAndUploadAvatar(source);
+  }
+
+  Future<void> _pickAndUploadAvatar(ImageSource source) async {
+    try {
+      final XFile? picked = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
+      );
+      if (picked == null || !mounted) return;
+
+      final file = File(picked.path);
+      setState(() {
+        _pickedAvatarFile = file;
+        _isUploadingAvatar = true;
+      });
+
+      final user = context.read<AuthProvider>().currentUser;
+      if (user == null) {
+        throw Exception('Chưa đăng nhập — không thể tải ảnh.');
+      }
+
+      final url = await _avatarStorage.uploadAvatar(
+        file: file,
+        userId: user.userId.toString(),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _avatarController.text = url;
+        _isUploadingAvatar = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã tải ảnh lên. Bấm "Lưu thay đổi" để xác nhận.'),
+          backgroundColor: AppColors.brandPrimary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isUploadingAvatar = false;
+      });
+      final message = e is AvatarUploadException
+          ? e.message
+          : 'Không thể tải ảnh: ${e.toString()}';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: AppColors.critical,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Widget _buildCard(List<Widget> children) {

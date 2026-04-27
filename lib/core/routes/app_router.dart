@@ -11,7 +11,10 @@ import 'package:healthguard/features/home/presentation/screens/home_dashboard_sc
 import 'package:healthguard/features/profile/screens/edit_profile_screen.dart';
 import 'package:healthguard/features/profile/screens/medical_info_screen.dart';
 import 'package:healthguard/features/profile/screens/delete_account_screen.dart';
+import 'package:healthguard/features/profile/screens/profile_settings_screen.dart';
 import 'package:healthguard/features/profile/screens/profile_shell_screen.dart';
+import 'package:healthguard/features/analysis/domain/entities/risk_report_detail_entity.dart';
+import 'package:healthguard/features/analysis/presentation/screens/risk_shap_detail_screen.dart';
 import 'package:healthguard/features/family/screens/family_shell_screen.dart';
 import 'package:healthguard/features/family/screens/family_dashboard_screen.dart';
 import 'package:healthguard/features/family/screens/add_contact_screen.dart';
@@ -22,6 +25,7 @@ import 'package:healthguard/features/sleep_analysis/screens/sleep_report_screen.
 import 'package:healthguard/features/sleep_analysis/screens/sleep_detail_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_history_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_settings_screen.dart';
+import 'package:healthguard/features/health_monitoring/screens/health_report_screen.dart';
 import 'package:healthguard/features/health_monitoring/screens/vital_detail_screen.dart';
 import 'package:healthguard/features/emergency/screens/manual_sos_screen.dart';
 import 'package:healthguard/features/emergency/screens/sos_confirm_screen.dart';
@@ -48,6 +52,9 @@ class AppRouter {
   static const String changePassword = '/change-password';
   static const String editProfile = '/edit-profile';
   static const String profile = '/profile';
+  static const String profileSettings = '/profile/settings';
+  // Phase 8 slice 4b — clinician-only SHAP waterfall.
+  static const String riskShapDetail = '/risk-report/shap-detail';
   static const String medicalInfo = '/medical-info';
   static const String deleteAccount = '/delete-account';
   static const String familyManagement = '/family-management';
@@ -57,6 +64,7 @@ class AppRouter {
   static const String sleepHistory = '/sleep-history';
   static const String sleepSettings = '/sleep-settings';
   static const String vitalDetail = '/vital-detail';
+  static const String healthReport = '/health-report';
   static const String addContact = '/add-contact';
   static const String linkedContactDetail = '/linked-contact-detail';
   static const String familyDashboard = '/family-dashboard';
@@ -166,6 +174,11 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileShellScreen());
+      case profileSettings:
+        return MaterialPageRoute(
+          settings: const RouteSettings(name: profileSettings),
+          builder: (_) => const ProfileSettingsScreen(),
+        );
       case editProfile:
         return MaterialPageRoute(builder: (_) => const EditProfileScreen());
       case medicalInfo:
@@ -232,6 +245,13 @@ class AppRouter {
             profileId: routeArgs['profileId'] as String?,
           ),
         );
+      case healthReport:
+        return MaterialPageRoute(
+          settings: RouteSettings(name: healthReport, arguments: routeArgs),
+          builder: (_) => HealthReportScreen(
+            profileId: routeArgs['profileId'] as String?,
+          ),
+        );
       case manualSos:
         return MaterialPageRoute(builder: (_) => ManualSOSScreen());
       case sosConfirm:
@@ -258,6 +278,36 @@ class AppRouter {
                 RiskReportProvider(repository: RiskAnalysisRepository()),
             child: RiskReportScreen(
               profileId: routeArgs['profileId'] as String?,
+            ),
+          ),
+        );
+      case riskShapDetail:
+        // Phase 8 slice 4b: the caller (RiskReportDetailScreen) passes
+        // the already-loaded RiskReportDetailEntity in route arguments
+        // so we don't have to re-fetch + re-parse the clinician
+        // payload. Returns the screen with an ``unavailable`` empty
+        // state when the args are misshapen — safer than a runtime
+        // cast crash.
+        final detailArg = routeArgs['detail'];
+        if (detailArg is RiskReportDetailEntity) {
+          return MaterialPageRoute(
+            settings: const RouteSettings(name: riskShapDetail),
+            builder: (_) => RiskShapDetailScreen(detail: detailArg),
+          );
+        }
+        return MaterialPageRoute(
+          settings: const RouteSettings(name: riskShapDetail),
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('Chi tiết SHAP')),
+            body: const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Thiếu dữ liệu báo cáo cho màn hình SHAP. '
+                  'Hãy quay lại và mở chi tiết báo cáo trước.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           ),
         );

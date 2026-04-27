@@ -60,6 +60,10 @@ diff.txt
 crash_log.txt
 *.log
 out*.txt
+_test_*.py
+_diag_*.py
+_check_*.py
+_db_out*.txt
 
 # AI Code Assistant Folders
 .codex_appdata/

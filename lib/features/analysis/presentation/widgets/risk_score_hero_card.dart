@@ -44,7 +44,7 @@ class RiskScoreHeroCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Điểm đánh giá hiện tại', style: AppTextStyles.bodyMedium),
+              Text('Điểm sức khoẻ hiện tại', style: AppTextStyles.bodyMedium),
               Text(timeStr, style: AppTextStyles.caption),
             ],
           ),
@@ -64,7 +64,7 @@ class RiskScoreHeroCard extends StatelessWidget {
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  report.score.toString(),
+                  report.healthScore.toString(),
                   style: AppTextStyles.displayCompact.copyWith(
                     color: scoreColor,
                     fontSize: 36,
@@ -86,11 +86,21 @@ class RiskScoreHeroCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: AppSpacing.gapXs),
-                    Text(
-                      report.previousScore == null
-                          ? 'Chưa có mốc so sánh trước đó'
-                          : '${report.score - report.previousScore! >= 0 ? '+' : ''}${report.score - report.previousScore!} so với lần trước',
-                      style: AppTextStyles.caption,
+                    Builder(
+                      builder: (_) {
+                        final delta = report.healthDelta;
+                        if (delta == null) {
+                          return Text(
+                            'Chưa có lần đo trước để so sánh',
+                            style: AppTextStyles.caption,
+                          );
+                        }
+                        final sign = delta > 0 ? '+' : (delta < 0 ? '' : '±');
+                        return Text(
+                          '$sign$delta điểm so với lần trước',
+                          style: AppTextStyles.caption,
+                        );
+                      },
                     ),
                   ],
                 ),

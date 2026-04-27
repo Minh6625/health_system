@@ -6,14 +6,17 @@ import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../../../shared/presentation/feedback/inline_error_block.dart';
 import '../../../../shared/presentation/feedback/inline_status_banner.dart';
+import '../../domain/entities/risk_report_detail_entity.dart';
 import '../../providers/risk_report_provider.dart';
 import '../widgets/factor_contribution_section.dart';
+import '../widgets/first_aid_action_card.dart';
 import '../widgets/medical_disclaimer_card.dart';
 import '../widgets/recommendation_checklist_card.dart';
 import '../widgets/related_drilldown_section.dart';
 import '../widgets/risk_detail_summary_card.dart';
 import '../widgets/supporting_metrics_snapshot_card.dart';
 import '../widgets/xai_narrative_card.dart';
+import '../../../profile/providers/clinician_audience_provider.dart';
 
 class RiskReportDetailScreen extends StatefulWidget {
   final int reportId;
@@ -30,6 +33,21 @@ class RiskReportDetailScreen extends StatefulWidget {
 }
 
 class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
+  /// Phase 8 / slice 4a: resolve the audience query parameter from
+  /// the persistent toggle, falling back to ``null`` when the
+  /// provider isn't injected (e.g. older widget tests that don't yet
+  /// know about the new dependency). Defensive so this slice doesn't
+  /// require a same-PR migration of every existing test fixture.
+  String? _resolveAudience() {
+    try {
+      return context
+          .read<ClinicianAudienceProvider>()
+          .audienceQueryValue;
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +55,7 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
       context.read<RiskReportProvider>().fetchReportDetail(
         widget.reportId,
         widget.profileId,
+        audience: _resolveAudience(),
       );
     });
   }
@@ -45,6 +64,7 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
     await context.read<RiskReportProvider>().fetchReportDetail(
       widget.reportId,
       widget.profileId,
+      audience: _resolveAudience(),
     );
   }
 
@@ -127,6 +147,23 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
                       : null,
                 ),
                 const SizedBox(height: AppSpacing.gapLg),
+                FirstAidActionCard(
+                  level: detail.level,
+                  onMeasureAgain: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.vitalDetail,
+                      arguments: {
+                        'vitalType': 'hr',
+                        'profileId': widget.profileId,
+                      },
+                    );
+                  },
+                  onContactFamily: () {
+                    Navigator.pushNamed(context, AppRouter.familyDashboard);
+                  },
+                ),
+                const SizedBox(height: AppSpacing.gapLg),
                 FactorContributionSection(
                   breakdown: detail.breakdown,
                   onFactorTap: (routeTarget) {
@@ -146,6 +183,17 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
                 const SizedBox(height: AppSpacing.gapLg),
                 SupportingMetricsSnapshotCard(snapshot: detail.snapshot),
                 const SizedBox(height: AppSpacing.gapLg),
+                // Phase 8 slice 4b: clinician-only entry point. Visible
+                // when (a) the user has the toggle on AND (b) this
+                // particular detail load received clinician-shape SHAP
+                // data from the backend. The toggle gate is server-
+                // truth: a non-clinician role with the toggle on still
+                // gets a 403 + the patient flow falls back, so the
+                // entity simply never has shapDetails populated.
+                if (detail.hasClinicianShapDetails) ...[
+                  _ClinicianShapLink(detail: detail),
+                  const SizedBox(height: AppSpacing.gapLg),
+                ],
                 RecommendationChecklistCard(
                   recommendations:
                       detail.aiExplanation.recommendedActions.isNotEmpty
@@ -179,6 +227,74 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Phase 8 slice 4b — entry point card for the clinician SHAP screen.
+///
+/// Stateless + private to this file because it's a one-off entry
+/// surface; if more screens need to deep-link into the SHAP screen
+/// later we can promote it.
+class _ClinicianShapLink extends StatelessWidget {
+  final RiskReportDetailEntity detail;
+  const _ClinicianShapLink({required this.detail});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          Navigator.pushNamed(
+            context,
+            AppRouter.riskShapDetail,
+            arguments: {'detail': detail},
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Icon(
+                Icons.science_outlined,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Xem chi tiết SHAP (clinician)',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Đóng góp của ${detail.shapDetails!.values.length} '
+                      'đặc trưng + mã yêu cầu mô hình.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 14,
+                color: theme.colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

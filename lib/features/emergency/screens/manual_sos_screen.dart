@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:healthguard/core/services/sos_audio_service.dart';
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
 import 'package:healthguard/features/emergency/screens/sos_confirm_screen.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
@@ -40,6 +41,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
   bool _networkError = false;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  final SosAudioService _audio = SosAudioService();
 
   @override
   void initState() {
@@ -58,6 +60,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    _audio.start();
     _startCountdown();
   }
 
@@ -161,6 +164,8 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
         longitude: position?.longitude,
       );
 
+      _audio.stop();
+
       if (mounted) {
         Navigator.pushReplacement(
           context,
@@ -184,12 +189,14 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
   void _cancelSOS() {
     _isCancelled = true;
     _timer?.cancel();
+    _audio.stop();
     Navigator.pop(context);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _audio.stop();
     _countdownNotifier.dispose();
     _isSendingNotifier.dispose();
     _pulseController.dispose();

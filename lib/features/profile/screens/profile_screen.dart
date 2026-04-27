@@ -8,6 +8,7 @@ import 'package:healthguard/features/device/providers/device_provider.dart';
 import 'package:healthguard/features/profile/widgets/profile_widgets.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/widgets/remote_avatar.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -275,29 +276,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Column(
         children: [
-          CircleAvatar(
+          RemoteAvatar(
+            url: profile.avatarUrl,
             radius: 44,
+            fallbackText: initial,
             backgroundColor: AppColors.bgSurface,
-            backgroundImage: (profile.avatarUrl?.isNotEmpty ?? false)
-                ? NetworkImage(profile.avatarUrl!)
-                : null,
-            child: (profile.avatarUrl?.isNotEmpty ?? false)
-                ? null
-                : Text(
-                    initial,
-                    style: const TextStyle(
-                      color: AppColors.brandPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 34,
-                    ),
-                  ),
+            foregroundColor: AppColors.brandPrimary,
+            fallbackTextStyle: const TextStyle(
+              color: AppColors.brandPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 34,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
             profile.fullName,
             style: const TextStyle(
               color: AppColors.bgSurface,
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -306,7 +302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             profile.email,
             style: TextStyle(
               color: AppColors.bgSurface.withValues(alpha: 0.82),
-              fontSize: 13,
+              fontSize: 14,
             ),
           ),
           const SizedBox(height: 12),
@@ -354,7 +350,7 @@ class _HeroBadge extends StatelessWidget {
         label,
         style: const TextStyle(
           color: AppColors.bgSurface,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),

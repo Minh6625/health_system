@@ -145,6 +145,157 @@ void main() {
     );
 
     test(
+      'fetchLatestReport parses canonical-only payload (no deprecated risk_score)',
+      () async {
+        // Phase 1 contract: backend may eventually drop the deprecated
+        // `risk_score` alias (Phase 6). The mobile parser must already prefer
+        // `score`, so a payload missing `risk_score` must still parse correctly.
+        final client = _FakeApiClient((call) async {
+          return [
+            {
+              'id': 11,
+              'risk_type': 'general',
+              // Note: no `risk_score` key — only canonical `score`.
+              'score': 73.0,
+              'risk_level': 'medium',
+              'display_status': 'Theo doi',
+              'summary': 'Theo doi.',
+              'timestamp': '2026-04-21T08:00:00Z',
+              'previous_score': 70,
+              'trend_7d': [70, 71, 72, 73],
+              'top_factors': const [],
+              'recommendation_preview': const [],
+              'confidence': 0.81,
+              'is_stale': false,
+            },
+          ];
+        });
+        final repository = RiskAnalysisRepository(apiClient: client);
+
+        final report = await repository.fetchLatestReport('42');
+
+        expect(report.score, 73);
+        expect(report.displayStatus, 'Theo doi');
+      },
+    );
+
+    test(
+      'fetchReportDetail parses canonical-only payload (no risk_score, no xai_explanation)',
+      () async {
+        final client = _FakeApiClient((call) async {
+          return {
+            'id': 11,
+            'risk_type': 'general',
+            // Canonical only: no `risk_score`, no `xai_explanation`.
+            'score': 73.0,
+            'health_score': 27.0,
+            'risk_level': 'medium',
+            'display_status': 'Theo doi',
+            'summary': 'Theo doi.',
+            'timestamp': '2026-04-21T08:00:00Z',
+            'previous_score': 70,
+            'trend_7d': [70, 71, 72, 73],
+            'explanation': 'Nhip tim hoi cao.',
+            'breakdown': const [],
+            'recommendations': const ['Nghi ngoi.'],
+            'recommendation_preview': const ['Nghi ngoi.'],
+            'top_factors': const [],
+            'snapshot': const {
+              'heart_rate': 96,
+              'spo2': 96,
+              'sys_bp': 122,
+              'dia_bp': 78,
+              'body_temp': 36.7,
+              'hrv': 36,
+              'map_val': 92,
+            },
+            'confidence': 0.78,
+            'is_stale': false,
+          };
+        });
+        final repository = RiskAnalysisRepository(apiClient: client);
+
+        final detail = await repository.fetchReportDetail(11, '42');
+
+        expect(detail.score, 73);
+        expect(detail.healthScore, 27.0);
+        expect(detail.xaiExplanation, 'Nhip tim hoi cao.');
+      },
+    );
+
+    test(
+      'fetchHistory parses canonical-only payload (no risk_score on items)',
+      () async {
+        final client = _FakeApiClient((call) async {
+          return {
+            'range': '7d',
+            'summary': const {
+              'average_score': 72.5,
+              'highest_score': 75.0,
+              'lowest_score': 70.0,
+              'delta_vs_previous_period': 1.5,
+              'trend_points': [70, 71, 72, 73, 74, 75, 73],
+            },
+            'items': [
+              {
+                'report_id': 11,
+                // Canonical only.
+                'score': 73.0,
+                'health_score': 27.0,
+                'risk_level': 'medium',
+                'display_status': 'Theo doi',
+                'analyzed_at': '2026-04-21T08:00:00Z',
+                'reason_preview': 'Nhip tim hoi cao.',
+                'is_stale': false,
+              },
+            ],
+            'page': 1,
+            'limit': 20,
+            'has_more': false,
+          };
+        });
+        final repository = RiskAnalysisRepository(apiClient: client);
+
+        final history = await repository.fetchHistory(profileId: '42');
+
+        expect(history.items.single.score, 73);
+        expect(history.items.single.healthScore, 27.0);
+      },
+    );
+
+    test(
+      'mobile parser prefers canonical score when both keys are present and disagree',
+      () async {
+        // Defensive: if a buggy backend ever emits divergent values for the
+        // deprecated and canonical keys, the parser must trust the canonical
+        // value. This locks in the Phase 1 ordering.
+        final client = _FakeApiClient((call) async {
+          return [
+            {
+              'id': 12,
+              'risk_type': 'general',
+              'score': 50.0, // canonical — should win
+              'risk_score': 99.0, // deprecated — must be ignored
+              'risk_level': 'medium',
+              'display_status': 'Theo doi',
+              'summary': '',
+              'timestamp': '2026-04-21T08:00:00Z',
+              'top_factors': const [],
+              'recommendation_preview': const [],
+              'confidence': 0.5,
+              'is_stale': false,
+            },
+          ];
+        });
+        final repository = RiskAnalysisRepository(apiClient: client);
+
+        final report = await repository.fetchLatestReport('42');
+
+        expect(report.score, 50, reason: 'canonical `score` must win');
+      },
+    );
+
+    test(
       'parses canonical detail and history payloads with doubles and stale fields',
       () async {
         final client = _FakeApiClient((call) async {

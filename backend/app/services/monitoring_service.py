@@ -9,6 +9,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
+from app.core.risk_contract import RISK_CONTRACT_VERSION
+from app.observability.timing import record_timing
 from app.schemas.monitoring import (
     AiExplanationResponse,
     FactorBreakdownResponse,
@@ -16,6 +18,7 @@ from app.schemas.monitoring import (
     RiskHistoryItemResponse,
     RiskHistoryResponse,
     RiskHistorySummaryResponse,
+    RiskReportClinicianResponse,
     RiskReportDetailResponse,
     RiskReportResponse,
     SleepSessionResponse,
@@ -23,6 +26,7 @@ from app.schemas.monitoring import (
     TopFactorResponse,
     VitalSignsResponse,
 )
+from app.services.normalized_risk_row import NormalizedRiskRow
 from app.services.risk_inference_service import (
     canonicalize_risk_level,
     derive_display_status,
@@ -32,6 +36,12 @@ from app.services.risk_inference_service import (
     derive_risk_summary,
     is_risk_report_stale,
     normalize_risk_score,
+)
+from app.services.risk_report_builder import (
+    build_risk_history_item,
+    build_risk_report,
+    build_risk_report_clinician_detail,
+    build_risk_report_detail,
 )
 
 logger = logging.getLogger(__name__)
@@ -166,7 +176,13 @@ class MonitoringService:
         )
 
     @staticmethod
-    def _normalize_risk_row(row: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_risk_row(row: dict[str, Any]) -> NormalizedRiskRow:
+        """Project a raw ``risk_scores`` row into the canonical normalized form.
+
+        Phase 3: returns the typed :class:`NormalizedRiskRow` dataclass
+        instead of the legacy ``dict[str, Any]``. The set of produced fields
+        is now explicit; consumers use attribute access.
+        """
         features = MonitoringService._parse_json_object(row.get("features"))
         backend = row.get("algorithm") or features.get("backend") or "unknown"
         confidence = MonitoringService._safe_float(features.get("confidence"), 0.0)
@@ -187,26 +203,52 @@ class MonitoringService:
         recommendations = MonitoringService._parse_json_list(row.get("recommendations"))
         top_features = MonitoringService._parse_json_list(row.get("top_features_json"))
         ai_explanation = MonitoringService._parse_json_object(row.get("ai_explanation_json"))
-        return {
-            **row,
-            "features": features,
-            "feature_snapshot": feature_snapshot,
-            "raw_vitals": raw_vitals,
-            "feature_importance": feature_importance,
-            "top_features": [item for item in top_features if isinstance(item, dict)],
-            "ai_explanation": ai_explanation,
-            "recommendations": [str(item) for item in recommendations if str(item).strip()],
-            "confidence": round(confidence, 4),
-            "risk_level": risk_level,
-            "risk_score": risk_score,
-            "health_score": health_score,
-            "health_level": derive_health_level(risk_level),
-            "display_status": derive_display_status(risk_level),
-            "risk_summary": derive_risk_summary(risk_level),
-            "health_summary": derive_health_summary(risk_level),
-            "is_stale": is_risk_report_stale(timestamp),
-            "timestamp": timestamp,
-        }
+        explanation_text = row.get("explanation_text")
+        model_version = row.get("model_version")
+        algorithm = row.get("algorithm")
+        # Phase 5: surface the persisted shap waterfall + upstream request id
+        # on the read path. ``shap_details_json`` is a JSONB so it arrives
+        # already-parsed as a dict (or None for legacy rows). ``model_request_id``
+        # is a varchar; defensively coerce + truncate in case the DB ever
+        # gets a value that exceeds the column width via a future migration.
+        raw_shap = row.get("shap_details_json")
+        shap_details = raw_shap if isinstance(raw_shap, dict) else None
+        raw_request_id = row.get("model_request_id")
+        model_request_id: str | None = None
+        if raw_request_id is not None:
+            candidate = str(raw_request_id).strip()
+            model_request_id = candidate[:36] if candidate else None
+        return NormalizedRiskRow(
+            # Some intermediate query paths (e.g. ``_get_history_summary``)
+            # only need timestamp + risk_score and pass rows that omit
+            # ``id``. Default to 0 so the dataclass accepts them; downstream
+            # consumers that depend on ``id`` already receive proper rows
+            # from the LATERAL-joined queries.
+            id=int(row["id"]) if "id" in row else 0,
+            risk_type=str(row.get("risk_type") or ""),
+            risk_score=risk_score,
+            health_score=health_score,
+            risk_level=risk_level,
+            health_level=derive_health_level(risk_level),
+            display_status=derive_display_status(risk_level),
+            risk_summary=derive_risk_summary(risk_level),
+            health_summary=derive_health_summary(risk_level),
+            timestamp=timestamp,
+            confidence=round(confidence, 4),
+            is_stale=is_risk_report_stale(timestamp),
+            features=features,
+            feature_snapshot=feature_snapshot,
+            raw_vitals=raw_vitals,
+            feature_importance=feature_importance,
+            top_features=[item for item in top_features if isinstance(item, dict)],
+            ai_explanation=ai_explanation,
+            recommendations=[str(item) for item in recommendations if str(item).strip()],
+            explanation_text=str(explanation_text) if explanation_text is not None else None,
+            model_version=str(model_version) if model_version is not None else None,
+            algorithm=str(algorithm) if algorithm is not None else None,
+            shap_details=shap_details,
+            model_request_id=model_request_id,
+        )
 
     @staticmethod
     def _top_factors(
@@ -429,10 +471,10 @@ class MonitoringService:
         daily_max: dict[str, int] = {}
         for raw_row in rows:
             normalized = MonitoringService._normalize_risk_row(dict(raw_row))
-            day_key = normalized["timestamp"].date().isoformat()
+            day_key = normalized.timestamp.date().isoformat()
             daily_max[day_key] = max(
                 daily_max.get(day_key, 0),
-                MonitoringService._safe_int(normalized["risk_score"]),
+                MonitoringService._safe_int(normalized.risk_score),
             )
 
         trend_points: list[int] = []
@@ -578,7 +620,7 @@ class MonitoringService:
             return None
 
         normalized = MonitoringService._normalize_risk_row(dict(previous_row))
-        return normalized["risk_score"]
+        return normalized.risk_score
 
     @staticmethod
     def _get_history_summary(
@@ -622,11 +664,11 @@ class MonitoringService:
         ).mappings().all()
 
         current_scores = [
-            MonitoringService._normalize_risk_row(dict(row))["risk_score"]
+            MonitoringService._normalize_risk_row(dict(row)).risk_score
             for row in current_rows
         ]
         previous_scores = [
-            MonitoringService._normalize_risk_row(dict(row))["risk_score"]
+            MonitoringService._normalize_risk_row(dict(row)).risk_score
             for row in previous_rows
         ]
 
@@ -643,10 +685,10 @@ class MonitoringService:
         trend_map: dict[str, int] = {}
         for row in current_rows:
             normalized = MonitoringService._normalize_risk_row(dict(row))
-            day_key = normalized["timestamp"].date().isoformat()
+            day_key = normalized.timestamp.date().isoformat()
             trend_map[day_key] = max(
                 trend_map.get(day_key, 0),
-                MonitoringService._safe_int(normalized["risk_score"]),
+                MonitoringService._safe_int(normalized.risk_score),
             )
 
         trend_points: list[int] = []
@@ -792,18 +834,21 @@ class MonitoringService:
     def get_health_report(patient_id: int, db: Session) -> HealthReportResponse:
         vitals_dict: dict[str, Any] = {}
         try:
+            # Aliases below MUST match the Flutter `HealthReport.vitals24hAvg`
+            # contract documented in
+            # `lib/features/health_monitoring/models/health_report.dart`. The
+            # screen `_VitalsAvgGrid` reads these exact keys; renaming them
+            # silently breaks the 24-hour averages section.
             vitals_stats = db.execute(
                 text(
                     """
                     SELECT
-                        ROUND(AVG(heart_rate)::numeric, 1) as avg_hr,
-                        MIN(heart_rate) as min_hr,
-                        MAX(heart_rate) as max_hr,
-                        ROUND(AVG(spo2)::numeric, 1) as avg_spo2,
-                        MIN(spo2) as min_spo2,
-                        ROUND(AVG(temperature)::numeric, 1) as avg_temp,
-                        ROUND(AVG(blood_pressure_sys)::numeric, 0) as avg_bp_sys,
-                        ROUND(AVG(blood_pressure_dia)::numeric, 0) as avg_bp_dia
+                        ROUND(AVG(heart_rate)::numeric, 1) AS heart_rate,
+                        ROUND(AVG(spo2)::numeric, 1) AS spo2,
+                        ROUND(AVG(temperature)::numeric, 1) AS temperature,
+                        ROUND(AVG(respiratory_rate)::numeric, 1) AS respiratory_rate,
+                        ROUND(AVG(blood_pressure_sys)::numeric, 0) AS blood_pressure_sys,
+                        ROUND(AVG(blood_pressure_dia)::numeric, 0) AS blood_pressure_dia
                     FROM vitals v
                     INNER JOIN devices d ON v.device_id = d.id
                     WHERE d.user_id = :user_id
@@ -834,15 +879,15 @@ class MonitoringService:
             normalized = MonitoringService._normalize_risk_row(dict(latest_risk_row))
             return HealthReportResponse(
                 vitals_24h_avg=vitals_dict,
-                latest_risk_score=normalized["risk_score"],
-                risk_level=normalized["risk_level"],
-                risk_type=normalized["risk_type"],
-                last_updated=normalized["timestamp"],
-                health_score=normalized["health_score"],
-                health_level=normalized["health_level"],
-                health_summary=normalized["health_summary"],
-                confidence=normalized["confidence"],
-                is_stale=normalized["is_stale"],
+                latest_risk_score=normalized.risk_score,
+                risk_level=normalized.risk_level,
+                risk_type=normalized.risk_type,
+                last_updated=normalized.timestamp,
+                health_score=normalized.health_score,
+                health_level=normalized.health_level,
+                health_summary=normalized.health_summary,
+                confidence=normalized.confidence,
+                is_stale=normalized.is_stale,
             )
         except Exception:
             logger.exception(
@@ -869,14 +914,21 @@ class MonitoringService:
                         re.feature_importance,
                         re.recommendations,
                         re.top_features_json,
-                        re.ai_explanation_json
+                        re.ai_explanation_json,
+                        re.shap_details_json,
+                        re.model_request_id,
+                        re.audience_payload_json
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
-                        SELECT explanation_text,
+                        SELECT id AS risk_explanation_id,
+                               explanation_text,
                                feature_importance,
                                recommendations,
                                top_features_json,
-                               ai_explanation_json
+                               ai_explanation_json,
+                               shap_details_json,
+                               model_request_id,
+                               audience_payload_json
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -897,39 +949,26 @@ class MonitoringService:
             normalized = MonitoringService._normalize_risk_row(dict(raw_row))
             previous_score = MonitoringService._previous_risk_score(
                 patient_id,
-                normalized["risk_type"],
-                normalized["timestamp"],
+                normalized.risk_type,
+                normalized.timestamp,
                 db,
             )
             trend_7d = MonitoringService._compute_trend_7d(
                 patient_id,
-                normalized["risk_type"],
-                normalized["timestamp"],
+                normalized.risk_type,
+                normalized.timestamp,
                 db,
             )
             top_factors = MonitoringService._top_factors(
-                normalized["feature_importance"],
-                top_features=normalized.get("top_features"),
+                normalized.feature_importance,
+                top_features=normalized.top_features,
             )
             reports.append(
-                RiskReportResponse(
-                    id=normalized["id"],
-                    risk_type=normalized["risk_type"],
-                    risk_score=normalized["risk_score"],
-                    score=normalized["risk_score"],
-                    health_score=normalized["health_score"],
-                    risk_level=normalized["risk_level"],
-                    health_level=normalized["health_level"],
-                    display_status=normalized["display_status"],
-                    summary=normalized["health_summary"],
-                    timestamp=normalized["timestamp"],
+                build_risk_report(
+                    normalized,
                     previous_score=previous_score,
                     trend_7d=trend_7d,
-                    key_features=[factor.key for factor in top_factors],
                     top_factors=top_factors,
-                    recommendation_preview=normalized["recommendations"][:2],
-                    confidence=normalized["confidence"],
-                    is_stale=normalized["is_stale"],
                 )
             )
         return reports
@@ -950,18 +989,26 @@ class MonitoringService:
                         rs.features,
                         rs.model_version,
                         rs.algorithm,
+                        re.id AS risk_explanation_id,
                         re.explanation_text,
                         re.feature_importance,
                         re.recommendations,
                         re.top_features_json,
-                        re.ai_explanation_json
+                        re.ai_explanation_json,
+                        re.shap_details_json,
+                        re.model_request_id,
+                        re.audience_payload_json
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
-                        SELECT explanation_text,
+                        SELECT id,
+                               explanation_text,
                                feature_importance,
                                recommendations,
                                top_features_json,
-                               ai_explanation_json
+                               ai_explanation_json,
+                               shap_details_json,
+                               model_request_id,
+                               audience_payload_json
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -980,70 +1027,267 @@ class MonitoringService:
         if risk_row is None:
             return None
 
-        normalized = MonitoringService._normalize_risk_row(dict(risk_row))
+        row_dict = dict(risk_row)
+        cached = MonitoringService._read_audience_cache(
+            row_dict, audience="patient", model=RiskReportDetailResponse,
+        )
+        if cached is not None:
+            return cached
+        result = build_risk_report_detail(
+            **MonitoringService._build_detail_inputs(patient_id, row_dict, db),
+        )
+        MonitoringService._write_audience_cache(
+            db, row_dict, audience="patient", payload=result,
+        )
+        return result
+
+    @staticmethod
+    def get_risk_report_clinician_detail(
+        patient_id: int, report_id: int, db: Session,
+    ) -> RiskReportClinicianResponse | None:
+        """Phase 5 clinician variant of :meth:`get_risk_report_detail`.
+
+        Same SQL fetch + assembly as the patient flow; only the final
+        builder differs. Role gating is enforced at the route layer
+        (``app/core/audience.require_clinician_audience``) so this
+        method trusts that the caller has already verified the
+        permission.
+        """
+        try:
+            risk_row = db.execute(
+                text(
+                    """
+                    SELECT
+                        rs.id,
+                        rs.user_id,
+                        rs.risk_type,
+                        rs.score,
+                        rs.risk_level,
+                        rs.calculated_at,
+                        rs.features,
+                        rs.model_version,
+                        rs.algorithm,
+                        re.id AS risk_explanation_id,
+                        re.explanation_text,
+                        re.feature_importance,
+                        re.recommendations,
+                        re.top_features_json,
+                        re.ai_explanation_json,
+                        re.shap_details_json,
+                        re.model_request_id,
+                        re.audience_payload_json
+                    FROM risk_scores rs
+                    LEFT JOIN LATERAL (
+                        SELECT id,
+                               explanation_text,
+                               feature_importance,
+                               recommendations,
+                               top_features_json,
+                               ai_explanation_json,
+                               shap_details_json,
+                               model_request_id,
+                               audience_payload_json
+                        FROM risk_explanations
+                        WHERE risk_score_id = rs.id
+                        ORDER BY id DESC
+                        LIMIT 1
+                    ) re ON TRUE
+                    WHERE rs.id = :report_id
+                      AND rs.user_id = :user_id
+                    LIMIT 1
+                    """
+                ),
+                {"report_id": report_id, "user_id": patient_id},
+            ).mappings().first()
+        except ProgrammingError:
+            return None
+
+        if risk_row is None:
+            return None
+
+        row_dict = dict(risk_row)
+        cached = MonitoringService._read_audience_cache(
+            row_dict, audience="clinician", model=RiskReportClinicianResponse,
+        )
+        if cached is not None:
+            return cached
+        result = build_risk_report_clinician_detail(
+            **MonitoringService._build_detail_inputs(patient_id, row_dict, db),
+        )
+        MonitoringService._write_audience_cache(
+            db, row_dict, audience="clinician", payload=result,
+        )
+        return result
+
+    @staticmethod
+    def _read_audience_cache(
+        row_dict: dict[str, Any],
+        *,
+        audience: str,
+        model: type[Any],
+    ) -> Any | None:
+        """Return the cached DTO for ``audience`` if it matches the current
+        contract version, else ``None`` (signalling cache miss / stale).
+
+        Cache shape:
+        ``{"<audience>": {"contract_version": "x.y.z", "payload": {...}}}``.
+
+        Phase 7: ``RISK_CONTRACT_VERSION`` is the cache key suffix so a
+        contract bump invalidates every entry without a manual flush.
+        """
+        cache = row_dict.get("audience_payload_json")
+        if not isinstance(cache, dict):
+            record_timing(
+                "build_dto", 0.0, audience=audience, cache="miss",
+                reason="no_cache_column",
+            )
+            return None
+        entry = cache.get(audience)
+        if not isinstance(entry, dict):
+            record_timing(
+                "build_dto", 0.0, audience=audience, cache="miss",
+                reason="no_audience_entry",
+            )
+            return None
+        version = entry.get("contract_version")
+        payload = entry.get("payload")
+        if version != RISK_CONTRACT_VERSION or not isinstance(payload, dict):
+            record_timing(
+                "build_dto", 0.0, audience=audience, cache="miss",
+                reason="version_mismatch" if version != RISK_CONTRACT_VERSION else "malformed_payload",
+            )
+            return None
+        try:
+            result = model.model_validate(payload)
+        except Exception:  # noqa: BLE001 - fall back to rebuild on any parse error
+            logger.exception(
+                "Audience cache hit but payload failed validation; rebuilding"
+            )
+            record_timing(
+                "build_dto", 0.0, audience=audience, cache="miss",
+                reason="payload_validate_failed",
+            )
+            return None
+        record_timing("build_dto", 0.0, audience=audience, cache="hit")
+        return result
+
+    @staticmethod
+    def _write_audience_cache(
+        db: Session,
+        row_dict: dict[str, Any],
+        *,
+        audience: str,
+        payload: Any,
+    ) -> None:
+        """Best-effort write the freshly-built ``payload`` to the cache column.
+
+        Merges with whatever is already in ``audience_payload_json`` so a
+        patient-built request that lands first does not erase a clinician
+        entry written later (or vice versa). Failures are logged but never
+        propagated — the request flow already has the freshly-built payload.
+        """
+        risk_explanation_id = row_dict.get("risk_explanation_id")
+        if risk_explanation_id is None:
+            # Legacy / synthetic rows that come through ``_get_history_summary``
+            # without the LATERAL join. Cache write is a no-op for them.
+            return
+        existing = row_dict.get("audience_payload_json")
+        merged: dict[str, Any] = dict(existing) if isinstance(existing, dict) else {}
+        merged[audience] = {
+            "contract_version": RISK_CONTRACT_VERSION,
+            "payload": payload.model_dump(mode="json"),
+        }
+        try:
+            db.execute(
+                text(
+                    """
+                    UPDATE risk_explanations
+                    SET audience_payload_json = CAST(:cache AS jsonb)
+                    WHERE id = :risk_explanation_id
+                    """
+                ),
+                {
+                    "cache": json.dumps(merged),
+                    "risk_explanation_id": int(risk_explanation_id),
+                },
+            )
+            db.commit()
+            # Reflect the new state in the row_dict so a sibling cache read
+            # within the same request sees the freshly written entry.
+            row_dict["audience_payload_json"] = merged
+        except Exception:  # noqa: BLE001 - cache write must never break the request flow
+            db.rollback()
+            logger.exception(
+                "Failed to write audience cache for risk_explanation_id=%s audience=%s",
+                risk_explanation_id,
+                audience,
+            )
+
+    @staticmethod
+    def _build_detail_inputs(
+        patient_id: int,
+        raw_row: dict[str, Any],
+        db: Session,
+    ) -> dict[str, Any]:
+        """Shared assembly for the patient + clinician detail builders.
+
+        Phase 5 split this out of :meth:`get_risk_report_detail` so the
+        new clinician variant can call the same builder with the same
+        input set without duplicating the four service-layer calls
+        (``_previous_risk_score``, ``_compute_trend_7d``,
+        ``_build_breakdown``, ``_build_ai_explanation``).
+        """
+        normalized = MonitoringService._normalize_risk_row(raw_row)
         previous_score = MonitoringService._previous_risk_score(
             patient_id,
-            normalized["risk_type"],
-            normalized["timestamp"],
+            normalized.risk_type,
+            normalized.timestamp,
             db,
         )
         trend_7d = MonitoringService._compute_trend_7d(
             patient_id,
-            normalized["risk_type"],
-            normalized["timestamp"],
+            normalized.risk_type,
+            normalized.timestamp,
             db,
         )
-        top_features = normalized.get("top_features") or []
+        top_features = normalized.top_features
         breakdown = MonitoringService._build_breakdown(
-            normalized["feature_importance"],
-            normalized["feature_snapshot"],
-            normalized["raw_vitals"],
+            normalized.feature_importance,
+            normalized.feature_snapshot,
+            normalized.raw_vitals,
             top_features=top_features,
         )
         snapshot = MonitoringService._build_snapshot(
-            normalized["feature_snapshot"],
-            normalized["raw_vitals"],
+            normalized.feature_snapshot,
+            normalized.raw_vitals,
         )
         top_factors = MonitoringService._top_factors(
-            normalized["feature_importance"],
+            normalized.feature_importance,
             top_features=top_features,
         )
         ai_explanation = MonitoringService._build_ai_explanation(
-            normalized.get("ai_explanation") or {},
-            fallback_recommendations=normalized["recommendations"],
+            normalized.ai_explanation,
+            fallback_recommendations=normalized.recommendations,
         )
+        return {
+            "normalized": normalized,
+            "previous_score": previous_score,
+            "trend_7d": trend_7d,
+            "top_factors": top_factors,
+            "breakdown": breakdown,
+            "snapshot": snapshot,
+            "ai_explanation": ai_explanation,
+        }
 
-        return RiskReportDetailResponse(
-            id=normalized["id"],
-            risk_type=normalized["risk_type"],
-            risk_score=normalized["risk_score"],
-            score=normalized["risk_score"],
-            health_score=normalized["health_score"],
-            risk_level=normalized["risk_level"],
-            health_level=normalized["health_level"],
-            display_status=normalized["display_status"],
-            summary=normalized["risk_summary"],
-            timestamp=normalized["timestamp"],
-            previous_score=previous_score,
-            trend_7d=trend_7d,
-            explanation=str(normalized.get("explanation_text") or ""),
-            xai_explanation=str(normalized.get("explanation_text") or ""),
-            features=normalized["features"],
-            feature_importance={
-                key: round(MonitoringService._safe_float(value), 4)
-                for key, value in normalized["feature_importance"].items()
-            },
-            breakdown=breakdown,
-            recommendations=normalized["recommendations"],
-            recommendation_preview=normalized["recommendations"][:2],
-            top_factors=top_factors,
-            snapshot=snapshot,
-            model_version=str(normalized.get("model_version") or "1.0"),
-            algorithm=str(normalized.get("algorithm") or "unknown"),
-            confidence=normalized["confidence"],
-            is_stale=normalized["is_stale"],
-            ai_explanation=ai_explanation,
-        )
+    #: Allow-listed values for the ``risk_type`` filter on
+    #: ``get_risk_history``. Phase 4A-full slice 3b — Flutter exposes
+    #: a filter chip row over these values plus an "All" pseudo-option
+    #: that omits the filter entirely. Anything outside the allow-list
+    #: is silently treated as "no filter" so a future client passing a
+    #: typo doesn't blow up the screen.
+    RISK_HISTORY_TYPE_FILTERS: frozenset[str] = frozenset({
+        "general", "sleep", "fall",
+    })
 
     @staticmethod
     def get_risk_history(
@@ -1052,6 +1296,7 @@ class MonitoringService:
         range_key: str = "7d",
         page: int = 1,
         limit: int = 20,
+        risk_type: str | None = None,
     ) -> RiskHistoryResponse:
         range_key = range_key if range_key in MonitoringService.RISK_HISTORY_RANGE_DAYS else "7d"
         days = MonitoringService.RISK_HISTORY_RANGE_DAYS[range_key]
@@ -1060,53 +1305,76 @@ class MonitoringService:
         offset = (page - 1) * limit
         start_time = datetime.now(UTC) - timedelta(days=days)
 
-        try:
-            total = db.execute(
-                text(
-                    """
-                    SELECT COUNT(*)
-                    FROM risk_scores
-                    WHERE user_id = :user_id
-                      AND calculated_at >= :start_time
-                    """
-                ),
-                {"user_id": patient_id, "start_time": start_time},
-            ).scalar() or 0
+        # Phase 4A-full slice 3b: optional ``risk_type`` filter.
+        # Empty / missing / unknown values fall back to "no filter" so
+        # the route is forward-compatible with future risk_type values
+        # the backend doesn't recognise yet.
+        normalized_risk_type: str | None = None
+        if risk_type:
+            stripped = risk_type.strip().lower()
+            if stripped in MonitoringService.RISK_HISTORY_TYPE_FILTERS:
+                normalized_risk_type = stripped
 
-            rows = db.execute(
-                text(
-                    """
-                    SELECT
-                        rs.id,
-                        rs.risk_type,
-                        rs.score,
-                        rs.risk_level,
-                        rs.calculated_at,
-                        rs.features,
-                        rs.algorithm,
-                        re.explanation_text
-                    FROM risk_scores rs
-                    LEFT JOIN LATERAL (
-                        SELECT explanation_text
-                        FROM risk_explanations
-                        WHERE risk_score_id = rs.id
-                        ORDER BY id DESC
-                        LIMIT 1
-                    ) re ON TRUE
-                    WHERE rs.user_id = :user_id
-                      AND rs.calculated_at >= :start_time
-                    ORDER BY rs.calculated_at DESC
-                    OFFSET :offset
-                    LIMIT :limit
-                    """
-                ),
-                {
-                    "user_id": patient_id,
-                    "start_time": start_time,
-                    "offset": offset,
-                    "limit": limit,
-                },
-            ).mappings().all()
+        try:
+            count_sql = (
+                """
+                SELECT COUNT(*)
+                FROM risk_scores
+                WHERE user_id = :user_id
+                  AND calculated_at >= :start_time
+                """
+            )
+            if normalized_risk_type is not None:
+                count_sql += "  AND risk_type = :risk_type\n"
+
+            count_params: dict[str, Any] = {
+                "user_id": patient_id, "start_time": start_time,
+            }
+            if normalized_risk_type is not None:
+                count_params["risk_type"] = normalized_risk_type
+            total = db.execute(text(count_sql), count_params).scalar() or 0
+
+            list_sql = (
+                """
+                SELECT
+                    rs.id,
+                    rs.risk_type,
+                    rs.score,
+                    rs.risk_level,
+                    rs.calculated_at,
+                    rs.features,
+                    rs.algorithm,
+                    re.explanation_text
+                FROM risk_scores rs
+                LEFT JOIN LATERAL (
+                    SELECT explanation_text
+                    FROM risk_explanations
+                    WHERE risk_score_id = rs.id
+                    ORDER BY id DESC
+                    LIMIT 1
+                ) re ON TRUE
+                WHERE rs.user_id = :user_id
+                  AND rs.calculated_at >= :start_time
+                """
+            )
+            if normalized_risk_type is not None:
+                list_sql += "  AND rs.risk_type = :risk_type\n"
+            list_sql += (
+                """ORDER BY rs.calculated_at DESC
+                OFFSET :offset
+                LIMIT :limit
+                """
+            )
+
+            list_params: dict[str, Any] = {
+                "user_id": patient_id,
+                "start_time": start_time,
+                "offset": offset,
+                "limit": limit,
+            }
+            if normalized_risk_type is not None:
+                list_params["risk_type"] = normalized_risk_type
+            rows = db.execute(text(list_sql), list_params).mappings().all()
         except ProgrammingError:
             return RiskHistoryResponse(
                 range=range_key,
@@ -1120,20 +1388,7 @@ class MonitoringService:
         items: list[RiskHistoryItemResponse] = []
         for raw_row in rows:
             normalized = MonitoringService._normalize_risk_row(dict(raw_row))
-            reason_preview = str(normalized.get("explanation_text") or normalized["risk_summary"]).strip()
-            items.append(
-                RiskHistoryItemResponse(
-                    report_id=normalized["id"],
-                    risk_score=normalized["risk_score"],
-                    score=normalized["risk_score"],
-                    health_score=normalized["health_score"],
-                    risk_level=normalized["risk_level"],
-                    display_status=normalized["display_status"],
-                    analyzed_at=normalized["timestamp"],
-                    reason_preview=reason_preview,
-                    is_stale=normalized["is_stale"],
-                )
-            )
+            items.append(build_risk_history_item(normalized))
 
         summary = MonitoringService._get_history_summary(patient_id, range_key, db)
         return RiskHistoryResponse(

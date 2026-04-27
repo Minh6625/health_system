@@ -61,6 +61,7 @@ dependencies:
   qr_flutter: ^4.1.0
   image: ^4.5.4
   yomu: ^1.0.0
+  supabase_flutter: ^2.8.0
 
   flutter_native_splash: any
 dev_dependencies:

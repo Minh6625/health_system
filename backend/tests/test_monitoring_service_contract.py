@@ -50,7 +50,7 @@ class TestMonitoringServiceContract:
         now = datetime.now(UTC)
         db = MagicMock()
         db.execute.side_effect = [
-            _FakeQueryResult(first={"avg_hr": 74.1, "avg_spo2": 98.0}),
+            _FakeQueryResult(first={"heart_rate": 74.1, "spo2": 98.0}),
             _FakeQueryResult(
                 first={
                     "id": 11,
@@ -79,7 +79,7 @@ class TestMonitoringServiceContract:
         refreshed_time = datetime.now(UTC)
         db = MagicMock()
         db.execute.side_effect = [
-            _FakeQueryResult(first={"avg_hr": 74.1, "avg_spo2": 98.0}),
+            _FakeQueryResult(first={"heart_rate": 74.1, "spo2": 98.0}),
             _FakeQueryResult(
                 first={
                     "id": 11,
@@ -136,8 +136,8 @@ class TestMonitoringServiceContract:
         db.execute.side_effect = [
             _FakeQueryResult(
                 first={
-                    "avg_hr": 74.1,
-                    "avg_spo2": 98.0,
+                    "heart_rate": 74.1,
+                    "spo2": 98.0,
                 }
             ),
             _FakeQueryResult(
@@ -167,7 +167,7 @@ class TestMonitoringServiceContract:
 
     def test_health_report_returns_vitals_only_when_risk_row_missing(self, monkeypatch) -> None:
         db = MagicMock()
-        db.execute.side_effect = [_FakeQueryResult(first={"avg_hr": 74.1, "avg_spo2": 98.0})]
+        db.execute.side_effect = [_FakeQueryResult(first={"heart_rate": 74.1, "spo2": 98.0})]
         monkeypatch.setattr(
             MonitoringService,
             "_refresh_latest_risk_row",
@@ -176,7 +176,7 @@ class TestMonitoringServiceContract:
 
         report = MonitoringService.get_health_report(patient_id=7, db=db)
 
-        assert report.vitals_24h_avg == {"avg_hr": 74.1, "avg_spo2": 98.0}
+        assert report.vitals_24h_avg == {"heart_rate": 74.1, "spo2": 98.0}
         assert report.latest_risk_score is None
         assert report.health_score is None
         assert report.risk_level is None

@@ -25,11 +25,18 @@ class TopFactor {
 class RiskReportEntity {
   final int reportId;
   final String profileId;
+
+  /// Raw risk score returned by the backend (`risk_score`). Higher = worse
+  /// health. Kept as the storage representation; UI should prefer
+  /// [healthScore] which inverts the semantic so larger values are better.
   final int score;
   final RiskLevel level;
   final String displayStatus;
   final String summary;
   final DateTime analyzedAt;
+
+  /// Risk score from the previous report, if any. UI should derive deltas
+  /// from [healthDelta] which flips the sign so positive = improvement.
   final int? previousScore;
   final List<int> trend7d;
   final List<TopFactor> topFactors;
@@ -52,4 +59,21 @@ class RiskReportEntity {
     required this.confidence,
     required this.isStale,
   });
+
+  /// User-facing health score (0–100, higher is better). Computed as the
+  /// complement of the underlying risk score.
+  int get healthScore => (100 - score).clamp(0, 100);
+
+  /// Difference in health score versus the previous report. Positive means
+  /// health improved; null when there was no prior comparison.
+  int? get healthDelta {
+    final prev = previousScore;
+    if (prev == null) return null;
+    return prev - score;
+  }
+
+  /// Trend points expressed in the health domain (higher = better) so charts
+  /// rendered upward indicate improvement.
+  List<int> get healthTrend7d =>
+      trend7d.map((point) => (100 - point).clamp(0, 100)).toList();
 }

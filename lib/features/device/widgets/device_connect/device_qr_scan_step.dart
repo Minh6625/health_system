@@ -3,6 +3,7 @@ import '../../../../shared/presentation/theme/app_colors.dart';
 import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
+import 'device_connect_demo_banner.dart';
 
 class DeviceQrScanStep extends StatelessWidget {
   const DeviceQrScanStep({super.key});
@@ -14,6 +15,8 @@ class DeviceQrScanStep extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const DeviceConnectDemoBanner(),
+          SizedBox(height: AppSpacing.sectionGapMd),
           Text(
             'Quét mã QR',
             style: AppTextStyles.sectionTitle.copyWith(fontSize: 24),

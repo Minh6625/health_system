@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:healthguard/core/services/sos_audio_service.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
@@ -74,6 +75,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
   Timer? _countdownTimer;
   late int _remainingSeconds;
   bool _isActionInProgress = false;
+  final SosAudioService _audio = SosAudioService();
 
   bool get _isCritical => widget.riskLevel.toLowerCase() == 'critical';
 
@@ -99,6 +101,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
         );
 
     _pulseController.repeat();
+    _audio.start();
     _startCountdown();
   }
 
@@ -132,22 +135,23 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
 
     _countdownTimer?.cancel();
     _countdownTimer = null;
+    _audio.stop();
 
     try {
       await action();
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isActionInProgress = false;
+        });
       }
-      setState(() {
-        _isActionInProgress = false;
-      });
     }
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _audio.stop();
     _pulseController.dispose();
     super.dispose();
   }

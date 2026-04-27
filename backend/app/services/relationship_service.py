@@ -421,7 +421,9 @@ class RelationshipService:
             risk_level = "low"
             sleep_duration_minutes = 0
             sleep_quality = "Trung bình"
-            health_score_7_days = 0
+            # None until we read a real health_report below; preserves the
+            # distinction between 'no data' and a real score of 0 (critical).
+            health_score_7_days: int | None = None
             health_score_level = "Trung bình"
             special_note = ""
 

@@ -11,7 +11,9 @@ class UserProfileModel {
   // Medical fields
   final String? gender;
   final String? bloodType;
-  final double? heightCm;
+  /// Backend stores `height_cm` in a Postgres `smallint` column; only
+  /// whole-cm values are persistable, so the Dart side mirrors with `int`.
+  final int? heightCm;
   final double? weightKg;
   final List<String> medications;
   final List<String> allergies;
@@ -55,7 +57,7 @@ class UserProfileModel {
       avatarUrl: json['avatar_url'] as String?,
       gender: json['gender'] as String?,
       bloodType: json['blood_type'] as String?,
-      heightCm: (json['height_cm'] as num?)?.toDouble(),
+      heightCm: (json['height_cm'] as num?)?.toInt(),
       weightKg: (json['weight_kg'] as num?)?.toDouble(),
       medications: ((json['medications'] as List<dynamic>?) ?? []).map((e) => e.toString()).toList(),
       allergies: ((json['allergies'] as List<dynamic>?) ?? []).map((e) => e.toString()).toList(),

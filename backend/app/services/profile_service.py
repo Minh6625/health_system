@@ -3,7 +3,12 @@ from sqlalchemy.orm import Session
 
 from app.models.user_model import User
 from app.repositories.audit_log_repository import AuditLogRepository
-from app.schemas.profile import DeleteAccountRequest, ProfileResponse, ProfileUpdateRequest
+from app.schemas.profile import (
+    GENDER_EN_TO_VI,
+    DeleteAccountRequest,
+    ProfileResponse,
+    ProfileUpdateRequest,
+)
 from app.utils.datetime_helper import get_current_time
 from app.utils.password import verify_password
 
@@ -11,6 +16,9 @@ from app.utils.password import verify_password
 class ProfileService:
     @staticmethod
     def get_profile(user: User) -> ProfileResponse:
+        # DB stores canonical English ('male'/'female'/'other'); API surface
+        # exposes Vietnamese to keep the mobile UI label-driven.
+        gender_label = GENDER_EN_TO_VI.get(user.gender) if user.gender else None
         return ProfileResponse(
             user_id=user.id,
             email=user.email,
@@ -21,7 +29,7 @@ class ProfileService:
             is_active=user.is_active,
             is_verified=user.is_verified,
             avatar_url=user.avatar_url,
-            gender=user.gender,
+            gender=gender_label,
             blood_type=user.blood_type,
             height_cm=user.height_cm,
             weight_kg=user.weight_kg,
