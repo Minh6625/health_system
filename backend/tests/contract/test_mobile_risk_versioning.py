@@ -169,7 +169,10 @@ def risk_client(monkeypatch) -> TestClient:
         MonitoringService,
         "get_risk_history",
         staticmethod(
-            lambda patient_id, db, range_key="7d", page=1, limit=20: _stub_risk_history()
+            # Phase 4A-full slice 3b added the optional ``risk_type``
+            # kwarg; accept + ignore it so this stub keeps working
+            # for the version-header tests.
+            lambda patient_id, db, range_key="7d", page=1, limit=20, risk_type=None: _stub_risk_history()
         ),
     )
     monkeypatch.setattr(

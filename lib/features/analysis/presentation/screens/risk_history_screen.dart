@@ -13,6 +13,7 @@ import '../widgets/pagination_footer.dart';
 import '../widgets/range_filter_chips.dart';
 import '../widgets/risk_history_item_card.dart';
 import '../widgets/risk_trend_summary_card.dart';
+import '../widgets/risk_type_filter_chips.dart';
 
 class RiskHistoryScreen extends StatefulWidget {
   final String? profileId;
@@ -124,6 +125,17 @@ class _RiskHistoryScreenState extends State<RiskHistoryScreen> {
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(),
         slivers: [
+          // Phase 4A-full slice 3b: risk-type filter chip row
+          // (Tất cả / Sức khoẻ / Giấc ngủ / Té ngã). Sits above the
+          // existing range chips so users see "what type" before
+          // "what window".
+          SliverToBoxAdapter(
+            child: RiskTypeFilterChips(
+              selectedValue: provider.currentRiskType,
+              onChanged: (value) =>
+                  provider.changeRiskType(widget.profileId, value),
+            ),
+          ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.only(

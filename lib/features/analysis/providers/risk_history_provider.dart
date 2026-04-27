@@ -20,6 +20,10 @@ class RiskHistoryProvider extends ChangeNotifier {
   String _currentRange = '7d';
   int _currentPage = 1;
   bool _hasMore = true;
+  // Phase 4A-full slice 3b: filter chip on RiskHistoryScreen.
+  // ``null`` = "All" pseudo-option (no filter), otherwise one of
+  // ``general`` / ``sleep`` / ``fall``.
+  String? _currentRiskType;
   int _activeRequestId = 0;
 
   bool get isLoading => _isInitialLoading || _isRefreshing;
@@ -31,6 +35,7 @@ class RiskHistoryProvider extends ChangeNotifier {
   RiskHistorySummary? get summary => _summary;
   List<RiskHistoryItemEntity> get items => _items;
   String get currentRange => _currentRange;
+  String? get currentRiskType => _currentRiskType;
   bool get hasMore => _hasMore;
   bool get isEmpty =>
       _hasLoaded && _items.isEmpty && _error == null && !_isInitialLoading;
@@ -40,6 +45,11 @@ class RiskHistoryProvider extends ChangeNotifier {
     required String? profileId,
     String range = '7d',
     bool refresh = false,
+    // Phase 4A-full slice 3b. ``riskType`` overrides the in-memory
+    // filter when supplied; pass ``null`` to clear back to "All".
+    // Pass the sentinel :data:`_kPreserveRiskType` (default) to keep
+    // whatever filter the screen previously selected.
+    Object? riskType = _kPreserveRiskType,
   }) async {
     final requestId = ++_activeRequestId;
     final isLoadingFirstPage = _currentPage == 1 || refresh || !_hasLoaded;
@@ -47,6 +57,11 @@ class RiskHistoryProvider extends ChangeNotifier {
     if (refresh) {
       _currentPage = 1;
       _hasMore = true;
+    }
+
+    if (!identical(riskType, _kPreserveRiskType)) {
+      // Caller explicitly chose a new filter (or cleared it).
+      _currentRiskType = riskType as String?;
     }
 
     if (isLoadingFirstPage) {
@@ -72,6 +87,7 @@ class RiskHistoryProvider extends ChangeNotifier {
         range: range,
         page: _currentPage,
         limit: 20,
+        riskType: _currentRiskType,
       );
 
       if (requestId != _activeRequestId) return;
@@ -113,9 +129,32 @@ class RiskHistoryProvider extends ChangeNotifier {
     await fetchHistory(profileId: profileId, range: newRange, refresh: true);
   }
 
+  /// Phase 4A-full slice 3b: change the active risk-type filter +
+  /// re-fetch from page 1.
+  ///
+  /// ``newRiskType`` is one of ``general`` / ``sleep`` / ``fall`` for
+  /// a specific filter, or ``null`` to clear back to "All". The
+  /// method is a no-op when the requested filter already matches.
+  Future<void> changeRiskType(String? profileId, String? newRiskType) async {
+    if (newRiskType == _currentRiskType) return;
+    await fetchHistory(
+      profileId: profileId,
+      range: _currentRange,
+      refresh: true,
+      riskType: newRiskType,
+    );
+  }
+
   void loadMore(String? profileId) {
     if (_hasMore && !_isInitialLoading && !_isRefreshing && !_isLoadingMore) {
       fetchHistory(profileId: profileId, range: _currentRange, refresh: false);
     }
   }
 }
+
+/// Sentinel object used to distinguish "caller didn't pass a value"
+/// from "caller passed null". Methods like
+/// [RiskHistoryProvider.fetchHistory] need to treat ``null`` as a
+/// real value (= clear the filter) rather than "keep current", so the
+/// default value is this sentinel rather than ``null``.
+const Object _kPreserveRiskType = Object();

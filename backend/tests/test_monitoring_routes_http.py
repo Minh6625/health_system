@@ -198,7 +198,10 @@ def test_mobile_monitoring_routes_use_canonical_shape_and_target_profile(
         MonitoringService,
         "get_risk_history",
         staticmethod(
-            lambda patient_id, db, range_key="7d", page=1, limit=20: (
+            # Phase 4A-full slice 3b added the optional ``risk_type``
+            # kwarg; this stub accepts it but the test doesn't assert
+            # on filter behaviour (covered separately).
+            lambda patient_id, db, range_key="7d", page=1, limit=20, risk_type=None: (
                 _record("history", patient_id),
                 RiskHistoryResponse(
                     range=range_key,

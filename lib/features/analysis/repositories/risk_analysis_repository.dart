@@ -223,12 +223,26 @@ class RiskAnalysisRepository {
     String range = '7d',
     int page = 1,
     int limit = 20,
+    // Phase 4A-full slice 3b: optional filter for the chip row on
+    // ``RiskHistoryScreen``. ``null`` (default) returns every type;
+    // canonical values are ``general`` / ``sleep`` / ``fall``.
+    // Unknown values are silently dropped server-side
+    // (forward-compatible with future risk types).
+    String? riskType,
   }) async {
     final targetProfileId = _resolveTargetProfileId(profileId);
+    final queryParams = <String, dynamic>{
+      'range': range,
+      'page': page,
+      'limit': limit,
+    };
+    if (riskType != null && riskType.trim().isNotEmpty) {
+      queryParams['risk_type'] = riskType.trim();
+    }
     final result = await _apiClient.get(
       '/analysis/risk-history',
       requiresAuth: true,
-      queryParams: {'range': range, 'page': page, 'limit': limit},
+      queryParams: queryParams,
       targetProfileId: targetProfileId,
     );
     final json = Map<String, dynamic>.from(result as Map);

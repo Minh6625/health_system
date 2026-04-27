@@ -1279,6 +1279,16 @@ class MonitoringService:
             "ai_explanation": ai_explanation,
         }
 
+    #: Allow-listed values for the ``risk_type`` filter on
+    #: ``get_risk_history``. Phase 4A-full slice 3b — Flutter exposes
+    #: a filter chip row over these values plus an "All" pseudo-option
+    #: that omits the filter entirely. Anything outside the allow-list
+    #: is silently treated as "no filter" so a future client passing a
+    #: typo doesn't blow up the screen.
+    RISK_HISTORY_TYPE_FILTERS: frozenset[str] = frozenset({
+        "general", "sleep", "fall",
+    })
+
     @staticmethod
     def get_risk_history(
         patient_id: int,
@@ -1286,6 +1296,7 @@ class MonitoringService:
         range_key: str = "7d",
         page: int = 1,
         limit: int = 20,
+        risk_type: str | None = None,
     ) -> RiskHistoryResponse:
         range_key = range_key if range_key in MonitoringService.RISK_HISTORY_RANGE_DAYS else "7d"
         days = MonitoringService.RISK_HISTORY_RANGE_DAYS[range_key]
@@ -1294,53 +1305,76 @@ class MonitoringService:
         offset = (page - 1) * limit
         start_time = datetime.now(UTC) - timedelta(days=days)
 
-        try:
-            total = db.execute(
-                text(
-                    """
-                    SELECT COUNT(*)
-                    FROM risk_scores
-                    WHERE user_id = :user_id
-                      AND calculated_at >= :start_time
-                    """
-                ),
-                {"user_id": patient_id, "start_time": start_time},
-            ).scalar() or 0
+        # Phase 4A-full slice 3b: optional ``risk_type`` filter.
+        # Empty / missing / unknown values fall back to "no filter" so
+        # the route is forward-compatible with future risk_type values
+        # the backend doesn't recognise yet.
+        normalized_risk_type: str | None = None
+        if risk_type:
+            stripped = risk_type.strip().lower()
+            if stripped in MonitoringService.RISK_HISTORY_TYPE_FILTERS:
+                normalized_risk_type = stripped
 
-            rows = db.execute(
-                text(
-                    """
-                    SELECT
-                        rs.id,
-                        rs.risk_type,
-                        rs.score,
-                        rs.risk_level,
-                        rs.calculated_at,
-                        rs.features,
-                        rs.algorithm,
-                        re.explanation_text
-                    FROM risk_scores rs
-                    LEFT JOIN LATERAL (
-                        SELECT explanation_text
-                        FROM risk_explanations
-                        WHERE risk_score_id = rs.id
-                        ORDER BY id DESC
-                        LIMIT 1
-                    ) re ON TRUE
-                    WHERE rs.user_id = :user_id
-                      AND rs.calculated_at >= :start_time
-                    ORDER BY rs.calculated_at DESC
-                    OFFSET :offset
-                    LIMIT :limit
-                    """
-                ),
-                {
-                    "user_id": patient_id,
-                    "start_time": start_time,
-                    "offset": offset,
-                    "limit": limit,
-                },
-            ).mappings().all()
+        try:
+            count_sql = (
+                """
+                SELECT COUNT(*)
+                FROM risk_scores
+                WHERE user_id = :user_id
+                  AND calculated_at >= :start_time
+                """
+            )
+            if normalized_risk_type is not None:
+                count_sql += "  AND risk_type = :risk_type\n"
+
+            count_params: dict[str, Any] = {
+                "user_id": patient_id, "start_time": start_time,
+            }
+            if normalized_risk_type is not None:
+                count_params["risk_type"] = normalized_risk_type
+            total = db.execute(text(count_sql), count_params).scalar() or 0
+
+            list_sql = (
+                """
+                SELECT
+                    rs.id,
+                    rs.risk_type,
+                    rs.score,
+                    rs.risk_level,
+                    rs.calculated_at,
+                    rs.features,
+                    rs.algorithm,
+                    re.explanation_text
+                FROM risk_scores rs
+                LEFT JOIN LATERAL (
+                    SELECT explanation_text
+                    FROM risk_explanations
+                    WHERE risk_score_id = rs.id
+                    ORDER BY id DESC
+                    LIMIT 1
+                ) re ON TRUE
+                WHERE rs.user_id = :user_id
+                  AND rs.calculated_at >= :start_time
+                """
+            )
+            if normalized_risk_type is not None:
+                list_sql += "  AND rs.risk_type = :risk_type\n"
+            list_sql += (
+                """ORDER BY rs.calculated_at DESC
+                OFFSET :offset
+                LIMIT :limit
+                """
+            )
+
+            list_params: dict[str, Any] = {
+                "user_id": patient_id,
+                "start_time": start_time,
+                "offset": offset,
+                "limit": limit,
+            }
+            if normalized_risk_type is not None:
+                list_params["risk_type"] = normalized_risk_type
+            rows = db.execute(text(list_sql), list_params).mappings().all()
         except ProgrammingError:
             return RiskHistoryResponse(
                 range=range_key,

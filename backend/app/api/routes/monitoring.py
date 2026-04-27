@@ -157,14 +157,30 @@ def get_risk_history(
     range: str = Query(default="7d"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
+    risk_type: str | None = Query(
+        default=None,
+        description=(
+            "Optional filter — one of ``general`` / ``sleep`` / ``fall``. "
+            "Phase 4A-full slice 3b. Unknown values are silently ignored "
+            "(forward-compatible with future risk types). Omit to return "
+            "every type in one paginated stream."
+        ),
+    ),
 ) -> RiskHistoryResponse:
-    """Get canonical risk score history for charts and paginated mobile lists."""
+    """Get canonical risk score history for charts and paginated mobile lists.
+
+    Phase 4A-full slice 3b adds the optional ``risk_type`` query parameter
+    so the Flutter risk-history screen can render a filter chip row over
+    "All" / "Sức khỏe" (general) / "Giấc ngủ" (sleep) / "Té ngã" (fall)
+    without a separate endpoint per type.
+    """
     return MonitoringService.get_risk_history(
         patient_id=target_profile_id,
         db=db,
         range_key=range,
         page=page,
         limit=limit,
+        risk_type=risk_type,
     )
 
 
