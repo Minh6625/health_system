@@ -3,6 +3,7 @@ import 'package:healthguard/app.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:healthguard/features/notifications/services/notification_runtime_service.dart';
 
 void main() async {
@@ -29,6 +30,22 @@ void main() async {
       debugPrint("==== FIREBASE INITIALIZED ====");
     } catch (e) {
       debugPrint("==== FIREBASE INIT ERROR (IGNORING) ==== $e");
+    }
+
+    try {
+      final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
+      final supabaseAnon = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+      if (supabaseUrl.isNotEmpty && supabaseAnon.isNotEmpty) {
+        await Supabase.initialize(
+          url: supabaseUrl,
+          anonKey: supabaseAnon,
+        );
+        debugPrint("==== SUPABASE INITIALIZED ====");
+      } else {
+        debugPrint("==== SUPABASE SKIPPED (missing env keys) ====");
+      }
+    } catch (e) {
+      debugPrint("==== SUPABASE INIT ERROR (IGNORING) ==== $e");
     }
 
     runApp(const HealthSystemApp());

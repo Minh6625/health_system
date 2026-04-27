@@ -297,7 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             profile.fullName,
             style: const TextStyle(
               color: AppColors.bgSurface,
-              fontSize: 20,
+              fontSize: 22,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -306,7 +306,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             profile.email,
             style: TextStyle(
               color: AppColors.bgSurface.withValues(alpha: 0.82),
-              fontSize: 13,
+              fontSize: 14,
             ),
           ),
           const SizedBox(height: 12),
@@ -354,7 +354,7 @@ class _HeroBadge extends StatelessWidget {
         label,
         style: const TextStyle(
           color: AppColors.bgSurface,
-          fontSize: 12,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),
