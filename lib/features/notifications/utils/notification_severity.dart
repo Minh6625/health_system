@@ -96,6 +96,118 @@ Color notificationTypeChipColor(String alertType) {
   }
 }
 
+/// Coarse buckets used by the type filter chips on the notifications
+/// screen. The `all` value is reserved for the chip selection state and is
+/// never returned by [notificationTypeBucket].
+enum NotificationTypeFilter { all, sos, health, medication, system }
+
+/// Returns Vietnamese label for a [NotificationTypeFilter] value, used by
+/// the filter chips.
+String notificationTypeFilterLabel(NotificationTypeFilter filter) {
+  switch (filter) {
+    case NotificationTypeFilter.all:
+      return 'Tất cả';
+    case NotificationTypeFilter.sos:
+      return 'Khẩn cấp';
+    case NotificationTypeFilter.health:
+      return 'Sức khoẻ';
+    case NotificationTypeFilter.medication:
+      return 'Thuốc';
+    case NotificationTypeFilter.system:
+      return 'Hệ thống';
+  }
+}
+
+/// Buckets a notification item by its `alert_type`. Used to power the
+/// secondary filter row on the notifications list.
+NotificationTypeFilter notificationTypeBucket(Map<String, dynamic> item) {
+  final alertType = (item['alert_type'] as String?)?.toLowerCase() ?? '';
+  if (alertType == 'sos' ||
+      alertType == 'manual' ||
+      alertType.startsWith('fall_')) {
+    return NotificationTypeFilter.sos;
+  }
+  if (alertType.startsWith('medication_')) {
+    return NotificationTypeFilter.medication;
+  }
+  if (alertType.startsWith('risk_') || alertType.endsWith('_critical')) {
+    return NotificationTypeFilter.health;
+  }
+  return NotificationTypeFilter.system;
+}
+
+/// Icon shown inside the leading colored square of a notification card.
+IconData notificationLeadingIcon(String alertType) {
+  final t = alertType.toLowerCase();
+  if (t == 'sos' || t == 'manual') {
+    return Icons.emergency_share_rounded;
+  }
+  if (t.startsWith('fall_')) {
+    return Icons.warning_amber_rounded;
+  }
+  if (t.startsWith('medication_')) {
+    return Icons.medication_rounded;
+  }
+  if (t.startsWith('risk_') || t.endsWith('_critical')) {
+    return Icons.monitor_heart_rounded;
+  }
+  return Icons.notifications_active_rounded;
+}
+
+/// Solid background color for the leading icon square. Pairs with the
+/// existing chip color helper but uses the saturated brand color so the
+/// icon stands out against the card surface.
+Color notificationLeadingIconBg(String alertType) {
+  final t = alertType.toLowerCase();
+  if (t == 'sos' ||
+      t == 'manual' ||
+      t.startsWith('fall_') ||
+      t == 'risk_critical') {
+    return AppColors.critical;
+  }
+  if (t.startsWith('risk_') || t.endsWith('_critical')) {
+    return AppColors.warning;
+  }
+  if (t.startsWith('medication_')) {
+    return AppColors.success;
+  }
+  return AppColors.info;
+}
+
+/// Coarse date buckets used to render section headers on the list. The
+/// boundaries are local-time so a notification from "today" stays in
+/// `today` regardless of UTC offsets.
+enum NotificationDateBucket { today, yesterday, thisWeek, older }
+
+NotificationDateBucket notificationDateBucketOf(DateTime createdAt) {
+  final now = DateTime.now();
+  final localCreated = createdAt.toLocal();
+  final today = DateTime(now.year, now.month, now.day);
+  final created = DateTime(
+    localCreated.year,
+    localCreated.month,
+    localCreated.day,
+  );
+  final daysFromToday = today.difference(created).inDays;
+  if (daysFromToday <= 0) return NotificationDateBucket.today;
+  if (daysFromToday == 1) return NotificationDateBucket.yesterday;
+  if (daysFromToday <= 6) return NotificationDateBucket.thisWeek;
+  return NotificationDateBucket.older;
+}
+
+String notificationDateBucketLabel(NotificationDateBucket bucket) {
+  switch (bucket) {
+    case NotificationDateBucket.today:
+      return 'Hôm nay';
+    case NotificationDateBucket.yesterday:
+      return 'Hôm qua';
+    case NotificationDateBucket.thisWeek:
+      return 'Tuần này';
+    case NotificationDateBucket.older:
+      return 'Trước đó';
+  }
+}
+
 /// True if the notification represents an SOS / manual emergency event.
 bool isSosNotification(Map<String, dynamic> item) {
   final alertType = (item['alert_type'] as String?)?.toLowerCase() ?? '';

@@ -1,18 +1,17 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/routes/app_router.dart';
 import '../../../shared/presentation/theme/app_colors.dart';
+import '../../../shared/presentation/theme/app_radii.dart';
 import '../utils/notification_severity.dart';
 import '../utils/notification_vital_insight.dart';
 import '../widgets/notification_empty_state.dart';
 import '../widgets/notification_error_view.dart';
 import '../widgets/notification_filter_chips.dart';
 import '../widgets/notification_list_item.dart';
-import '../widgets/notification_pagination_controls.dart';
 import '../widgets/notification_search_bar.dart';
 import 'notification_detail_screen.dart';
 
@@ -29,26 +28,43 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   ApiClient get _apiClient => widget.apiClient ?? ApiClient();
+
+  static const int _pageSize = 20;
+  static const double _loadMoreThresholdPx = 240;
+
   final TextEditingController _searchController = TextEditingController();
-  static const int _pageSize = 10;
-  static const int _fetchAllPageSize = 100;
+  final ScrollController _scrollController = ScrollController();
 
   NotificationFilter _selectedFilter = NotificationFilter.all;
-  bool _isLoading = true;
-  bool _isRefreshing = false;
-  String? _error;
-  List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
-  int _currentPage = 1;
-  int _totalPages = 1;
-  int _unreadCount = 0;
+  NotificationTypeFilter _typeFilter = NotificationTypeFilter.all;
   String _searchQuery = '';
   Timer? _searchDebounce;
+
+  bool _isInitialLoading = true;
+  bool _isRefreshing = false;
+  bool _isLoadingMore = false;
+  String? _error;
+  List<Map<String, dynamic>> _items = <Map<String, dynamic>>[];
+  int _unreadCount = 0;
+  bool _hasMore = true;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
-    _loadNotifications();
+    _scrollController.addListener(_onScroll);
+    _refresh();
+  }
+
+  @override
+  void didUpdateWidget(covariant NotificationsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-fetch when the parent passes a different ApiClient (e.g. the user
+    // logged out and back in with a different token). Without this the
+    // screen would keep showing the old payload until pull-to-refresh.
+    if (oldWidget.apiClient != widget.apiClient) {
+      _refresh();
+    }
   }
 
   void _onSearchChanged() {
@@ -61,46 +77,47 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 400), () {
       if (!mounted) return;
-      _currentPage = 1;
-      _loadNotifications(showLoading: false, page: 1);
+      // Search runs purely client-side over already-loaded items, so a
+      // setState is enough — no need to round-trip the API.
+      setState(() {});
     });
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - _loadMoreThresholdPx) {
+      _loadMore();
+    }
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _scrollController.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   // ─── API ───────────────────────────────────────────────────────────────
 
-  Future<void> _loadNotifications({bool showLoading = true, int? page}) async {
-    if (showLoading) {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-    } else {
-      setState(() {
-        _isRefreshing = true;
-        _error = null;
-      });
-    }
+  Future<void> _refresh() async {
+    if (!mounted) return;
+    final hasItems = _items.isNotEmpty;
+    setState(() {
+      _isInitialLoading = !hasItems;
+      _isRefreshing = hasItems;
+      _error = null;
+    });
 
     try {
-      final isSearching = _searchQuery.isNotEmpty;
-      final unreadOnly = _selectedFilter == NotificationFilter.unread;
-
-      if (isSearching) {
-        await _fetchAllForSearch(unreadOnly: unreadOnly);
-      } else {
-        await _fetchSinglePage(
-          page: page ?? _currentPage,
-          showLoading: showLoading,
-          unreadOnly: unreadOnly,
-        );
-      }
+      final page = await _fetchPage(offset: 0);
+      if (!mounted) return;
+      setState(() {
+        _items = sortNotifications(page.items);
+        _hasMore = page.hasMore;
+        _unreadCount = page.unreadCount;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -109,77 +126,41 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isInitialLoading = false;
           _isRefreshing = false;
         });
       }
     }
   }
 
-  /// Fetches ALL notifications across multiple pages for client-side search.
-  ///
-  /// Backend enforces `limit<=100`, so this loops through pages of
-  /// [_fetchAllPageSize] until everything is retrieved.
-  Future<void> _fetchAllForSearch({required bool unreadOnly}) async {
-    final allItems = <Map<String, dynamic>>[];
-    var offset = 0;
-    int? totalCount;
-    var unreadCount = 0;
-
-    while (true) {
-      if (!mounted) return;
-
-      final result = await _apiClient.get(
-        '/notifications',
-        queryParams: {
-          'limit': _fetchAllPageSize,
-          'offset': offset,
-          'unread_only': unreadOnly,
-        },
-      );
-
-      final raw = result['notifications'] as List? ?? const [];
-      final fetched = raw
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-
-      totalCount ??= (result['total_count'] as num?)?.toInt();
-      unreadCount = (result['unread_count'] as num?)?.toInt() ?? unreadCount;
-
-      allItems.addAll(fetched);
-
-      if (fetched.isEmpty || fetched.length < _fetchAllPageSize) break;
-      if (totalCount != null && allItems.length >= totalCount) break;
-
-      offset += _fetchAllPageSize;
+  Future<void> _loadMore() async {
+    if (!_hasMore ||
+        _isInitialLoading ||
+        _isRefreshing ||
+        _isLoadingMore ||
+        !mounted) {
+      return;
     }
-
-    if (!mounted) return;
-
-    final effectiveTotal = totalCount ?? allItems.length;
-    final totalPages = math.max(
-      1,
-      (effectiveTotal + _pageSize - 1) ~/ _pageSize,
-    );
-
-    setState(() {
-      _items = sortNotifications(allItems);
-      _currentPage = 1;
-      _totalPages = totalPages;
-      _unreadCount = unreadCount;
-    });
+    setState(() => _isLoadingMore = true);
+    try {
+      final page = await _fetchPage(offset: _items.length);
+      if (!mounted) return;
+      setState(() {
+        final merged = <Map<String, dynamic>>[..._items, ...page.items];
+        _items = sortNotifications(merged);
+        _hasMore = page.hasMore;
+        _unreadCount = page.unreadCount;
+      });
+    } catch (_) {
+      // Silently swallow load-more failures so the list stays usable; the
+      // user can pull-to-refresh to retry.
+    } finally {
+      if (mounted) setState(() => _isLoadingMore = false);
+    }
   }
 
-  /// Fetches a single page of notifications for normal (non-search) browsing.
-  Future<void> _fetchSinglePage({
-    required int page,
-    required bool showLoading,
-    required bool unreadOnly,
-  }) async {
-    final normalizedPage = page < 1 ? 1 : page;
-    final offset = (normalizedPage - 1) * _pageSize;
-
+  Future<_NotificationsPage> _fetchPage({required int offset}) async {
+    final unreadOnly = _selectedFilter == NotificationFilter.unread;
     final result = await _apiClient.get(
       '/notifications',
       queryParams: {
@@ -188,94 +169,102 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         'unread_only': unreadOnly,
       },
     );
-
     final raw = result['notifications'] as List? ?? const [];
     final fetched = raw
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
-    final totalCount =
-        (result['total_count'] as num?)?.toInt() ?? fetched.length;
-    final totalPages = math.max(1, (totalCount + _pageSize - 1) ~/ _pageSize);
-    final clampedPage = normalizedPage > totalPages
-        ? totalPages
-        : normalizedPage;
     final unreadCount = (result['unread_count'] as num?)?.toInt() ?? 0;
-
-    if (!mounted) return;
-
-    if (clampedPage != normalizedPage) {
-      await _loadNotifications(showLoading: showLoading, page: clampedPage);
-      return;
-    }
-
-    setState(() {
-      _items = sortNotifications(fetched);
-      _currentPage = clampedPage;
-      _totalPages = totalPages;
-      _unreadCount = unreadCount;
-    });
+    return _NotificationsPage(
+      items: fetched,
+      unreadCount: unreadCount,
+      hasMore: fetched.length >= _pageSize,
+    );
   }
 
-  // ─── Filtering / pagination derivation ─────────────────────────────────
+  // ─── Filtering ─────────────────────────────────────────────────────────
 
-  /// Returns ALL items matching the current filter + search query.
-  List<Map<String, dynamic>> get _allFilteredItems {
-    List<Map<String, dynamic>> filtered;
+  /// All items matching the current status, type and search filters.
+  List<Map<String, dynamic>> get _filteredItems {
+    Iterable<Map<String, dynamic>> stream = _items;
+
     switch (_selectedFilter) {
       case NotificationFilter.read:
-        filtered = _items.where((item) => item['is_read'] == true).toList();
+        stream = stream.where((item) => item['is_read'] == true);
         break;
       case NotificationFilter.unread:
-        filtered = _items.where((item) => item['is_read'] != true).toList();
+        stream = stream.where((item) => item['is_read'] != true);
         break;
       case NotificationFilter.all:
-        filtered = _items;
         break;
     }
 
-    if (_searchQuery.isEmpty) return filtered;
-
-    return filtered.where((item) {
-      final title = (item['title'] as String? ?? '').toLowerCase();
-      final message = (item['message'] as String? ?? '').toLowerCase();
-      return title.contains(_searchQuery) || message.contains(_searchQuery);
-    }).toList();
-  }
-
-  /// Total pages: client-side count when searching, server-side otherwise.
-  int get _effectiveTotalPages {
-    if (_searchQuery.isNotEmpty) {
-      final count = _allFilteredItems.length;
-      return math.max(1, (count + _pageSize - 1) ~/ _pageSize);
+    if (_typeFilter != NotificationTypeFilter.all) {
+      stream = stream.where(
+        (item) => notificationTypeBucket(item) == _typeFilter,
+      );
     }
-    return _totalPages;
+
+    if (_searchQuery.isNotEmpty) {
+      stream = stream.where((item) {
+        final title = (item['title'] as String? ?? '').toLowerCase();
+        final message = (item['message'] as String? ?? '').toLowerCase();
+        return title.contains(_searchQuery) ||
+            message.contains(_searchQuery);
+      });
+    }
+
+    return stream.toList();
   }
 
-  /// Paginated slice of filtered items for the current page.
-  List<Map<String, dynamic>> get _paginatedItems {
-    final allFiltered = _allFilteredItems;
-    if (_searchQuery.isNotEmpty) {
-      final startIndex = (_currentPage - 1) * _pageSize;
-      if (startIndex >= allFiltered.length) {
-        return <Map<String, dynamic>>[];
+  /// Groups already-filtered items into ordered date sections so the list
+  /// can render sticky-style "Hôm nay / Hôm qua / Tuần này / Trước đó"
+  /// headers between cards.
+  List<_NotificationDateGroup> _groupByDate(
+    List<Map<String, dynamic>> items,
+  ) {
+    final buckets = <NotificationDateBucket, List<Map<String, dynamic>>>{};
+    final undated = <Map<String, dynamic>>[];
+    for (final item in items) {
+      final ts = notificationCreatedAt(item);
+      if (ts == null) {
+        undated.add(item);
+        continue;
       }
-      final endIndex = math.min(startIndex + _pageSize, allFiltered.length);
-      return allFiltered.sublist(startIndex, endIndex);
+      final bucket = notificationDateBucketOf(ts);
+      buckets.putIfAbsent(bucket, () => <Map<String, dynamic>>[]).add(item);
     }
-    return allFiltered;
+    final groups = <_NotificationDateGroup>[];
+    for (final bucket in NotificationDateBucket.values) {
+      final list = buckets[bucket];
+      if (list != null && list.isNotEmpty) {
+        groups.add(_NotificationDateGroup(bucket: bucket, items: list));
+      }
+    }
+    if (undated.isNotEmpty) {
+      groups.add(
+        _NotificationDateGroup(
+          bucket: NotificationDateBucket.older,
+          items: undated,
+        ),
+      );
+    }
+    return groups;
   }
 
   // ─── Actions ───────────────────────────────────────────────────────────
 
   Future<void> _changeFilter(NotificationFilter next) async {
     if (_selectedFilter == next) return;
+    setState(() => _selectedFilter = next);
+    await _refresh();
+  }
 
-    setState(() {
-      _selectedFilter = next;
-      _currentPage = 1;
-    });
-    await _loadNotifications(showLoading: false, page: 1);
+  void _changeTypeFilter(NotificationTypeFilter next) {
+    if (_typeFilter == next) return;
+    // Type is a purely client-side filter so we just rebuild over the
+    // already-loaded items; no API round-trip needed.
+    setState(() => _typeFilter = next);
   }
 
   Future<void> _markAsRead(Map<String, dynamic> item) async {
@@ -331,30 +320,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
   }
 
-  Future<void> _goToPreviousPage() async {
-    if (_currentPage <= 1 || _isLoading || _isRefreshing) return;
-    if (_searchQuery.isNotEmpty) {
-      // Client-side pagination: just change page, no API call.
-      setState(() {
-        _currentPage = _currentPage - 1;
-      });
-      return;
-    }
-    await _loadNotifications(showLoading: false, page: _currentPage - 1);
-  }
-
-  Future<void> _goToNextPage() async {
-    final totalPages = _effectiveTotalPages;
-    if (_currentPage >= totalPages || _isLoading || _isRefreshing) return;
-    if (_searchQuery.isNotEmpty) {
-      setState(() {
-        _currentPage = _currentPage + 1;
-      });
-      return;
-    }
-    await _loadNotifications(showLoading: false, page: _currentPage + 1);
-  }
-
   Future<void> _openNotification(Map<String, dynamic> item) async {
     await _markAsRead(item);
     if (!mounted) return;
@@ -367,9 +332,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           AppRouter.emergencySosDetail,
           arguments: {'sosId': sosId},
         );
-        if (mounted) {
-          await _loadNotifications(showLoading: false, page: _currentPage);
-        }
+        if (mounted) await _refresh();
         return;
       }
     }
@@ -385,9 +348,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
     );
 
-    if (mounted) {
-      await _loadNotifications(showLoading: false, page: _currentPage);
-    }
+    if (mounted) await _refresh();
   }
 
   // ─── Build ─────────────────────────────────────────────────────────────
@@ -424,9 +385,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             selected: _selectedFilter,
             onChanged: _changeFilter,
           ),
+          NotificationTypeFilterChips(
+            selected: _typeFilter,
+            onChanged: _changeTypeFilter,
+          ),
           Expanded(
             child: RefreshIndicator(
-              onRefresh: () => _loadNotifications(showLoading: false),
+              onRefresh: _refresh,
               child: _buildBody(),
             ),
           ),
@@ -435,77 +400,215 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  Widget _buildPaginationControls() {
-    return NotificationPaginationControls(
-      currentPage: _currentPage,
-      totalPages: _effectiveTotalPages,
-      canGoPrevious: _currentPage > 1 && !_isLoading && !_isRefreshing,
-      canGoNext:
-          _currentPage < _effectiveTotalPages && !_isLoading && !_isRefreshing,
-      onPrevious: _goToPreviousPage,
-      onNext: _goToNextPage,
-    );
-  }
-
   Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+    if (_isInitialLoading) {
+      return const _NotificationsListSkeleton();
     }
 
     if (_error != null) {
-      return NotificationErrorView(
-        message: _error!,
-        onRetry: () => _loadNotifications(),
+      return NotificationErrorView(message: _error!, onRetry: _refresh);
+    }
+
+    final items = _filteredItems;
+    if (items.isEmpty) {
+      return NotificationEmptyState(
+        isSearching: _searchQuery.isNotEmpty,
+        filter: _selectedFilter,
       );
     }
 
-    final items = _paginatedItems;
-    if (items.isEmpty) {
-      return Column(
-        children: [
-          Expanded(
-            child: NotificationEmptyState(
-              isSearching: _searchQuery.isNotEmpty,
-              filter: _selectedFilter,
+    final groups = _groupByDate(items);
+
+    return CustomScrollView(
+      controller: _scrollController,
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        if (_isRefreshing)
+          const SliverToBoxAdapter(
+            child: LinearProgressIndicator(minHeight: 2),
+          ),
+        for (final group in groups) ...[
+          SliverToBoxAdapter(
+            child: _DateSectionHeader(
+              label: notificationDateBucketLabel(group.bucket),
+              count: group.items.length,
             ),
           ),
-          _buildPaginationControls(),
+          SliverList.builder(
+            itemCount: group.items.length,
+            itemBuilder: (context, index) {
+              final item = group.items[index];
+              return NotificationListItem(
+                item: item,
+                onTap: () => _openNotification(item),
+              );
+            },
+          ),
         ],
-      );
-    }
-
-    final list = ListView.builder(
-      physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: items.length,
-      padding: const EdgeInsets.only(top: 6, bottom: 16),
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return NotificationListItem(
-          item: item,
-          onTap: () => _openNotification(item),
-        );
-      },
+        if (_isLoadingMore)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2.4),
+                ),
+              ),
+            ),
+          )
+        else if (!_hasMore && items.isNotEmpty)
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(
+                child: Text(
+                  'Bạn đã xem hết thông báo',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        const SliverPadding(padding: EdgeInsets.only(bottom: 12)),
+      ],
     );
+  }
+}
 
-    final content = !_isRefreshing
-        ? list
-        : Stack(
+/// Plain data holder for the result of a single page fetch.
+class _NotificationsPage {
+  const _NotificationsPage({
+    required this.items,
+    required this.unreadCount,
+    required this.hasMore,
+  });
+
+  final List<Map<String, dynamic>> items;
+  final int unreadCount;
+  final bool hasMore;
+}
+
+/// Internal grouping container used by `_buildBody` to render section
+/// headers between item runs.
+class _NotificationDateGroup {
+  const _NotificationDateGroup({required this.bucket, required this.items});
+
+  final NotificationDateBucket bucket;
+  final List<Map<String, dynamic>> items;
+}
+
+/// Renders a section divider with the bucket label (e.g. "Hôm nay") and
+/// the number of items inside the bucket.
+class _DateSectionHeader extends StatelessWidget {
+  const _DateSectionHeader({required this.label, required this.count});
+
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '· $count',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Skeleton placeholder shown during the initial fetch. Mirrors the
+/// dimensions of `NotificationListItem` so the layout doesn't visibly jump
+/// when the real cards arrive.
+class _NotificationsListSkeleton extends StatelessWidget {
+  const _NotificationsListSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: 6, bottom: 16),
+      itemCount: 5,
+      itemBuilder: (context, _) {
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+          padding: const EdgeInsets.fromLTRB(14, 14, 16, 14),
+          decoration: BoxDecoration(
+            color: AppColors.bgSurface,
+            borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+            border: Border.all(color: AppColors.strokeSoft),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              list,
-              const Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: LinearProgressIndicator(minHeight: 2),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.strokeSoft.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      height: 14,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: AppColors.strokeSoft.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 12,
+                      width: 220,
+                      decoration: BoxDecoration(
+                        color: AppColors.strokeSoft.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 12,
+                      width: 140,
+                      decoration: BoxDecoration(
+                        color: AppColors.strokeSoft.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
-          );
-
-    return Column(
-      children: [
-        Expanded(child: content),
-        _buildPaginationControls(),
-      ],
+          ),
+        );
+      },
     );
   }
 }
