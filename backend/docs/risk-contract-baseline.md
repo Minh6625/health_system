@@ -7,10 +7,13 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.7` (Phase 2 focused — `model_request_id` traceability) |
+| Baseline version | `v0.8` (Phase 4B-thin — IMU window ingest route) |
 | Wire version | `0.4.0` (`X-Risk-Contract-Version` header value, unchanged) |
-| Captured from branch | `refactor/risk-core-phase2-model-request-id` |
+| Captured from branch | `refactor/risk-core-phase4b-thin-imu-window` |
 | Pending DBA migration | `backend/migrations/20260427_model_request_id.sql` |
+| Fall persistence adapter | `backend/app/adapters/fall_persistence_adapter.py` |
+| IMU window route | `POST /mobile/telemetry/imu-window` (`backend/app/api/routes/telemetry.py`) |
+| IMU window schemas | `backend/app/schemas/fall_telemetry.py` |
 | Schema source | `backend/app/schemas/monitoring.py` |
 | Version constant | `backend/app/core/risk_contract.py` |
 | Circuit breaker | `backend/app/services/circuit_breaker.py` |
@@ -53,6 +56,7 @@
 | `v0.5` | 2026-04-27 | `refactor/risk-core-phase6-versioning` | **Plan's Phase 6 — versioning + OpenAPI guard**: added `RISK_CONTRACT_VERSION = "0.4.0"` constant + `RiskContractVersionMiddleware` so every response on the mobile risk surface (`/mobile/analysis/risk-reports`, `/risk-reports/{id}`, `/risk-history`, `/mobile/metrics/health-report`) carries `X-Risk-Contract-Version`. Mobile `ApiClient` reads + debug-warns once per distinct mismatch via the new `RiskContractVersion` singleton. New `tests/contract/test_mobile_risk_versioning.py` (23 tests) pins the route surface, the header presence, the header scope (off-surface routes do NOT get the header) and the OpenAPI components shape. No wire-format change. |
 | `v0.6` | 2026-04-27 | `refactor/risk-core-phase7-resilience` | **Plan's Phase 7 (reduced) — resilience + observability**: added a 3-state `CircuitBreaker` (CLOSED → OPEN → HALF_OPEN) and wired it into `ModelApiClient.predict_health_risk` + `predict_fall` with **separate per-endpoint breakers** so health and fall outages cannot mask one another. Network / timeout / 5xx errors trip the breaker after `MODEL_API_BREAKER_FAILURES` (default 5) consecutive failures; malformed-JSON does NOT trip (it's a contract bug, not an outage). Added `app/observability/timing.py` with `StageTimer` context manager + `record_timing` log emitter for the four canonical stages (`build_record`, `model_api_call`, `persist`, `build_dto`). Stage timings now flow on every `calculate_device_risk` call. 26 new tests (12 breaker state-machine, 7 timing helpers, 7 breaker-on-client integration). The plan's cache (`audience_payload_json`) is **deferred** — depends on Phase 2 (alembic) and Phase 5 (audience profiles), neither landed. No wire-format change. |
 | `v0.7` | 2026-04-27 | `refactor/risk-core-phase2-model-request-id` | **Plan's Phase 2 (focused subset) — `model_request_id` traceability**: added `backend/migrations/20260427_model_request_id.sql` (raw SQL — project does not use alembic) to add a nullable `VARCHAR(36)` column on `risk_explanations` with a partial index on `IS NOT NULL` rows. `ModelApiHealthAdapter.from_response` extracts `meta.request_id` (defensive: `str()`-coerces, trims whitespace, truncates to 36 chars, normalises blanks to `NULL`). `NormalizedExplanation` carries the field; `RiskPersistenceAdapter.persist` writes it. Rule-based / ONNX / LightGBM fallback rows keep `NULL` (no upstream request to correlate with). Backfill is intentionally NOT done — historical rows have no recoverable request_id. **Migration is pending DBA application; the column write is forward-compatible until then.** Plan's `audience_payload_json` column deliberately deferred — purely Phase 5 prep, no consumer yet. 9 new tests. No wire-format change. |
+| `v0.8` | 2026-04-27 | `refactor/risk-core-phase4b-thin-imu-window` | **Plan's Phase 4B (focused subset) — backend IMU window ingest**: added `POST /mobile/telemetry/imu-window` accepting an `ImuWindowRequest` (verbatim port of model-api `FallPredictionRequest` + `db_device_id`). The route forwards to `ModelApiClient.predict_fall` (already breaker-wrapped + timed by Phase 7), persists a `fall_events` row via the new `FallPersistenceAdapter`, and returns the `fall_event_id` + `model_request_id` for log correlation. **On `predict_fall` returning `None`** (breaker open / transport / 5xx / malformed body), no row is written and the response carries `status="model_unavailable"` — false-negatives on real falls are dangerous, so the route surfaces uncertainty rather than guessing. Confusion-matrix harness, simulator-side IMU window dispatch, mobile fall alert UI, and rule-based fall fallback all **deliberately deferred** to Phase 4B-full (needs UP-Fall + PAMAP2 datasets + push channel + mobile UI work). 23 new tests (11 adapter unit, 5 HTTP route, 7 helper). No wire-format change to existing risk DTOs. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -491,6 +495,74 @@ Behaviour is **verbatim-preserved**:
 
 ---
 
+## 7e. IMU window ingest — Phase 4B-thin architecture
+
+Phase 4B in the original plan is a full fall pipeline: backend route +
+simulator dispatch + mobile alert UI + push channel + a confusion-matrix
+harness running against UP-Fall + PAMAP2 datasets. The version landed
+under `v0.8` is **only the backend slice** — enough that a future
+simulator / mobile integration can call into a stable, tested route.
+
+### Route — `POST /mobile/telemetry/imu-window`
+
+| Concern | Behaviour |
+| --- | --- |
+| Auth | Internal-service (no JWT); same trust model as `/mobile/telemetry/vitals` and `/mobile/telemetry/alert`. Caller passes `db_device_id`; FK constraint on `fall_events.device_id` validates at write time. |
+| Payload | `ImuWindowRequest` (`backend/app/schemas/fall_telemetry.py`) — verbatim port of model-api `FallPredictionRequest` plus `db_device_id`. The inner `data` array (one `SensorSample` per timestep) passes through to model-api unchanged. |
+| Min window length | 20 samples at the FastAPI layer; the model-api may demand more (its `fall_min_sequence_samples` is the authoritative threshold) and a too-short window surfaces as `status="model_unavailable"` rather than an HTTP error. |
+| Upstream call | `ModelApiClient.predict_fall(...)` — already breaker-wrapped (`model_api_fall` breaker) and timed (`model_api_call` stage) by Phase 7. |
+| Success | Persist one `fall_events` row via `FallPersistenceAdapter`; return `status="ok"` + `fall_event_id` + `fall_probability` + `prediction_band` + `model_request_id`. |
+| Failure | `predict_fall` returns `None` (breaker open / transport / non-200 / malformed body) → `status="model_unavailable"`, `fall_event_id=null`, **no row written**. The caller decides whether to retry. |
+
+### Why no rule-based fallback for fall
+
+The risk-pipeline pattern (`risk_alert_service`) falls back to a local
+rule-based predictor when model-api is unavailable. Fall does **not**
+follow that pattern in this slice because:
+
+1. A rule-based fall predictor would need its own confusion-matrix
+   harness to defend its sensitivity / specificity numbers; that's
+   Phase 4B-full territory (plan calls for ≥0.90 sensitivity, ≥0.85
+   specificity, F1 ≥0.87 against UP-Fall + PAMAP2).
+2. Plan section F.3 frames fall as **alert-state**, not insight-state —
+   uncertainty must be surfaced, not silently filled in.
+3. False-negative cost (missed real fall) and false-positive cost
+   (alarm fatigue → user disables notifications → next real fall
+   missed) are both severe; defaulting to "no fall" or "fall" is
+   strictly worse than "model_unavailable, retry".
+
+### What's deferred to Phase 4B-full
+
+- **Simulator-side dispatch**: `pre_model_trigger/healthguard_client.py`
+  needs a new `request_fall_prediction(device_id, motion_window)` method
+  that POSTs to this route. Today the simulator's
+  `HealthGuardAPIClient` only has `request_prediction` for vitals.
+- **Mobile fall alert UI**: full-screen overlay with 30s countdown +
+  push-notification handler. Needs a new `lib/features/fall/` feature
+  module (none exists today).
+- **Push notification channel for fall**: highest-priority channel that
+  can wake the device screen on Android.
+- **Confusion-matrix harness**: `backend/tests/eval/test_fall_classifier_quality.py`
+  with the dataset-driven sensitivity / specificity / F1 acceptance
+  metrics from plan §4B.3.
+- **Threshold sweep / ROC analysis**: per plan §4B.4.
+- **Edge-case scenarios**: drop-device, vung-tay, ngồi-mạnh, etc., per
+  plan §4B.5 — needs dataset access.
+
+### Schema notes — `fall_events` reuse
+
+The plan called for a richer `fall_events` schema (status state machine
+`detected → confirmed → dismissed → escalated`, countdown timestamps,
+`shap_details_json`). The existing table already has the core columns
+(`device_id`, `detected_at`, `confidence`, `model_version`, `features`,
+GPS, user-response workflow, SOS link). The features JSONB carries the
+upstream `top_features` + `prediction` + `meta` blocks plus the
+promoted `model_request_id` for log correlation, so no schema migration
+is needed for this slice. Adding a state-machine column when Phase 4B-full
+lands the countdown UI is a separate small migration.
+
+---
+
 ## 7d. Persistence traceability — Phase 2 (focused) architecture
 
 Phase 2 in the original plan is a full persistence-schema migration
@@ -758,7 +830,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 375 passed, 1 skipped (was 366 before Phase 2's 9 added traceability tests).
+Expected: 398 passed, 1 skipped (was 375 before Phase 4B-thin's 23 added tests).
 
 Mobile parser smoke (after Phase 6):
 

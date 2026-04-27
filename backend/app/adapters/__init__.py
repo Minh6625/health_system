@@ -16,11 +16,13 @@ as :mod:`app.services.risk_report_builder`; it consumes the typed
 when the persisted rows are fetched back through ``MonitoringService``.
 """
 
+from app.adapters.fall_persistence_adapter import FallPersistenceAdapter
 from app.adapters.model_api_health_adapter import ModelApiHealthAdapter
 from app.adapters.normalized_explanation import NormalizedExplanation
 from app.adapters.risk_persistence_adapter import RiskPersistenceAdapter
 
 __all__ = [
+    "FallPersistenceAdapter",
     "ModelApiHealthAdapter",
     "NormalizedExplanation",
     "RiskPersistenceAdapter",

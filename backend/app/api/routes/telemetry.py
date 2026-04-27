@@ -11,10 +11,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.adapters import FallPersistenceAdapter
 from app.db.database import get_db
 from app.models.device_model import Device
 from app.models.sos_event_model import Alert, FallEvent
+from app.schemas.fall_telemetry import ImuWindowRequest, ImuWindowResponse
 from app.services.emergency_service import EmergencyService
+from app.services.model_api_client import get_model_api_client
 from app.services.risk_alert_service import calculate_device_risk, dispatch_risk_alerts
 from app.services.settings_service import SettingsService
 
@@ -529,3 +532,85 @@ def ingest_sleep_session(
     except Exception as exc:
         db.rollback()
         return IngestResponse(ingested=0, errors=[str(exc)])
+
+
+# ---------------------------------------------------------------------------
+# Phase 4B-thin — raw IMU window ingest
+# ---------------------------------------------------------------------------
+
+
+@router.post("/imu-window", response_model=ImuWindowResponse)
+def ingest_imu_window(
+    payload: ImuWindowRequest,
+    db: Session = Depends(get_db),
+) -> ImuWindowResponse:
+    """Ingest a raw IMU window, run model-api fall inference, persist on success.
+
+    Phase 4B-thin (see ``backend/docs/risk-contract-baseline.md`` §7e):
+
+    1. The mobile / simulator client posts a SensorSample window.
+    2. Backend forwards it to ``ModelApiClient.predict_fall`` (which is
+       breaker-wrapped + timed by Phase 7).
+    3. On a successful prediction, ``FallPersistenceAdapter.persist``
+       writes one ``fall_events`` row and the response carries the new
+       ``fall_event_id`` so the caller can later POST
+       ``/mobile/telemetry/alert`` with that id for SOS escalation.
+    4. On breaker-open / network failure / 5xx (anything that makes
+       ``predict_fall`` return ``None``), **no row is written**. Falsely
+       claiming "no fall" is dangerous (false-negative on a real fall)
+       and falsely claiming "fall" is dangerous too (alarm fatigue), so
+       we surface ``status="model_unavailable"`` and let the caller
+       decide whether to retry. Existing rule-based fallback paths in
+       ``risk_alert_service`` are deliberately **not** invoked for fall:
+       the plan flags fall as alert-state, not insight-state, and a
+       rule-based fall predictor would need its own confusion-matrix
+       harness (Phase 4B-full).
+    """
+    # Build the upstream payload in the model-api shape, dropping our
+    # internal ``db_device_id``. The model-api uses a string device id;
+    # we send the DB id for log correlation back to the same row.
+    model_payload: dict[str, Any] = {
+        "device_id": str(payload.db_device_id),
+        "sampling_rate": payload.sampling_rate,
+        "window_size": payload.window_size,
+        "data": [sample.model_dump() for sample in payload.data],
+    }
+
+    prediction = get_model_api_client().predict_fall(model_payload)
+    if prediction is None:
+        # Breaker open / transport error / non-200 / malformed body.
+        # Logged inside ModelApiClient already; we just surface the
+        # outcome to the caller without persisting a row.
+        return ImuWindowResponse(status="model_unavailable")
+
+    fall_event = FallPersistenceAdapter.persist(
+        db,
+        db_device_id=payload.db_device_id,
+        prediction=prediction,
+    )
+
+    fall_probability = FallPersistenceAdapter._extract_probability(prediction)
+    band = str(
+        (prediction.get("prediction") or {}).get("prediction_band")
+        or prediction.get("predicted_fall_label")
+        or prediction.get("risk_level")
+        or "unknown"
+    )
+    requires_attention = bool(prediction.get("requires_attention", False))
+    predicted_fall = bool(prediction.get("predicted_fall", False))
+    meta = prediction.get("meta") if isinstance(prediction.get("meta"), dict) else {}
+    raw_request_id = meta.get("request_id") if isinstance(meta, dict) else None
+    model_request_id: str | None = None
+    if raw_request_id is not None:
+        candidate = str(raw_request_id).strip()
+        model_request_id = candidate[:36] if candidate else None
+
+    return ImuWindowResponse(
+        status="ok",
+        fall_event_id=fall_event.id,
+        fall_probability=fall_probability,
+        prediction_band=band,
+        predicted_fall=predicted_fall,
+        requires_attention=requires_attention,
+        model_request_id=model_request_id,
+    )
