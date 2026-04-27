@@ -7,18 +7,23 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.4` (Phase 3b — adapter layer formalisation) |
-| Captured from branch | `refactor/risk-core-phase3b-adapters` |
+| Baseline version | `v0.5` (Phase 6 — contract versioning + OpenAPI guard) |
+| Wire version | `0.4.0` (`X-Risk-Contract-Version` header value) |
+| Captured from branch | `refactor/risk-core-phase6-versioning` |
 | Schema source | `backend/app/schemas/monitoring.py` |
+| Version constant | `backend/app/core/risk_contract.py` |
+| Mobile version inspector | `lib/core/network/risk_contract_version.dart` |
 | Normalized row (read path) | `backend/app/services/normalized_risk_row.py` |
 | Normalized explanation (write path) | `backend/app/adapters/normalized_explanation.py` |
 | Model-api adapter | `backend/app/adapters/model_api_health_adapter.py` |
 | Persistence adapter | `backend/app/adapters/risk_persistence_adapter.py` |
 | Mobile DTO builder | `backend/app/services/risk_report_builder.py` |
-| Snapshot test | `backend/tests/contract/test_mobile_risk_dto_snapshot.py` |
+| DTO snapshot test | `backend/tests/contract/test_mobile_risk_dto_snapshot.py` |
+| Versioning + OpenAPI test | `backend/tests/contract/test_mobile_risk_versioning.py` |
 | Builder unit test | `backend/tests/test_risk_report_builder.py` |
 | Persistence adapter test | `backend/tests/test_risk_persistence_adapter.py` |
 | Mobile parser | `lib/features/analysis/repositories/risk_analysis_repository.dart` |
+| Mobile inspector test | `test/core/network/risk_contract_version_test.dart` |
 | Risk plan | `.windsurf/plans/risk-core-architecture-refactor-9ea607.md` |
 
 > **Plan-vs-execution note**: the plan's *Phase 2* is a persistence-schema
@@ -39,6 +44,7 @@
 | `v0.2` | 2026-04-27 | `refactor/risk-core-phase2-builder-extract` | **Out-of-plan refactor** (mislabelled as "Phase 2" in the original commit; the plan's Phase 2 is a persistence migration). Extracted `build_risk_report` / `build_risk_report_detail` / `build_risk_history_item` into `app/services/risk_report_builder.py`. Logically belongs in plan's Phase 3 (as the `MobileRiskDtoAdapter`). |
 | `v0.3` | 2026-04-27 | `refactor/risk-core-phase3-typed-normalized-row` | **Phase 3a — prep**: replaced the `dict[str, Any]` returned by `MonitoringService._normalize_risk_row` with a frozen `NormalizedRiskRow` dataclass. All 7 internal call sites + builders + builder tests migrated. No wire-format change. Sets up the typed input layer the plan's Phase 3 adapter extraction will produce. |
 | `v0.4` | 2026-04-27 | `refactor/risk-core-phase3b-adapters` | **Plan's Phase 3 — adapter formalisation**: extracted `ModelApiHealthAdapter` (`to_record` / `from_response` / `from_local_inference` + 7 private helpers) and `RiskPersistenceAdapter` (`build_features_json` / `persist`) under `backend/app/adapters/`. `risk_alert_service.calculate_device_risk` shrank from 263 LOC to 99 LOC; the file as a whole went from 773 to 393 LOC. Verbatim behaviour: medical defaults (75 bpm / 120-80 / 165 cm / 65 kg / 50 ms HRV), recommendations copy, explanation text format, and `feature_importance` rounding are all unchanged. |
+| `v0.5` | 2026-04-27 | `refactor/risk-core-phase6-versioning` | **Plan's Phase 6 — versioning + OpenAPI guard**: added `RISK_CONTRACT_VERSION = "0.4.0"` constant + `RiskContractVersionMiddleware` so every response on the mobile risk surface (`/mobile/analysis/risk-reports`, `/risk-reports/{id}`, `/risk-history`, `/mobile/metrics/health-report`) carries `X-Risk-Contract-Version`. Mobile `ApiClient` reads + debug-warns once per distinct mismatch via the new `RiskContractVersion` singleton. New `tests/contract/test_mobile_risk_versioning.py` (23 tests) pins the route surface, the header presence, the header scope (off-surface routes do NOT get the header) and the OpenAPI components shape. No wire-format change. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -477,6 +483,72 @@ Behaviour is **verbatim-preserved**:
 
 ---
 
+## 7b. Contract versioning — Phase 6 architecture
+
+Phase 6 introduces a wire-level signal so an older Flutter binary can
+detect that it is talking to a backend on a different version of this
+contract. Two pieces work together:
+
+### Backend: `X-Risk-Contract-Version` middleware
+
+`backend/app/main.py` registers a `RiskContractVersionMiddleware` that
+injects `X-Risk-Contract-Version: <RISK_CONTRACT_VERSION>` on every
+response whose path matches `RISK_CONTRACT_ROUTE_PREFIXES` in
+`backend/app/core/risk_contract.py`.
+
+The route surface is intentionally narrow:
+
+- `/mobile/analysis/risk-reports`
+- `/mobile/analysis/risk-reports/{report_id}`
+- `/mobile/analysis/risk-history`
+- `/mobile/metrics/health-report`
+
+Off-surface routes (auth, notifications, vitals ingestion, sleep) do
+**not** receive the header. The version describes the **mobile risk
+DTO contract** only — bumping it in lockstep with unrelated APIs would
+be a category error.
+
+The CORS middleware is configured with `expose_headers` so browser
+clients (the Swagger UI on `/mobile-docs` and any future web SDK) can
+read the header in JS contexts.
+
+### Mobile: `RiskContractVersion` singleton
+
+`lib/core/network/risk_contract_version.dart` defines the singleton
+the Flutter `ApiClient` consults on every response:
+
+- `expectedVersion` — the version this binary was compiled against
+  (currently `0.4.0`).
+- `latestObserved` — the most recent version the backend reported, or
+  `null` if no risk-surface request has been made yet (useful when
+  building a "Backend is ahead of your app" banner in Phase 8 UX).
+- `inspect(headers)` — extracts `x-risk-contract-version` (lowercased
+  per the `http` package convention), updates `latestObserved`, and
+  emits a `debugPrint` warning **once per distinct mismatched value**
+  so a stale binary chatting with a newer backend leaves a clear
+  breadcrumb without spamming the device log.
+
+Inspection is wired in `ApiClient._sendJsonRequest` so it runs on every
+response (success or failure). Routes that omit the header are no-ops.
+
+### Bumping rules
+
+Patch / minor / major rules are documented at the top of
+`backend/app/core/risk_contract.py`. The four files that must move
+together when bumping are:
+
+1. `backend/app/core/risk_contract.py` — `RISK_CONTRACT_VERSION`.
+2. `lib/core/network/risk_contract_version.dart` — `_defaultExpectedVersion`.
+3. `backend/docs/risk-contract-baseline.md` — top-of-file Wire version
+   row + a new entry in the [Version history](#version-history).
+4. `backend/tests/contract/test_mobile_risk_dto_snapshot.py` — only if
+   the wire shape genuinely changed (a major bump).
+
+A patch bump (internal refactor, no observable change) only requires
+files 1, 2, 3.
+
+---
+
 ## 8. Update procedure
 
 When the contract genuinely evolves:
@@ -503,16 +575,26 @@ python -m pytest tests/contract tests/test_risk_report_builder.py \
                  tests/test_shap_explanation_contract.py -v --tb=short
 ```
 
-Expected output (`v0.4`): **all green**, 0 failing.
+Expected output (`v0.5`): **all green**, 0 failing.
 
-Contract layer (`tests/contract/test_mobile_risk_dto_snapshot.py`):
+Contract layer — DTO snapshot (`tests/contract/test_mobile_risk_dto_snapshot.py`):
 
 - 9 snapshot tests pin the JSON keys of every mobile DTO (drift triggers a
   `Mobile contract drift detected on ...` failure with the exact set of
   added / removed keys).
 - 3 round-trip tests catch silent drift caused by `model_config` changes.
 - 7 invariant tests assert every deprecated alias mirrors its canonical
-  source so Phase 6 removal cannot lose data.
+  source so removing it later cannot lose data.
+
+Contract layer — versioning + OpenAPI (`tests/contract/test_mobile_risk_versioning.py`, Phase 6):
+
+- 2 route-signature tests pin every risk path's `response_model`.
+- 5 header tests prove `X-Risk-Contract-Version` is set on the risk
+  surface and equals `RISK_CONTRACT_VERSION`.
+- 13 scope tests prove `applies_to_path` recognises the risk surface and
+  excludes auth / notifications / sleep / docs.
+- 3 OpenAPI tests pin the path list and DTO component names exposed for
+  mobile codegen.
 
 Builder layer (`tests/test_risk_report_builder.py`):
 
@@ -543,4 +625,13 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 317 passed, 1 skipped (was 310 before Phase 3b's added tests).
+Expected: 340 passed, 1 skipped (was 317 before Phase 6's 23 added tests).
+
+Mobile parser smoke (after Phase 6):
+
+```bash
+flutter test test/features/analysis/repositories/risk_analysis_repository_test.dart \
+             test/core/network/risk_contract_version_test.dart
+```
+
+Expected: 8 + 5 = 13 tests pass.
