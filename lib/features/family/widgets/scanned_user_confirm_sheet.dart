@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/widgets/remote_avatar.dart';
 import 'package:healthguard/features/family/models/contact_tag.dart';
 
 class ScannedUserConfirmSheet extends StatefulWidget {
@@ -91,24 +92,19 @@ class _ScannedUserConfirmSheetState extends State<ScannedUserConfirmSheet> {
               ),
               const SizedBox(height: 24),
               // User info
-              CircleAvatar(
+              RemoteAvatar(
+                url: widget.avatarUrl,
                 radius: 36,
                 backgroundColor: AppColors.brandPrimaryLight,
-                backgroundImage: widget.avatarUrl != null
-                    ? NetworkImage(widget.avatarUrl!)
-                    : null,
-                child: widget.avatarUrl == null
-                    ? Text(
-                        widget.userName != null && widget.userName!.isNotEmpty
-                            ? widget.userName![0].toUpperCase()
-                            : 'A',
-                        style: const TextStyle(
-                          fontSize: 28,
-                          color: AppColors.brandPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
+                foregroundColor: AppColors.brandPrimary,
+                fallbackText: widget.userName != null && widget.userName!.isNotEmpty
+                    ? widget.userName![0].toUpperCase()
+                    : 'A',
+                fallbackTextStyle: const TextStyle(
+                  fontSize: 28,
+                  color: AppColors.brandPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 16),
               Text(

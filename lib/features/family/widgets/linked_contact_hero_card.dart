@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
+import 'package:healthguard/shared/presentation/widgets/remote_avatar.dart';
 import 'package:healthguard/features/family/models/linked_contact_model.dart';
 
 class LinkedContactHeroCard extends StatelessWidget {
@@ -15,24 +16,17 @@ class LinkedContactHeroCard extends StatelessWidget {
       decoration: BoxDecoration(color: AppColors.bgPrimary),
       child: Column(
         children: [
-          CircleAvatar(
+          RemoteAvatar(
+            url: contact.avatarUrl,
             radius: 40,
-            backgroundColor: AppColors.strokeSoft,
-            backgroundImage: contact.avatarUrl.isNotEmpty
-                ? NetworkImage(contact.avatarUrl)
-                : null,
-            child: contact.avatarUrl.isEmpty
-                ? Text(
-                    contact.displayName.isNotEmpty
-                        ? contact.displayName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textSecondary,
-                    ),
-                  )
-                : null,
+            fallbackText: contact.displayName.isNotEmpty
+                ? contact.displayName[0].toUpperCase()
+                : '?',
+            fallbackTextStyle: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textSecondary,
+            ),
           ),
           const SizedBox(height: 16),
           Text(

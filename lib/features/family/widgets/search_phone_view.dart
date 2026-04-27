@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
+import 'package:healthguard/shared/presentation/widgets/remote_avatar.dart';
 import '../models/user_search_model.dart';
 import '../repositories/family_repository.dart';
 
@@ -264,24 +265,19 @@ class _SearchPhoneViewState extends State<SearchPhoneView> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          CircleAvatar(
+          RemoteAvatar(
+            url: user.avatarUrl,
             radius: 40,
             backgroundColor: AppColors.brandPrimaryLight,
-            backgroundImage:
-                user.avatarUrl != null ? NetworkImage(user.avatarUrl!) : null,
-            child:
-                user.avatarUrl == null
-                    ? Text(
-                      user.fullName.isNotEmpty
-                          ? user.fullName[0].toUpperCase()
-                          : 'A',
-                      style: const TextStyle(
-                        fontSize: 28,
-                        color: AppColors.brandPrimary,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    )
-                    : null,
+            foregroundColor: AppColors.brandPrimary,
+            fallbackText: user.fullName.isNotEmpty
+                ? user.fullName[0].toUpperCase()
+                : 'A',
+            fallbackTextStyle: const TextStyle(
+              fontSize: 28,
+              color: AppColors.brandPrimary,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
