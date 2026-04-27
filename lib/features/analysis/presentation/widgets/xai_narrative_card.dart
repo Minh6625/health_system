@@ -64,10 +64,11 @@ class _XaiNarrativeCardState extends State<XaiNarrativeCard> {
               const Icon(Icons.auto_awesome, color: AppColors.info, size: 20),
               const SizedBox(width: AppSpacing.gapSm),
               Text(
-                'AI Giải thích',
+                'Kết luận của AI',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
@@ -76,9 +77,13 @@ class _XaiNarrativeCardState extends State<XaiNarrativeCard> {
           AnimatedCrossFade(
             firstChild: Text(
               primary,
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.body.copyWith(height: 1.5),
+              style: AppTextStyles.body.copyWith(
+                height: 1.5,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
             ),
             secondChild: _ExpandedNarrative(
               primaryText: primary,
