@@ -23,6 +23,7 @@ from app.schemas.monitoring import (
     TopFactorResponse,
     VitalSignsResponse,
 )
+from app.services.normalized_risk_row import NormalizedRiskRow
 from app.services.risk_inference_service import (
     canonicalize_risk_level,
     derive_display_status,
@@ -171,7 +172,13 @@ class MonitoringService:
         )
 
     @staticmethod
-    def _normalize_risk_row(row: dict[str, Any]) -> dict[str, Any]:
+    def _normalize_risk_row(row: dict[str, Any]) -> NormalizedRiskRow:
+        """Project a raw ``risk_scores`` row into the canonical normalized form.
+
+        Phase 3: returns the typed :class:`NormalizedRiskRow` dataclass
+        instead of the legacy ``dict[str, Any]``. The set of produced fields
+        is now explicit; consumers use attribute access.
+        """
         features = MonitoringService._parse_json_object(row.get("features"))
         backend = row.get("algorithm") or features.get("backend") or "unknown"
         confidence = MonitoringService._safe_float(features.get("confidence"), 0.0)
@@ -192,26 +199,38 @@ class MonitoringService:
         recommendations = MonitoringService._parse_json_list(row.get("recommendations"))
         top_features = MonitoringService._parse_json_list(row.get("top_features_json"))
         ai_explanation = MonitoringService._parse_json_object(row.get("ai_explanation_json"))
-        return {
-            **row,
-            "features": features,
-            "feature_snapshot": feature_snapshot,
-            "raw_vitals": raw_vitals,
-            "feature_importance": feature_importance,
-            "top_features": [item for item in top_features if isinstance(item, dict)],
-            "ai_explanation": ai_explanation,
-            "recommendations": [str(item) for item in recommendations if str(item).strip()],
-            "confidence": round(confidence, 4),
-            "risk_level": risk_level,
-            "risk_score": risk_score,
-            "health_score": health_score,
-            "health_level": derive_health_level(risk_level),
-            "display_status": derive_display_status(risk_level),
-            "risk_summary": derive_risk_summary(risk_level),
-            "health_summary": derive_health_summary(risk_level),
-            "is_stale": is_risk_report_stale(timestamp),
-            "timestamp": timestamp,
-        }
+        explanation_text = row.get("explanation_text")
+        model_version = row.get("model_version")
+        algorithm = row.get("algorithm")
+        return NormalizedRiskRow(
+            # Some intermediate query paths (e.g. ``_get_history_summary``)
+            # only need timestamp + risk_score and pass rows that omit
+            # ``id``. Default to 0 so the dataclass accepts them; downstream
+            # consumers that depend on ``id`` already receive proper rows
+            # from the LATERAL-joined queries.
+            id=int(row["id"]) if "id" in row else 0,
+            risk_type=str(row.get("risk_type") or ""),
+            risk_score=risk_score,
+            health_score=health_score,
+            risk_level=risk_level,
+            health_level=derive_health_level(risk_level),
+            display_status=derive_display_status(risk_level),
+            risk_summary=derive_risk_summary(risk_level),
+            health_summary=derive_health_summary(risk_level),
+            timestamp=timestamp,
+            confidence=round(confidence, 4),
+            is_stale=is_risk_report_stale(timestamp),
+            features=features,
+            feature_snapshot=feature_snapshot,
+            raw_vitals=raw_vitals,
+            feature_importance=feature_importance,
+            top_features=[item for item in top_features if isinstance(item, dict)],
+            ai_explanation=ai_explanation,
+            recommendations=[str(item) for item in recommendations if str(item).strip()],
+            explanation_text=str(explanation_text) if explanation_text is not None else None,
+            model_version=str(model_version) if model_version is not None else None,
+            algorithm=str(algorithm) if algorithm is not None else None,
+        )
 
     @staticmethod
     def _top_factors(
@@ -434,10 +453,10 @@ class MonitoringService:
         daily_max: dict[str, int] = {}
         for raw_row in rows:
             normalized = MonitoringService._normalize_risk_row(dict(raw_row))
-            day_key = normalized["timestamp"].date().isoformat()
+            day_key = normalized.timestamp.date().isoformat()
             daily_max[day_key] = max(
                 daily_max.get(day_key, 0),
-                MonitoringService._safe_int(normalized["risk_score"]),
+                MonitoringService._safe_int(normalized.risk_score),
             )
 
         trend_points: list[int] = []
@@ -583,7 +602,7 @@ class MonitoringService:
             return None
 
         normalized = MonitoringService._normalize_risk_row(dict(previous_row))
-        return normalized["risk_score"]
+        return normalized.risk_score
 
     @staticmethod
     def _get_history_summary(
@@ -627,11 +646,11 @@ class MonitoringService:
         ).mappings().all()
 
         current_scores = [
-            MonitoringService._normalize_risk_row(dict(row))["risk_score"]
+            MonitoringService._normalize_risk_row(dict(row)).risk_score
             for row in current_rows
         ]
         previous_scores = [
-            MonitoringService._normalize_risk_row(dict(row))["risk_score"]
+            MonitoringService._normalize_risk_row(dict(row)).risk_score
             for row in previous_rows
         ]
 
@@ -648,10 +667,10 @@ class MonitoringService:
         trend_map: dict[str, int] = {}
         for row in current_rows:
             normalized = MonitoringService._normalize_risk_row(dict(row))
-            day_key = normalized["timestamp"].date().isoformat()
+            day_key = normalized.timestamp.date().isoformat()
             trend_map[day_key] = max(
                 trend_map.get(day_key, 0),
-                MonitoringService._safe_int(normalized["risk_score"]),
+                MonitoringService._safe_int(normalized.risk_score),
             )
 
         trend_points: list[int] = []
@@ -842,15 +861,15 @@ class MonitoringService:
             normalized = MonitoringService._normalize_risk_row(dict(latest_risk_row))
             return HealthReportResponse(
                 vitals_24h_avg=vitals_dict,
-                latest_risk_score=normalized["risk_score"],
-                risk_level=normalized["risk_level"],
-                risk_type=normalized["risk_type"],
-                last_updated=normalized["timestamp"],
-                health_score=normalized["health_score"],
-                health_level=normalized["health_level"],
-                health_summary=normalized["health_summary"],
-                confidence=normalized["confidence"],
-                is_stale=normalized["is_stale"],
+                latest_risk_score=normalized.risk_score,
+                risk_level=normalized.risk_level,
+                risk_type=normalized.risk_type,
+                last_updated=normalized.timestamp,
+                health_score=normalized.health_score,
+                health_level=normalized.health_level,
+                health_summary=normalized.health_summary,
+                confidence=normalized.confidence,
+                is_stale=normalized.is_stale,
             )
         except Exception:
             logger.exception(
@@ -905,19 +924,19 @@ class MonitoringService:
             normalized = MonitoringService._normalize_risk_row(dict(raw_row))
             previous_score = MonitoringService._previous_risk_score(
                 patient_id,
-                normalized["risk_type"],
-                normalized["timestamp"],
+                normalized.risk_type,
+                normalized.timestamp,
                 db,
             )
             trend_7d = MonitoringService._compute_trend_7d(
                 patient_id,
-                normalized["risk_type"],
-                normalized["timestamp"],
+                normalized.risk_type,
+                normalized.timestamp,
                 db,
             )
             top_factors = MonitoringService._top_factors(
-                normalized["feature_importance"],
-                top_features=normalized.get("top_features"),
+                normalized.feature_importance,
+                top_features=normalized.top_features,
             )
             reports.append(
                 build_risk_report(
@@ -978,34 +997,34 @@ class MonitoringService:
         normalized = MonitoringService._normalize_risk_row(dict(risk_row))
         previous_score = MonitoringService._previous_risk_score(
             patient_id,
-            normalized["risk_type"],
-            normalized["timestamp"],
+            normalized.risk_type,
+            normalized.timestamp,
             db,
         )
         trend_7d = MonitoringService._compute_trend_7d(
             patient_id,
-            normalized["risk_type"],
-            normalized["timestamp"],
+            normalized.risk_type,
+            normalized.timestamp,
             db,
         )
-        top_features = normalized.get("top_features") or []
+        top_features = normalized.top_features
         breakdown = MonitoringService._build_breakdown(
-            normalized["feature_importance"],
-            normalized["feature_snapshot"],
-            normalized["raw_vitals"],
+            normalized.feature_importance,
+            normalized.feature_snapshot,
+            normalized.raw_vitals,
             top_features=top_features,
         )
         snapshot = MonitoringService._build_snapshot(
-            normalized["feature_snapshot"],
-            normalized["raw_vitals"],
+            normalized.feature_snapshot,
+            normalized.raw_vitals,
         )
         top_factors = MonitoringService._top_factors(
-            normalized["feature_importance"],
+            normalized.feature_importance,
             top_features=top_features,
         )
         ai_explanation = MonitoringService._build_ai_explanation(
-            normalized.get("ai_explanation") or {},
-            fallback_recommendations=normalized["recommendations"],
+            normalized.ai_explanation,
+            fallback_recommendations=normalized.recommendations,
         )
 
         return build_risk_report_detail(

@@ -15,8 +15,8 @@ the Phase 1 / Phase 2 contract guarantees:
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Any
 
 import pytest
 
@@ -35,6 +35,7 @@ from app.schemas.monitoring import (
     SnapshotMetricsResponse,
     TopFactorResponse,
 )
+from app.services.normalized_risk_row import NormalizedRiskRow
 from app.services.risk_report_builder import (
     build_risk_history_item,
     build_risk_report,
@@ -48,36 +49,36 @@ from app.services.risk_report_builder import (
 _FROZEN_TIMESTAMP = datetime(2026, 4, 21, 8, 0, tzinfo=UTC)
 
 
-def _normalized_row() -> dict[str, Any]:
-    """Minimal but representative ``_normalize_risk_row`` output."""
-    return {
-        "id": 42,
-        "risk_type": "general",
-        "risk_score": 58.0,
-        "health_score": 42.0,
-        "risk_level": "medium",
-        "health_level": "watch",
-        "display_status": "Cần theo dõi",
-        "risk_summary": "Cần theo dõi nhịp tim và SpO2.",
-        "health_summary": "Sức khỏe ổn định nhưng cần theo dõi.",
-        "timestamp": _FROZEN_TIMESTAMP,
-        "explanation_text": "Nhịp tim cao và SpO2 thấp đang đẩy mức rủi ro lên.",
-        "features": {"heart_rate": 112, "spo2": 94},
-        "feature_snapshot": {"heart_rate": 112, "spo2": 94},
-        "raw_vitals": {"heart_rate": 112, "spo2": 94},
-        "feature_importance": {"heart_rate": 0.4242, "spo2": 0.31},
-        "recommendations": [
+def _normalized_row() -> NormalizedRiskRow:
+    """Minimal but representative ``_normalize_risk_row`` output (Phase 3 typed)."""
+    return NormalizedRiskRow(
+        id=42,
+        risk_type="general",
+        risk_score=58.0,
+        health_score=42.0,
+        risk_level="medium",
+        health_level="watch",
+        display_status="Cần theo dõi",
+        risk_summary="Cần theo dõi nhịp tim và SpO2.",
+        health_summary="Sức khỏe ổn định nhưng cần theo dõi.",
+        timestamp=_FROZEN_TIMESTAMP,
+        confidence=0.82,
+        is_stale=False,
+        features={"heart_rate": 112, "spo2": 94},
+        feature_snapshot={"heart_rate": 112, "spo2": 94},
+        raw_vitals={"heart_rate": 112, "spo2": 94},
+        feature_importance={"heart_rate": 0.4242, "spo2": 0.31},
+        top_features=[],
+        ai_explanation={},
+        recommendations=[
             "Đo lại chỉ số sau 15 phút",
             "Nghỉ ngơi tại chỗ",
             "Liên hệ bác sĩ nếu kéo dài",
         ],
-        "top_features": [],
-        "ai_explanation": {},
-        "confidence": 0.82,
-        "is_stale": False,
-        "model_version": "model_api_v1",
-        "algorithm": "model_api_health",
-    }
+        explanation_text="Nhịp tim cao và SpO2 thấp đang đẩy mức rủi ro lên.",
+        model_version="model_api_v1",
+        algorithm="model_api_health",
+    )
 
 
 def _top_factors() -> list[TopFactorResponse]:
@@ -186,7 +187,7 @@ class TestBuildRiskReport:
             trend_7d=[],
             top_factors=_top_factors(),
         )
-        assert report.summary == row["health_summary"]
+        assert report.summary == row.health_summary
 
     def test_recommendation_preview_is_first_two_recommendations(self) -> None:
         report = build_risk_report(
@@ -245,8 +246,7 @@ class TestBuildRiskReportDetail:
         assert detail.xai_explanation == detail.explanation
 
     def test_explanation_falls_back_to_empty_string_when_missing(self) -> None:
-        row = _normalized_row()
-        row["explanation_text"] = None
+        row = replace(_normalized_row(), explanation_text=None)
         detail = build_risk_report_detail(
             row,
             previous_score=None,
@@ -270,13 +270,15 @@ class TestBuildRiskReportDetail:
             snapshot=_snapshot(),
             ai_explanation=None,
         )
-        assert detail.summary == row["risk_summary"]
+        assert detail.summary == row.risk_summary
 
     def test_feature_importance_is_rounded_to_4_decimals(self) -> None:
-        row = _normalized_row()
         # 0.4242 already has 4 decimals; verify rounding works for longer
         # floats too.
-        row["feature_importance"] = {"heart_rate": 0.42424242, "spo2": 0.31}
+        row = replace(
+            _normalized_row(),
+            feature_importance={"heart_rate": 0.42424242, "spo2": 0.31},
+        )
         detail = build_risk_report_detail(
             row,
             previous_score=None,
@@ -304,9 +306,7 @@ class TestBuildRiskReportDetail:
         assert set(detail.feature_importance.keys()).issubset(breakdown_keys)
 
     def test_model_metadata_falls_back_when_missing(self) -> None:
-        row = _normalized_row()
-        row["model_version"] = None
-        row["algorithm"] = None
+        row = replace(_normalized_row(), model_version=None, algorithm=None)
         detail = build_risk_report_detail(
             row,
             previous_score=None,
@@ -338,10 +338,9 @@ class TestBuildRiskHistoryItem:
         )
 
     def test_reason_preview_falls_back_to_risk_summary(self) -> None:
-        row = _normalized_row()
-        row["explanation_text"] = None
+        row = replace(_normalized_row(), explanation_text=None)
         item = build_risk_history_item(row)
-        assert item.reason_preview == row["risk_summary"]
+        assert item.reason_preview == row.risk_summary
 
     def test_reason_preview_strips_whitespace_only_explanation(self) -> None:
         # Pre-existing producer behavior (preserved by Phase 2 verbatim):
@@ -349,8 +348,7 @@ class TestBuildRiskHistoryItem:
         # gets ``.strip()``-ed down to "" rather than falling back to
         # ``risk_summary``. This is arguably a bug; if changed in a future
         # phase, update this test alongside ``monitoring_service``.
-        row = _normalized_row()
-        row["explanation_text"] = "   "
+        row = replace(_normalized_row(), explanation_text="   ")
         item = build_risk_history_item(row)
         assert item.reason_preview == ""
 

@@ -1,7 +1,9 @@
 """Pure DTO builders for the mobile risk-report contract.
 
 Phase 2 (see ``backend/docs/risk-contract-baseline.md``) extracts the DTO
-construction logic out of :mod:`monitoring_service` so:
+construction logic out of :mod:`monitoring_service`. Phase 3 then narrows
+the input from ``dict[str, Any]`` to the typed
+:class:`~app.services.normalized_risk_row.NormalizedRiskRow` dataclass, so:
 
 * Both list and detail code paths assemble :class:`RiskReportResponse` /
   :class:`RiskReportDetailResponse` through one call site, eliminating the
@@ -11,13 +13,10 @@ construction logic out of :mod:`monitoring_service` so:
   ``xai_explanation == explanation``, ``key_features == [f.key for f in
   top_factors]``) are encoded *once*, here, and impossible to forget at the
   call sites.
+* Field access is type-checked. Adding or renaming a normalized field
+  forces a code review across every consumer.
 * The builders are pure functions of ``normalized`` + already-computed
   dependencies, so they can be unit-tested without a database fixture.
-
-The shape of ``normalized`` is the dict returned by
-``MonitoringService._normalize_risk_row``. We deliberately keep it as a
-plain dict for now; introducing a typed ``NormalizedRiskRow`` is tracked as
-a possible follow-up and would be a much larger change.
 """
 
 from __future__ import annotations
@@ -33,6 +32,7 @@ from app.schemas.monitoring import (
     SnapshotMetricsResponse,
     TopFactorResponse,
 )
+from app.services.normalized_risk_row import NormalizedRiskRow
 
 __all__ = [
     "build_risk_report",
@@ -42,7 +42,7 @@ __all__ = [
 
 
 def build_risk_report(
-    normalized: dict[str, Any],
+    normalized: NormalizedRiskRow,
     *,
     previous_score: float | None,
     trend_7d: list[int],
@@ -54,34 +54,34 @@ def build_risk_report(
     from their canonical sources so the Phase 1 invariants always hold.
     """
 
-    score = float(normalized["risk_score"])
+    score = float(normalized.risk_score)
     return RiskReportResponse(
-        id=normalized["id"],
-        risk_type=normalized["risk_type"],
+        id=normalized.id,
+        risk_type=normalized.risk_type,
         # Canonical: ``score``. Deprecated alias ``risk_score`` mirrors it
         # so older clients keep parsing until Phase 6.
         risk_score=score,
         score=score,
-        health_score=normalized["health_score"],
-        risk_level=normalized["risk_level"],
-        health_level=normalized["health_level"],
-        display_status=normalized["display_status"],
-        summary=normalized["health_summary"],
-        timestamp=normalized["timestamp"],
+        health_score=normalized.health_score,
+        risk_level=normalized.risk_level,
+        health_level=normalized.health_level,
+        display_status=normalized.display_status,
+        summary=normalized.health_summary,
+        timestamp=normalized.timestamp,
         previous_score=previous_score,
         trend_7d=trend_7d,
         # Canonical: ``top_factors``. Deprecated ``key_features`` is derived
         # from it so the two cannot drift.
         key_features=[factor.key for factor in top_factors],
         top_factors=top_factors,
-        recommendation_preview=normalized["recommendations"][:2],
-        confidence=normalized["confidence"],
-        is_stale=normalized["is_stale"],
+        recommendation_preview=normalized.recommendations[:2],
+        confidence=normalized.confidence,
+        is_stale=normalized.is_stale,
     )
 
 
 def build_risk_report_detail(
-    normalized: dict[str, Any],
+    normalized: NormalizedRiskRow,
     *,
     previous_score: float | None,
     trend_7d: list[int],
@@ -98,47 +98,47 @@ def build_risk_report_detail(
     Phase 1 guarantees its keys are a subset of the breakdown keys.
     """
 
-    score = float(normalized["risk_score"])
-    explanation = str(normalized.get("explanation_text") or "")
+    score = float(normalized.risk_score)
+    explanation = str(normalized.explanation_text or "")
     feature_importance = {
         key: round(_safe_float(value), 4)
-        for key, value in normalized["feature_importance"].items()
+        for key, value in normalized.feature_importance.items()
     }
     return RiskReportDetailResponse(
-        id=normalized["id"],
-        risk_type=normalized["risk_type"],
+        id=normalized.id,
+        risk_type=normalized.risk_type,
         # Canonical: ``score``. Deprecated alias ``risk_score`` mirrors it.
         risk_score=score,
         score=score,
-        health_score=normalized["health_score"],
-        risk_level=normalized["risk_level"],
-        health_level=normalized["health_level"],
-        display_status=normalized["display_status"],
-        summary=normalized["risk_summary"],
-        timestamp=normalized["timestamp"],
+        health_score=normalized.health_score,
+        risk_level=normalized.risk_level,
+        health_level=normalized.health_level,
+        display_status=normalized.display_status,
+        summary=normalized.risk_summary,
+        timestamp=normalized.timestamp,
         previous_score=previous_score,
         trend_7d=trend_7d,
         # Canonical: ``explanation``. Deprecated alias ``xai_explanation``
         # mirrors it so older clients keep parsing until Phase 6.
         explanation=explanation,
         xai_explanation=explanation,
-        features=normalized["features"],
+        features=normalized.features,
         feature_importance=feature_importance,
         breakdown=breakdown,
-        recommendations=normalized["recommendations"],
-        recommendation_preview=normalized["recommendations"][:2],
+        recommendations=normalized.recommendations,
+        recommendation_preview=normalized.recommendations[:2],
         top_factors=top_factors,
         snapshot=snapshot,
-        model_version=str(normalized.get("model_version") or "1.0"),
-        algorithm=str(normalized.get("algorithm") or "unknown"),
-        confidence=normalized["confidence"],
-        is_stale=normalized["is_stale"],
+        model_version=normalized.model_version or "1.0",
+        algorithm=normalized.algorithm or "unknown",
+        confidence=normalized.confidence,
+        is_stale=normalized.is_stale,
         ai_explanation=ai_explanation,
     )
 
 
 def build_risk_history_item(
-    normalized: dict[str, Any],
+    normalized: NormalizedRiskRow,
 ) -> RiskHistoryItemResponse:
     """Build a :class:`RiskHistoryItemResponse` from a normalized risk row.
 
@@ -147,20 +147,20 @@ def build_risk_history_item(
     to the canonical risk summary, matching the legacy behavior.
     """
 
-    score = float(normalized["risk_score"])
+    score = float(normalized.risk_score)
     reason_preview = str(
-        normalized.get("explanation_text") or normalized["risk_summary"]
+        normalized.explanation_text or normalized.risk_summary
     ).strip()
     return RiskHistoryItemResponse(
-        report_id=normalized["id"],
+        report_id=normalized.id,
         risk_score=score,
         score=score,
-        health_score=normalized["health_score"],
-        risk_level=normalized["risk_level"],
-        display_status=normalized["display_status"],
-        analyzed_at=normalized["timestamp"],
+        health_score=normalized.health_score,
+        risk_level=normalized.risk_level,
+        display_status=normalized.display_status,
+        analyzed_at=normalized.timestamp,
         reason_preview=reason_preview,
-        is_stale=normalized["is_stale"],
+        is_stale=normalized.is_stale,
     )
 
 

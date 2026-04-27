@@ -7,22 +7,33 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.2` (Phase 2 — DTO builder extraction) |
-| Captured from branch | `refactor/risk-core-phase2-builder-extract` |
+| Baseline version | `v0.3` (Phase 3a — typed normalized risk row) |
+| Captured from branch | `refactor/risk-core-phase3-typed-normalized-row` |
 | Schema source | `backend/app/schemas/monitoring.py` |
+| Normalized row | `backend/app/services/normalized_risk_row.py` |
 | DTO builder | `backend/app/services/risk_report_builder.py` |
 | Snapshot test | `backend/tests/contract/test_mobile_risk_dto_snapshot.py` |
 | Builder unit test | `backend/tests/test_risk_report_builder.py` |
 | Mobile parser | `lib/features/analysis/repositories/risk_analysis_repository.dart` |
 | Risk plan | `.windsurf/plans/risk-core-architecture-refactor-9ea607.md` |
 
+> **Plan-vs-execution note**: the plan's *Phase 2* is a persistence-schema
+> migration (alembic, new columns) and *Phase 3* is the
+> `risk_alert_service` adapter extraction. The intermediate builder +
+> typed-row work landed under the `v0.1 → v0.3` versions is **preparatory
+> infrastructure for the plan's Phase 3** (the `MobileRiskDtoAdapter`
+> portion plus its input type), not the full Phase 3. Plan's Phase 2
+> (alembic) is intentionally deferred — it requires DBA + production
+> migration window per the plan's risk note.
+
 ## Version history
 
 | Version | Date | Branch | Change |
 | --- | --- | --- | --- |
-| `v0.0` | 2026-04-27 | `refactor/risk-core-phase0-audit` | Initial baseline pinned by snapshot tests. |
-| `v0.1` | 2026-04-27 | `refactor/risk-core-phase1-canonicalize` | Phase 1: marked duplicate fields `deprecated=True` (no wire-format change), added invariance tests, flipped mobile parser to prefer canonical keys. |
-| `v0.2` | 2026-04-27 | `refactor/risk-core-phase2-builder-extract` | Phase 2: extracted `build_risk_report` / `build_risk_report_detail` / `build_risk_history_item` into `app/services/risk_report_builder.py`. The canonical/deprecated mirroring is now encoded once at the builder layer instead of repeated at every DTO construction site. No wire-format change. |
+| `v0.0` | 2026-04-27 | `refactor/risk-core-phase0-audit` | Plan's Phase 0: initial baseline pinned by snapshot tests. |
+| `v0.1` | 2026-04-27 | `refactor/risk-core-phase1-canonicalize` | Plan's Phase 1: marked duplicate fields `deprecated=True` (no wire-format change), added invariance tests, flipped mobile parser to prefer canonical keys. |
+| `v0.2` | 2026-04-27 | `refactor/risk-core-phase2-builder-extract` | **Out-of-plan refactor** (mislabelled as "Phase 2" in the original commit; the plan's Phase 2 is a persistence migration). Extracted `build_risk_report` / `build_risk_report_detail` / `build_risk_history_item` into `app/services/risk_report_builder.py`. Logically belongs in plan's Phase 3 (as the `MobileRiskDtoAdapter`). |
+| `v0.3` | 2026-04-27 | `refactor/risk-core-phase3-typed-normalized-row` | **Phase 3a — prep**: replaced the `dict[str, Any]` returned by `MonitoringService._normalize_risk_row` with a frozen `NormalizedRiskRow` dataclass. All 7 internal call sites + builders + builder tests migrated. No wire-format change. Sets up the typed input layer the plan's Phase 3 adapter extraction will produce. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -372,11 +383,12 @@ single-PR change driven by the invariant tests above:
 
 ---
 
-## 7. DTO builders — Phase 2 architecture
+## 7. DTO builders + typed normalized row — Phase 3a architecture
 
-Phase 2 extracted the DTO construction code out of `MonitoringService` into a
-dedicated builder module so the canonical/deprecated mirroring lives at one
-site instead of being repeated at every call site.
+The DTO construction code is extracted out of `MonitoringService` into a
+dedicated builder module so the canonical/deprecated mirroring lives at
+one site instead of being repeated at every call site, and the input is a
+typed dataclass rather than a stringly-typed dict.
 
 | Builder | Returns | Used by |
 | --- | --- | --- |
@@ -386,14 +398,16 @@ site instead of being repeated at every call site.
 
 Each builder is a pure function of:
 
-- the `normalized` dict returned by `MonitoringService._normalize_risk_row`;
+- a frozen `NormalizedRiskRow` dataclass (see
+  `backend/app/services/normalized_risk_row.py`) — explicit, finite field
+  set; immutable; supports `dataclasses.replace` for tests;
 - already-computed dependencies (top factors, breakdown, snapshot, AI
   explanation, trend, previous score) passed as keyword arguments.
 
 This means the builders are unit-tested in isolation
 (`backend/tests/test_risk_report_builder.py`) without a database fixture, and
-the `MonitoringService` methods become thin orchestrators that fetch + assemble
-inputs, then delegate construction.
+the `MonitoringService` methods become thin orchestrators that fetch +
+assemble inputs, then delegate construction.
 
 ### Why an extra module instead of static methods on `MonitoringService`
 
@@ -405,8 +419,34 @@ inputs, then delegate construction.
 - It makes the Phase 6 removal sequence trivial: deleting a deprecated field
   becomes a single edit per deprecated field at the builder level.
 
-> Phase 3 candidate: introduce a typed `NormalizedRiskRow` dataclass so the
-> builders no longer take `dict[str, Any]`. Tracked but not blocking.
+### Why a frozen `NormalizedRiskRow` dataclass instead of `dict[str, Any]`
+
+- The set of fields produced by the normaliser is now explicit and finite;
+  adding a field requires touching the dataclass, which forces a code
+  review on every consumer.
+- Builders and helpers (`MonitoringService._compute_trend_7d` etc.) get
+  attribute access with full IDE / mypy support instead of stringly-typed
+  dict lookups.
+- `frozen=True` + `slots=True` give us immutability at the boundary
+  between the data layer and the DTO layer, plus a small memory win on
+  the hot path. Tests use `dataclasses.replace` for variations.
+- The dataclass is intentionally **plain** (not Pydantic) because it
+  never crosses the API boundary; we don't need Pydantic's
+  serialisation / validation cost at this internal layer.
+
+### Phase 3b follow-up — adapter extraction (not yet done)
+
+The plan's full Phase 3 also extracts adapters out of
+`risk_alert_service.py`:
+
+- `ModelApiHealthAdapter` — `to_record(payload) -> dict`,
+  `from_response(resp) -> NormalizedRiskRow`-shaped object.
+- `RiskPersistenceAdapter` — `to_db_row(NormalizedExplanation) -> RiskExplanation`.
+- `MobileRiskDtoAdapter` — already exists as `risk_report_builder.py`.
+
+The typed `NormalizedRiskRow` lands first because the adapters will
+produce / consume it. Phase 3b will live on a separate branch and bring
+`risk_alert_service.calculate_device_risk` from ~250 LOC to <100 LOC.
 
 ---
 
@@ -433,7 +473,7 @@ cd backend
 python -m pytest tests/contract tests/test_risk_report_builder.py -v --tb=short
 ```
 
-Expected output (`v0.2`): **38 tests passing**, 0 failing.
+Expected output (`v0.3`): **38 tests passing**, 0 failing.
 
 Contract layer (`tests/contract/test_mobile_risk_dto_snapshot.py`):
 
