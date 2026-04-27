@@ -73,3 +73,12 @@ class NormalizedRiskRow:
     explanation_text: str | None = None
     model_version: str | None = None
     algorithm: str | None = None
+    #: Phase 5 — raw SHAP waterfall payload from ``risk_explanations.shap_details_json``.
+    #: Surfaced ONLY on the clinician audience response; gated at the route
+    #: layer because raw SHAP is clinical data per plan §F.1.
+    shap_details: dict[str, Any] | None = None
+    #: Phase 5 (read path) — upstream model-api ``meta.request_id`` already
+    #: persisted by :class:`~app.adapters.risk_persistence_adapter.RiskPersistenceAdapter`
+    #: in Phase 2. Phase 5 lights it up on the read path so the clinician
+    #: response can carry it for end-to-end log correlation.
+    model_request_id: str | None = None

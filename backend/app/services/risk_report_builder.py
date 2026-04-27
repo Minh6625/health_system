@@ -27,6 +27,7 @@ from app.schemas.monitoring import (
     AiExplanationResponse,
     FactorBreakdownResponse,
     RiskHistoryItemResponse,
+    RiskReportClinicianResponse,
     RiskReportDetailResponse,
     RiskReportResponse,
     SnapshotMetricsResponse,
@@ -37,6 +38,7 @@ from app.services.normalized_risk_row import NormalizedRiskRow
 __all__ = [
     "build_risk_report",
     "build_risk_report_detail",
+    "build_risk_report_clinician_detail",
     "build_risk_history_item",
 ]
 
@@ -134,6 +136,48 @@ def build_risk_report_detail(
         confidence=normalized.confidence,
         is_stale=normalized.is_stale,
         ai_explanation=ai_explanation,
+    )
+
+
+def build_risk_report_clinician_detail(
+    normalized: NormalizedRiskRow,
+    *,
+    previous_score: float | None,
+    trend_7d: list[int],
+    top_factors: list[TopFactorResponse],
+    breakdown: list[FactorBreakdownResponse],
+    snapshot: SnapshotMetricsResponse,
+    ai_explanation: AiExplanationResponse | None,
+) -> RiskReportClinicianResponse:
+    """Build the Phase 5 clinician variant of the detail response.
+
+    Reuses :func:`build_risk_report_detail` for every field on the
+    patient response so the two responses cannot drift on shared
+    fields. Adds two clinical-only fields populated from
+    :class:`NormalizedRiskRow`:
+
+    * ``shap_details`` — raw SHAP waterfall (already on the read path
+      after Phase 5 wired it through ``MonitoringService._normalize_risk_row``).
+    * ``model_request_id`` — upstream ``meta.request_id`` for end-to-end
+      log correlation.
+
+    The route layer is responsible for the role gate; this builder is
+    pure and trusts that the caller already verified clinician access.
+    """
+
+    base = build_risk_report_detail(
+        normalized,
+        previous_score=previous_score,
+        trend_7d=trend_7d,
+        top_factors=top_factors,
+        breakdown=breakdown,
+        snapshot=snapshot,
+        ai_explanation=ai_explanation,
+    )
+    return RiskReportClinicianResponse(
+        **base.model_dump(),
+        shap_details=normalized.shap_details,
+        model_request_id=normalized.model_request_id,
     )
 
 

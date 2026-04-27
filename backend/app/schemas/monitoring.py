@@ -185,6 +185,33 @@ class RiskReportDetailResponse(BaseModel):
     ai_explanation: AiExplanationResponse | None = None
 
 
+class RiskReportClinicianResponse(RiskReportDetailResponse):
+    """Phase 5 clinician-only extension of :class:`RiskReportDetailResponse`.
+
+    Returned from ``GET /mobile/analysis/risk-reports/{id}`` only when the
+    caller passes ``?audience=clinician`` AND ``user.role`` is in
+    :data:`~app.core.audience.CLINICIAN_ROLES`. Inherits every field of
+    the patient response unchanged so mobile codegen can model this as a
+    refinement / subtype, then adds two clinical-only fields:
+
+    * ``shap_details`` — raw SHAP waterfall (base_value + per-feature
+      contributions). Plan §F.1 frames raw SHAP as data lâm sàng that
+      should not surface on the patient screen by default.
+    * ``model_request_id`` — upstream model-api ``meta.request_id`` for
+      end-to-end log correlation when investigating production
+      incidents (already persisted by Phase 2; this surface lights it
+      up on the read path for clinician audiences only).
+
+    Phase 5 leaves the patient ``RiskReportDetailResponse`` shape
+    unchanged so the existing snapshot tests + mobile parser keep
+    working without modification. Wire-version bump is ``v0.4.0 ->
+    v0.5.0`` (minor — additive, optional fields).
+    """
+
+    shap_details: dict[str, object] | None = None
+    model_request_id: str | None = None
+
+
 class RiskHistorySummaryResponse(BaseModel):
     average_score: float = 0.0
     highest_score: float = 0.0

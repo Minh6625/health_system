@@ -50,16 +50,16 @@ void main() {
 
       // Force the expected version to a known string so the test is not
       // coupled to whatever the production constant happens to be today.
-      RiskContractVersion.testInstance(_buildOverride(expected: '0.4.0'));
+      RiskContractVersion.testInstance(_buildOverride(expected: '0.5.0'));
 
       // Mismatch — should warn exactly once.
       for (var i = 0; i < 5; i++) {
         RiskContractVersion.instance.inspect(<String, String>{
-          RiskContractVersion.headerName: '0.5.0',
+          RiskContractVersion.headerName: '0.6.0',
         });
       }
 
-      expect(RiskContractVersion.instance.latestObserved, '0.5.0');
+      expect(RiskContractVersion.instance.latestObserved, '0.6.0');
       expect(
         captured.length,
         1,
@@ -67,8 +67,8 @@ void main() {
             'mismatch logging must dedupe by value to avoid spamming the '
             'device log on every request',
       );
+      expect(captured.single, contains('0.6.0'));
       expect(captured.single, contains('0.5.0'));
-      expect(captured.single, contains('0.4.0'));
 
       // A second distinct mismatched value warns exactly once more.
       RiskContractVersion.instance.inspect(<String, String>{
@@ -79,27 +79,27 @@ void main() {
 
       // Returning to the first mismatched value does NOT warn again.
       RiskContractVersion.instance.inspect(<String, String>{
-        RiskContractVersion.headerName: '0.5.0',
+        RiskContractVersion.headerName: '0.6.0',
       });
       expect(captured.length, 2);
     });
 
     test('updates latestObserved each call even when header repeats', () {
-      RiskContractVersion.testInstance(_buildOverride(expected: '0.4.0'));
-
-      RiskContractVersion.instance.inspect(<String, String>{
-        RiskContractVersion.headerName: '0.4.0',
-      });
-      expect(RiskContractVersion.instance.latestObserved, '0.4.0');
+      RiskContractVersion.testInstance(_buildOverride(expected: '0.5.0'));
 
       RiskContractVersion.instance.inspect(<String, String>{
         RiskContractVersion.headerName: '0.5.0',
       });
       expect(RiskContractVersion.instance.latestObserved, '0.5.0');
+
+      RiskContractVersion.instance.inspect(<String, String>{
+        RiskContractVersion.headerName: '0.6.0',
+      });
+      expect(RiskContractVersion.instance.latestObserved, '0.6.0');
     });
 
     test('treats empty header value as if missing', () {
-      RiskContractVersion.testInstance(_buildOverride(expected: '0.4.0'));
+      RiskContractVersion.testInstance(_buildOverride(expected: '0.5.0'));
 
       RiskContractVersion.instance.inspect(<String, String>{
         RiskContractVersion.headerName: '',

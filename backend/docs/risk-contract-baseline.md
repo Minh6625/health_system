@@ -7,10 +7,12 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.9` (Phase 4A-thin — sleep risk ingest route) |
-| Wire version | `0.4.0` (`X-Risk-Contract-Version` header value, unchanged) |
-| Captured from branch | `refactor/risk-core-phase4a-thin-sleep-risk` |
+| Baseline version | `v1.0` (Phase 5 — audience profiles + clinician role gate) |
+| Wire version | `0.5.0` (`X-Risk-Contract-Version` header — minor bump, additive optional fields) |
+| Captured from branch | `refactor/risk-core-phase5-audience-profiles` |
 | Pending DBA migrations | `backend/migrations/20260427_model_request_id.sql`, `backend/migrations/20260427_sleep_risk_type.sql` |
+| Audience helper | `backend/app/core/audience.py` |
+| Clinician schema | `backend/app/schemas/monitoring.py::RiskReportClinicianResponse` |
 | Fall persistence adapter | `backend/app/adapters/fall_persistence_adapter.py` |
 | Sleep risk adapter | `backend/app/adapters/sleep_risk_adapter.py` |
 | IMU window route | `POST /mobile/telemetry/imu-window` (`backend/app/api/routes/telemetry.py`) |
@@ -61,6 +63,7 @@
 | `v0.7` | 2026-04-27 | `refactor/risk-core-phase2-model-request-id` | **Plan's Phase 2 (focused subset) — `model_request_id` traceability**: added `backend/migrations/20260427_model_request_id.sql` (raw SQL — project does not use alembic) to add a nullable `VARCHAR(36)` column on `risk_explanations` with a partial index on `IS NOT NULL` rows. `ModelApiHealthAdapter.from_response` extracts `meta.request_id` (defensive: `str()`-coerces, trims whitespace, truncates to 36 chars, normalises blanks to `NULL`). `NormalizedExplanation` carries the field; `RiskPersistenceAdapter.persist` writes it. Rule-based / ONNX / LightGBM fallback rows keep `NULL` (no upstream request to correlate with). Backfill is intentionally NOT done — historical rows have no recoverable request_id. **Migration is pending DBA application; the column write is forward-compatible until then.** Plan's `audience_payload_json` column deliberately deferred — purely Phase 5 prep, no consumer yet. 9 new tests. No wire-format change. |
 | `v0.8` | 2026-04-27 | `refactor/risk-core-phase4b-thin-imu-window` | **Plan's Phase 4B (focused subset) — backend IMU window ingest**: added `POST /mobile/telemetry/imu-window` accepting an `ImuWindowRequest` (verbatim port of model-api `FallPredictionRequest` + `db_device_id`). The route forwards to `ModelApiClient.predict_fall` (already breaker-wrapped + timed by Phase 7), persists a `fall_events` row via the new `FallPersistenceAdapter`, and returns the `fall_event_id` + `model_request_id` for log correlation. **On `predict_fall` returning `None`** (breaker open / transport / 5xx / malformed body), no row is written and the response carries `status="model_unavailable"` — false-negatives on real falls are dangerous, so the route surfaces uncertainty rather than guessing. Confusion-matrix harness, simulator-side IMU window dispatch, mobile fall alert UI, and rule-based fall fallback all **deliberately deferred** to Phase 4B-full (needs UP-Fall + PAMAP2 datasets + push channel + mobile UI work). 23 new tests (11 adapter unit, 5 HTTP route, 7 helper). No wire-format change to existing risk DTOs. |
 | `v0.9` | 2026-04-27 | `refactor/risk-core-phase4a-thin-sleep-risk` | **Plan's Phase 4A (focused subset) — backend sleep risk ingest**: added `POST /mobile/telemetry/sleep-risk` accepting a `SleepRiskRequest` (verbatim port of model-api `SleepRecord` + `db_device_id` + `db_user_id`). New `ModelApiClient.predict_sleep` with its own `model_api_sleep` breaker (independent of health + fall), forwarding to `/api/v1/sleep/predict`. New `SleepRiskAdapter` projects results into `NormalizedExplanation` with **score inversion** — model-api sleep_score 0–100 (high=good) becomes `risk_score = 100 - sleep_score` (high=worse) so sleep rows share the same axis as vitals risk rows. Persisted via existing `RiskPersistenceAdapter` with `risk_type='sleep'` (allowed by new SQL migration `20260427_sleep_risk_type.sql` relaxing the `check_risk_type` CHECK constraint). `model_unavailable` semantics mirror the IMU window route — no row written when `predict_sleep` returns `None`. Simulator-side dispatch (the dead `SleepAIClient` path), the 40-field mobile mapper, and mobile sleep risk surface all **deliberately deferred** to Phase 4A-full. 36 new tests (31 adapter + 5 route). No wire-format change to existing risk DTOs. |
+| `v1.0` | 2026-04-27 | `refactor/risk-core-phase5-audience-profiles` | **Plan's Phase 5 — audience profiles + clinician role gate**: added `AudienceEnum` + `require_clinician_audience` in `app/core/audience.py`. Audit revealed `users.role` already exists (no RBAC migration needed) — `CLINICIAN_ROLES = {"clinician", "admin"}`. New `RiskReportClinicianResponse` extends the existing `RiskReportDetailResponse` with two clinical-only fields: `shap_details` (raw SHAP waterfall) + `model_request_id` (Phase 2 traceability surfaced on the read path). The detail route's `response_model` is now `RiskReportDetailResponse \| RiskReportClinicianResponse` (FastAPI emits an `anyOf` in OpenAPI). `audience=patient` is the default, so existing Flutter binaries are unaffected. `audience=clinician` from a non-clinician role returns HTTP 403. Read-path SQL extended to include `shap_details_json` + `model_request_id` from `risk_explanations`; `NormalizedRiskRow` carries both. Wire version bumped `0.4.0 -> 0.5.0` (minor — additive optional fields). 8 new tests (7 audience-gating + 1 anyOf-OpenAPI). No mobile wire-format change for patient surface. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -920,7 +923,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 434 passed, 1 skipped (was 398 before Phase 4A-thin's 36 added tests).
+Expected: 442 passed, 1 skipped (was 434 before Phase 5's 8 added audience-gating + OpenAPI tests).
 
 Mobile parser smoke (after Phase 6):
 
@@ -929,4 +932,4 @@ flutter test test/features/analysis/repositories/risk_analysis_repository_test.d
              test/core/network/risk_contract_version_test.dart
 ```
 
-Expected: 8 + 5 = 13 tests pass.
+Expected: 8 + 5 = 13 tests pass (mobile inspector now expects `0.5.0` after Phase 5's wire-version bump).

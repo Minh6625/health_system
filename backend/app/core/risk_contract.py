@@ -50,7 +50,13 @@ RISK_CONTRACT_VERSION_HEADER: Final[str] = "X-Risk-Contract-Version"
 #: ``backend/docs/risk-contract-baseline.md`` and with the matching
 #: ``RiskAnalysisRepository.expectedContractVersion`` constant on the
 #: Flutter side.
-RISK_CONTRACT_VERSION: Final[str] = "0.4.0"
+#:
+#: Phase 5 minor bump (``0.4.0 -> 0.5.0``): the detail route now emits
+#: a Union response type — patient (unchanged) or clinician (additive
+#: ``shap_details`` + ``model_request_id``). Older clients that always
+#: get patient see no shape change; clients that ask for clinician opt
+#: in to the new fields.
+RISK_CONTRACT_VERSION: Final[str] = "0.5.0"
 
 #: URL prefixes whose responses should carry the contract version header.
 #:

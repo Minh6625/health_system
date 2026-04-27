@@ -26,7 +26,12 @@ class RiskContractVersion {
   /// Sync with `RISK_CONTRACT_VERSION` in
   /// `backend/app/core/risk_contract.py` and with the **Baseline version**
   /// in `backend/docs/risk-contract-baseline.md`.
-  static const String _defaultExpectedVersion = '0.4.0';
+  ///
+  /// Phase 5 minor bump (`0.4.0 -> 0.5.0`): the detail route now emits a
+  /// Union of patient + clinician DTOs. The mobile parser ignores
+  /// fields it doesn't know about, so this is forward-compatible for
+  /// patient-only clients.
+  static const String _defaultExpectedVersion = '0.5.0';
 
   /// Header name (must match `RISK_CONTRACT_VERSION_HEADER` on the backend).
   static const String headerName = 'x-risk-contract-version';

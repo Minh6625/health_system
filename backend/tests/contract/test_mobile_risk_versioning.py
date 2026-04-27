@@ -23,6 +23,7 @@ import pytest
 from fastapi import Header, HTTPException, status
 from fastapi.testclient import TestClient
 
+from app.core.audience import AudienceEnum, require_clinician_audience
 from app.core.dependencies import get_db, get_target_profile_id
 from app.core.risk_contract import (
     RISK_CONTRACT_VERSION,
@@ -34,6 +35,7 @@ from app.schemas.monitoring import (
     HealthReportResponse,
     RiskHistoryResponse,
     RiskHistorySummaryResponse,
+    RiskReportClinicianResponse,
     RiskReportDetailResponse,
     RiskReportResponse,
     SnapshotMetricsResponse,
@@ -140,8 +142,16 @@ def risk_client(monkeypatch) -> TestClient:
     def _override_db():
         yield object()
 
+    # Phase 5 added ``require_clinician_audience`` to the detail route.
+    # Override it to always return ``patient`` so the existing header /
+    # OpenAPI tests don't need to plumb a real authenticated user — they
+    # already exercise the patient surface.
+    def _override_audience() -> AudienceEnum:
+        return AudienceEnum.patient
+
     main_app.dependency_overrides[get_target_profile_id] = _override_target_profile_id
     main_app.dependency_overrides[get_db] = _override_db
+    main_app.dependency_overrides[require_clinician_audience] = _override_audience
 
     monkeypatch.setattr(
         MonitoringService,
@@ -180,7 +190,14 @@ def risk_client(monkeypatch) -> TestClient:
 
 _EXPECTED_RESPONSE_MODELS: dict[str, type] = {
     "/mobile/analysis/risk-reports": list[RiskReportResponse],  # type: ignore[dict-item]
-    "/mobile/analysis/risk-reports/{report_id}": RiskReportDetailResponse,
+    # Phase 5 turned the detail route's response_model into a Union of
+    # patient + clinician DTOs. FastAPI preserves the Union on the
+    # runtime ``route.response_model`` attribute AND emits a faithful
+    # ``anyOf`` in OpenAPI (the latter is asserted below in
+    # ``TestMobileRiskOpenApiSnapshot.test_detail_path_emits_anyof_for_audience``).
+    "/mobile/analysis/risk-reports/{report_id}": (
+        RiskReportDetailResponse | RiskReportClinicianResponse
+    ),
     "/mobile/analysis/risk-history": RiskHistoryResponse,
     "/mobile/metrics/health-report": HealthReportResponse,
 }
@@ -295,6 +312,32 @@ class TestRiskContractVersionHeaderScope:
 # ---------------------------------------------------------------------------
 
 
+def _collect_refs(schema: dict[str, Any]) -> list[str]:
+    """Walk an OpenAPI schema fragment and return every ``$ref`` it contains.
+
+    Handles three shapes:
+
+    * ``{"$ref": "..."}`` — single DTO response.
+    * ``{"items": {"$ref": "..."}}`` — list response.
+    * ``{"oneOf"|"anyOf": [{"$ref": "..."}, ...]}`` — Phase 5 Union
+      response_model on the detail surface.
+    """
+    refs: list[str] = []
+    if not isinstance(schema, dict):
+        return refs
+    if isinstance(schema.get("$ref"), str):
+        refs.append(schema["$ref"])
+    items = schema.get("items")
+    if isinstance(items, dict) and isinstance(items.get("$ref"), str):
+        refs.append(items["$ref"])
+    for key in ("oneOf", "anyOf"):
+        branch = schema.get(key)
+        if isinstance(branch, list):
+            for entry in branch:
+                refs.extend(_collect_refs(entry))
+    return refs
+
+
 _EXPECTED_OPENAPI_PATHS = frozenset(
     {
         "/mobile/analysis/risk-reports",
@@ -329,13 +372,44 @@ class TestMobileRiskOpenApiSnapshot:
             spec = paths[path]["get"]
             content = spec["responses"]["200"]["content"]["application/json"]
             schema = content["schema"]
-            # Either a ``$ref`` (single DTO) or an ``items.$ref`` (list).
-            ref = schema.get("$ref") or (schema.get("items") or {}).get("$ref")
-            assert ref, (
-                f"Risk path {path} does not reference a DTO schema in "
+            # Phase 5: the detail surface emits a ``oneOf`` (Union of
+            # patient + clinician DTOs); other surfaces stay as a single
+            # ``$ref`` or a list of ``$ref``. Walk all three shapes so a
+            # single helper covers every risk path.
+            refs = _collect_refs(schema)
+            assert refs, (
+                f"Risk path {path} does not reference any DTO schema in "
                 f"OpenAPI; mobile codegen would emit ``Map<String, dynamic>``. "
                 f"Ensure ``response_model=...`` is set on the route."
             )
+
+    def test_detail_path_emits_anyof_for_audience(self) -> None:
+        """Phase 5: the detail route's OpenAPI schema must include both
+        the patient and clinician DTOs as an ``anyOf`` so mobile codegen
+        can model the audience-conditioned response.
+
+        FastAPI collapses ``A | B(A)`` on the runtime ``route.response_model``
+        attribute, but the OpenAPI generator preserves both branches
+        because the route function's return type annotation is still the
+        Union. This test pins the OpenAPI guarantee — codegen consumers
+        depend on it.
+        """
+        spec = main_app.openapi()
+        schema = spec["paths"]["/mobile/analysis/risk-reports/{report_id}"][
+            "get"
+        ]["responses"]["200"]["content"]["application/json"]["schema"]
+        refs = set(_collect_refs(schema))
+        expected = {
+            "#/components/schemas/RiskReportDetailResponse",
+            "#/components/schemas/RiskReportClinicianResponse",
+        }
+        assert expected.issubset(refs), (
+            f"OpenAPI detail-route response is missing one or more "
+            f"audience DTOs. Expected refs: {expected}. Got: {refs}. "
+            "If you collapsed the Union response_model to a single DTO, "
+            "either restore it or update this test + bump "
+            "RISK_CONTRACT_VERSION + the baseline doc."
+        )
 
     def test_dto_components_match_phase_1_pinned_dtos(self) -> None:
         components = main_app.openapi()["components"]["schemas"]
@@ -343,9 +417,11 @@ class TestMobileRiskOpenApiSnapshot:
         # rename / split / merge, both this test AND the snapshot tests in
         # tests/contract/test_mobile_risk_dto_snapshot.py will fail —
         # which is the intended behaviour.
+        # Phase 5 adds ``RiskReportClinicianResponse`` to the required set.
         for required in (
             "RiskReportResponse",
             "RiskReportDetailResponse",
+            "RiskReportClinicianResponse",
             "RiskHistoryResponse",
             "RiskHistoryItemResponse",
             "RiskHistorySummaryResponse",

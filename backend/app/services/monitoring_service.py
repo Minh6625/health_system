@@ -16,6 +16,7 @@ from app.schemas.monitoring import (
     RiskHistoryItemResponse,
     RiskHistoryResponse,
     RiskHistorySummaryResponse,
+    RiskReportClinicianResponse,
     RiskReportDetailResponse,
     RiskReportResponse,
     SleepSessionResponse,
@@ -37,6 +38,7 @@ from app.services.risk_inference_service import (
 from app.services.risk_report_builder import (
     build_risk_history_item,
     build_risk_report,
+    build_risk_report_clinician_detail,
     build_risk_report_detail,
 )
 
@@ -202,6 +204,18 @@ class MonitoringService:
         explanation_text = row.get("explanation_text")
         model_version = row.get("model_version")
         algorithm = row.get("algorithm")
+        # Phase 5: surface the persisted shap waterfall + upstream request id
+        # on the read path. ``shap_details_json`` is a JSONB so it arrives
+        # already-parsed as a dict (or None for legacy rows). ``model_request_id``
+        # is a varchar; defensively coerce + truncate in case the DB ever
+        # gets a value that exceeds the column width via a future migration.
+        raw_shap = row.get("shap_details_json")
+        shap_details = raw_shap if isinstance(raw_shap, dict) else None
+        raw_request_id = row.get("model_request_id")
+        model_request_id: str | None = None
+        if raw_request_id is not None:
+            candidate = str(raw_request_id).strip()
+            model_request_id = candidate[:36] if candidate else None
         return NormalizedRiskRow(
             # Some intermediate query paths (e.g. ``_get_history_summary``)
             # only need timestamp + risk_score and pass rows that omit
@@ -230,6 +244,8 @@ class MonitoringService:
             explanation_text=str(explanation_text) if explanation_text is not None else None,
             model_version=str(model_version) if model_version is not None else None,
             algorithm=str(algorithm) if algorithm is not None else None,
+            shap_details=shap_details,
+            model_request_id=model_request_id,
         )
 
     @staticmethod
@@ -896,14 +912,18 @@ class MonitoringService:
                         re.feature_importance,
                         re.recommendations,
                         re.top_features_json,
-                        re.ai_explanation_json
+                        re.ai_explanation_json,
+                        re.shap_details_json,
+                        re.model_request_id
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
                         SELECT explanation_text,
                                feature_importance,
                                recommendations,
                                top_features_json,
-                               ai_explanation_json
+                               ai_explanation_json,
+                               shap_details_json,
+                               model_request_id
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -968,14 +988,18 @@ class MonitoringService:
                         re.feature_importance,
                         re.recommendations,
                         re.top_features_json,
-                        re.ai_explanation_json
+                        re.ai_explanation_json,
+                        re.shap_details_json,
+                        re.model_request_id
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
                         SELECT explanation_text,
                                feature_importance,
                                recommendations,
                                top_features_json,
-                               ai_explanation_json
+                               ai_explanation_json,
+                               shap_details_json,
+                               model_request_id
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -994,7 +1018,89 @@ class MonitoringService:
         if risk_row is None:
             return None
 
-        normalized = MonitoringService._normalize_risk_row(dict(risk_row))
+        return build_risk_report_detail(
+            **MonitoringService._build_detail_inputs(patient_id, dict(risk_row), db),
+        )
+
+    @staticmethod
+    def get_risk_report_clinician_detail(
+        patient_id: int, report_id: int, db: Session,
+    ) -> RiskReportClinicianResponse | None:
+        """Phase 5 clinician variant of :meth:`get_risk_report_detail`.
+
+        Same SQL fetch + assembly as the patient flow; only the final
+        builder differs. Role gating is enforced at the route layer
+        (``app/core/audience.require_clinician_audience``) so this
+        method trusts that the caller has already verified the
+        permission.
+        """
+        try:
+            risk_row = db.execute(
+                text(
+                    """
+                    SELECT
+                        rs.id,
+                        rs.user_id,
+                        rs.risk_type,
+                        rs.score,
+                        rs.risk_level,
+                        rs.calculated_at,
+                        rs.features,
+                        rs.model_version,
+                        rs.algorithm,
+                        re.explanation_text,
+                        re.feature_importance,
+                        re.recommendations,
+                        re.top_features_json,
+                        re.ai_explanation_json,
+                        re.shap_details_json,
+                        re.model_request_id
+                    FROM risk_scores rs
+                    LEFT JOIN LATERAL (
+                        SELECT explanation_text,
+                               feature_importance,
+                               recommendations,
+                               top_features_json,
+                               ai_explanation_json,
+                               shap_details_json,
+                               model_request_id
+                        FROM risk_explanations
+                        WHERE risk_score_id = rs.id
+                        ORDER BY id DESC
+                        LIMIT 1
+                    ) re ON TRUE
+                    WHERE rs.id = :report_id
+                      AND rs.user_id = :user_id
+                    LIMIT 1
+                    """
+                ),
+                {"report_id": report_id, "user_id": patient_id},
+            ).mappings().first()
+        except ProgrammingError:
+            return None
+
+        if risk_row is None:
+            return None
+
+        return build_risk_report_clinician_detail(
+            **MonitoringService._build_detail_inputs(patient_id, dict(risk_row), db),
+        )
+
+    @staticmethod
+    def _build_detail_inputs(
+        patient_id: int,
+        raw_row: dict[str, Any],
+        db: Session,
+    ) -> dict[str, Any]:
+        """Shared assembly for the patient + clinician detail builders.
+
+        Phase 5 split this out of :meth:`get_risk_report_detail` so the
+        new clinician variant can call the same builder with the same
+        input set without duplicating the four service-layer calls
+        (``_previous_risk_score``, ``_compute_trend_7d``,
+        ``_build_breakdown``, ``_build_ai_explanation``).
+        """
+        normalized = MonitoringService._normalize_risk_row(raw_row)
         previous_score = MonitoringService._previous_risk_score(
             patient_id,
             normalized.risk_type,
@@ -1026,16 +1132,15 @@ class MonitoringService:
             normalized.ai_explanation,
             fallback_recommendations=normalized.recommendations,
         )
-
-        return build_risk_report_detail(
-            normalized,
-            previous_score=previous_score,
-            trend_7d=trend_7d,
-            top_factors=top_factors,
-            breakdown=breakdown,
-            snapshot=snapshot,
-            ai_explanation=ai_explanation,
-        )
+        return {
+            "normalized": normalized,
+            "previous_score": previous_score,
+            "trend_7d": trend_7d,
+            "top_factors": top_factors,
+            "breakdown": breakdown,
+            "snapshot": snapshot,
+            "ai_explanation": ai_explanation,
+        }
 
     @staticmethod
     def get_risk_history(
