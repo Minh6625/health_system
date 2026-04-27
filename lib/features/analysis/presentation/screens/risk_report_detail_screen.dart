@@ -15,6 +15,7 @@ import '../widgets/related_drilldown_section.dart';
 import '../widgets/risk_detail_summary_card.dart';
 import '../widgets/supporting_metrics_snapshot_card.dart';
 import '../widgets/xai_narrative_card.dart';
+import '../../../profile/providers/clinician_audience_provider.dart';
 
 class RiskReportDetailScreen extends StatefulWidget {
   final int reportId;
@@ -31,6 +32,21 @@ class RiskReportDetailScreen extends StatefulWidget {
 }
 
 class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
+  /// Phase 8 / slice 4a: resolve the audience query parameter from
+  /// the persistent toggle, falling back to ``null`` when the
+  /// provider isn't injected (e.g. older widget tests that don't yet
+  /// know about the new dependency). Defensive so this slice doesn't
+  /// require a same-PR migration of every existing test fixture.
+  String? _resolveAudience() {
+    try {
+      return context
+          .read<ClinicianAudienceProvider>()
+          .audienceQueryValue;
+    } on ProviderNotFoundException {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -38,6 +54,7 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
       context.read<RiskReportProvider>().fetchReportDetail(
         widget.reportId,
         widget.profileId,
+        audience: _resolveAudience(),
       );
     });
   }
@@ -46,6 +63,7 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
     await context.read<RiskReportProvider>().fetchReportDetail(
       widget.reportId,
       widget.profileId,
+      audience: _resolveAudience(),
     );
   }
 

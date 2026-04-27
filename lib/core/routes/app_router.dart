@@ -11,6 +11,7 @@ import 'package:healthguard/features/home/presentation/screens/home_dashboard_sc
 import 'package:healthguard/features/profile/screens/edit_profile_screen.dart';
 import 'package:healthguard/features/profile/screens/medical_info_screen.dart';
 import 'package:healthguard/features/profile/screens/delete_account_screen.dart';
+import 'package:healthguard/features/profile/screens/profile_settings_screen.dart';
 import 'package:healthguard/features/profile/screens/profile_shell_screen.dart';
 import 'package:healthguard/features/family/screens/family_shell_screen.dart';
 import 'package:healthguard/features/family/screens/family_dashboard_screen.dart';
@@ -49,6 +50,7 @@ class AppRouter {
   static const String changePassword = '/change-password';
   static const String editProfile = '/edit-profile';
   static const String profile = '/profile';
+  static const String profileSettings = '/profile/settings';
   static const String medicalInfo = '/medical-info';
   static const String deleteAccount = '/delete-account';
   static const String familyManagement = '/family-management';
@@ -168,6 +170,11 @@ class AppRouter {
         return MaterialPageRoute(builder: (_) => const ChangePasswordScreen());
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileShellScreen());
+      case profileSettings:
+        return MaterialPageRoute(
+          settings: const RouteSettings(name: profileSettings),
+          builder: (_) => const ProfileSettingsScreen(),
+        );
       case editProfile:
         return MaterialPageRoute(builder: (_) => const EditProfileScreen());
       case medicalInfo:

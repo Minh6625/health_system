@@ -26,8 +26,9 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
   @override
   Future<RiskReportDetailEntity> fetchReportDetail(
     int reportId,
-    String? profileId,
-  ) async {
+    String? profileId, {
+    String? audience,
+  }) async {
     return detail!;
   }
 }

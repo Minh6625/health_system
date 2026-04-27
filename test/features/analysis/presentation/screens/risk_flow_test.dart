@@ -49,8 +49,9 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
   @override
   Future<RiskReportDetailEntity> fetchReportDetail(
     int reportId,
-    String? profileId,
-  ) async {
+    String? profileId, {
+    String? audience,
+  }) async {
     calls.add(_RepoCall('detail', profileId, reportId: reportId));
     return detailById[reportId]!;
   }
@@ -61,6 +62,7 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
     String range = '7d',
     int page = 1,
     int limit = 20,
+    String? riskType,
   }) async {
     calls.add(_RepoCall('history', profileId, range: range, page: page));
     return historyByRange[range]![page]!;

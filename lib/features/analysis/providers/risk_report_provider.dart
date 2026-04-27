@@ -54,7 +54,17 @@ class RiskReportProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchReportDetail(int reportId, String? profileId) async {
+  Future<void> fetchReportDetail(
+    int reportId,
+    String? profileId, {
+    // Phase 8 / slice 4a. Forwarded verbatim to
+    // ``RiskAnalysisRepository.fetchReportDetail``. ``null`` keeps
+    // the legacy patient flow; ``"clinician"`` (when the user has
+    // toggled the setting on AND has a clinician role) flips to the
+    // ``RiskReportClinicianResponse`` shape with raw SHAP +
+    // model_request_id.
+    String? audience,
+  }) async {
     final hasExistingContent = _reportDetail != null;
     _isInitialLoading = !hasExistingContent;
     _isRefreshing = hasExistingContent;
@@ -62,7 +72,11 @@ class RiskReportProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _reportDetail = await _repository.fetchReportDetail(reportId, profileId);
+      _reportDetail = await _repository.fetchReportDetail(
+        reportId,
+        profileId,
+        audience: audience,
+      );
     } catch (e) {
       _error = 'Không thể tải chi tiết: $e';
     } finally {

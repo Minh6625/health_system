@@ -23,6 +23,7 @@ class _FakeRiskHistoryRepository extends RiskAnalysisRepository {
     String range = '7d',
     int page = 1,
     int limit = 20,
+    String? riskType,
   }) async {
     return _handler(
       profileId: profileId,

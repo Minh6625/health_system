@@ -159,12 +159,25 @@ class RiskAnalysisRepository {
 
   Future<RiskReportDetailEntity> fetchReportDetail(
     int reportId,
-    String? profileId,
-  ) async {
+    String? profileId, {
+    // Phase 8 / Phase 4B-full slice 4a. Optional ``audience`` lets a
+    // clinician role flip the response shape from the lean
+    // ``RiskReportDetailResponse`` to ``RiskReportClinicianResponse``
+    // (adds ``shap_details`` + ``model_request_id``). The mobile
+    // ``ClinicianAudienceProvider`` decides when to set this; the
+    // repository just forwards verbatim. ``null`` (default) keeps
+    // the legacy patient flow.
+    String? audience,
+  }) async {
     final targetProfileId = _resolveTargetProfileId(profileId);
+    final queryParams = <String, dynamic>{};
+    if (audience != null && audience.trim().isNotEmpty) {
+      queryParams['audience'] = audience.trim();
+    }
     final result = await _apiClient.get(
       '/analysis/risk-reports/$reportId',
       requiresAuth: true,
+      queryParams: queryParams.isEmpty ? null : queryParams,
       targetProfileId: targetProfileId,
     );
     final json = Map<String, dynamic>.from(result as Map);
