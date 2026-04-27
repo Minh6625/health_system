@@ -6,7 +6,6 @@ import '../../../shared/presentation/theme/app_radii.dart';
 import '../utils/notification_severity.dart';
 import '../utils/notification_vital_insight.dart';
 import '../widgets/notification_detail_section.dart';
-import '../widgets/notification_info_chip.dart';
 import '../widgets/notification_vital_insight_card.dart';
 
 /// Detail screen pushed when the user taps a notification card. Re-fetches
@@ -213,18 +212,20 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
     final severity = (item['severity'] as String?) ?? 'normal';
     final title = (item['title'] as String?) ?? 'Thông báo';
     final message = (item['message'] as String?) ?? '';
-    final notificationId = item['id']?.toString() ?? '--';
     final alertTypeLabel = notificationAlertTypeLabel(type);
     final severityLabel = notificationSeverityLabel(severity);
     final severityColor = notificationSeverityColor(severity);
+    final leadingIconColor = notificationLeadingIconBg(type);
+    final leadingIcon = notificationLeadingIcon(type);
     final createdAt = notificationCreatedAt(item);
     final createdAtText = createdAt != null
         ? notificationDateTimeLabel(createdAt)
         : '--';
     final createdAgoText = createdAt != null
         ? notificationTimeAgoLabel(createdAt)
-        : '--';
-    final readStatusText = item['is_read'] == true ? 'Đã đọc' : 'Chưa đọc';
+        : null;
+    final isRead = item['is_read'] == true;
+    final readStatusText = isRead ? 'Đã đọc' : 'Chưa đọc';
     final readAt = _parseDateTimeValue(item['read_at']);
     final readAtText = readAt != null
         ? notificationDateTimeLabel(readAt)
@@ -283,72 +284,17 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
               ),
               const SizedBox(height: 10),
             ],
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.bgSurface,
-                borderRadius: BorderRadius.circular(AppRadii.radiusMd),
-                border: Border.all(color: AppColors.strokeSoft),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 10,
-                        height: 10,
-                        decoration: BoxDecoration(
-                          color: severityColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    message.isEmpty ? 'Không có nội dung mô tả.' : message,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      NotificationInfoChip(
-                        label: alertTypeLabel,
-                        color: AppStateColors.infoBg,
-                      ),
-                      NotificationInfoChip(
-                        label: severityLabel,
-                        color: severityColor.withValues(alpha: 0.14),
-                      ),
-                      NotificationInfoChip(
-                        label: readStatusText,
-                        color: readStatusText == 'Đã đọc'
-                            ? AppStateColors.successBg
-                            : AppStateColors.warningBg,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+            _DetailHero(
+              title: title,
+              message: message,
+              alertTypeLabel: alertTypeLabel,
+              severityLabel: severityLabel,
+              severityColor: severityColor,
+              leadingIcon: leadingIcon,
+              leadingIconColor: leadingIconColor,
+              createdAgoText: createdAgoText,
+              isRead: isRead,
+              readStatusText: readStatusText,
             ),
             const SizedBox(height: 12),
             if (vitalInsight != null) ...[
@@ -408,10 +354,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
               title: 'Thông tin chi tiết',
               child: Column(
                 children: [
-                  NotificationDetailRow(
-                    label: 'Mã thông báo',
-                    value: notificationId,
-                  ),
                   NotificationDetailRow(label: 'Loại', value: alertTypeLabel),
                   NotificationDetailRow(label: 'Mức độ', value: severityLabel),
                   NotificationDetailRow(
@@ -421,10 +363,6 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
                   NotificationDetailRow(
                     label: 'Thời gian tạo',
                     value: createdAtText,
-                  ),
-                  NotificationDetailRow(
-                    label: 'Khoảng thời gian',
-                    value: createdAgoText,
                   ),
                   if (readAtText != null)
                     NotificationDetailRow(
@@ -437,6 +375,204 @@ class _NotificationDetailScreenState extends State<NotificationDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Hero card at the top of the detail screen. Replaces the previous dense
+/// title + dot + 3-chip block with a colored thumbnail, a single severity
+/// pill, larger typography and a single info strip at the bottom.
+class _DetailHero extends StatelessWidget {
+  const _DetailHero({
+    required this.title,
+    required this.message,
+    required this.alertTypeLabel,
+    required this.severityLabel,
+    required this.severityColor,
+    required this.leadingIcon,
+    required this.leadingIconColor,
+    required this.createdAgoText,
+    required this.isRead,
+    required this.readStatusText,
+  });
+
+  final String title;
+  final String message;
+  final String alertTypeLabel;
+  final String severityLabel;
+  final Color severityColor;
+  final IconData leadingIcon;
+  final Color leadingIconColor;
+  final String? createdAgoText;
+  final bool isRead;
+  final String readStatusText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            leadingIconColor.withValues(alpha: 0.10),
+            AppColors.bgSurface,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+        border: Border.all(color: leadingIconColor.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: leadingIconColor.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+                  border: Border.all(
+                    color: leadingIconColor.withValues(alpha: 0.4),
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Icon(leadingIcon, color: leadingIconColor, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SeverityPill(
+                      label: severityLabel,
+                      color: severityColor,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        height: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            message.isEmpty ? 'Không có nội dung mô tả.' : message,
+            style: const TextStyle(
+              fontSize: 15,
+              color: AppColors.textPrimary,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(height: 1, color: leadingIconColor.withValues(alpha: 0.18)),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _MetaItem(
+                icon: Icons.label_outline_rounded,
+                label: alertTypeLabel,
+              ),
+              if (createdAgoText != null)
+                _MetaItem(
+                  icon: Icons.schedule_rounded,
+                  label: createdAgoText!,
+                ),
+              _MetaItem(
+                icon: isRead
+                    ? Icons.mark_email_read_rounded
+                    : Icons.mark_email_unread_rounded,
+                label: readStatusText,
+                color: isRead ? AppColors.success : AppColors.warning,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Compact severity pill rendered inside the hero card.
+class _SeverityPill extends StatelessWidget {
+  const _SeverityPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: AppRadii.pillRadius,
+        border: Border.all(color: color.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Single icon + label cell used by the bottom meta strip of the hero.
+class _MetaItem extends StatelessWidget {
+  const _MetaItem({required this.icon, required this.label, this.color});
+
+  final IconData icon;
+  final String label;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = color ?? AppColors.textSecondary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: fg),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: fg,
+          ),
+        ),
+      ],
     );
   }
 }
