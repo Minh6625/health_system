@@ -401,3 +401,137 @@ class PushNotificationService:
             risk_level,
             device_id,
         )
+
+    # ------------------------------------------------------------------
+    # Fall critical push (Phase 4B-full slice 2d)
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def send_fall_critical_alert(
+        cls,
+        db: Session,
+        *,
+        recipient_user_ids: Sequence[int],
+        fall_event_id: int,
+        fall_event_uuid: str,
+        title: str,
+        body: str,
+        confidence: float,
+        notification_id_by_user: dict[int, int] | None = None,
+    ) -> None:
+        """Fan out a fall-detected push to the user + their caregivers.
+
+        Phase 4B-full slice 2d (see baseline doc §7k). Distinct from
+        :meth:`send_sos_push_alerts` because:
+
+        * It carries a ``fall_event_id`` (not an ``sos_id``) so the
+          mobile handler can deep-link into ``FallAlertScreen`` /
+          ``FallHistoryScreen`` without the heavy SOS state-machine
+          stomping on the alert.
+        * The data envelope uses ``type='fall_alert'`` +
+          ``event_type='fall_detected'`` so the mobile
+          ``fall_event_handler.dart`` can branch cleanly off the
+          existing SOS / risk handlers.
+        * Always uses the takeover path (data-only, full-screen-intent
+          via ``sos_fullscreen_alerts`` channel) — false negatives on
+          a real fall are dangerous so we never let the OS suppress
+          the notification.
+
+        ``confidence`` lands in the FCM data payload so the mobile
+        side can decide whether to auto-open the alert vs just show
+        a banner. Bounded ``[0, 1]`` by the upstream model-api
+        contract; we trust the value here.
+        """
+        if not recipient_user_ids:
+            return
+
+        if cls._push_disabled_for_e2e():
+            logger.info(
+                "Skipping fall critical push fan-out because E2E_DISABLE_PUSH=1",
+            )
+            return
+
+        if not cls._ensure_initialized():
+            logger.warning(
+                "Fall critical push skipped: FCM unavailable for fall_event_id=%s recipients=%s",
+                fall_event_id,
+                list(recipient_user_ids),
+            )
+            return
+
+        rows = (
+            db.query(UserPushToken)
+            .filter(
+                UserPushToken.user_id.in_(list(recipient_user_ids)),
+                UserPushToken.is_active.is_(True),
+            )
+            .all()
+        )
+        if not rows:
+            logger.warning(
+                "Fall critical push skipped: no active tokens for fall_event_id=%s recipients=%s",
+                fall_event_id,
+                list(recipient_user_ids),
+            )
+            return
+
+        notif_map = notification_id_by_user or {}
+        created_at = datetime.now(timezone.utc).isoformat()
+        messages: list[Any] = []
+        sent_token_refs: list[tuple[int, str]] = []
+
+        logger.info(
+            "Preparing FCM fall critical push: recipients=%s active_tokens=%s fall_event_id=%s confidence=%.3f",
+            list(recipient_user_ids),
+            len(rows),
+            fall_event_id,
+            float(confidence),
+        )
+
+        for row in rows:
+            notification_id = notif_map.get(int(row.user_id))
+            data = {
+                # Discriminator that the mobile fall_event_handler keys on.
+                "type": "fall_alert",
+                "event_type": "fall_detected",
+                "fall_event_id": str(fall_event_id),
+                "fall_event_uuid": str(fall_event_uuid),
+                "confidence": f"{float(confidence):.3f}",
+                "notification_id": str(notification_id or ""),
+                "created_at": created_at,
+                "title": title,
+                "body": body,
+                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+            }
+
+            # Always-takeover for fall alerts: a missed fall = potential
+            # untreated injury, so we never let the OS suppress the
+            # notification or let the user "swipe to dismiss" without
+            # surfacing the full-screen alert first.
+            android_config = messaging.AndroidConfig(priority="high")
+            messages.append(
+                messaging.Message(
+                    token=row.token,
+                    notification=None,  # data-only, takeover
+                    data=data,
+                    android=android_config,
+                )
+            )
+            sent_token_refs.append((row.id, row.token))
+
+        if not messages:
+            return
+
+        try:
+            response = messaging.send_each(messages)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("FCM fall critical push send failed: %s", exc)
+            return
+
+        cls._invalidate_stale_tokens(db, response, sent_token_refs)
+        logger.info(
+            "FCM fall critical push sent: success=%s failure=%s fall_event_id=%s",
+            response.success_count,
+            response.failure_count,
+            fall_event_id,
+        )

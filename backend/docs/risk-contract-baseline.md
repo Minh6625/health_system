@@ -7,9 +7,9 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v1.3` (Phase 4B-full slice 2c — mobile fall-events read surface) |
-| Wire version | `0.5.0` (unchanged — new routes outside the risk-DTO surface; no contract bump) |
-| Captured from branch | `refactor/risk-core-phase4b-mobile-fall-events` |
+| Baseline version | `v1.4` (Phase 4B-full slice 2d — fall critical push) |
+| Wire version | `0.5.0` (unchanged — push payload is FCM data, not a DTO contract) |
+| Captured from branch | `feat/risk-core-phase4b-fall-push` |
 | Pending DBA migrations | `backend/migrations/20260427_model_request_id.sql`, `backend/migrations/20260427_sleep_risk_type.sql`, `backend/migrations/20260427_audience_payload_json.sql` |
 | Audience helper | `backend/app/core/audience.py` |
 | Audience cache helpers | `MonitoringService._read_audience_cache` / `_write_audience_cache` |
@@ -17,6 +17,8 @@
 | Fall quality harness | `backend/tests/eval/test_fall_classifier_quality.py` (gated by `RUN_EVAL=1`) |
 | Fall events read service | `backend/app/services/fall_event_service.py` |
 | Fall events routes | `backend/app/api/routes/fall_events.py` (`GET /mobile/fall-events`, `GET /{id}`, `POST /{id}/dismiss`) |
+| Fall critical push | `PushNotificationService.send_fall_critical_alert` |
+| Fall push handler (mobile) | `lib/core/notifications/fall_event_handler.dart` |
 | Fall persistence adapter | `backend/app/adapters/fall_persistence_adapter.py` |
 | Sleep risk adapter | `backend/app/adapters/sleep_risk_adapter.py` |
 | IMU window route | `POST /mobile/telemetry/imu-window` (`backend/app/api/routes/telemetry.py`) |
@@ -71,6 +73,8 @@
 | `v1.1` | 2026-04-27 | `refactor/risk-core-phase7-audience-cache` | **Plan's Phase 7 — audience-payload DTO cache**: added `risk_explanations.audience_payload_json` JSONB column (`backend/migrations/20260427_audience_payload_json.sql`) + nullable column on the ORM. Read-path detail handlers (`MonitoringService.get_risk_report_detail` / `get_risk_report_clinician_detail`) now follow a **lazy write-through cache** pattern: cache-first lookup keyed by `(audience, RISK_CONTRACT_VERSION)`; on miss, build via the existing assembly path then UPDATE the row. Cache writes are **best-effort** (failures are logged + rolled back but the request still returns the freshly-built DTO). Cache invalidation is automatic on contract-version bump (the version is the cache key suffix) so a future Phase doesn't need a manual flush job. New observability: `record_timing("build_dto", ..., cache="hit"\|"miss", reason=...)` so cache hit-rate can be charted. **No wire-format change** — cache is server-internal; the assembled DTOs are byte-for-byte identical to v1.0. 6 new tests (cache miss build, cache hit short-circuit, version invalidation, partial dict append, write-failure tolerance, timing tags). |
 | `v1.2` | 2026-04-27 | `refactor/risk-core-phase4b-confusion-matrix` | **Plan's Phase 4B-full slice 2a — fall classifier confusion-matrix harness**: added `backend/tests/eval/` package with three modules: `etl_up_fall.py` (deterministic UP-Fall raw CSV → labelled JSONL), `test_etl_up_fall.py` (21 always-on unit tests pinning peak detection / window extraction / pre-pad-with-first-sample / orientation derivation / CSV parsing / committed-fixture sanity), and `test_fall_classifier_quality.py` (gated harness POSTing each labelled window to `/api/v1/fall/predict` and computing TP/TN/FP/FN → sensitivity / specificity / F1 → dated JSON report under `reports/`). Acceptance gates from plan §4B.3 §I: **sensitivity ≥ 0.90, specificity ≥ 0.85, F1 ≥ 0.87**. Audit found UP-Fall trials are 40 samples (model-api requires 50) so the ETL pre-pads with the first sample to simulate pre-event stillness — same shape a production sliding window catches. **PAMAP2 not used** because the dataset directory is empty in the simulator repo; UP-Fall already provides both classes (A01–A05 falls + A06–A11 ADLs). Wire version unchanged. Fixture: 126 windows (57 falls + 69 ADLs), checked into git. 24 new always-on tests + 3 confusion-matrix maths tests + 1 properly gated live-harness test. |
 | `v1.3` | 2026-04-27 | `refactor/risk-core-phase4b-mobile-fall-events` | **Plan's Phase 4B-full slice 2c (backend half) — mobile fall-events read surface**: added three routes the Flutter `lib/features/fall/` module consumes: `GET /mobile/fall-events` (paginated list, newest-first, ``limit≤100``), `GET /mobile/fall-events/{id}` (one event), `POST /mobile/fall-events/{id}/dismiss` (mark as user-cancelled). Owner-scoped through ``X-Target-Profile-Id`` + JOIN ``devices.user_id``; non-owned ids return **HTTP 404, not 403** (no enumeration leak). New `FallEventService` projects raw rows to ``FallEventResponse`` and derives a single ``status`` string (``detected`` → ``dismissed`` / ``confirmed`` / ``escalated``) so Flutter doesn't reproduce the state machine. Dismiss is idempotent and locks the row with ``SELECT FOR UPDATE`` to prevent concurrent-tap races. New schemas (`FallEventResponse`, `FallEventListResponse`, `FallEventDismissRequest`, `FallEventDismissResponse`) added to `app/schemas/fall_telemetry.py`. Wire-version unchanged — routes outside the risk-DTO surface so the contract version doesn't apply. 23 new tests (11 service + 12 HTTP). |
+| `v1.3.1` | 2026-04-27 | `feat/risk-core-phase4b-mobile-fall-feature` | **Plan's Phase 4B-full slice 2c (mobile half) — fall feature module**: added `lib/features/fall/` with model (``FallEvent`` + ``FallEventStatus`` forward-compat enum + ``FallEventList``), repository (3 methods wrapping the backend routes; 404 → null), provider (ChangeNotifier with list-state machine + dismiss in-flight guard + ``latestActiveEvent`` getter), widgets (``FallStatusChip`` + ``FallCountdownRing`` with test-overridable tick), screens (``FallAlertScreen`` full-screen overlay with PopScope-blocked back + 30 s countdown + dismiss/confirm + disclaimer; ``FallHistoryScreen`` newest-first list with empty/error/loading states + footer disclaimer). 20 new Flutter tests. No backend change in this commit — the mobile module consumes v1.3 verbatim. |
+| `v1.4` | 2026-04-27 | `feat/risk-core-phase4b-fall-push` | **Plan's Phase 4B-full slice 2d — fall critical push**: added `PushNotificationService.send_fall_critical_alert` — dedicated fan-out for fall-detected pushes that builds a ``type='fall_alert'`` data envelope with ``fall_event_id`` + ``fall_event_uuid`` + 3-decimal ``confidence`` so the mobile handler can deep-link into ``FallAlertScreen`` without the heavy SOS state machine. Always uses the takeover path (data-only, ``notification=None``) since false negatives on a real fall are dangerous. Plus mobile `lib/core/notifications/fall_event_handler.dart` with ``parseFallEventFromPushData`` (forward-compat parser — unknown ``type`` → null, missing/unparseable ``fall_event_id`` → null, confidence clamped to ``[0, 1]``), ``presentFallAlert`` (Navigator push with idempotent guard against duplicate retries), ``hydrateFallEvent`` (best-effort fetch of full server-side state — transport failure leaves the synthetic stub in place rather than crashing). **Wiring deferred**: calling ``send_fall_critical_alert`` from the IMU window route + hooking the handler into ``notification_runtime_service.dart`` are both touch-many-files changes that merit their own slice. 7 backend tests + 8 Flutter tests. No wire-version change — the FCM data envelope is not a risk-DTO contract surface. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -506,6 +510,113 @@ Behaviour is **verbatim-preserved**:
   `0.0` and rounds to 4 decimals.
 - `_build_feature_importance` (snapshot path) takes `abs(value)` and
   rounds to 4 decimals.
+
+---
+
+## 7k. Fall critical push — Phase 4B-full slice 2d
+
+The push fan-out for freshly-detected falls. Distinct from the
+existing SOS push (``send_sos_push_alerts``) so the mobile fall
+handler can branch cleanly on ``type='fall_alert'`` without
+inheriting the SOS state machine that doesn't apply to a "the AI
+just saw a fall — confirm or dismiss" workflow.
+
+### Backend — ``PushNotificationService.send_fall_critical_alert``
+
+Signature::
+
+    send_fall_critical_alert(
+        db, *,
+        recipient_user_ids, fall_event_id, fall_event_uuid,
+        title, body, confidence,
+        notification_id_by_user=None,
+    )
+
+Builds one FCM message per active push token of every recipient.
+Always **takeover** (``notification=None``, data-only) so the OS
+never auto-renders a banner that bypasses the full-screen alert
+flow — false negatives on a real fall are dangerous, so we route
+everything through the Flutter background handler.
+
+### Push payload contract
+
+The mobile ``parseFallEventFromPushData`` parser pins these data fields:
+
+| Field | Type | Notes |
+|---|---|---|
+| ``type`` | string | Always ``"fall_alert"``. Discriminator that the mobile handler keys on. |
+| ``event_type`` | string | Always ``"fall_detected"`` (legacy compatibility with the existing ``is_sos_emergency_takeover`` allow-list). |
+| ``fall_event_id`` | string | Numeric id of the ``fall_events`` row. Mobile parses to int; unparseable → drop the push. |
+| ``fall_event_uuid`` | string | Stable UUID for FCM-retry dedup. Empty → drop the push. |
+| ``confidence`` | string | 3-decimal float. Mobile clamps to ``[0, 1]``; unparseable → 0.0. |
+| ``title`` / ``body`` | string | Vietnamese alert copy. |
+| ``notification_id`` | string | DB notification row id, or empty string when not pre-created. |
+| ``created_at`` | ISO-8601 | Server-side push creation time (NOT the fall detection time). |
+| ``click_action`` | string | Always ``"FLUTTER_NOTIFICATION_CLICK"`` so Android tap routes through ``onMessageOpenedApp``. |
+
+### Mobile — ``lib/core/notifications/fall_event_handler.dart``
+
+Three helpers:
+
+* ``parseFallEventFromPushData(data)`` — turns the FCM string-only
+  data envelope back into a typed [FallEvent] stub. Forward-compatible:
+  unknown ``type`` returns null (lets the existing SOS / risk handlers
+  branch on theirs); missing required fields return null; confidence
+  clamps to ``[0, 1]``; unparseable confidence falls back to 0.0.
+* ``presentFallAlert(context, event)`` — pushes [FallAlertScreen] onto
+  the Navigator with a fullscreen-dialog route. Idempotent guard
+  against FCM-retry double-pushes via ``replaceCurrent`` flag.
+* ``hydrateFallEvent(stub, repository)`` — best-effort fetch of the
+  full server-side row (GPS, address, model_version, features). On
+  transport failure returns null and the synthetic stub stays
+  visible — better than failing the alert because the network
+  hiccupped.
+
+### Why ``confidence`` lands in the push payload
+
+The mobile UI uses confidence to decide:
+
+* High confidence (≥ 0.85) → auto-open ``FallAlertScreen`` immediately.
+* Medium confidence (0.6 – 0.85) → show a banner with "Phát hiện ngã"
+  badge + tap to view (less aggressive UX since the model might be
+  wrong).
+* Low confidence (< 0.6) → don't push at all (the backend's IMU
+  route would not have triggered a fall_events row in the first
+  place).
+
+Embedding it in the push avoids a hydrate round-trip just to make
+the auto-open vs banner decision.
+
+### Why no wire-version bump
+
+The FCM data envelope is **not** a DTO contract surface — it's a
+private push protocol between this backend and this Flutter app.
+``RISK_CONTRACT_VERSION`` covers the read-path JSON contract
+(``/risk-reports*`` etc.), and the version checker
+(``RiskContractVersion`` mobile inspector) only inspects HTTP
+response headers. Pushing a new field on FCM data triggers no
+version mismatch warning.
+
+### What's deferred
+
+The two **wiring** changes are deliberately not in this slice:
+
+* **IMU window route → push trigger**: extending
+  ``POST /mobile/telemetry/imu-window`` to call
+  ``send_fall_critical_alert`` after persisting a high-confidence
+  fall. Touches the route handler + adds a recipient resolver that
+  walks ``devices.user_id`` + caregiver relationships. Better as
+  its own slice with focused tests.
+* **Mobile notification handler hookup**: wiring
+  ``parseFallEventFromPushData`` into the existing
+  ``_handleFcmForegroundMessage`` and ``_handleRemoteMessageOpen``
+  in ``notification_runtime_service.dart``. Touches a
+  multi-thousand-line file with intricate routing; safer as its
+  own focused diff.
+
+The primitives (backend method + mobile parser + presenter) are
+fully tested standalone; the wiring is a follow-up that operates
+on top.
 
 ---
 
@@ -1293,7 +1404,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 495 passed, 2 skipped (was 472 before Phase 4B slice 2c's 23 added fall-events tests).
+Expected: 502 passed, 2 skipped (was 495 before Phase 4B slice 2d's 7 added push tests).
 
 Mobile parser smoke (after Phase 6):
 
@@ -1302,4 +1413,4 @@ flutter test test/features/analysis/repositories/risk_analysis_repository_test.d
              test/core/network/risk_contract_version_test.dart
 ```
 
-Expected: 8 + 5 = 13 tests pass (mobile inspector now expects `0.5.0` after Phase 5's wire-version bump).
+Expected: 8 + 5 = 13 tests pass (mobile inspector now expects `0.5.0` after Phase 5's wire-version bump). Phase 4B slice 2c-mobile + 2d-mobile add 28 more Flutter tests (`flutter test test/features/fall/ test/core/notifications/fall_event_handler_test.dart`) covering the fall feature module + the FCM push handler.
