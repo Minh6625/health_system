@@ -25,10 +25,14 @@ from app.schemas.monitoring import (
     TopFactorResponse,
 )
 from app.services.monitoring_service import MonitoringService
-from app.services.risk_alert_service import (
-    _build_ai_explanation_payload,
-    _default_recommendations,
-)
+from app.adapters.model_api_health_adapter import ModelApiHealthAdapter
+
+# Phase 3b: these helpers moved from ``risk_alert_service`` to
+# ``ModelApiHealthAdapter``. Module-level aliases preserve the existing
+# call sites so the SHAP/AI explanation contract tests don't have to be
+# rewritten.
+_default_recommendations = ModelApiHealthAdapter._default_recommendations
+_build_ai_explanation_payload = ModelApiHealthAdapter._build_ai_explanation_payload
 
 
 # ---------------------------------------------------------------------------

@@ -7,13 +7,17 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.3` (Phase 3a — typed normalized risk row) |
-| Captured from branch | `refactor/risk-core-phase3-typed-normalized-row` |
+| Baseline version | `v0.4` (Phase 3b — adapter layer formalisation) |
+| Captured from branch | `refactor/risk-core-phase3b-adapters` |
 | Schema source | `backend/app/schemas/monitoring.py` |
-| Normalized row | `backend/app/services/normalized_risk_row.py` |
-| DTO builder | `backend/app/services/risk_report_builder.py` |
+| Normalized row (read path) | `backend/app/services/normalized_risk_row.py` |
+| Normalized explanation (write path) | `backend/app/adapters/normalized_explanation.py` |
+| Model-api adapter | `backend/app/adapters/model_api_health_adapter.py` |
+| Persistence adapter | `backend/app/adapters/risk_persistence_adapter.py` |
+| Mobile DTO builder | `backend/app/services/risk_report_builder.py` |
 | Snapshot test | `backend/tests/contract/test_mobile_risk_dto_snapshot.py` |
 | Builder unit test | `backend/tests/test_risk_report_builder.py` |
+| Persistence adapter test | `backend/tests/test_risk_persistence_adapter.py` |
 | Mobile parser | `lib/features/analysis/repositories/risk_analysis_repository.dart` |
 | Risk plan | `.windsurf/plans/risk-core-architecture-refactor-9ea607.md` |
 
@@ -34,6 +38,7 @@
 | `v0.1` | 2026-04-27 | `refactor/risk-core-phase1-canonicalize` | Plan's Phase 1: marked duplicate fields `deprecated=True` (no wire-format change), added invariance tests, flipped mobile parser to prefer canonical keys. |
 | `v0.2` | 2026-04-27 | `refactor/risk-core-phase2-builder-extract` | **Out-of-plan refactor** (mislabelled as "Phase 2" in the original commit; the plan's Phase 2 is a persistence migration). Extracted `build_risk_report` / `build_risk_report_detail` / `build_risk_history_item` into `app/services/risk_report_builder.py`. Logically belongs in plan's Phase 3 (as the `MobileRiskDtoAdapter`). |
 | `v0.3` | 2026-04-27 | `refactor/risk-core-phase3-typed-normalized-row` | **Phase 3a — prep**: replaced the `dict[str, Any]` returned by `MonitoringService._normalize_risk_row` with a frozen `NormalizedRiskRow` dataclass. All 7 internal call sites + builders + builder tests migrated. No wire-format change. Sets up the typed input layer the plan's Phase 3 adapter extraction will produce. |
+| `v0.4` | 2026-04-27 | `refactor/risk-core-phase3b-adapters` | **Plan's Phase 3 — adapter formalisation**: extracted `ModelApiHealthAdapter` (`to_record` / `from_response` / `from_local_inference` + 7 private helpers) and `RiskPersistenceAdapter` (`build_features_json` / `persist`) under `backend/app/adapters/`. `risk_alert_service.calculate_device_risk` shrank from 263 LOC to 99 LOC; the file as a whole went from 773 to 393 LOC. Verbatim behaviour: medical defaults (75 bpm / 120-80 / 165 cm / 65 kg / 50 ms HRV), recommendations copy, explanation text format, and `feature_importance` rounding are all unchanged. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -383,7 +388,7 @@ single-PR change driven by the invariant tests above:
 
 ---
 
-## 7. DTO builders + typed normalized row — Phase 3a architecture
+## 7. Adapter layer + DTO builders — Phase 3 architecture
 
 The DTO construction code is extracted out of `MonitoringService` into a
 dedicated builder module so the canonical/deprecated mirroring lives at
@@ -434,19 +439,41 @@ assemble inputs, then delegate construction.
   never crosses the API boundary; we don't need Pydantic's
   serialisation / validation cost at this internal layer.
 
-### Phase 3b follow-up — adapter extraction (not yet done)
+### Phase 3b — adapter layer (landed in v0.4)
 
-The plan's full Phase 3 also extracts adapters out of
+The plan's full Phase 3 extracted three adapters out of
 `risk_alert_service.py`:
 
-- `ModelApiHealthAdapter` — `to_record(payload) -> dict`,
-  `from_response(resp) -> NormalizedRiskRow`-shaped object.
-- `RiskPersistenceAdapter` — `to_db_row(NormalizedExplanation) -> RiskExplanation`.
-- `MobileRiskDtoAdapter` — already exists as `risk_report_builder.py`.
+| Adapter | Responsibility | Static methods |
+| --- | --- | --- |
+| `ModelApiHealthAdapter` | Inference-layer boundary | `to_record(payload) -> dict`, `from_response(resp, *, defaults_applied, feature_snapshot) -> NormalizedExplanation`, `from_local_inference(RiskInferenceResult, ...) -> NormalizedExplanation` |
+| `RiskPersistenceAdapter` | Database write boundary | `build_features_json(...) -> dict`, `persist(db, ...) -> RiskScore` |
+| `MobileRiskDtoAdapter` | Mobile read boundary | Already exists as `app/services/risk_report_builder.py` (relocation deferred — would only churn imports without changing behaviour) |
 
-The typed `NormalizedRiskRow` lands first because the adapters will
-produce / consume it. Phase 3b will live on a separate branch and bring
-`risk_alert_service.calculate_device_risk` from ~250 LOC to <100 LOC.
+The two new adapters share the `NormalizedExplanation` dataclass — the
+**write-path** counterpart of `NormalizedRiskRow` (which is the
+**read-path** type). Keeping the two distinct prevents a producer /
+consumer cycle in the data model and lets each side evolve independently.
+
+After the extraction, `risk_alert_service.calculate_device_risk` is
+**99 LOC** (was 263) and the whole file is **393 LOC** (was 773). The
+function is now pure orchestration: cooldown check → vitals fetch →
+inference (model-api or local fallback) → persistence → alert dispatch.
+
+Behaviour is **verbatim-preserved**:
+
+- Medical defaults in `to_record` (75 bpm / 16 rpm / 36.6 °C / 98% /
+  120-80 mmHg / 165 cm / 65 kg / 50 ms HRV) and the gender int 0/1 +
+  `height_m` output convention.
+- `_default_recommendations` copy and counts (3 for critical, 2 for
+  medium, 2 for low) — pinned by
+  `tests/test_shap_explanation_contract.py::TestDefaultRecommendations`.
+- `_build_explanation_text` English copy with backticked backend label —
+  matches what existing `risk_explanations` rows already store on disk.
+- `_feature_importance_from_top_features` defaults missing impact to
+  `0.0` and rounds to 4 decimals.
+- `_build_feature_importance` (snapshot path) takes `abs(value)` and
+  rounds to 4 decimals.
 
 ---
 
@@ -470,10 +497,13 @@ When the contract genuinely evolves:
 
 ```bash
 cd backend
-python -m pytest tests/contract tests/test_risk_report_builder.py -v --tb=short
+python -m pytest tests/contract tests/test_risk_report_builder.py \
+                 tests/test_risk_persistence_adapter.py \
+                 tests/test_risk_alert_service_helpers.py \
+                 tests/test_shap_explanation_contract.py -v --tb=short
 ```
 
-Expected output (`v0.3`): **38 tests passing**, 0 failing.
+Expected output (`v0.4`): **all green**, 0 failing.
 
 Contract layer (`tests/contract/test_mobile_risk_dto_snapshot.py`):
 
@@ -490,3 +520,27 @@ Builder layer (`tests/test_risk_report_builder.py`):
 - 7 `build_risk_report_detail` tests
 - 4 `build_risk_history_item` tests
 - 3 cross-cutting builder invariant tests
+
+Adapter layer (Phase 3b):
+
+- `tests/test_risk_persistence_adapter.py` — 7 tests pinning
+  `build_features_json` shape, value mirroring and `Decimal` encoding.
+- `tests/test_risk_alert_service_helpers.py` — 5 helpers covered via
+  module-level aliases pointing to `ModelApiHealthAdapter` static methods.
+- `tests/test_shap_explanation_contract.py` — `_default_recommendations`
+  and `_build_ai_explanation_payload` covered via the same alias pattern.
+
+Full non-e2e backend suite (smoke):
+
+```bash
+python -m pytest tests/ \
+  --ignore=tests/test_e2e_analysis_risk_read_surfaces.py \
+  --ignore=tests/test_e2e_manual_sos.py \
+  --ignore=tests/test_e2e_model_api_shap_persistence.py \
+  --ignore=tests/test_e2e_relationships_real_db.py \
+  --ignore=tests/test_e2e_risk_notification.py \
+  --ignore=tests/test_e2e_risk_response_real_db.py \
+  --ignore=tests/test_e2e_telemetry_real_db.py
+```
+
+Expected: 317 passed, 1 skipped (was 310 before Phase 3b's added tests).
