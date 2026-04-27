@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -195,18 +196,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     _buildField(
                       child: TextFormField(
                         controller: _phoneController,
-                        keyboardType: TextInputType.phone,
+                        keyboardType: TextInputType.number,
                         textInputAction: TextInputAction.next,
                         style: const TextStyle(fontSize: 16),
+                        // Chặn ngay từ bàn phím: chỉ cho nhập số, tối đa 11 ký tự.
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(11),
+                        ],
                         decoration: _inputDecoration(
                             'Số điện thoại', Icons.phone_outlined),
                         validator: (v) {
-                          final text =
-                              v?.replaceAll(RegExp(r'[\s-]'), '').trim() ?? '';
+                          final text = v?.trim() ?? '';
                           if (text.isEmpty) return null;
-                          if (!RegExp(r'^\d+$').hasMatch(text)) {
-                            return 'Số điện thoại chỉ được chứa chữ số';
-                          }
                           if (text.length < 10 || text.length > 11) {
                             return 'Số điện thoại phải có 10-11 chữ số';
                           }

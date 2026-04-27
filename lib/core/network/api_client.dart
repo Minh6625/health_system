@@ -301,6 +301,12 @@ class ApiClient {
   }
 
   String _extractServerErrorMessage(http.Response response) {
+    if (kDebugMode) {
+      final method = response.request?.method ?? '?';
+      final url = response.request?.url.toString() ?? '?';
+      debugPrint('[ApiClient] $method $url → ${response.statusCode}');
+      debugPrint('[ApiClient] response body: ${response.body}');
+    }
     try {
       final body = jsonDecode(response.body);
       if (body is Map<String, dynamic>) {

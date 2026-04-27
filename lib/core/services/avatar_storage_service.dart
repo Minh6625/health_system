@@ -54,6 +54,10 @@ class AvatarStorageService {
         ),
       );
 
+      // Sau khi upload thành công, dọn dẹp các avatar cũ trong folder user.
+      // Best-effort: nếu xóa thất bại (network, RLS) cũng không fail upload.
+      await _cleanupOldAvatars(userId: userId, keepObjectPath: objectPath);
+
       final publicUrl = storage.getPublicUrl(objectPath);
       // Cache-busting query param tránh CDN/HTTP cache giữ ảnh cũ.
       return '$publicUrl?v=$timestamp';
@@ -69,6 +73,31 @@ class AvatarStorageService {
         'Tải ảnh lên thất bại. Vui lòng thử lại.',
         cause: e,
       );
+    }
+  }
+
+  /// Xóa các avatar cũ trong folder `<userId>/`, giữ lại file vừa upload.
+  /// Được gọi sau mỗi lần upload thành công. Best-effort: lỗi không
+  /// được throw lên UI để tránh chặn flow chính.
+  Future<void> _cleanupOldAvatars({
+    required String userId,
+    required String keepObjectPath,
+  }) async {
+    try {
+      final storage = _supabase.storage.from(_bucket);
+      final files = await storage.list(path: userId);
+      final pathsToDelete = files
+          .map((f) => '$userId/${f.name}')
+          .where((p) => p != keepObjectPath)
+          .toList();
+      if (pathsToDelete.isNotEmpty) {
+        await storage.remove(pathsToDelete);
+        debugPrint(
+          '[AvatarStorageService] removed ${pathsToDelete.length} old avatar(s) for user $userId',
+        );
+      }
+    } catch (e) {
+      debugPrint('[AvatarStorageService] cleanup old avatars failed (non-fatal): $e');
     }
   }
 
