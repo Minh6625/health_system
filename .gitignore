@@ -60,6 +60,8 @@ diff.txt
 crash_log.txt
 *.log
 out*.txt
+_test_supabase*.py
+_diag_supabase*.py
 
 # AI Code Assistant Folders
 .codex_appdata/
