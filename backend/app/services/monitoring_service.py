@@ -33,6 +33,11 @@ from app.services.risk_inference_service import (
     is_risk_report_stale,
     normalize_risk_score,
 )
+from app.services.risk_report_builder import (
+    build_risk_history_item,
+    build_risk_report,
+    build_risk_report_detail,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -915,24 +920,11 @@ class MonitoringService:
                 top_features=normalized.get("top_features"),
             )
             reports.append(
-                RiskReportResponse(
-                    id=normalized["id"],
-                    risk_type=normalized["risk_type"],
-                    risk_score=normalized["risk_score"],
-                    score=normalized["risk_score"],
-                    health_score=normalized["health_score"],
-                    risk_level=normalized["risk_level"],
-                    health_level=normalized["health_level"],
-                    display_status=normalized["display_status"],
-                    summary=normalized["health_summary"],
-                    timestamp=normalized["timestamp"],
+                build_risk_report(
+                    normalized,
                     previous_score=previous_score,
                     trend_7d=trend_7d,
-                    key_features=[factor.key for factor in top_factors],
                     top_factors=top_factors,
-                    recommendation_preview=normalized["recommendations"][:2],
-                    confidence=normalized["confidence"],
-                    is_stale=normalized["is_stale"],
                 )
             )
         return reports
@@ -1016,35 +1008,13 @@ class MonitoringService:
             fallback_recommendations=normalized["recommendations"],
         )
 
-        return RiskReportDetailResponse(
-            id=normalized["id"],
-            risk_type=normalized["risk_type"],
-            risk_score=normalized["risk_score"],
-            score=normalized["risk_score"],
-            health_score=normalized["health_score"],
-            risk_level=normalized["risk_level"],
-            health_level=normalized["health_level"],
-            display_status=normalized["display_status"],
-            summary=normalized["risk_summary"],
-            timestamp=normalized["timestamp"],
+        return build_risk_report_detail(
+            normalized,
             previous_score=previous_score,
             trend_7d=trend_7d,
-            explanation=str(normalized.get("explanation_text") or ""),
-            xai_explanation=str(normalized.get("explanation_text") or ""),
-            features=normalized["features"],
-            feature_importance={
-                key: round(MonitoringService._safe_float(value), 4)
-                for key, value in normalized["feature_importance"].items()
-            },
-            breakdown=breakdown,
-            recommendations=normalized["recommendations"],
-            recommendation_preview=normalized["recommendations"][:2],
             top_factors=top_factors,
+            breakdown=breakdown,
             snapshot=snapshot,
-            model_version=str(normalized.get("model_version") or "1.0"),
-            algorithm=str(normalized.get("algorithm") or "unknown"),
-            confidence=normalized["confidence"],
-            is_stale=normalized["is_stale"],
             ai_explanation=ai_explanation,
         )
 
@@ -1123,20 +1093,7 @@ class MonitoringService:
         items: list[RiskHistoryItemResponse] = []
         for raw_row in rows:
             normalized = MonitoringService._normalize_risk_row(dict(raw_row))
-            reason_preview = str(normalized.get("explanation_text") or normalized["risk_summary"]).strip()
-            items.append(
-                RiskHistoryItemResponse(
-                    report_id=normalized["id"],
-                    risk_score=normalized["risk_score"],
-                    score=normalized["risk_score"],
-                    health_score=normalized["health_score"],
-                    risk_level=normalized["risk_level"],
-                    display_status=normalized["display_status"],
-                    analyzed_at=normalized["timestamp"],
-                    reason_preview=reason_preview,
-                    is_stale=normalized["is_stale"],
-                )
-            )
+            items.append(build_risk_history_item(normalized))
 
         summary = MonitoringService._get_history_summary(patient_id, range_key, db)
         return RiskHistoryResponse(

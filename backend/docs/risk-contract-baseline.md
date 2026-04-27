@@ -7,10 +7,12 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.1` (Phase 1 — canonicalisation + deprecation marking) |
-| Captured from branch | `refactor/risk-core-phase1-canonicalize` |
+| Baseline version | `v0.2` (Phase 2 — DTO builder extraction) |
+| Captured from branch | `refactor/risk-core-phase2-builder-extract` |
 | Schema source | `backend/app/schemas/monitoring.py` |
+| DTO builder | `backend/app/services/risk_report_builder.py` |
 | Snapshot test | `backend/tests/contract/test_mobile_risk_dto_snapshot.py` |
+| Builder unit test | `backend/tests/test_risk_report_builder.py` |
 | Mobile parser | `lib/features/analysis/repositories/risk_analysis_repository.dart` |
 | Risk plan | `.windsurf/plans/risk-core-architecture-refactor-9ea607.md` |
 
@@ -20,6 +22,7 @@
 | --- | --- | --- | --- |
 | `v0.0` | 2026-04-27 | `refactor/risk-core-phase0-audit` | Initial baseline pinned by snapshot tests. |
 | `v0.1` | 2026-04-27 | `refactor/risk-core-phase1-canonicalize` | Phase 1: marked duplicate fields `deprecated=True` (no wire-format change), added invariance tests, flipped mobile parser to prefer canonical keys. |
+| `v0.2` | 2026-04-27 | `refactor/risk-core-phase2-builder-extract` | Phase 2: extracted `build_risk_report` / `build_risk_report_detail` / `build_risk_history_item` into `app/services/risk_report_builder.py`. The canonical/deprecated mirroring is now encoded once at the builder layer instead of repeated at every DTO construction site. No wire-format change. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -365,11 +368,49 @@ single-PR change driven by the invariant tests above:
 3. Remove the matching invariant test (it would otherwise fail because the
    field no longer exists).
 4. Drop the canonical-first fallback in `risk_analysis_repository.dart`.
-5. Bump the **Baseline version** at the top of this file (`v0.1` → `v1.0`).
+5. Bump the **Baseline version** at the top of this file (`v0.2` → `v1.0`).
 
 ---
 
-## 7. Update procedure
+## 7. DTO builders — Phase 2 architecture
+
+Phase 2 extracted the DTO construction code out of `MonitoringService` into a
+dedicated builder module so the canonical/deprecated mirroring lives at one
+site instead of being repeated at every call site.
+
+| Builder | Returns | Used by |
+| --- | --- | --- |
+| `build_risk_report` | `RiskReportResponse` | `MonitoringService.get_risk_reports` |
+| `build_risk_report_detail` | `RiskReportDetailResponse` | `MonitoringService.get_risk_report_detail` |
+| `build_risk_history_item` | `RiskHistoryItemResponse` | `MonitoringService.get_risk_history` |
+
+Each builder is a pure function of:
+
+- the `normalized` dict returned by `MonitoringService._normalize_risk_row`;
+- already-computed dependencies (top factors, breakdown, snapshot, AI
+  explanation, trend, previous score) passed as keyword arguments.
+
+This means the builders are unit-tested in isolation
+(`backend/tests/test_risk_report_builder.py`) without a database fixture, and
+the `MonitoringService` methods become thin orchestrators that fetch + assemble
+inputs, then delegate construction.
+
+### Why an extra module instead of static methods on `MonitoringService`
+
+- The builders need to be importable from future risk-pipeline producers
+  (e.g. the SHAP explanation pipeline, the model-API client) without pulling
+  in the full `MonitoringService` and its DB coupling.
+- Pure DTO construction logic does not belong in a service class whose
+  primary concern is data access.
+- It makes the Phase 6 removal sequence trivial: deleting a deprecated field
+  becomes a single edit per deprecated field at the builder level.
+
+> Phase 3 candidate: introduce a typed `NormalizedRiskRow` dataclass so the
+> builders no longer take `dict[str, Any]`. Tracked but not blocking.
+
+---
+
+## 8. Update procedure
 
 When the contract genuinely evolves:
 
@@ -385,14 +426,16 @@ When the contract genuinely evolves:
 
 ---
 
-## 8. Verification command
+## 9. Verification commands
 
 ```bash
 cd backend
-python -m pytest tests/contract -v --tb=short
+python -m pytest tests/contract tests/test_risk_report_builder.py -v --tb=short
 ```
 
-Expected output (`v0.1`): **19 tests passing**, 0 failing.
+Expected output (`v0.2`): **38 tests passing**, 0 failing.
+
+Contract layer (`tests/contract/test_mobile_risk_dto_snapshot.py`):
 
 - 9 snapshot tests pin the JSON keys of every mobile DTO (drift triggers a
   `Mobile contract drift detected on ...` failure with the exact set of
@@ -400,3 +443,10 @@ Expected output (`v0.1`): **19 tests passing**, 0 failing.
 - 3 round-trip tests catch silent drift caused by `model_config` changes.
 - 7 invariant tests assert every deprecated alias mirrors its canonical
   source so Phase 6 removal cannot lose data.
+
+Builder layer (`tests/test_risk_report_builder.py`):
+
+- 5 `build_risk_report` tests
+- 7 `build_risk_report_detail` tests
+- 4 `build_risk_history_item` tests
+- 3 cross-cutting builder invariant tests
