@@ -23,6 +23,8 @@ class RiskHistoryItemEntity {
 }
 
 class RiskHistorySummary {
+  /// Risk-domain stats from the backend. Kept as-is for storage parity; UI
+  /// should prefer the `health*` getters below which invert the semantic.
   final double averageScore;
   final double highestScore;
   final double lowestScore;
@@ -36,6 +38,26 @@ class RiskHistorySummary {
     required this.deltaVsPreviousPeriod,
     required this.trendPoints,
   });
+
+  /// Average health score (0–100, higher is better) for the period.
+  double get healthAverage => (100 - averageScore).clamp(0.0, 100.0);
+
+  /// Best (highest) health score in the period — the inverse of the worst
+  /// (highest) risk score.
+  double get healthHighest => (100 - lowestScore).clamp(0.0, 100.0);
+
+  /// Worst (lowest) health score in the period — the inverse of the best
+  /// (lowest) risk score.
+  double get healthLowest => (100 - highestScore).clamp(0.0, 100.0);
+
+  /// Period-over-period delta in the health domain. Positive means health
+  /// improved compared to the previous period.
+  double get healthDeltaVsPreviousPeriod => -deltaVsPreviousPeriod;
+
+  /// Trend points re-expressed in the health domain so charts rendered
+  /// upward represent improvement.
+  List<int> get healthTrendPoints =>
+      trendPoints.map((point) => (100 - point).clamp(0, 100)).toList();
 }
 
 class RiskHistoryEntity {

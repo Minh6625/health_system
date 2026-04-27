@@ -66,7 +66,7 @@ class RiskDetailSummaryCard extends StatelessWidget {
                 ),
               ),
               Text(
-                detail.score.toString(),
+                detail.healthScore.round().toString(),
                 style: AppTextStyles.displayCompact.copyWith(
                   color: scoreColor,
                   fontSize: 48,
@@ -78,11 +78,22 @@ class RiskDetailSummaryCard extends StatelessWidget {
           const SizedBox(height: AppSpacing.gapMd),
           Divider(color: AppColors.strokeSoft.withValues(alpha: 0.5)),
           const SizedBox(height: AppSpacing.gapMd),
-          Text(
-            detail.previousScore == null
-                ? 'Chưa có lần đo trước để so sánh'
-                : '${detail.score - detail.previousScore! >= 0 ? '+' : ''}${detail.score - detail.previousScore!} so với lần trước',
-            style: AppTextStyles.caption,
+          Builder(
+            builder: (_) {
+              final prev = detail.previousScore;
+              if (prev == null) {
+                return Text(
+                  'Chưa có lần đo trước để so sánh',
+                  style: AppTextStyles.caption,
+                );
+              }
+              final delta = prev - detail.score;
+              final sign = delta > 0 ? '+' : (delta < 0 ? '' : '±');
+              return Text(
+                '$sign$delta điểm so với lần trước',
+                style: AppTextStyles.caption,
+              );
+            },
           ),
           const SizedBox(height: AppSpacing.gapMd),
           Text(detail.summary, style: AppTextStyles.bodyMedium),

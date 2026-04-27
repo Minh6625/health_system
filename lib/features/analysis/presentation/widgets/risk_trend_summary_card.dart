@@ -21,9 +21,9 @@ class RiskTrendSummaryCard extends StatelessWidget {
     final averageBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Điểm trung bình', style: AppTextStyles.caption),
+        const Text('Điểm sức khoẻ trung bình', style: AppTextStyles.caption),
         Text(
-          _formatScore(summary.averageScore),
+          _formatScore(summary.healthAverage),
           style: AppTextStyles.displayCompact.copyWith(fontSize: 32),
         ),
       ],
@@ -35,12 +35,12 @@ class RiskTrendSummaryCard extends StatelessWidget {
           : CrossAxisAlignment.end,
       children: [
         Text(
-          'Cao nhất: ${_formatScore(summary.highestScore)}',
+          'Cao nhất: ${_formatScore(summary.healthHighest)}',
           style: AppTextStyles.bodyMedium,
         ),
         const SizedBox(height: AppSpacing.gapXs),
         Text(
-          'Thấp nhất: ${_formatScore(summary.lowestScore)}',
+          'Thấp nhất: ${_formatScore(summary.healthLowest)}',
           style: AppTextStyles.bodyMedium,
         ),
       ],
@@ -85,12 +85,14 @@ class RiskTrendSummaryCard extends StatelessWidget {
             children: [
               _buildStatsHeader(compact),
               const SizedBox(height: AppSpacing.gapLg),
-              if (summary.trendPoints.isNotEmpty) ...[
+              if (summary.healthTrendPoints.isNotEmpty) ...[
                 SizedBox(
                   height: 80,
                   width: double.infinity,
                   child: CustomPaint(
-                    painter: _SimpleLinePainter(data: summary.trendPoints),
+                    painter: _SimpleLinePainter(
+                      data: summary.healthTrendPoints,
+                    ),
                   ),
                 ),
               ],

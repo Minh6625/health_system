@@ -339,7 +339,7 @@ void main() {
       await tester.tap(find.text('Xem lịch sử'));
       await tester.pumpAndSettle();
       expect(find.text('Lịch sử đánh giá rủi ro'), findsOneWidget);
-      expect(find.text('Điểm trung bình'), findsOneWidget);
+      expect(find.text('Điểm sức khoẻ trung bình'), findsOneWidget);
 
       await tester.tap(find.text('30 ngày'));
       await tester.pumpAndSettle();
@@ -456,7 +456,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Chưa có lịch sử'), findsOneWidget);
-    expect(find.text('Điểm trung bình'), findsNothing);
+    expect(find.text('Điểm sức khoẻ trung bình'), findsNothing);
     expect(find.textContaining('Cao nhất:'), findsNothing);
   });
 }

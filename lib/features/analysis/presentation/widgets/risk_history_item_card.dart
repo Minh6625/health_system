@@ -54,7 +54,7 @@ class RiskHistoryItemCard extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      item.score.toString(),
+                      item.healthScore.round().toString(),
                       style: AppTextStyles.displayCompact.copyWith(
                         color: scoreColor,
                         fontSize: 24,
