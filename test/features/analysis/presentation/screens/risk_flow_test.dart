@@ -230,6 +230,13 @@ void main() {
   testWidgets(
     'self flow uses CTA path from report to detail history and drilldowns',
     (tester) async {
+      // The redesigned trend cards add axis labels, threshold lines and
+      // delta badges, which makes the layout legitimately taller. Bump
+      // the test surface so all rows fit without ad-hoc scroll plumbing.
+      tester.view.physicalSize = const Size(800, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
       final repository = _FakeRiskAnalysisRepository(
         latestReport: _report(isStale: true),
         detailById: {

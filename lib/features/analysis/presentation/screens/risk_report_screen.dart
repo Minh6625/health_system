@@ -136,7 +136,10 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                 const SizedBox(height: AppSpacing.gapLg),
                 TopFactorChipsSection(factors: report.topFactors),
                 const SizedBox(height: AppSpacing.gapLg),
-                RiskTrendPreviewCard(trend7d: report.healthTrend7d),
+                RiskTrendPreviewCard(
+                  trend7d: report.healthTrend7d,
+                  healthDelta: report.healthDelta,
+                ),
                 const SizedBox(height: AppSpacing.gapLg),
                 RecommendationPreviewCard(
                   recommendations: report.recommendationPreview,

@@ -4,6 +4,8 @@ import '../../../../shared/presentation/theme/app_radii.dart';
 import '../../../../shared/presentation/theme/app_spacing.dart';
 import '../../../../shared/presentation/theme/app_text_styles.dart';
 import '../../domain/entities/risk_history_entity.dart';
+import 'health_score_delta_badge.dart';
+import 'health_score_trend_chart.dart';
 
 class RiskTrendSummaryCard extends StatelessWidget {
   final RiskHistorySummary summary;
@@ -84,15 +86,26 @@ class RiskTrendSummaryCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildStatsHeader(compact),
-              const SizedBox(height: AppSpacing.gapLg),
+              const SizedBox(height: AppSpacing.gapMd),
+              if (summary.healthDeltaVsPreviousPeriod.abs() > 0.0001 ||
+                  summary.healthTrendPoints.isNotEmpty)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: HealthScoreDeltaBadge(
+                    delta: summary.healthDeltaVsPreviousPeriod,
+                    comparedTo: 'kỳ trước',
+                  ),
+                ),
               if (summary.healthTrendPoints.isNotEmpty) ...[
-                SizedBox(
-                  height: 80,
-                  width: double.infinity,
-                  child: CustomPaint(
-                    painter: _SimpleLinePainter(
-                      data: summary.healthTrendPoints,
-                    ),
+                const SizedBox(height: AppSpacing.gapLg),
+                HealthScoreTrendChart(
+                  data: summary.healthTrendPoints,
+                ),
+                const SizedBox(height: AppSpacing.gapSm),
+                Text(
+                  'Ngưỡng: ≥80 ổn định · 60–80 cần theo dõi · <60 nguy hiểm',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -104,44 +117,3 @@ class RiskTrendSummaryCard extends StatelessWidget {
   }
 }
 
-class _SimpleLinePainter extends CustomPainter {
-  final List<int> data;
-
-  _SimpleLinePainter({required this.data});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (data.isEmpty) return;
-
-    final paint = Paint()
-      ..color = AppColors.brandPrimary
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final maxVal = data.reduce((a, b) => a > b ? a : b);
-    final minVal = data.reduce((a, b) => a < b ? a : b);
-    final range = (maxVal - minVal) == 0 ? 1 : (maxVal - minVal);
-
-    final path = Path();
-    final double stepX = size.width / (data.length > 1 ? data.length - 1 : 1);
-
-    for (int i = 0; i < data.length; i++) {
-      final double x = i * stepX;
-      final double normalizedY = (data[i] - minVal) / range;
-      final double y = size.height - (normalizedY * size.height * 0.9);
-
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
