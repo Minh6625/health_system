@@ -155,6 +155,10 @@ class RiskPersistenceAdapter:
                     if isinstance(inference.shap_details, dict)
                     else None
                 ),
+                # Phase 2 traceability — NULL on the rule_based / ONNX
+                # fallback path (NormalizedExplanation defaults the field
+                # to None there).
+                model_request_id=inference.model_request_id,
             )
             db.add(risk_explanation)
             db.commit()

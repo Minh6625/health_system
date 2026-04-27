@@ -7,9 +7,10 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v0.6` (Phase 7 — circuit breaker + timing observability) |
-| Wire version | `0.4.0` (`X-Risk-Contract-Version` header value) |
-| Captured from branch | `refactor/risk-core-phase7-resilience` |
+| Baseline version | `v0.7` (Phase 2 focused — `model_request_id` traceability) |
+| Wire version | `0.4.0` (`X-Risk-Contract-Version` header value, unchanged) |
+| Captured from branch | `refactor/risk-core-phase2-model-request-id` |
+| Pending DBA migration | `backend/migrations/20260427_model_request_id.sql` |
 | Schema source | `backend/app/schemas/monitoring.py` |
 | Version constant | `backend/app/core/risk_contract.py` |
 | Circuit breaker | `backend/app/services/circuit_breaker.py` |
@@ -51,6 +52,7 @@
 | `v0.4` | 2026-04-27 | `refactor/risk-core-phase3b-adapters` | **Plan's Phase 3 — adapter formalisation**: extracted `ModelApiHealthAdapter` (`to_record` / `from_response` / `from_local_inference` + 7 private helpers) and `RiskPersistenceAdapter` (`build_features_json` / `persist`) under `backend/app/adapters/`. `risk_alert_service.calculate_device_risk` shrank from 263 LOC to 99 LOC; the file as a whole went from 773 to 393 LOC. Verbatim behaviour: medical defaults (75 bpm / 120-80 / 165 cm / 65 kg / 50 ms HRV), recommendations copy, explanation text format, and `feature_importance` rounding are all unchanged. |
 | `v0.5` | 2026-04-27 | `refactor/risk-core-phase6-versioning` | **Plan's Phase 6 — versioning + OpenAPI guard**: added `RISK_CONTRACT_VERSION = "0.4.0"` constant + `RiskContractVersionMiddleware` so every response on the mobile risk surface (`/mobile/analysis/risk-reports`, `/risk-reports/{id}`, `/risk-history`, `/mobile/metrics/health-report`) carries `X-Risk-Contract-Version`. Mobile `ApiClient` reads + debug-warns once per distinct mismatch via the new `RiskContractVersion` singleton. New `tests/contract/test_mobile_risk_versioning.py` (23 tests) pins the route surface, the header presence, the header scope (off-surface routes do NOT get the header) and the OpenAPI components shape. No wire-format change. |
 | `v0.6` | 2026-04-27 | `refactor/risk-core-phase7-resilience` | **Plan's Phase 7 (reduced) — resilience + observability**: added a 3-state `CircuitBreaker` (CLOSED → OPEN → HALF_OPEN) and wired it into `ModelApiClient.predict_health_risk` + `predict_fall` with **separate per-endpoint breakers** so health and fall outages cannot mask one another. Network / timeout / 5xx errors trip the breaker after `MODEL_API_BREAKER_FAILURES` (default 5) consecutive failures; malformed-JSON does NOT trip (it's a contract bug, not an outage). Added `app/observability/timing.py` with `StageTimer` context manager + `record_timing` log emitter for the four canonical stages (`build_record`, `model_api_call`, `persist`, `build_dto`). Stage timings now flow on every `calculate_device_risk` call. 26 new tests (12 breaker state-machine, 7 timing helpers, 7 breaker-on-client integration). The plan's cache (`audience_payload_json`) is **deferred** — depends on Phase 2 (alembic) and Phase 5 (audience profiles), neither landed. No wire-format change. |
+| `v0.7` | 2026-04-27 | `refactor/risk-core-phase2-model-request-id` | **Plan's Phase 2 (focused subset) — `model_request_id` traceability**: added `backend/migrations/20260427_model_request_id.sql` (raw SQL — project does not use alembic) to add a nullable `VARCHAR(36)` column on `risk_explanations` with a partial index on `IS NOT NULL` rows. `ModelApiHealthAdapter.from_response` extracts `meta.request_id` (defensive: `str()`-coerces, trims whitespace, truncates to 36 chars, normalises blanks to `NULL`). `NormalizedExplanation` carries the field; `RiskPersistenceAdapter.persist` writes it. Rule-based / ONNX / LightGBM fallback rows keep `NULL` (no upstream request to correlate with). Backfill is intentionally NOT done — historical rows have no recoverable request_id. **Migration is pending DBA application; the column write is forward-compatible until then.** Plan's `audience_payload_json` column deliberately deferred — purely Phase 5 prep, no consumer yet. 9 new tests. No wire-format change. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -489,6 +491,49 @@ Behaviour is **verbatim-preserved**:
 
 ---
 
+## 7d. Persistence traceability — Phase 2 (focused) architecture
+
+Phase 2 in the original plan is a full persistence-schema migration
+(alembic, multiple new columns, backfill). The version landed under
+`v0.7` is a focused subset — only the `model_request_id` column —
+because:
+
+- The `audience_payload_json` cache is purely Phase 5 prep; with no
+  audience profiles yet, the column would be unused.
+- Backfilling historical rows is impossible: the upstream request_id
+  is not retained anywhere it could be reconstructed from.
+- The column itself is forward-compatible (nullable, partial index on
+  `IS NOT NULL`); the next deploy starts populating it for new model-api
+  rows automatically.
+
+### What's persisted
+
+| Column | Type | Source | NULL when |
+| --- | --- | --- | --- |
+| `model_request_id` | `VARCHAR(36)` | `meta.request_id` from the model-api 6-layer response | The local rule_based / ONNX / LightGBM fallback path produced the row |
+
+### Defensive parsing
+
+`ModelApiHealthAdapter.from_response` applies four guards before
+populating `NormalizedExplanation.model_request_id`:
+
+1. **Type coerce** — `str()` so a numeric upstream value never crashes
+   the SQLAlchemy write path.
+2. **Trim** — `.strip()` so a whitespace-only value normalises to `NULL`.
+3. **Truncate** — `[:36]` so the DB column never overflows.
+4. **Blank → NULL** — empty strings collapse to `None` so the partial
+   index stays empty for them.
+
+### Pending ops work
+
+- Apply `backend/migrations/20260427_model_request_id.sql` against the
+  production database during the next migration window.
+- Spot-check that ≥ 95 % of new rows produced via the model-api path
+  populate the column once the migration is live (rule_based rows
+  intentionally stay `NULL`).
+
+---
+
 ## 7c. Resilience + observability — Phase 7 architecture
 
 Phase 7 (reduced scope — see plan section E.7) adds two production
@@ -713,7 +758,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 366 passed, 1 skipped (was 340 before Phase 7's 26 added tests).
+Expected: 375 passed, 1 skipped (was 366 before Phase 2's 9 added traceability tests).
 
 Mobile parser smoke (after Phase 6):
 

@@ -197,6 +197,15 @@ class ModelApiHealthAdapter:
             if isinstance(response.get("meta"), dict)
             else None
         )
+        # Phase 2: pull the upstream model-api ``meta.request_id`` so the
+        # persistence adapter can write it onto the row for end-to-end log
+        # correlation. The column is varchar(36) (UUID-shaped) but we
+        # ``str()`` defensively in case the upstream sent a number.
+        raw_request_id = meta.get("request_id") if isinstance(meta, dict) else None
+        model_request_id: str | None = None
+        if raw_request_id is not None:
+            candidate = str(raw_request_id).strip()
+            model_request_id = candidate[:36] if candidate else None
 
         return NormalizedExplanation(
             risk_level=risk_level,
@@ -215,6 +224,7 @@ class ModelApiHealthAdapter:
             xai_method=xai_method,
             artifact_path=artifact_path,
             fallback_reason=None,
+            model_request_id=model_request_id,
         )
 
     # ------------------------------------------------------------------

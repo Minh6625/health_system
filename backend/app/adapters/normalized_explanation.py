@@ -70,3 +70,7 @@ class NormalizedExplanation:
     xai_method: str = "rule_based"
     artifact_path: str | None = None
     fallback_reason: str | None = None
+    #: healthguard-model-api ``meta.request_id`` (Phase 2). ``None`` on the
+    #: rule_based / ONNX fallback path — there is no upstream request to
+    #: correlate with there.
+    model_request_id: str | None = None

@@ -40,6 +40,13 @@ class RiskExplanation(Base):
     ai_explanation_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
     shap_details_json: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
+    # Phase 2 traceability — upstream model-api ``meta.request_id`` so backend
+    # logs can be correlated with model-api server-side logs end-to-end.
+    # NULL on rows produced by the local rule_based / ONNX / LightGBM fallback.
+    model_request_id: Mapped[Optional[str]] = mapped_column(
+        String(36), nullable=True, index=True,
+    )
+
     # Timestamps
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=get_current_time, nullable=True,
