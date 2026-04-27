@@ -13,6 +13,7 @@ import '../../providers/home_dashboard_provider.dart';
 import '../../../auth/providers/auth_provider.dart';
 import '../../../device/models/device_model.dart';
 import '../../../device/providers/device_provider.dart';
+import '../../../analysis/utils/health_level_label.dart';
 import '../../../profile/providers/profile_provider.dart';
 import '../../../health_monitoring/models/vital_signs.dart';
 import '../models/home_dashboard_view_model.dart';
@@ -583,8 +584,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
           (provider.sleepData?['in_bed_minutes'] as int?) ?? 0,
       sleepInsightSummary: sleepInsightSummary,
       riskScoreLabel: provider.healthScore?.toStringAsFixed(0) ?? '--',
+      // Translate the backend's `health_level` enum (stable/watch/critical)
+      // before we hand it to the UI. The previous pass-through let the raw
+      // English strings leak into the greeting card.
       riskLevelLabel:
-          provider.healthLevel ??
+          vietnameseHealthLevel(provider.healthLevel) ??
           (normalizedRiskLevel != null ? displayRiskLevel : 'Không xác định'),
       riskSummary: dashboardHealthSummary(
         backendSummary: provider.healthSummary,
