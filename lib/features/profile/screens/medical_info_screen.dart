@@ -18,8 +18,14 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
 
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
-  final _medicationsController = TextEditingController();
-  final _allergiesController = TextEditingController();
+  // Per-item chip input: a single TextField for typing the next entry,
+  // plus a list rendered as InputChips. Replaces the previous comma-
+  // delimited string which silently mis-parsed entries containing
+  // commas (e.g. "Vitamin B1, B6, B12").
+  final _medicationInputController = TextEditingController();
+  final _allergyInputController = TextEditingController();
+  final List<String> _medications = [];
+  final List<String> _allergies = [];
 
   String? _selectedBloodType;
   final Set<String> _selectedConditions = {};
@@ -51,8 +57,8 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
         if (profile.weightKg != null) {
           _weightController.text = profile.weightKg!.toStringAsFixed(1);
         }
-        _medicationsController.text = profile.medications.join(', ');
-        _allergiesController.text = profile.allergies.join(', ');
+        _medications.addAll(profile.medications);
+        _allergies.addAll(profile.allergies);
         _selectedConditions.addAll(profile.medicalConditions);
       }
       _initialized = true;
@@ -63,17 +69,27 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
   void dispose() {
     _heightController.dispose();
     _weightController.dispose();
-    _medicationsController.dispose();
-    _allergiesController.dispose();
+    _medicationInputController.dispose();
+    _allergyInputController.dispose();
     super.dispose();
   }
 
-  List<String> _parseCommaList(String text) {
-    return text
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
+  /// Adds a trimmed entry to the target list if it's non-empty and not
+  /// already present (case-insensitive). Returns true when appended so
+  /// the caller can clear its TextField.
+  bool _commitChipEntry(List<String> target, String raw) {
+    final value = raw.trim();
+    if (value.isEmpty) return false;
+    final exists = target.any(
+      (e) => e.toLowerCase() == value.toLowerCase(),
+    );
+    if (exists) return false;
+    setState(() => target.add(value));
+    return true;
+  }
+
+  void _removeChipEntry(List<String> target, int index) {
+    setState(() => target.removeAt(index));
   }
 
   Future<void> _handleSave() async {
@@ -96,12 +112,24 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       weightKg: _weightController.text.trim().isEmpty
           ? null
           : double.tryParse(_weightController.text.trim()),
-      medications: _medicationsController.text.trim().isEmpty
-          ? []
-          : _parseCommaList(_medicationsController.text),
-      allergies: _allergiesController.text.trim().isEmpty
-          ? []
-          : _parseCommaList(_allergiesController.text),
+      // Auto-commit any in-progress text in the entry fields so a
+      // user who typed an item but forgot to press Enter doesn't lose it.
+      medications: [
+        ..._medications,
+        if (_medicationInputController.text.trim().isNotEmpty &&
+            !_medications.any((e) =>
+                e.toLowerCase() ==
+                _medicationInputController.text.trim().toLowerCase()))
+          _medicationInputController.text.trim(),
+      ],
+      allergies: [
+        ..._allergies,
+        if (_allergyInputController.text.trim().isNotEmpty &&
+            !_allergies.any((e) =>
+                e.toLowerCase() ==
+                _allergyInputController.text.trim().toLowerCase()))
+          _allergyInputController.text.trim(),
+      ],
       medicalConditions: _selectedConditions.toList(),
     );
 
@@ -215,14 +243,20 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                                 decimal: true),
                             textInputAction: TextInputAction.next,
                             style: const TextStyle(fontSize: 16),
+                            // Backend & UI both display 1 decimal; cap input
+                            // here so user-entered 70.123 cannot get silently
+                            // truncated to 70.1 on next reload.
+                            inputFormatters: const [
+                              _DecimalTextInputFormatter(decimalRange: 1),
+                            ],
                             decoration: _inputDecor(
                                 'Cân nặng (kg)', Icons.monitor_weight_outlined),
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return null;
                               final val = double.tryParse(v.trim());
                               if (val == null) return 'Nhập số hợp lệ';
-                              if (val < 2 || val > 500) {
-                                return 'Cân nặng phải từ 2 – 500 kg';
+                              if (val < 2 || val >= 500) {
+                                return 'Cân nặng phải từ 2 – dưới 500 kg';
                               }
                               return null;
                             },
@@ -233,33 +267,37 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Thuốc & Dị ứng ──────────────────────────────────
+                  // ── Thuốc & Dị ứng (chip input) ──────────────
                   const ProfileSectionLabel('Thuốc & Dị ứng'),
                   ProfileSectionCard(
                     child: Column(
                       children: [
-                        _FormField(
-                          child: TextFormField(
-                            controller: _medicationsController,
-                            textInputAction: TextInputAction.next,
-                            style: const TextStyle(fontSize: 16),
-                            decoration: _inputDecor(
-                              'Thuốc đang dùng (phân cách bằng dấu phẩy)',
-                              Icons.medication_outlined,
-                            ),
-                          ),
+                        _ChipListInput(
+                          label: 'Thuốc đang dùng',
+                          icon: Icons.medication_outlined,
+                          items: _medications,
+                          controller: _medicationInputController,
+                          onSubmit: (value) {
+                            if (_commitChipEntry(_medications, value)) {
+                              _medicationInputController.clear();
+                            }
+                          },
+                          onRemove: (i) =>
+                              _removeChipEntry(_medications, i),
                         ),
-                        _FormField(
+                        _ChipListInput(
                           isLast: true,
-                          child: TextFormField(
-                            controller: _allergiesController,
-                            textInputAction: TextInputAction.done,
-                            style: const TextStyle(fontSize: 16),
-                            decoration: _inputDecor(
-                              'Dị ứng (phân cách bằng dấu phẩy)',
-                              Icons.warning_amber_outlined,
-                            ),
-                          ),
+                          label: 'Dị ứng',
+                          icon: Icons.warning_amber_outlined,
+                          items: _allergies,
+                          controller: _allergyInputController,
+                          onSubmit: (value) {
+                            if (_commitChipEntry(_allergies, value)) {
+                              _allergyInputController.clear();
+                            }
+                          },
+                          onRemove: (i) =>
+                              _removeChipEntry(_allergies, i),
                         ),
                       ],
                     ),
@@ -475,5 +513,127 @@ class _WarningNote extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+/// Chip list editor: a wrapped row of removable chips plus a single
+/// TextField + add button for adding the next entry. Replaces the
+/// previous comma-delimited string which mis-parsed entries containing
+/// commas (e.g. "Vitamin B1, B6, B12").
+class _ChipListInput extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final List<String> items;
+  final TextEditingController controller;
+  final ValueChanged<String> onSubmit;
+  final ValueChanged<int> onRemove;
+  final bool isLast;
+
+  const _ChipListInput({
+    required this.label,
+    required this.icon,
+    required this.items,
+    required this.controller,
+    required this.onSubmit,
+    required this.onRemove,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, isLast ? 16 : 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: AppColors.brandPrimary),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          if (items.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: List.generate(items.length, (i) {
+                return InputChip(
+                  label: Text(items[i], style: const TextStyle(fontSize: 13)),
+                  onDeleted: () => onRemove(i),
+                  deleteIconColor: AppColors.textSecondary,
+                  backgroundColor: AppColors.bgPrimary,
+                  side: BorderSide(color: AppColors.strokeSoft),
+                );
+              }),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  textInputAction: TextInputAction.done,
+                  style: const TextStyle(fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: 'Thêm mục mới…',
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius.circular(AppRadii.radiusSm),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius.circular(AppRadii.radiusSm),
+                      borderSide: const BorderSide(
+                          color: AppColors.brandPrimary, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                  ),
+                  onSubmitted: onSubmit,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () => onSubmit(controller.text),
+                icon: const Icon(Icons.add_circle,
+                    color: AppColors.brandPrimary, size: 32),
+                tooltip: 'Thêm',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Limits a numeric TextField to a fixed number of decimal places so the
+/// user can't enter more precision than the UI/backend will preserve.
+class _DecimalTextInputFormatter extends TextInputFormatter {
+  final int decimalRange;
+  const _DecimalTextInputFormatter({required this.decimalRange})
+      : assert(decimalRange >= 0);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text;
+    if (text.isEmpty) return newValue;
+    final pattern = RegExp(r'^\d*\.?\d{0,' + decimalRange.toString() + r'}$');
+    if (pattern.hasMatch(text)) return newValue;
+    return oldValue;
   }
 }
