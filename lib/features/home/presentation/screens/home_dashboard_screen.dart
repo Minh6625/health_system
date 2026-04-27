@@ -182,8 +182,8 @@ class HomeDashboardScreen extends StatefulWidget {
 
 class _HomeDashboardScreenState extends State<HomeDashboardScreen>
     with WidgetsBindingObserver {
-  static const Duration _autoRefreshInterval = Duration(seconds: 30);
-  static const Duration _notificationRefreshInterval = Duration(seconds: 30);
+  static const Duration _autoRefreshInterval = Duration(seconds: 5);
+  static const Duration _notificationRefreshInterval = Duration(seconds: 5);
   static const Duration _utcPlus7Offset = Duration(hours: 7);
 
   final ApiClient _apiClient = ApiClient();

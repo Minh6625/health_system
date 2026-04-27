@@ -29,6 +29,7 @@ class AppShellBottomNav extends StatelessWidget {
         border: Border(top: BorderSide(color: AppColors.strokeSoft, width: 1)),
       ),
       child: SafeArea(
+        top: false,
         child: SizedBox(
           height: AppBottomNavTokens.heightBase,
           child: Row(

@@ -319,75 +319,78 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       avatarImage = NetworkImage(currentUrl);
     }
 
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            CircleAvatar(
-              radius: 56,
-              backgroundColor: AppColors.strokeSoft,
-              backgroundImage: avatarImage,
-              child: avatarImage == null
-                  ? Icon(
-                      Icons.person_outline_rounded,
-                      size: 56,
-                      color: AppColors.textSecondary,
-                    )
-                  : null,
-            ),
-            if (_isUploadingAvatar)
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    shape: BoxShape.circle,
-                  ),
-                  alignment: Alignment.center,
-                  child: const SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: CircularProgressIndicator(
-                      color: AppColors.bgSurface,
-                      strokeWidth: 3,
-                    ),
-                  ),
-                ),
-              )
-            else
-              Material(
-                color: AppColors.brandPrimary,
-                shape: const CircleBorder(),
-                elevation: 2,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: _showAvatarPickerSheet,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Icon(
-                      Icons.camera_alt_outlined,
-                      size: 18,
-                      color: AppColors.bgSurface,
-                    ),
-                  ),
-                ),
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 56,
+                backgroundColor: AppColors.strokeSoft,
+                backgroundImage: avatarImage,
+                child: avatarImage == null
+                    ? Icon(
+                        Icons.person_outline_rounded,
+                        size: 56,
+                        color: AppColors.textSecondary,
+                      )
+                    : null,
               ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Text(
-          hasPicked
-              ? 'Ảnh mới đã chọn — bấm "Lưu thay đổi" để cập nhật.'
-              : (hasUrl
-                  ? 'Bấm biểu tượng máy ảnh để đổi ảnh đại diện.'
-                  : 'Chưa có ảnh đại diện. Bấm máy ảnh để tải lên.'),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 13,
-            color: AppColors.textSecondary,
+              if (_isUploadingAvatar)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.45),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: CircularProgressIndicator(
+                        color: AppColors.bgSurface,
+                        strokeWidth: 3,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Material(
+                  color: AppColors.brandPrimary,
+                  shape: const CircleBorder(),
+                  elevation: 2,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: _showAvatarPickerSheet,
+                    child: const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.camera_alt_outlined,
+                        size: 18,
+                        color: AppColors.bgSurface,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          Text(
+            hasPicked
+                ? 'Ảnh mới đã chọn — bấm "Lưu thay đổi" để cập nhật.'
+                : (hasUrl
+                    ? 'Bấm biểu tượng máy ảnh để đổi ảnh đại diện.'
+                    : 'Chưa có ảnh đại diện. Bấm máy ảnh để tải lên.'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
