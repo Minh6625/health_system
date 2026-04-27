@@ -11,5 +11,15 @@ class ApiEndpoints {
   static const String vitalsLatest = latestVitals;
   static const String profile = '/profile';
 
+  // Fall events — Phase 4B-full slice 2c
+  static const String fallEvents = '/fall-events';
+
+  /// Build the path for one fall event by id, e.g. ``/fall-events/17``.
+  static String fallEventDetail(int id) => '$fallEvents/$id';
+
+  /// Build the dismiss path for one fall event, e.g.
+  /// ``/fall-events/17/dismiss``.
+  static String fallEventDismiss(int id) => '$fallEvents/$id/dismiss';
+
   const ApiEndpoints._();
 }
