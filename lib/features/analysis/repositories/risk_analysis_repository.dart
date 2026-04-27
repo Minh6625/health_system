@@ -228,6 +228,54 @@ class RiskAnalysisRepository {
       confidence: _parseDouble(json['confidence']),
       isStale: json['is_stale'] as bool? ?? true,
       aiExplanation: aiExplanation,
+      // Phase 8 slice 4b — only the clinician audience response carries
+      // these fields; patient responses leave them as ``null`` so the
+      // detail screen knows not to surface the SHAP link.
+      shapDetails: _parseShapDetails(json['shap_details']),
+      modelRequestId: (json['model_request_id'] as String?)?.trim().isNotEmpty == true
+          ? (json['model_request_id'] as String).trim()
+          : null,
+    );
+  }
+
+  /// Parse the ``shap_details`` block from a clinician detail response.
+  ///
+  /// Returns ``null`` when the field is absent (patient response) or
+  /// not an object. A ``"available": false`` payload is preserved as
+  /// :data:`ShapWaterfall.empty`-shaped so the screen can render the
+  /// "rule-based fallback" empty state with context rather than
+  /// vanishing.
+  ShapWaterfall? _parseShapDetails(Object? raw) {
+    if (raw is! Map) return null;
+    final map = Map<String, dynamic>.from(raw);
+    final available = map['available'] as bool? ?? false;
+    final baseValue = _parseDouble(map['base_value']);
+    final rawValues = map['values'];
+    final contributions = <ShapContribution>[];
+    if (rawValues is List) {
+      for (final item in rawValues) {
+        if (item is! Map) continue;
+        final entry = Map<String, dynamic>.from(item);
+        final feature = entry['feature'] as String? ?? '';
+        if (feature.isEmpty) continue;
+        final shapValue = _parseDouble(entry['shap_value']);
+        // Backend ships ``impact`` as ``abs(shap_value)`` for
+        // pre-sorted bars; fall back to ``abs(shapValue)`` if missing
+        // so a future schema simplification doesn't break the screen.
+        final impact = entry['impact'] != null
+            ? _parseDouble(entry['impact'])
+            : shapValue.abs();
+        contributions.add(
+          ShapContribution(
+            feature: feature, shapValue: shapValue, impact: impact,
+          ),
+        );
+      }
+    }
+    return ShapWaterfall(
+      available: available,
+      baseValue: baseValue,
+      values: contributions,
     );
   }
 

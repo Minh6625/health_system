@@ -13,6 +13,8 @@ import 'package:healthguard/features/profile/screens/medical_info_screen.dart';
 import 'package:healthguard/features/profile/screens/delete_account_screen.dart';
 import 'package:healthguard/features/profile/screens/profile_settings_screen.dart';
 import 'package:healthguard/features/profile/screens/profile_shell_screen.dart';
+import 'package:healthguard/features/analysis/domain/entities/risk_report_detail_entity.dart';
+import 'package:healthguard/features/analysis/presentation/screens/risk_shap_detail_screen.dart';
 import 'package:healthguard/features/family/screens/family_shell_screen.dart';
 import 'package:healthguard/features/family/screens/family_dashboard_screen.dart';
 import 'package:healthguard/features/family/screens/add_contact_screen.dart';
@@ -51,6 +53,8 @@ class AppRouter {
   static const String editProfile = '/edit-profile';
   static const String profile = '/profile';
   static const String profileSettings = '/profile/settings';
+  // Phase 8 slice 4b — clinician-only SHAP waterfall.
+  static const String riskShapDetail = '/risk-report/shap-detail';
   static const String medicalInfo = '/medical-info';
   static const String deleteAccount = '/delete-account';
   static const String familyManagement = '/family-management';
@@ -274,6 +278,36 @@ class AppRouter {
                 RiskReportProvider(repository: RiskAnalysisRepository()),
             child: RiskReportScreen(
               profileId: routeArgs['profileId'] as String?,
+            ),
+          ),
+        );
+      case riskShapDetail:
+        // Phase 8 slice 4b: the caller (RiskReportDetailScreen) passes
+        // the already-loaded RiskReportDetailEntity in route arguments
+        // so we don't have to re-fetch + re-parse the clinician
+        // payload. Returns the screen with an ``unavailable`` empty
+        // state when the args are misshapen — safer than a runtime
+        // cast crash.
+        final detailArg = routeArgs['detail'];
+        if (detailArg is RiskReportDetailEntity) {
+          return MaterialPageRoute(
+            settings: const RouteSettings(name: riskShapDetail),
+            builder: (_) => RiskShapDetailScreen(detail: detailArg),
+          );
+        }
+        return MaterialPageRoute(
+          settings: const RouteSettings(name: riskShapDetail),
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text('Chi tiết SHAP')),
+            body: const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'Thiếu dữ liệu báo cáo cho màn hình SHAP. '
+                  'Hãy quay lại và mở chi tiết báo cáo trước.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           ),
         );

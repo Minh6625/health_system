@@ -67,6 +67,72 @@ class SnapshotMetrics {
   });
 }
 
+/// Phase 8 slice 4b — clinician-only SHAP waterfall payload.
+///
+/// Mirrors ``backend/app/schemas/monitoring.py::RiskReportClinicianResponse.shap_details``
+/// (which itself wraps the model-api ``ShapDetails``). Patient
+/// responses don't carry this field; the entity stores ``null`` for
+/// patient-mode detail loads.
+class ShapWaterfall {
+  /// True when the upstream model produced a usable SHAP payload.
+  /// Some backend fallbacks (rule_based, ONNX) return
+  /// ``available=false`` because they don't compute real SHAP
+  /// values; the screen renders an explanatory empty state in that
+  /// case rather than fake bars.
+  final bool available;
+
+  /// SHAP base value (the model's mean prediction). Bars on the
+  /// waterfall are anchored to this baseline.
+  final double baseValue;
+
+  /// Per-feature contributions. Length is bounded by the model-api
+  /// `top_n` config (typically <=20).
+  final List<ShapContribution> values;
+
+  const ShapWaterfall({
+    required this.available,
+    required this.baseValue,
+    required this.values,
+  });
+
+  bool get hasValues => available && values.isNotEmpty;
+
+  /// Sum of all contributions on top of the base value. Equals the
+  /// final prediction (in raw SHAP space, not 0..100 risk score).
+  double get totalContribution =>
+      values.fold<double>(0, (acc, v) => acc + v.shapValue);
+
+  static const ShapWaterfall empty = ShapWaterfall(
+    available: false,
+    baseValue: 0,
+    values: [],
+  );
+}
+
+/// One feature's SHAP contribution.
+class ShapContribution {
+  /// Backend feature name (snake_case, model-api domain).
+  final String feature;
+
+  /// Raw SHAP value. Sign matters — positive pushes the prediction
+  /// up (toward higher risk), negative pulls it down (protective).
+  final double shapValue;
+
+  /// Optional pre-computed magnitude (``abs(shap_value)``) the
+  /// backend ships for sorting. Falls back to ``shapValue.abs()``
+  /// when missing so consumers can sort uniformly.
+  final double impact;
+
+  const ShapContribution({
+    required this.feature,
+    required this.shapValue,
+    required this.impact,
+  });
+
+  bool get isProtective => shapValue < 0;
+}
+
+
 class RiskReportDetailEntity {
   final int reportId;
   final String profileId;
@@ -88,6 +154,17 @@ class RiskReportDetailEntity {
   final bool isStale;
   final AiExplanation aiExplanation;
 
+  /// Phase 8 slice 4b — populated only when the request was made with
+  /// ``audience=clinician`` AND the user has the role gate. ``null``
+  /// for the default patient flow so existing callers ignore it.
+  final ShapWaterfall? shapDetails;
+
+  /// Phase 8 slice 4b — model-api request id surfaced for log
+  /// correlation. ``null`` for patient responses + for fallback
+  /// inference (rule_based / ONNX) where there's no upstream
+  /// request to correlate with.
+  final String? modelRequestId;
+
   RiskReportDetailEntity({
     required this.reportId,
     required this.profileId,
@@ -108,5 +185,13 @@ class RiskReportDetailEntity {
     required this.confidence,
     required this.isStale,
     this.aiExplanation = AiExplanation.empty,
+    this.shapDetails,
+    this.modelRequestId,
   });
+
+  /// True when the response carried clinician-only SHAP details that
+  /// the screen can render. Used by ``RiskReportDetailScreen`` to
+  /// decide whether to show the "Xem chi tiết SHAP" link.
+  bool get hasClinicianShapDetails =>
+      shapDetails != null && shapDetails!.hasValues;
 }
