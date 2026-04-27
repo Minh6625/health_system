@@ -90,38 +90,47 @@ def load_device_owner_context(db: Session, device_id: int) -> dict[str, Any]:
 
 
 def _fetch_latest_vitals(db: Session, device_id: int) -> dict[str, Any] | None:
+    # Average the 5 most-recent samples (~5 s of data at 1 Hz) so that a
+    # single noisy reading does not dominate the risk score.
     query_with_bp = text(
         """
         SELECT
-            time,
-            heart_rate,
-            spo2,
-            temperature,
-            hrv,
-            respiratory_rate,
-            blood_pressure_sys,
-            blood_pressure_dia
-        FROM vitals
-        WHERE device_id = :device_id
-        ORDER BY time DESC
-        LIMIT 1
+            MAX(time)                    AS time,
+            AVG(heart_rate)              AS heart_rate,
+            AVG(spo2)                    AS spo2,
+            AVG(temperature)             AS temperature,
+            AVG(hrv)                     AS hrv,
+            AVG(respiratory_rate)        AS respiratory_rate,
+            AVG(blood_pressure_sys)      AS blood_pressure_sys,
+            AVG(blood_pressure_dia)      AS blood_pressure_dia
+        FROM (
+            SELECT time, heart_rate, spo2, temperature, hrv,
+                   respiratory_rate, blood_pressure_sys, blood_pressure_dia
+            FROM vitals
+            WHERE device_id = :device_id
+            ORDER BY time DESC
+            LIMIT 5
+        ) AS recent
         """
     )
     query_without_bp = text(
         """
         SELECT
-            time,
-            heart_rate,
-            spo2,
-            temperature,
-            hrv,
-            respiratory_rate,
-            NULL AS blood_pressure_sys,
-            NULL AS blood_pressure_dia
-        FROM vitals
-        WHERE device_id = :device_id
-        ORDER BY time DESC
-        LIMIT 1
+            MAX(time)                    AS time,
+            AVG(heart_rate)              AS heart_rate,
+            AVG(spo2)                    AS spo2,
+            AVG(temperature)             AS temperature,
+            AVG(hrv)                     AS hrv,
+            AVG(respiratory_rate)        AS respiratory_rate,
+            NULL                         AS blood_pressure_sys,
+            NULL                         AS blood_pressure_dia
+        FROM (
+            SELECT time, heart_rate, spo2, temperature, hrv, respiratory_rate
+            FROM vitals
+            WHERE device_id = :device_id
+            ORDER BY time DESC
+            LIMIT 5
+        ) AS recent
         """
     )
 
@@ -137,7 +146,13 @@ def _fetch_latest_vitals(db: Session, device_id: int) -> dict[str, Any] | None:
         else:
             raise
 
-    return dict(row) if row is not None else None
+    if row is None:
+        return None
+    row_dict = dict(row)
+    # Averaging an empty table yields NULL for all columns → treat as no data
+    if row_dict.get("heart_rate") is None and row_dict.get("spo2") is None:
+        return None
+    return row_dict
 
 
 def _build_inference_payload(

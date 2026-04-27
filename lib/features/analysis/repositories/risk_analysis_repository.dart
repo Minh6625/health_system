@@ -279,6 +279,15 @@ class RiskAnalysisRepository {
     );
   }
 
+  Future<void> recalculateRisk(String? profileId) async {
+    final targetProfileId = _resolveTargetProfileId(profileId);
+    await _apiClient.post(
+      '/risk/recalculate',
+      requiresAuth: true,
+      targetProfileId: targetProfileId,
+    );
+  }
+
   Future<RiskHistoryEntity> fetchHistory({
     required String? profileId,
     String range = '7d',

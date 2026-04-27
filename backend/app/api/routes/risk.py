@@ -337,6 +337,57 @@ def respond_to_risk_alert(
     return RiskAlertResponseResponse(**result)
 
 
+@router.post("/risk/recalculate", response_model=RiskCalculateResponse)
+def recalculate_risk(
+    current_user: User = Depends(get_current_user),
+    x_target_profile_id: int | None = Header(default=None, alias="X-Target-Profile-Id"),
+    db: Session = Depends(get_db),
+) -> RiskCalculateResponse:
+    """Force a fresh risk calculation, bypassing the 6-hour cache.
+
+    The endpoint resolves the caller's active device automatically — no
+    ``device_id`` is required in the request body.  When an
+    ``X-Target-Profile-Id`` header is present (linked-profile flow) the
+    device lookup uses that profile's ID instead.
+    """
+    target_user_id = int(x_target_profile_id) if x_target_profile_id else int(current_user.id)
+
+    row = db.execute(
+        text(
+            """
+            SELECT id FROM devices
+            WHERE user_id = :uid
+              AND is_active = true
+              AND deleted_at IS NULL
+            ORDER BY id DESC
+            LIMIT 1
+            """
+        ),
+        {"uid": target_user_id},
+    ).mappings().first()
+
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy thiết bị đang hoạt động cho tài khoản này",
+        )
+
+    result = calculate_device_risk(
+        db,
+        device_id=int(row["id"]),
+        user_id=target_user_id,
+        allow_cached=False,
+        dispatch_alerts=True,
+    )
+    return RiskCalculateResponse(
+        risk_score_id=result.risk_score_id,
+        score=result.score,
+        risk_level=result.risk_level,
+        model=result.model,
+        calculated_at=str(result.calculated_at),
+    )
+
+
 @router.post("/risk/calculate", response_model=RiskCalculateResponse)
 def calculate_risk(
     payload: RiskCalculateRequest,

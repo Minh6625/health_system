@@ -11,6 +11,7 @@ class RiskReportProvider extends ChangeNotifier {
 
   bool _isInitialLoading = false;
   bool _isRefreshing = false;
+  bool _isRecalculating = false;
   RiskReportEntity? _report;
   RiskReportDetailEntity? _reportDetail;
   String? _error;
@@ -19,6 +20,7 @@ class RiskReportProvider extends ChangeNotifier {
   bool get isLoading => _isInitialLoading || _isRefreshing;
   bool get isInitialLoading => _isInitialLoading;
   bool get isRefreshing => _isRefreshing;
+  bool get isRecalculating => _isRecalculating;
   RiskReportEntity? get report => _report;
   RiskReportDetailEntity? get reportDetail => _reportDetail;
   String? get error => _error;
@@ -50,6 +52,23 @@ class RiskReportProvider extends ChangeNotifier {
     } finally {
       _isInitialLoading = false;
       _isRefreshing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> recalculateRisk(String? profileId) async {
+    _isRecalculating = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await _repository.recalculateRisk(profileId);
+      await fetchLatestReport(profileId);
+    } catch (e) {
+      _error = 'Không thể đánh giá lại: $e';
+      notifyListeners();
+    } finally {
+      _isRecalculating = false;
       notifyListeners();
     }
   }
