@@ -9,13 +9,11 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
     this.report,
     this.detail,
     this.latestError,
-    this.detailError,
   });
 
   final RiskReportEntity? report;
   final RiskReportDetailEntity? detail;
   final Object? latestError;
-  final Object? detailError;
 
   @override
   Future<RiskReportEntity> fetchLatestReport(String? profileId) async {
@@ -30,9 +28,6 @@ class _FakeRiskAnalysisRepository extends RiskAnalysisRepository {
     int reportId,
     String? profileId,
   ) async {
-    if (detailError != null) {
-      throw detailError!;
-    }
     return detail!;
   }
 }

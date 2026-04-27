@@ -138,7 +138,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
               } else {
                 await relationshipProvider.rejectRequest(relationshipRequest);
               }
-              if (mounted) {
+              if (rootContext.mounted) {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   SnackBar(
                     content: Text(
@@ -164,7 +164,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 tags: selectedTags,
                 primaryLabel: primaryLabel,
               );
-              if (mounted) {
+              if (rootContext.mounted) {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(
                     content: Text('Đã xác nhận yêu cầu thành công!'),
@@ -177,7 +177,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
               if (user != null) {
                 await relationshipProvider.cancelRequest(user);
               }
-              if (mounted) {
+              if (rootContext.mounted) {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(
                     content: Text('Đã hủy lời mời thành công!'),
@@ -196,7 +196,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 primaryLabel: primaryLabel,
               );
 
-              if (mounted) {
+              if (rootContext.mounted) {
                 ScaffoldMessenger.of(rootContext).showSnackBar(
                   const SnackBar(
                     content: Text('Đã gửi lời mời thành công!'),
@@ -213,7 +213,7 @@ class _AddContactScreenState extends State<AddContactScreen> {
                 errorMsg.contains('Mối quan hệ đã tồn tại') ||
                 errorMsg.contains('đang chờ xác nhận');
 
-            if (mounted) {
+            if (rootContext.mounted) {
               ScaffoldMessenger.of(rootContext).showSnackBar(
                 SnackBar(
                   content: Text(

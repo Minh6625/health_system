@@ -189,24 +189,18 @@ class _FamilyShellScreenState extends State<FamilyShellScreen>
     _lastRefreshedUserId = user.userId;
 
     _isRefreshingBadges = true;
+    final dashboardProvider = context.read<FamilyDashboardProvider>();
+    final emergencyProvider = context.read<EmergencyCaregiverProvider>();
     try {
       await _familyProvider.load(user.userId, silent: silent);
       _syncTabController(_familyProvider.canReceiveAlerts);
 
       final futures = <Future<void>>[
-        context.read<FamilyDashboardProvider>().loadDashboard(
-              user.userId,
-              silent: silent,
-            ),
+        dashboardProvider.loadDashboard(user.userId, silent: silent),
       ];
 
       if (_canReceiveAlerts && _tabController.index != 2) {
-        futures.add(
-          context.read<EmergencyCaregiverProvider>().fetchSOSAlerts(
-                'all',
-                silent: silent,
-              ),
-        );
+        futures.add(emergencyProvider.fetchSOSAlerts('all', silent: silent));
       }
 
       await Future.wait(futures);

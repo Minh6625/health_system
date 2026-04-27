@@ -102,7 +102,8 @@ void main() {
       final relationships = await tester.runAsync(
         () => FamilyRepository().getRelationships(),
       );
-      final accepted = relationships.firstWhere(
+      expect(relationships, isNotNull);
+      final accepted = relationships!.firstWhere(
         (item) => item['status'] == 'accepted',
       );
       final relationshipId = accepted['id'].toString();

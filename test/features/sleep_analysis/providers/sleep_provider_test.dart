@@ -9,7 +9,6 @@ class _FakeSleepRepository implements SleepRepository {
     this.history = const [],
     Map<DateTime, SleepSession?>? sessionsByDate,
     this.throwOnLatest,
-    this.throwOnHistory,
     this.throwOnSessionByDate,
   }) : _sessionsByDate = sessionsByDate ?? {};
 
@@ -17,7 +16,6 @@ class _FakeSleepRepository implements SleepRepository {
   final List<SleepSession> history;
   final Map<DateTime, SleepSession?> _sessionsByDate;
   final Object? throwOnLatest;
-  final Object? throwOnHistory;
   final Object? throwOnSessionByDate;
   final List<String?> latestCalls = [];
   final List<String?> historyCalls = [];
@@ -39,9 +37,6 @@ class _FakeSleepRepository implements SleepRepository {
     String? patientId,
   }) async {
     historyCalls.add(patientId);
-    if (throwOnHistory != null) {
-      throw throwOnHistory!;
-    }
     return history;
   }
 

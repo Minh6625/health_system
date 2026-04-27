@@ -132,7 +132,7 @@ class EmergencyCaregiverRepository {
       final result = await _apiClient.post(
         '/risk/alerts/$notificationId/respond',
         body: {
-          if (riskScoreId != null) 'risk_score_id': riskScoreId,
+          'risk_score_id': ?riskScoreId,
           'action': responseType,
           'source': source,
         },

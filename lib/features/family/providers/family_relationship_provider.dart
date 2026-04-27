@@ -125,7 +125,7 @@ class FamilyRelationshipProvider extends ChangeNotifier {
         'tags': tags
             .map((tag) => <String, dynamic>{'id': tag.id, 'name': tag.name})
             .toList(growable: false),
-      if (primaryLabel != null) 'primary_relationship_label': primaryLabel,
+      'primary_relationship_label': ?primaryLabel,
     };
 
     await _runMutation(() async {

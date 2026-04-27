@@ -18,7 +18,7 @@ class DeviceRepository {
           'mac_address': macAddress,
           'device_name': deviceName,
           'device_type': deviceType,
-          if (model != null) 'model': model,
+          'model': ?model,
         },
         requiresAuth: true,
       );

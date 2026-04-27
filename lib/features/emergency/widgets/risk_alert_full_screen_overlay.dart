@@ -136,12 +136,11 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
     try {
       await action();
     } finally {
-      if (!mounted) {
-        return;
+      if (mounted) {
+        setState(() {
+          _isActionInProgress = false;
+        });
       }
-      setState(() {
-        _isActionInProgress = false;
-      });
     }
   }
 
