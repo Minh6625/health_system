@@ -7,13 +7,14 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v1.1` (Phase 7 — audience-payload cache) |
-| Wire version | `0.5.0` (unchanged — cache is server-internal; no DTO shape change) |
-| Captured from branch | `refactor/risk-core-phase7-audience-cache` |
+| Baseline version | `v1.2` (Phase 4B-full slice 2a — fall confusion-matrix harness) |
+| Wire version | `0.5.0` (unchanged — harness is offline test gate; no shape change) |
+| Captured from branch | `refactor/risk-core-phase4b-confusion-matrix` |
 | Pending DBA migrations | `backend/migrations/20260427_model_request_id.sql`, `backend/migrations/20260427_sleep_risk_type.sql`, `backend/migrations/20260427_audience_payload_json.sql` |
 | Audience helper | `backend/app/core/audience.py` |
 | Audience cache helpers | `MonitoringService._read_audience_cache` / `_write_audience_cache` |
 | Clinician schema | `backend/app/schemas/monitoring.py::RiskReportClinicianResponse` |
+| Fall quality harness | `backend/tests/eval/test_fall_classifier_quality.py` (gated by `RUN_EVAL=1`) |
 | Fall persistence adapter | `backend/app/adapters/fall_persistence_adapter.py` |
 | Sleep risk adapter | `backend/app/adapters/sleep_risk_adapter.py` |
 | IMU window route | `POST /mobile/telemetry/imu-window` (`backend/app/api/routes/telemetry.py`) |
@@ -66,6 +67,7 @@
 | `v0.9` | 2026-04-27 | `refactor/risk-core-phase4a-thin-sleep-risk` | **Plan's Phase 4A (focused subset) — backend sleep risk ingest**: added `POST /mobile/telemetry/sleep-risk` accepting a `SleepRiskRequest` (verbatim port of model-api `SleepRecord` + `db_device_id` + `db_user_id`). New `ModelApiClient.predict_sleep` with its own `model_api_sleep` breaker (independent of health + fall), forwarding to `/api/v1/sleep/predict`. New `SleepRiskAdapter` projects results into `NormalizedExplanation` with **score inversion** — model-api sleep_score 0–100 (high=good) becomes `risk_score = 100 - sleep_score` (high=worse) so sleep rows share the same axis as vitals risk rows. Persisted via existing `RiskPersistenceAdapter` with `risk_type='sleep'` (allowed by new SQL migration `20260427_sleep_risk_type.sql` relaxing the `check_risk_type` CHECK constraint). `model_unavailable` semantics mirror the IMU window route — no row written when `predict_sleep` returns `None`. Simulator-side dispatch (the dead `SleepAIClient` path), the 40-field mobile mapper, and mobile sleep risk surface all **deliberately deferred** to Phase 4A-full. 36 new tests (31 adapter + 5 route). No wire-format change to existing risk DTOs. |
 | `v1.0` | 2026-04-27 | `refactor/risk-core-phase5-audience-profiles` | **Plan's Phase 5 — audience profiles + clinician role gate**: added `AudienceEnum` + `require_clinician_audience` in `app/core/audience.py`. Audit revealed `users.role` already exists (no RBAC migration needed) — `CLINICIAN_ROLES = {"clinician", "admin"}`. New `RiskReportClinicianResponse` extends the existing `RiskReportDetailResponse` with two clinical-only fields: `shap_details` (raw SHAP waterfall) + `model_request_id` (Phase 2 traceability surfaced on the read path). The detail route's `response_model` is now `RiskReportDetailResponse \| RiskReportClinicianResponse` (FastAPI emits an `anyOf` in OpenAPI). `audience=patient` is the default, so existing Flutter binaries are unaffected. `audience=clinician` from a non-clinician role returns HTTP 403. Read-path SQL extended to include `shap_details_json` + `model_request_id` from `risk_explanations`; `NormalizedRiskRow` carries both. Wire version bumped `0.4.0 -> 0.5.0` (minor — additive optional fields). 8 new tests (7 audience-gating + 1 anyOf-OpenAPI). No mobile wire-format change for patient surface. |
 | `v1.1` | 2026-04-27 | `refactor/risk-core-phase7-audience-cache` | **Plan's Phase 7 — audience-payload DTO cache**: added `risk_explanations.audience_payload_json` JSONB column (`backend/migrations/20260427_audience_payload_json.sql`) + nullable column on the ORM. Read-path detail handlers (`MonitoringService.get_risk_report_detail` / `get_risk_report_clinician_detail`) now follow a **lazy write-through cache** pattern: cache-first lookup keyed by `(audience, RISK_CONTRACT_VERSION)`; on miss, build via the existing assembly path then UPDATE the row. Cache writes are **best-effort** (failures are logged + rolled back but the request still returns the freshly-built DTO). Cache invalidation is automatic on contract-version bump (the version is the cache key suffix) so a future Phase doesn't need a manual flush job. New observability: `record_timing("build_dto", ..., cache="hit"\|"miss", reason=...)` so cache hit-rate can be charted. **No wire-format change** — cache is server-internal; the assembled DTOs are byte-for-byte identical to v1.0. 6 new tests (cache miss build, cache hit short-circuit, version invalidation, partial dict append, write-failure tolerance, timing tags). |
+| `v1.2` | 2026-04-27 | `refactor/risk-core-phase4b-confusion-matrix` | **Plan's Phase 4B-full slice 2a — fall classifier confusion-matrix harness**: added `backend/tests/eval/` package with three modules: `etl_up_fall.py` (deterministic UP-Fall raw CSV → labelled JSONL), `test_etl_up_fall.py` (21 always-on unit tests pinning peak detection / window extraction / pre-pad-with-first-sample / orientation derivation / CSV parsing / committed-fixture sanity), and `test_fall_classifier_quality.py` (gated harness POSTing each labelled window to `/api/v1/fall/predict` and computing TP/TN/FP/FN → sensitivity / specificity / F1 → dated JSON report under `reports/`). Acceptance gates from plan §4B.3 §I: **sensitivity ≥ 0.90, specificity ≥ 0.85, F1 ≥ 0.87**. Audit found UP-Fall trials are 40 samples (model-api requires 50) so the ETL pre-pads with the first sample to simulate pre-event stillness — same shape a production sliding window catches. **PAMAP2 not used** because the dataset directory is empty in the simulator repo; UP-Fall already provides both classes (A01–A05 falls + A06–A11 ADLs). Wire version unchanged. Fixture: 126 windows (57 falls + 69 ADLs), checked into git. 24 new always-on tests + 3 confusion-matrix maths tests + 1 properly gated live-harness test. |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -501,6 +503,114 @@ Behaviour is **verbatim-preserved**:
   `0.0` and rounds to 4 decimals.
 - `_build_feature_importance` (snapshot path) takes `abs(value)` and
   rounds to 4 decimals.
+
+---
+
+## 7i. Fall classifier quality harness — Phase 4B-full slice 2a
+
+Plan §4B.3 §I require the fall route shipped in v0.8 to clear three
+quality thresholds before any additional caller (simulator dispatch,
+mobile alert UI, push channel) is wired in. Slice 2a delivers the
+gate.
+
+### Acceptance thresholds
+
+| Metric | Threshold | Why |
+|---|---|---|
+| Sensitivity (TP / (TP + FN)) | **≥ 0.90** | False negatives on real falls are dangerous — a missed alert can mean an untreated injury for an elderly user. |
+| Specificity (TN / (TN + FP)) | **≥ 0.85** | Excessive false alarms cause alarm fatigue and erode trust. |
+| F1 | **≥ 0.87** | Combined precision-recall balance check. |
+
+A failing run halts Phase 4B-full landings until the fall model is
+retrained or the dataset is re-curated. Production protection: the
+fall route can ship behind a `FALL_INFERENCE_ENABLED=0` feature flag
+until the gate clears.
+
+### Layout
+
+```
+backend/tests/eval/
+├── etl_up_fall.py                     # raw UP-Fall CSV -> labelled JSONL
+├── fixtures/up_fall_windows.jsonl     # 126 windows committed to git
+├── test_etl_up_fall.py                # 21 always-on ETL unit tests
+├── test_fall_classifier_quality.py    # gated harness (RUN_EVAL=1)
+└── reports/                           # dated JSON reports (gitignored)
+```
+
+### Why UP-Fall, not PAMAP2
+
+The original plan listed both UP-Fall (positive class) and PAMAP2
+(negative class) as inputs. **Audit found PAMAP2 is not present in the
+simulator repo** (`Iot_Simulator_clean/datasets/04_activity/PAMAP2/`
+exists but `PAMAP2_Raw/` is empty). UP-Fall already provides both
+classes — A01–A05 are falls, A06–A11 are ADLs (walking, standing,
+sitting, picking up, jumping, laying) — so the harness has positive +
+negative samples without a second dataset.
+
+If PAMAP2 data is added later, drop a parallel `etl_pamap2.py` +
+fixture under `tests/eval/` and extend the harness's input loader to
+combine both. The threshold gate logic stays identical.
+
+### Why pre-pad short fall trials
+
+The 440 KB `UP-Fall_Dataset.zip` shipped in the simulator repo is a
+**curated mini-version** of the full UP-Fall Detection Dataset. Fall
+trials (A01–A05) have exactly **40 samples each**, but the model-api
+requires `fall_min_sequence_samples = 50`. The ETL pre-pads short
+trials with the first sample value (gravity-only, motionless) to
+simulate the brief pre-event stillness a production sliding window
+catches anyway. Tradeoffs considered:
+
+| Option | Why rejected |
+|---|---|
+| Linear upsampling 40 → 50 samples | Fabricates dynamics — the model would see motion that didn't exist. |
+| Zero-padding | The model can learn to recognise the synthetic flat region. |
+| Mirror padding (reflect last K) | Doubles motion artefacts — unnatural. |
+| Override `fall_min_sequence_samples=40` for eval | Eval results stop reflecting production behaviour. |
+| **Pre-pad with first sample** ✅ | Realistic — production's sliding window IS catching pre-fall stillness + the fall itself in a single 50-sample window. |
+
+The ETL summary reports `padded_windows` so a future contributor with
+the full UP-Fall dataset can re-run the ETL and see the padding ratio
+drop to zero automatically.
+
+### Cross-repo dependency
+
+The ETL reads from
+`d:\DoAn2\VSmartwatch\Iot_Simulator_clean\datasets\05_fall\UP-Fall\UP-Fall_Raw\`
+via a relative path computed from the test file's location. If the
+simulator repo isn't cloned alongside `health_system`, regenerating
+the fixture fails with a clear `FileNotFoundError`. The committed
+JSONL fixture means **the always-on tests + the gated harness both run
+without the simulator repo present** — only re-running the ETL needs
+it.
+
+### Running the gated harness
+
+```bash
+# Terminal 1 — start model-api
+cd healthguard-model-api
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8001
+
+# Terminal 2 — run the gated test
+cd health_system/backend
+$env:RUN_EVAL = "1"
+python -m pytest tests/eval/test_fall_classifier_quality.py -v -s
+```
+
+Output is a dated `reports/confusion_matrix_<UTC-timestamp>.json`
+with the full confusion matrix + per-window predictions for debugging.
+Reports are gitignored; the operator decides which to keep for
+trending.
+
+### What's deferred to slices 2b–2d
+
+- **Simulator dispatch**: slice 2b — `request_fall_prediction` on
+  `HealthGuardAPIClient` so a simulated fall actually hits the live
+  fall route (currently the harness is the only caller).
+- **Mobile fall alert UI**: slice 2c — `lib/features/fall/` module +
+  `GET /mobile/fall-events` routes.
+- **Push channel**: slice 2d — `fall_critical` FCM channel + handler
+  wired into `notification_runtime_service.dart`.
 
 ---
 
@@ -1109,7 +1219,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 448 passed, 1 skipped (was 442 before Phase 7's 6 added cache tests).
+Expected: 472 passed, 2 skipped (was 448 before Phase 4B slice 2a's 24 added ETL + maths tests; the +1 skipped is the gated `RUN_EVAL=1` harness).
 
 Mobile parser smoke (after Phase 6):
 
