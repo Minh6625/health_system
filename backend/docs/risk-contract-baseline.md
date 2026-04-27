@@ -7,11 +7,12 @@
 
 | Field | Value |
 | --- | --- |
-| Baseline version | `v1.0` (Phase 5 — audience profiles + clinician role gate) |
-| Wire version | `0.5.0` (`X-Risk-Contract-Version` header — minor bump, additive optional fields) |
-| Captured from branch | `refactor/risk-core-phase5-audience-profiles` |
-| Pending DBA migrations | `backend/migrations/20260427_model_request_id.sql`, `backend/migrations/20260427_sleep_risk_type.sql` |
+| Baseline version | `v1.1` (Phase 7 — audience-payload cache) |
+| Wire version | `0.5.0` (unchanged — cache is server-internal; no DTO shape change) |
+| Captured from branch | `refactor/risk-core-phase7-audience-cache` |
+| Pending DBA migrations | `backend/migrations/20260427_model_request_id.sql`, `backend/migrations/20260427_sleep_risk_type.sql`, `backend/migrations/20260427_audience_payload_json.sql` |
 | Audience helper | `backend/app/core/audience.py` |
+| Audience cache helpers | `MonitoringService._read_audience_cache` / `_write_audience_cache` |
 | Clinician schema | `backend/app/schemas/monitoring.py::RiskReportClinicianResponse` |
 | Fall persistence adapter | `backend/app/adapters/fall_persistence_adapter.py` |
 | Sleep risk adapter | `backend/app/adapters/sleep_risk_adapter.py` |
@@ -64,6 +65,7 @@
 | `v0.8` | 2026-04-27 | `refactor/risk-core-phase4b-thin-imu-window` | **Plan's Phase 4B (focused subset) — backend IMU window ingest**: added `POST /mobile/telemetry/imu-window` accepting an `ImuWindowRequest` (verbatim port of model-api `FallPredictionRequest` + `db_device_id`). The route forwards to `ModelApiClient.predict_fall` (already breaker-wrapped + timed by Phase 7), persists a `fall_events` row via the new `FallPersistenceAdapter`, and returns the `fall_event_id` + `model_request_id` for log correlation. **On `predict_fall` returning `None`** (breaker open / transport / 5xx / malformed body), no row is written and the response carries `status="model_unavailable"` — false-negatives on real falls are dangerous, so the route surfaces uncertainty rather than guessing. Confusion-matrix harness, simulator-side IMU window dispatch, mobile fall alert UI, and rule-based fall fallback all **deliberately deferred** to Phase 4B-full (needs UP-Fall + PAMAP2 datasets + push channel + mobile UI work). 23 new tests (11 adapter unit, 5 HTTP route, 7 helper). No wire-format change to existing risk DTOs. |
 | `v0.9` | 2026-04-27 | `refactor/risk-core-phase4a-thin-sleep-risk` | **Plan's Phase 4A (focused subset) — backend sleep risk ingest**: added `POST /mobile/telemetry/sleep-risk` accepting a `SleepRiskRequest` (verbatim port of model-api `SleepRecord` + `db_device_id` + `db_user_id`). New `ModelApiClient.predict_sleep` with its own `model_api_sleep` breaker (independent of health + fall), forwarding to `/api/v1/sleep/predict`. New `SleepRiskAdapter` projects results into `NormalizedExplanation` with **score inversion** — model-api sleep_score 0–100 (high=good) becomes `risk_score = 100 - sleep_score` (high=worse) so sleep rows share the same axis as vitals risk rows. Persisted via existing `RiskPersistenceAdapter` with `risk_type='sleep'` (allowed by new SQL migration `20260427_sleep_risk_type.sql` relaxing the `check_risk_type` CHECK constraint). `model_unavailable` semantics mirror the IMU window route — no row written when `predict_sleep` returns `None`. Simulator-side dispatch (the dead `SleepAIClient` path), the 40-field mobile mapper, and mobile sleep risk surface all **deliberately deferred** to Phase 4A-full. 36 new tests (31 adapter + 5 route). No wire-format change to existing risk DTOs. |
 | `v1.0` | 2026-04-27 | `refactor/risk-core-phase5-audience-profiles` | **Plan's Phase 5 — audience profiles + clinician role gate**: added `AudienceEnum` + `require_clinician_audience` in `app/core/audience.py`. Audit revealed `users.role` already exists (no RBAC migration needed) — `CLINICIAN_ROLES = {"clinician", "admin"}`. New `RiskReportClinicianResponse` extends the existing `RiskReportDetailResponse` with two clinical-only fields: `shap_details` (raw SHAP waterfall) + `model_request_id` (Phase 2 traceability surfaced on the read path). The detail route's `response_model` is now `RiskReportDetailResponse \| RiskReportClinicianResponse` (FastAPI emits an `anyOf` in OpenAPI). `audience=patient` is the default, so existing Flutter binaries are unaffected. `audience=clinician` from a non-clinician role returns HTTP 403. Read-path SQL extended to include `shap_details_json` + `model_request_id` from `risk_explanations`; `NormalizedRiskRow` carries both. Wire version bumped `0.4.0 -> 0.5.0` (minor — additive optional fields). 8 new tests (7 audience-gating + 1 anyOf-OpenAPI). No mobile wire-format change for patient surface. |
+| `v1.1` | 2026-04-27 | `refactor/risk-core-phase7-audience-cache` | **Plan's Phase 7 — audience-payload DTO cache**: added `risk_explanations.audience_payload_json` JSONB column (`backend/migrations/20260427_audience_payload_json.sql`) + nullable column on the ORM. Read-path detail handlers (`MonitoringService.get_risk_report_detail` / `get_risk_report_clinician_detail`) now follow a **lazy write-through cache** pattern: cache-first lookup keyed by `(audience, RISK_CONTRACT_VERSION)`; on miss, build via the existing assembly path then UPDATE the row. Cache writes are **best-effort** (failures are logged + rolled back but the request still returns the freshly-built DTO). Cache invalidation is automatic on contract-version bump (the version is the cache key suffix) so a future Phase doesn't need a manual flush job. New observability: `record_timing("build_dto", ..., cache="hit"\|"miss", reason=...)` so cache hit-rate can be charted. **No wire-format change** — cache is server-internal; the assembled DTOs are byte-for-byte identical to v1.0. 6 new tests (cache miss build, cache hit short-circuit, version invalidation, partial dict append, write-failure tolerance, timing tags). |
 
 The contract is enforced by frozen `EXPECTED_*_KEYS` sets in the snapshot test.
 Any unintentional shape change will fail those tests with a precise diff
@@ -502,6 +504,190 @@ Behaviour is **verbatim-preserved**:
 
 ---
 
+## 7h. Audience-payload cache — Phase 7 architecture
+
+Phase 7 closes the plan's §E.7 cache requirement: cache the assembled
+mobile DTOs on the same row that produced them so repeat detail
+requests serve the cached bytes instead of re-running SHAP →
+breakdown → builder. Lazy write-through, audience-keyed, contract-version-pinned.
+
+### Cache shape
+
+The new column `risk_explanations.audience_payload_json` (`JSONB`,
+nullable) stores a small dict keyed by audience profile:
+
+```json
+{
+  "patient": {
+    "contract_version": "0.5.0",
+    "payload": { ...RiskReportDetailResponse.model_dump()... }
+  },
+  "clinician": {
+    "contract_version": "0.5.0",
+    "payload": { ...RiskReportClinicianResponse.model_dump()... }
+  }
+}
+```
+
+Both keys are optional — a row may legitimately have only `patient`
+populated until the first clinician request lands. The persistence
+adapter does NOT pre-populate the cache; the read path is the only
+writer.
+
+### Read path — `MonitoringService.get_risk_report_*_detail`
+
+Unified pseudocode (both patient + clinician variants follow this):
+
+```python
+row = SELECT ... re.audience_payload_json FROM risk_scores rs JOIN ...
+if cached := _read_audience_cache(row, audience, ResponseModel):
+    return cached  # cache hit — short-circuits SHAP + breakdown + builder
+result = ResponseBuilder(**_build_detail_inputs(patient_id, row, db))
+_write_audience_cache(db, row, audience, result)  # best-effort
+return result
+```
+
+### Cache invalidation
+
+`RISK_CONTRACT_VERSION` is the cache key suffix. Any future contract
+bump (the constant in `app/core/risk_contract.py`) **automatically
+invalidates every cached row** — `_read_audience_cache` treats a
+mismatched `contract_version` as a miss and rebuilds. **No manual
+flush job is needed.**
+
+| Future change | Triggers cache rebuild? |
+|---|---|
+| Bump `RISK_CONTRACT_VERSION` (any reason) | YES — every entry treated as miss |
+| Add a field to `RiskReportDetailResponse` | YES if the bump is honoured (it must be — see plan §E.6) |
+| Builder logic change without contract bump | NO — stale entries leak. **Bump the version whenever the builder changes.** |
+
+The "builder change without bump" failure mode is documented in the
+contract-version comment in `risk_contract.py` so it's the first thing
+a future contributor sees.
+
+### Cache write atomicity + failure handling
+
+The write is a single `UPDATE risk_explanations SET
+audience_payload_json = ... WHERE id = ?` issued **after** the DTO has
+already been built in memory. The flow:
+
+1. Build the DTO via the existing assembly path.
+2. Merge the new audience entry into whatever's already in the column
+   (so a clinician write doesn't erase an existing patient entry).
+3. Try the UPDATE.
+4. **On any DB error**: `db.rollback()` + log via `logger.exception`.
+   The freshly-built DTO is still returned to the caller.
+
+This makes the cache a strictly **best-effort optimisation** — a
+broken cache write never affects request semantics. The next request
+will rebuild + try again.
+
+### Observability
+
+Every read emits a `record_timing("build_dto", ...)` record with these
+tags:
+
+| Tag | Values | Meaning |
+|---|---|---|
+| `audience` | `patient` / `clinician` | Which DTO was requested |
+| `cache` | `hit` / `miss` | Did we serve cached bytes? |
+| `reason` (miss only) | `no_cache_column` / `no_audience_entry` / `version_mismatch` / `malformed_payload` / `payload_validate_failed` | Why we missed |
+
+Hit-rate dashboards can plot `cache="hit"` count / total count grouped
+by `audience` to spot regressions. The `reason` tags help triage
+unexpected miss spikes (e.g. a sudden surge of `version_mismatch`
+means a deploy bumped `RISK_CONTRACT_VERSION`).
+
+### Disk usage estimate
+
+A typical detail payload `model_dump_json()` runs ≈ 4–8 KB depending
+on the SHAP detail size. Worst case at 100k users × 10 detail reads ×
+2 audiences ≈ 16 GB. **Acceptable for now**; future TTL-based cleanup
+or a separate cache table is a follow-up workstream when actual
+production volumes warrant it.
+
+### What's still deferred to a future "Phase 7-extended"
+
+- **TTL eviction** — currently the cache is keyed only by `contract_version`. Old rows accumulate forever until the contract bumps.
+- **Pre-population on persist** — the persistence adapter could pre-build both audience payloads after a fresh inference. Skipped because the read path needs `previous_score` / `trend_7d` / `breakdown` which are read-time concerns; pre-building them at write-time would require duplicating those queries. The lazy approach is a strict win.
+- **List-route cache** — `get_risk_reports` (list view) still rebuilds every list item DTO from scratch. Plan §E.7 only calls for the detail route; lists are typically rendered once per session anyway.
+- **Cross-row aggregation cache** — `get_risk_history_summary` recomputes highest/lowest/average on every call. Out of Phase 7 scope.
+
+---
+
+## 7g. Audience profiles + clinician gate — Phase 5 architecture
+
+Phase 5 introduces the trust-boundary split the plan calls for in
+§D.3 / §F.1: raw SHAP and the upstream model-api request id are
+**clinical** signals that should not surface on the patient screen by
+default. Flipping a query param + role check is sufficient gate; no
+new RBAC infrastructure was needed because the audit found
+`users.role` already exists and is populated.
+
+### Route — `GET /mobile/analysis/risk-reports/{id}?audience=...`
+
+| Audience | Who can call | Returns | Wire version |
+| --- | --- | --- | --- |
+| `patient` (default) | Any authenticated user | `RiskReportDetailResponse` (unchanged from v0.9) | `0.5.0` |
+| `clinician` | `user.role` in `CLINICIAN_ROLES` (`{"clinician", "admin"}`) | `RiskReportClinicianResponse` (extends patient + `shap_details` + `model_request_id`) | `0.5.0` |
+
+* `audience=patient` is the default so every Flutter binary built
+  against `v0.4.0` keeps getting the exact same shape.
+* `audience=clinician` from a user whose `role` is NOT in
+  `CLINICIAN_ROLES` returns **HTTP 403** — gated by
+  `require_clinician_audience` at the FastAPI dependency layer so the
+  handler never executes with an unauthorised audience.
+* Unauthenticated requests get **HTTP 401** before the gate runs (the
+  existing `HTTPBearer` dependency on `get_current_user`).
+
+OpenAPI exports both DTOs in `components.schemas` and the route
+response is an `anyOf: [RiskReportDetailResponse, RiskReportClinicianResponse]`
+so codegen consumers can model the audience-conditioned response.
+
+### Read-path additions
+
+The Phase 5 SQL change adds two columns to the LATERAL join in
+`MonitoringService.get_risk_reports` and
+`MonitoringService.get_risk_report_detail`:
+
+| Column | Source | Persisted by | Now read by |
+| --- | --- | --- | --- |
+| `shap_details_json` | `risk_explanations.shap_details_json` (JSONB) | Phase A SHAP migration + Phase 3b `RiskPersistenceAdapter` | Phase 5 — only surfaced on `RiskReportClinicianResponse.shap_details` |
+| `model_request_id` | `risk_explanations.model_request_id` (VARCHAR(36)) | Phase 2 (`20260427_model_request_id.sql` + persistence adapter) | Phase 5 — only surfaced on `RiskReportClinicianResponse.model_request_id` |
+
+`NormalizedRiskRow` carries both; the patient builder
+(`build_risk_report_detail`) intentionally ignores them, the clinician
+builder (`build_risk_report_clinician_detail`) wraps the patient
+result and adds them at the top level.
+
+### Why `users.role` instead of a full RBAC table
+
+The plan §I.1 flagged "RBAC cho clinician role: hiện có chưa? Nếu chưa,
+Phase 5 phải thêm role table + middleware → effort tăng ~1 ngày".
+Audit found:
+
+- `users.role` is already declared (`String(20)`, default `"user"`).
+- Existing values referenced in code: `'patient'`, `'user'`, `'admin'`.
+- No CHECK constraint on `users.role` — adding `'clinician'` is a
+  data change, not a schema change.
+
+So Phase 5 ships with a tiny allow-list (`CLINICIAN_ROLES = {"clinician",
+"admin"}`) that satisfies plan acceptance ("clinician profile chỉ
+available cho user role có quyền y tế") without adding RBAC plumbing.
+Production assignment of `role='clinician'` happens through the existing
+admin user-management flow — out of Phase 5 scope.
+
+### What's deferred to a future "Phase 5-extended"
+
+- **Mobile clinician toggle UI**: a settings switch that flips
+  `audience=clinician` on the API client. Phase 8 territory (now landing — see slice 4 of the final-completion plan).
+- **SHAP detail mobile screen**: currently no Flutter surface for raw
+  SHAP. Plan §G.3 reserves this for clinician audience (Phase 8 slice 4b).
+- **Doctor / nurse roles**: trivial one-line addition to
+  `CLINICIAN_ROLES` once those roles are minted.
+
+---
+
 ## 7f. Sleep risk ingest — Phase 4A-thin architecture
 
 Phase 4A in the plan is a full sleep pipeline alignment: backend route +
@@ -923,7 +1109,7 @@ python -m pytest tests/ \
   --ignore=tests/test_e2e_telemetry_real_db.py
 ```
 
-Expected: 442 passed, 1 skipped (was 434 before Phase 5's 8 added audience-gating + OpenAPI tests).
+Expected: 448 passed, 1 skipped (was 442 before Phase 7's 6 added cache tests).
 
 Mobile parser smoke (after Phase 6):
 

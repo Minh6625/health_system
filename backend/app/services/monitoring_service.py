@@ -9,6 +9,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
+from app.core.risk_contract import RISK_CONTRACT_VERSION
+from app.observability.timing import record_timing
 from app.schemas.monitoring import (
     AiExplanationResponse,
     FactorBreakdownResponse,
@@ -914,16 +916,19 @@ class MonitoringService:
                         re.top_features_json,
                         re.ai_explanation_json,
                         re.shap_details_json,
-                        re.model_request_id
+                        re.model_request_id,
+                        re.audience_payload_json
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
-                        SELECT explanation_text,
+                        SELECT id AS risk_explanation_id,
+                               explanation_text,
                                feature_importance,
                                recommendations,
                                top_features_json,
                                ai_explanation_json,
                                shap_details_json,
-                               model_request_id
+                               model_request_id,
+                               audience_payload_json
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -984,22 +989,26 @@ class MonitoringService:
                         rs.features,
                         rs.model_version,
                         rs.algorithm,
+                        re.id AS risk_explanation_id,
                         re.explanation_text,
                         re.feature_importance,
                         re.recommendations,
                         re.top_features_json,
                         re.ai_explanation_json,
                         re.shap_details_json,
-                        re.model_request_id
+                        re.model_request_id,
+                        re.audience_payload_json
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
-                        SELECT explanation_text,
+                        SELECT id,
+                               explanation_text,
                                feature_importance,
                                recommendations,
                                top_features_json,
                                ai_explanation_json,
                                shap_details_json,
-                               model_request_id
+                               model_request_id,
+                               audience_payload_json
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -1018,9 +1027,19 @@ class MonitoringService:
         if risk_row is None:
             return None
 
-        return build_risk_report_detail(
-            **MonitoringService._build_detail_inputs(patient_id, dict(risk_row), db),
+        row_dict = dict(risk_row)
+        cached = MonitoringService._read_audience_cache(
+            row_dict, audience="patient", model=RiskReportDetailResponse,
         )
+        if cached is not None:
+            return cached
+        result = build_risk_report_detail(
+            **MonitoringService._build_detail_inputs(patient_id, row_dict, db),
+        )
+        MonitoringService._write_audience_cache(
+            db, row_dict, audience="patient", payload=result,
+        )
+        return result
 
     @staticmethod
     def get_risk_report_clinician_detail(
@@ -1048,22 +1067,26 @@ class MonitoringService:
                         rs.features,
                         rs.model_version,
                         rs.algorithm,
+                        re.id AS risk_explanation_id,
                         re.explanation_text,
                         re.feature_importance,
                         re.recommendations,
                         re.top_features_json,
                         re.ai_explanation_json,
                         re.shap_details_json,
-                        re.model_request_id
+                        re.model_request_id,
+                        re.audience_payload_json
                     FROM risk_scores rs
                     LEFT JOIN LATERAL (
-                        SELECT explanation_text,
+                        SELECT id,
+                               explanation_text,
                                feature_importance,
                                recommendations,
                                top_features_json,
                                ai_explanation_json,
                                shap_details_json,
-                               model_request_id
+                               model_request_id,
+                               audience_payload_json
                         FROM risk_explanations
                         WHERE risk_score_id = rs.id
                         ORDER BY id DESC
@@ -1082,9 +1105,123 @@ class MonitoringService:
         if risk_row is None:
             return None
 
-        return build_risk_report_clinician_detail(
-            **MonitoringService._build_detail_inputs(patient_id, dict(risk_row), db),
+        row_dict = dict(risk_row)
+        cached = MonitoringService._read_audience_cache(
+            row_dict, audience="clinician", model=RiskReportClinicianResponse,
         )
+        if cached is not None:
+            return cached
+        result = build_risk_report_clinician_detail(
+            **MonitoringService._build_detail_inputs(patient_id, row_dict, db),
+        )
+        MonitoringService._write_audience_cache(
+            db, row_dict, audience="clinician", payload=result,
+        )
+        return result
+
+    @staticmethod
+    def _read_audience_cache(
+        row_dict: dict[str, Any],
+        *,
+        audience: str,
+        model: type[Any],
+    ) -> Any | None:
+        """Return the cached DTO for ``audience`` if it matches the current
+        contract version, else ``None`` (signalling cache miss / stale).
+
+        Cache shape:
+        ``{"<audience>": {"contract_version": "x.y.z", "payload": {...}}}``.
+
+        Phase 7: ``RISK_CONTRACT_VERSION`` is the cache key suffix so a
+        contract bump invalidates every entry without a manual flush.
+        """
+        cache = row_dict.get("audience_payload_json")
+        if not isinstance(cache, dict):
+            record_timing(
+                "build_dto", 0.0, audience=audience, cache="miss",
+                reason="no_cache_column",
+            )
+            return None
+        entry = cache.get(audience)
+        if not isinstance(entry, dict):
+            record_timing(
+                "build_dto", 0.0, audience=audience, cache="miss",
+                reason="no_audience_entry",
+            )
+            return None
+        version = entry.get("contract_version")
+        payload = entry.get("payload")
+        if version != RISK_CONTRACT_VERSION or not isinstance(payload, dict):
+            record_timing(
+                "build_dto", 0.0, audience=audience, cache="miss",
+                reason="version_mismatch" if version != RISK_CONTRACT_VERSION else "malformed_payload",
+            )
+            return None
+        try:
+            result = model.model_validate(payload)
+        except Exception:  # noqa: BLE001 - fall back to rebuild on any parse error
+            logger.exception(
+                "Audience cache hit but payload failed validation; rebuilding"
+            )
+            record_timing(
+                "build_dto", 0.0, audience=audience, cache="miss",
+                reason="payload_validate_failed",
+            )
+            return None
+        record_timing("build_dto", 0.0, audience=audience, cache="hit")
+        return result
+
+    @staticmethod
+    def _write_audience_cache(
+        db: Session,
+        row_dict: dict[str, Any],
+        *,
+        audience: str,
+        payload: Any,
+    ) -> None:
+        """Best-effort write the freshly-built ``payload`` to the cache column.
+
+        Merges with whatever is already in ``audience_payload_json`` so a
+        patient-built request that lands first does not erase a clinician
+        entry written later (or vice versa). Failures are logged but never
+        propagated — the request flow already has the freshly-built payload.
+        """
+        risk_explanation_id = row_dict.get("risk_explanation_id")
+        if risk_explanation_id is None:
+            # Legacy / synthetic rows that come through ``_get_history_summary``
+            # without the LATERAL join. Cache write is a no-op for them.
+            return
+        existing = row_dict.get("audience_payload_json")
+        merged: dict[str, Any] = dict(existing) if isinstance(existing, dict) else {}
+        merged[audience] = {
+            "contract_version": RISK_CONTRACT_VERSION,
+            "payload": payload.model_dump(mode="json"),
+        }
+        try:
+            db.execute(
+                text(
+                    """
+                    UPDATE risk_explanations
+                    SET audience_payload_json = CAST(:cache AS jsonb)
+                    WHERE id = :risk_explanation_id
+                    """
+                ),
+                {
+                    "cache": json.dumps(merged),
+                    "risk_explanation_id": int(risk_explanation_id),
+                },
+            )
+            db.commit()
+            # Reflect the new state in the row_dict so a sibling cache read
+            # within the same request sees the freshly written entry.
+            row_dict["audience_payload_json"] = merged
+        except Exception:  # noqa: BLE001 - cache write must never break the request flow
+            db.rollback()
+            logger.exception(
+                "Failed to write audience cache for risk_explanation_id=%s audience=%s",
+                risk_explanation_id,
+                audience,
+            )
 
     @staticmethod
     def _build_detail_inputs(

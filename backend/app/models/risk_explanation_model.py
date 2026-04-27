@@ -47,6 +47,16 @@ class RiskExplanation(Base):
         String(36), nullable=True, index=True,
     )
 
+    # Phase 7 audience-payload cache — JSONB keyed by audience profile.
+    # Shape: ``{"<audience>": {"contract_version": "x.y.z", "payload": {...}}}``.
+    # The persistence adapter writes this after a fresh inference; the read
+    # path (MonitoringService) checks cache-first keyed by audience +
+    # RISK_CONTRACT_VERSION. Version mismatch invalidates the entry and
+    # triggers a rebuild.
+    audience_payload_json: Mapped[Optional[dict]] = mapped_column(
+        JSONB, nullable=True,
+    )
+
     # Timestamps
     created_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), default=get_current_time, nullable=True,
