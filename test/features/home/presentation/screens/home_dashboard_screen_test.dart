@@ -11,6 +11,7 @@ import 'package:healthguard/features/device/models/device_model.dart';
 import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
 import 'package:healthguard/features/home/presentation/widgets/connection_status_strip.dart';
 import 'package:healthguard/features/home/presentation/widgets/sleep_insight_card.dart';
+import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/sleep_analysis/models/sleep_session.dart';
 import 'package:healthguard/features/sleep_analysis/providers/sleep_provider.dart';
 import 'package:healthguard/features/sleep_analysis/repositories/sleep_repository.dart';
@@ -73,6 +74,13 @@ class _StubHomeDashboardProvider extends HomeDashboardProvider {
 
   @override
   Future<void> refreshDashboard() async {}
+}
+
+/// No-op stub so the dashboard's `context.read<ProfileProvider>().fetchProfile()`
+/// call in initState doesn't try to hit the network during tests.
+class _StubProfileProvider extends ProfileProvider {
+  @override
+  Future<void> fetchProfile({bool force = false}) async {}
 }
 
 class _StubDeviceProvider extends DeviceProvider {
@@ -175,6 +183,9 @@ Widget _buildDashboardApp() {
         create: (_) => _StubDeviceProvider(),
       ),
       ChangeNotifierProvider<SleepProvider>.value(value: sleepProvider),
+      ChangeNotifierProvider<ProfileProvider>(
+        create: (_) => _StubProfileProvider(),
+      ),
     ],
     child: MaterialApp(
       home: const HomeDashboardScreen(
