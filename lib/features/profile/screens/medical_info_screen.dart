@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/profile/widgets/profile_widgets.dart';
@@ -44,7 +45,8 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       if (profile != null) {
         _selectedBloodType = profile.bloodType;
         if (profile.heightCm != null) {
-          _heightController.text = profile.heightCm!.toStringAsFixed(1);
+          // Whole-cm only (DB smallint).
+          _heightController.text = profile.heightCm!.toString();
         }
         if (profile.weightKg != null) {
           _weightController.text = profile.weightKg!.toStringAsFixed(1);
@@ -90,7 +92,7 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
       bloodType: _selectedBloodType,
       heightCm: _heightController.text.trim().isEmpty
           ? null
-          : double.tryParse(_heightController.text.trim()),
+          : int.tryParse(_heightController.text.trim()),
       weightKg: _weightController.text.trim().isEmpty
           ? null
           : double.tryParse(_weightController.text.trim()),
@@ -184,16 +186,20 @@ class _MedicalInfoScreenState extends State<MedicalInfoScreen> {
                         _FormField(
                           child: TextFormField(
                             controller: _heightController,
-                            keyboardType: const TextInputType.numberWithOptions(
-                                decimal: true),
+                            keyboardType: TextInputType.number,
                             textInputAction: TextInputAction.next,
                             style: const TextStyle(fontSize: 16),
+                            // DB column is `smallint`; only whole-cm allowed.
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(3),
+                            ],
                             decoration:
                                 _inputDecor('Chiều cao (cm)', Icons.height_outlined),
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) return null;
-                              final val = double.tryParse(v.trim());
-                              if (val == null) return 'Nhập số hợp lệ';
+                              final val = int.tryParse(v.trim());
+                              if (val == null) return 'Nhập số nguyên hợp lệ';
                               if (val < 50 || val > 250) {
                                 return 'Chiều cao phải từ 50 – 250 cm';
                               }

@@ -9,12 +9,15 @@ These tests pin both directions of the boundary mapping so a future
 refactor cannot silently revert and break the mobile app.
 """
 
+from datetime import date, timedelta
+
 import pytest
 from pydantic import ValidationError
 
 from app.schemas.profile import (
     GENDER_EN_TO_VI,
     GENDER_VI_TO_EN,
+    MEDICAL_CONDITION_KEYS,
     ProfileUpdateRequest,
     VALID_GENDERS,
 )
@@ -66,3 +69,106 @@ class TestWeightBound:
     def test_weight_below_min_rejected(self):
         with pytest.raises(ValidationError):
             ProfileUpdateRequest(full_name="Anh A", weight_kg=1)
+
+
+class TestHeightInteger:
+    """DB column is `smallint`; Pydantic must reject non-integer cm to
+    avoid the prior silent rounding (175.5 -> 176)."""
+
+    def test_height_int_accepted(self):
+        payload = ProfileUpdateRequest(full_name="Anh A", height_cm=175)
+        assert payload.height_cm == 175
+        assert isinstance(payload.height_cm, int)
+
+    def test_height_whole_float_accepted(self):
+        # 175.0 has no fractional component -> coerce to int
+        payload = ProfileUpdateRequest(full_name="Anh A", height_cm=175.0)
+        assert payload.height_cm == 175
+        assert isinstance(payload.height_cm, int)
+
+    def test_height_fractional_float_rejected(self):
+        with pytest.raises(ValidationError):
+            ProfileUpdateRequest(full_name="Anh A", height_cm=175.5)
+
+    def test_height_below_min_rejected(self):
+        with pytest.raises(ValidationError):
+            ProfileUpdateRequest(full_name="Anh A", height_cm=49)
+
+    def test_height_above_max_rejected(self):
+        with pytest.raises(ValidationError):
+            ProfileUpdateRequest(full_name="Anh A", height_cm=251)
+
+    def test_height_none_passes_through(self):
+        payload = ProfileUpdateRequest(full_name="Anh A", height_cm=None)
+        assert payload.height_cm is None
+
+
+class TestMedicalConditions:
+    """List values must be a subset of the UI's checkbox keys."""
+
+    def test_known_keys_accepted(self):
+        keys = sorted(MEDICAL_CONDITION_KEYS)
+        payload = ProfileUpdateRequest(full_name="Anh A", medical_conditions=keys)
+        assert payload.medical_conditions == keys
+
+    def test_empty_list_accepted(self):
+        payload = ProfileUpdateRequest(full_name="Anh A", medical_conditions=[])
+        assert payload.medical_conditions == []
+
+    def test_none_passes_through(self):
+        payload = ProfileUpdateRequest(full_name="Anh A", medical_conditions=None)
+        assert payload.medical_conditions is None
+
+    def test_unknown_key_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            ProfileUpdateRequest(
+                full_name="Anh A",
+                medical_conditions=["hypertension", "cancer"],
+            )
+        assert "cancer" in str(exc_info.value)
+
+    def test_typo_rejected(self):
+        # Common-typo regression: 'heart-disease' (hyphen) is not a valid key.
+        with pytest.raises(ValidationError):
+            ProfileUpdateRequest(
+                full_name="Anh A",
+                medical_conditions=["heart-disease"],
+            )
+
+
+class TestDateOfBirthValidation:
+    """ProfileUpdateRequest reuses validate_age so users cannot edit
+    themselves into the future or under 16."""
+
+    def test_valid_dob_accepted(self):
+        dob = date.today() - timedelta(days=25 * 365)
+        payload = ProfileUpdateRequest(full_name="Anh A", date_of_birth=dob)
+        assert payload.date_of_birth == dob
+
+    def test_none_accepted(self):
+        payload = ProfileUpdateRequest(full_name="Anh A", date_of_birth=None)
+        assert payload.date_of_birth is None
+
+    def test_future_date_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            ProfileUpdateRequest(
+                full_name="Anh A",
+                date_of_birth=date.today() + timedelta(days=1),
+            )
+        assert "tương lai" in str(exc_info.value).lower()
+
+    def test_under_16_rejected(self):
+        with pytest.raises(ValidationError) as exc_info:
+            ProfileUpdateRequest(
+                full_name="Anh A",
+                date_of_birth=date.today() - timedelta(days=15 * 365),
+            )
+        assert "16 tuổi" in str(exc_info.value)
+
+    def test_over_150_rejected(self):
+        today = date.today()
+        with pytest.raises(ValidationError):
+            ProfileUpdateRequest(
+                full_name="Anh A",
+                date_of_birth=date(today.year - 151, today.month, today.day),
+            )

@@ -1,5 +1,7 @@
 import re
 import secrets
+
+from app.utils.age_validator import validate_age as _validate_age
 from typing import Optional
 import logging
 from datetime import date, datetime, timedelta, timezone
@@ -30,37 +32,13 @@ class AuthService:
         """Generate cryptographically secure 6-digit PIN (100000-999999)."""
         return str(secrets.randbelow(900000) + 100000)
 
+    # ``validate_age`` lives in ``app.utils.age_validator`` so the
+    # ProfileUpdateRequest schema can reuse it without importing the
+    # whole service layer. Kept here as a passthrough for backward
+    # compatibility with existing call sites and tests.
     @staticmethod
     def validate_age(date_of_birth: Optional[date]) -> tuple[bool, str]:
-        """
-        Validate age from date of birth.
-
-        Requirements:
-        - Age >= 16
-        - Age <= 150 (reasonable upper limit)
-
-        Returns:
-            (is_valid, message) tuple
-        """
-        if date_of_birth is None:
-            return True, "OK"  # Optional field
-
-        today = date.today()
-
-        # Check if date is in future
-        if date_of_birth > today:
-            return False, "Ngày sinh không hợp lệ (trong tương lai)"
-
-        # Calculate age in days for more accurate boundary checking
-        days_old = (today - date_of_birth).days
-
-        if days_old < 16 * 365:
-            return False, "Bạn phải đủ 16 tuổi để đăng ký"
-
-        if days_old > 150 * 365:
-            return False, "Ngày sinh không hợp lệ (tuổi quá cao)"
-
-        return True, "OK"
+        return _validate_age(date_of_birth)
 
     @classmethod
     def register(

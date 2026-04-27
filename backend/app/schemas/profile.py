@@ -3,6 +3,8 @@ import re
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.utils.age_validator import validate_age
+
 VALID_BLOOD_TYPES = {'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'}
 
 # DB CHECK constraint `users_gender_check` only accepts canonical English
@@ -10,6 +12,18 @@ VALID_BLOOD_TYPES = {'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'}
 GENDER_VI_TO_EN = {'Nam': 'male', 'Nữ': 'female', 'Khác': 'other'}
 GENDER_EN_TO_VI = {v: k for k, v in GENDER_VI_TO_EN.items()}
 VALID_GENDERS = set(GENDER_VI_TO_EN.keys())
+
+# Whitelist of medical-condition keys the mobile UI exposes via
+# checkboxes. The DB column is `text[]` with no enum check, so without
+# this validator a buggy/older client could persist arbitrary values
+# that the UI then renders as empty checkboxes.
+MEDICAL_CONDITION_KEYS = {
+    'hypertension',
+    'heart_disease',
+    'diabetes',
+    'stroke',
+    'other',
+}
 
 
 class ProfileResponse(BaseModel):
@@ -25,7 +39,7 @@ class ProfileResponse(BaseModel):
     # Medical fields
     gender: str | None = None
     blood_type: str | None = None
-    height_cm: float | None = None
+    height_cm: int | None = None
     weight_kg: float | None = None
     medications: list[str] = []
     allergies: list[str] = []
@@ -42,7 +56,10 @@ class ProfileUpdateRequest(BaseModel):
     # Medical fields
     gender: str | None = None
     blood_type: str | None = None
-    height_cm: float | None = Field(default=None, ge=50, le=250)
+    # DB column is `smallint`; only whole-cm values are persistable. We
+    # accept ints (and silently reject floats with a helpful message)
+    # rather than rounding behind the user's back.
+    height_cm: int | None = Field(default=None, ge=50, le=250)
     # DB CHECK: weight_kg < 500 (strict). Pydantic must mirror.
     weight_kg: float | None = Field(default=None, ge=2, lt=500)
     medications: list[str] | None = None
@@ -92,6 +109,30 @@ class ProfileUpdateRequest(BaseModel):
         if value not in VALID_GENDERS:
             raise ValueError(f'Giới tính không hợp lệ. Các giá trị hợp lệ: {", ".join(VALID_GENDERS)}')
         return GENDER_VI_TO_EN[value]
+
+    @field_validator('date_of_birth')
+    @classmethod
+    def validate_date_of_birth(cls, value: date | None) -> date | None:
+        """Same age constraints as registration to prevent users from
+        editing themselves into impossible ages (future dates, < 16, > 150).
+        """
+        is_valid, message = validate_age(value)
+        if not is_valid:
+            raise ValueError(message)
+        return value
+
+    @field_validator('medical_conditions')
+    @classmethod
+    def validate_medical_conditions(cls, value: list[str] | None) -> list[str] | None:
+        if value is None:
+            return None
+        unknown = [v for v in value if v not in MEDICAL_CONDITION_KEYS]
+        if unknown:
+            raise ValueError(
+                f'Tiền sử bệnh không hợp lệ: {", ".join(unknown)}. '
+                f'Giá trị hợp lệ: {", ".join(sorted(MEDICAL_CONDITION_KEYS))}'
+            )
+        return value
 
 
 class DeleteAccountRequest(BaseModel):
