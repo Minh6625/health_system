@@ -13,9 +13,11 @@ void main() {
     });
 
     test('severity label and color are normalized for user-facing UI', () {
-      expect(notificationSeverityLabel('low'), 'low');
-      expect(notificationSeverityLabel('medium'), 'medium');
-      expect(notificationSeverityLabel('high'), 'medium');
+      expect(notificationSeverityLabel('low'), 'Nhẹ');
+      expect(notificationSeverityLabel('medium'), 'Cảnh báo');
+      expect(notificationSeverityLabel('high'), 'Cảnh báo');
+      expect(notificationSeverityLabel('critical'), 'Nguy hiểm');
+      expect(notificationSeverityLabel(null), 'Nhẹ');
       expect(notificationSeverityColor('low'), AppColors.success);
       expect(notificationSeverityColor('medium'), AppColors.warning);
       expect(notificationSeverityColor('critical'), AppColors.critical);

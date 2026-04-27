@@ -34,16 +34,20 @@ Color notificationSeverityColor(String? severity) {
   }
 }
 
+/// Vietnamese label for the severity chip rendered in notification cards
+/// and the detail screen. Returns one of 'Nhẹ' / 'Cảnh báo' / 'Nguy hiểm'.
+///
+/// Previously this helper returned the raw English bucket ('low' / 'medium' /
+/// 'critical') which leaked into the UI; callers now display it directly.
 String notificationSeverityLabel(String? severity) {
   switch (normalizeNotificationSeverityLabel(severity)) {
     case 'critical':
-      return 'critical';
+      return 'Nguy hiểm';
     case 'medium':
-      return 'medium';
+      return 'Cảnh báo';
     case 'low':
-      return 'low';
     default:
-      return 'low';
+      return 'Nhẹ';
   }
 }
 
