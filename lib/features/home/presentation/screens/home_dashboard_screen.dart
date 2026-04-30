@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/routes/app_router.dart';
+import '../../../../core/services/onboarding_permission_service.dart';
+import '../../../onboarding/widgets/location_permission_primer_sheet.dart';
 import '../../../../shared/presentation/emergency/emergency_sticky_bar.dart';
 import '../../../../shared/presentation/shell/app_shell_bottom_nav.dart';
 import '../../../../shared/presentation/shell/main_scaffold_shell.dart';
@@ -302,6 +304,26 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
       // ProfileProvider has a 5-minute cache, so this call is a no-op
       // when the user has already viewed the profile tab.
       context.read<ProfileProvider>().fetchProfile();
+
+      // F-15 (P-3): one-time location permission primer. Only fires on
+      // the self dashboard (caregivers viewing a family member's
+      // dashboard via `widget.profileId` get nothing — they do not
+      // own the SOS flow on someone else's profile, and we don't
+      // want to waste the one-shot primer slot on the wrong context).
+      // The service itself short-circuits if the user already saw it
+      // or already granted permission, so this is a single
+      // best-effort call that becomes a no-op on subsequent launches.
+      final isSelfDashboard = widget.profileId == null ||
+          widget.profileId!.isEmpty ||
+          widget.profileId == 'self';
+      if (isSelfDashboard) {
+        unawaited(
+          showLocationPermissionPrimer(
+            context: context,
+            service: OnboardingPermissionService(),
+          ),
+        );
+      }
     });
   }
 

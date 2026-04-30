@@ -9,6 +9,11 @@ class ApiEndpoints {
   static const String sleepHistory = '/metrics/sleep/history';
   static const String healthReport = '/metrics/health-report';
   static const String vitalsLatest = latestVitals;
+  // F-12 (M-6): downsampled vitals time-series for the chart on
+  // `vital_detail_screen.dart`. Path mirrors the FastAPI route mounted
+  // at `metrics_router.get("/vitals/timeseries", ...)` in
+  // `app/api/routes/monitoring.py`.
+  static const String vitalsTimeseries = '/metrics/vitals/timeseries';
   static const String profile = '/profile';
 
   // Fall events — Phase 4B-full slice 2c
