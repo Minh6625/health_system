@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
 import 'package:healthguard/features/device/providers/device_configure_provider.dart';
+import 'package:healthguard/features/device/providers/device_provider.dart';
+import 'package:healthguard/features/device/utils/device_name_constraints.dart';
 import 'package:healthguard/features/device/widgets/device_configure/configure_hero_header.dart';
 import 'package:healthguard/features/device/widgets/device_configure/config_section_card.dart';
 import 'package:healthguard/features/device/widgets/device_configure/danger_zone_card.dart';
@@ -72,41 +76,154 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
   }
 
   void _showUnpairDialog(BuildContext context, DeviceConfigureProvider provider) {
+    // F-11 (M-8): when the device is currently online (still streaming
+    // vitals + SOS coverage), users were unpairing without realising they'd
+    // cut off live monitoring. The original dialog only said "this can't be
+    // undone", which doesn't tell the user *what* they're losing. The fix:
+    //
+    //   * Online path  → stronger red warning that calls out vital
+    //     monitoring + SOS, AND a checkbox the user must tick before the
+    //     destructive button enables. Forces them to slow down and read.
+    //   * Offline path → keep the original short confirmation; making
+    //     offline users tick a checkbox just to delete a dead device would
+    //     be busywork.
+    //
+    // We use a StatefulBuilder so the checkbox state is local to the
+    // dialog and disposed with it.
+    final bool isOnline = widget.device.isOnline;
+
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Ngắt kết nối thiết bị?'),
-        content: const Text('Thiết bị sẽ bị xóa khỏi tài khoản của bạn. Hành động này không thể hoàn tác.', style: TextStyle(color: AppColors.critical)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final success = await provider.unpairDevice();
-              if (!context.mounted) return;
-              if (success) {
-                // Return 'deleted' so Detail screen can route all the way back to list
-                Navigator.of(context).pop('deleted');
-              } else {
-                // Surface the real backend error instead of silently closing.
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      provider.errorMessage ?? 'Hủy ghép nối thiết bị thất bại',
+      builder: (ctx) {
+        // State lives in the OUTER builder closure (called once per
+        // showDialog) so it survives the inner StatefulBuilder rebuilds
+        // triggered by setDialogState. Putting `acknowledgedRisk` inside
+        // the StatefulBuilder.builder would reset it to !isOnline on
+        // every rebuild and the checkbox could never stay checked.
+        var acknowledgedRisk = !isOnline; // offline path is pre-acked.
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            // Setter wrapper so we can rebuild the dialog when the checkbox
+            // toggles. Closure-captured into the Checkbox below.
+            void toggleAck(bool? value) {
+              setDialogState(() {
+                acknowledgedRisk = value ?? false;
+              });
+            }
+
+            return AlertDialog(
+            title: const Text('Ngắt kết nối thiết bị?'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isOnline) ...[
+                  // Stronger warning that names the consequences. The
+                  // generic "can't be undone" line is genuinely true for
+                  // both paths, but online users need to hear about the
+                  // monitoring loss specifically.
+                  const Text(
+                    'Thiết bị này đang hoạt động và theo dõi sức khỏe của bạn.',
+                    style: TextStyle(
+                      color: AppColors.critical,
+                      fontWeight: FontWeight.w700,
                     ),
-                    backgroundColor: AppColors.critical,
                   ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.critical),
-            child: const Text('Ngắt kết nối', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+                  const SizedBox(height: AppSpacing.gapSm),
+                  const Text(
+                    'Ngắt kết nối sẽ dừng cập nhật chỉ số sinh tồn và '
+                    'tắt cảnh báo SOS tự động cho đến khi bạn ghép nối '
+                    'lại thiết bị.',
+                    style: TextStyle(color: AppColors.critical),
+                  ),
+                  const SizedBox(height: AppSpacing.gapSm),
+                ],
+                const Text(
+                  'Thiết bị sẽ bị xóa khỏi tài khoản của bạn. Hành động này không thể hoàn tác.',
+                  style: TextStyle(color: AppColors.critical),
+                ),
+                if (isOnline) ...[
+                  const SizedBox(height: AppSpacing.gapMd),
+                  // Inline checkbox row keeps the tap target wide so the
+                  // user can tap the label, not just the tiny box.
+                  InkWell(
+                    key: const ValueKey('unpair-acknowledge-risk-row'),
+                    onTap: () => toggleAck(!acknowledgedRisk),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.gapXs,
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Checkbox(
+                            key: const ValueKey(
+                                'unpair-acknowledge-risk-checkbox'),
+                            value: acknowledgedRisk,
+                            onChanged: toggleAck,
+                          ),
+                          const Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(
+                                top: AppSpacing.gapMd,
+                              ),
+                              child: Text(
+                                'Tôi hiểu việc ngắt kết nối sẽ dừng theo '
+                                'dõi sức khỏe và cảnh báo SOS.',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Hủy'),
+              ),
+              ElevatedButton(
+                key: const ValueKey('unpair-confirm-button'),
+                onPressed: acknowledgedRisk
+                    ? () async {
+                        Navigator.pop(ctx);
+                        final success = await provider.unpairDevice();
+                        if (!context.mounted) return;
+                        if (success) {
+                          // Return 'deleted' so Detail screen can route all the way back to list
+                          Navigator.of(context).pop('deleted');
+                        } else {
+                          // Surface the real backend error instead of silently closing.
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                provider.errorMessage ??
+                                    'Hủy ghép nối thiết bị thất bại',
+                              ),
+                              backgroundColor: AppColors.critical,
+                            ),
+                          );
+                        }
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.critical,
+                  disabledBackgroundColor:
+                      AppColors.critical.withValues(alpha: 0.4),
+                ),
+                child: const Text(
+                  'Ngắt kết nối',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
+          );
+          },
+        );
+      },
     );
   }
 
@@ -139,10 +256,20 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
             ConfigSectionCard(
               title: 'Cơ bản',
               children: [
+                // QA M-13: same input constraints as the rename dialog —
+                // hard length cap (matches backend max_length=100) and a
+                // safe-character allow-list so users cannot type the
+                // special characters QA flagged. Built-in counter from
+                // `maxLength` shows live `xx/100` instead of letting users
+                // discover the limit only after a 422.
                 TextField(
                   controller: _nameController,
+                  maxLength: kDeviceNameMaxLength,
+                  inputFormatters: deviceNameInputFormatters(),
                   decoration: InputDecoration(
                     labelText: 'Tên thiết bị',
+                    helperText:
+                        'Tối đa $kDeviceNameMaxLength ký tự. Không dùng ký tự đặc biệt.',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.radiusMd)),
                     contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sectionGapMd, vertical: AppSpacing.sectionGapMd),
                   ),
@@ -212,7 +339,22 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
           isSaving: provider.isSaving,
           onSave: () async {
             final success = await provider.saveChanges();
-            if (success && context.mounted) {
+            if (!context.mounted) return;
+            if (success) {
+              // Bug 2 audit: invalidate the DeviceProvider list cache so a
+              // subsequent navigation (pop to Detail → pop to List → re-
+              // enter Configure for the same device) seeds the toggles
+              // from the freshly persisted `calibration_data` instead of
+              // the stale snapshot the list was holding. Fire-and-forget
+              // because the success snackbar + pop should not wait on a
+              // background list reload — Detail's own
+              // `fetchDeviceDetail()` already refreshes what the user
+              // sees next.
+              unawaited(
+                context
+                    .read<DeviceProvider>()
+                    .fetchDevices(forceRefresh: true),
+              );
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Lưu thay đổi thành công'),
@@ -221,7 +363,26 @@ class _DeviceConfigureContentState extends State<_DeviceConfigureContent> {
                 ),
               );
               Navigator.of(context).pop(true);
+              return;
             }
+            // F-7 (M-7): surface failure feedback honestly. Before this the
+            // screen swallowed the error and only the SnackBar from the
+            // dialog (rename-from-list flow) ever told the user anything,
+            // which meant a partial-success rename looked like a hard error
+            // without explanation. Now we tint the snackbar based on
+            // hasPartialSuccess so the user can tell apart "name persisted,
+            // toggles need retry" from "nothing was saved".
+            final message = provider.errorMessage;
+            if (message == null) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(message),
+                backgroundColor: provider.hasPartialSuccess
+                    ? AppColors.warning
+                    : AppColors.critical,
+                duration: const Duration(seconds: 4),
+              ),
+            );
           },
         ),
       ),

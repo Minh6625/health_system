@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/device/mock/device_mock_data.dart';
 import 'package:healthguard/features/device/models/device_model.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
 import 'package:healthguard/features/device/screens/device_connect_screen.dart';
+import 'package:healthguard/features/device/utils/device_name_constraints.dart';
 import 'package:healthguard/features/device/widgets/device_list/device_priority_card.dart';
 import 'package:healthguard/features/device/widgets/device_list/device_health_hero_card.dart';
 import 'package:healthguard/features/device/widgets/device_list/device_onboarding_empty_state.dart';
@@ -167,14 +169,36 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       if (provider.devices.isEmpty)
                         const DeviceOnboardingEmptyState()
                       else
-                        ...provider.devices.map((device) => DevicePriorityCard(
+                        // F-16 (M-10): pull current user's full name once
+                        // outside the .map so we don't re-resolve the
+                        // AuthProvider for every card. `watch` (not
+                        // `read`) so a still-bootstrapping session
+                        // updates the cards once auth resolves
+                        // (otherwise the badge would stay hidden until
+                        // the next list refresh).
+                        ...(() {
+                          final monitoredForName = context
+                              .watch<AuthProvider>()
+                              .currentUser
+                              ?.fullName;
+                          return provider.devices.map(
+                            (device) => DevicePriorityCard(
                               device: device,
-                              needsAttention: provider.needsAttentionDevices.contains(device),
-                              onActionSelected: (d, action) => _handleDeviceAction(d, action),
+                              needsAttention: provider.needsAttentionDevices
+                                  .contains(device),
+                              onActionSelected: (d, action) =>
+                                  _handleDeviceAction(d, action),
                               onRefreshRequested: () {
-                                if (mounted) context.read<DeviceProvider>().fetchDevices(forceRefresh: true);
+                                if (mounted) {
+                                  context
+                                      .read<DeviceProvider>()
+                                      .fetchDevices(forceRefresh: true);
+                                }
                               },
-                            )),
+                              monitoredForName: monitoredForName,
+                            ),
+                          );
+                        })(),
                     ],
                   ),
                 ),
@@ -204,36 +228,105 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Future<void> _showRenameDialog(DeviceModel device) async {
+    // QA M-13: rename dialog used to (a) accept any length up to whatever
+    // the OS keyboard let through, (b) accept any special character, and
+    // (c) silently pop with `success == false` when the backend rejected
+    // the name, so the user thought "Lưu" had worked. Three fixes here:
+    //
+    //   1. `maxLength` + the shared `deviceNameInputFormatters()` enforce
+    //      backend's `Field(min_length=1, max_length=100)` and the safe
+    //      character allow-list at input time (no special chars sneak in).
+    //   2. `validateDeviceName` runs on submit so empty / over-limit
+    //      values surface as inline `errorText` instead of a no-op.
+    //   3. On API failure we keep the dialog open and show
+    //      `provider.errorMessage` inside it, so the user can correct and
+    //      retry. The dialog only pops on real success.
     final controller = TextEditingController(text: device.displayName);
+    String? localError;
+    bool isSaving = false;
+
     final renamed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Đổi tên thiết bị'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(labelText: 'Tên mới'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final newName = controller.text.trim();
-                if (newName.isEmpty) return;
-                final success = await context.read<DeviceProvider>().updateDevice(
-                  deviceId: device.id,
-                  deviceName: newName,
-                );
-                if (!dialogContext.mounted) return;
-                Navigator.of(dialogContext).pop(success);
-              },
-              child: const Text('Lưu'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Đổi tên thiết bị'),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                maxLength: kDeviceNameMaxLength,
+                inputFormatters: deviceNameInputFormatters(),
+                decoration: InputDecoration(
+                  labelText: 'Tên mới',
+                  helperText:
+                      'Tối đa $kDeviceNameMaxLength ký tự. Không dùng ký tự đặc biệt.',
+                  errorText: localError,
+                ),
+                onChanged: (_) {
+                  // Clear stale validation error as soon as the user
+                  // starts editing so they don't see a red message that no
+                  // longer reflects what's in the field.
+                  if (localError != null) {
+                    setDialogState(() => localError = null);
+                  }
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSaving
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(false),
+                  child: const Text('Hủy'),
+                ),
+                FilledButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          final newName = controller.text.trim();
+                          final validationError =
+                              validateDeviceName(newName);
+                          if (validationError != null) {
+                            setDialogState(() {
+                              localError = validationError;
+                            });
+                            return;
+                          }
+                          if (newName == device.displayName) {
+                            // Nothing to do — close without firing an
+                            // API request (and without the success
+                            // snackbar, which would be misleading).
+                            Navigator.of(dialogContext).pop(false);
+                            return;
+                          }
+                          setDialogState(() => isSaving = true);
+                          final provider = context.read<DeviceProvider>();
+                          final success = await provider.updateDevice(
+                            deviceId: device.id,
+                            deviceName: newName,
+                          );
+                          if (!dialogContext.mounted) return;
+                          if (success) {
+                            Navigator.of(dialogContext).pop(true);
+                          } else {
+                            setDialogState(() {
+                              isSaving = false;
+                              localError = provider.errorMessage ??
+                                  'Không thể cập nhật tên thiết bị.';
+                            });
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Lưu'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

@@ -19,7 +19,11 @@ class _FakeDeviceRepository implements DeviceRepository {
   });
 
   final Object? failUnpairWith;
-  final Object? failUpdateWith;
+  // Mutable so the F-7 (M-7) partial-success retry test can flip the
+  // settings PUT from "throws" to "succeeds" between calls without
+  // building a second fake. The other failure injectors stay final because
+  // their tests only need a single attempt.
+  Object? failUpdateWith;
   final Object? failUpdateNameWith;
   final List<int> unpairCalls = <int>[];
   final List<Map<String, dynamic>> updateSettingsCalls =
@@ -286,6 +290,84 @@ void main() {
               'Settings PUT must wait until the name PATCH succeeds to avoid '
               'splitting the save halfway.');
       expect(provider.isDirty, isTrue);
+      expect(provider.hasPartialSuccess, isFalse,
+          reason:
+              'Hard failure (no rename committed) must not light up the '
+              'partial-success flag — that is reserved for cases where the '
+              'server already accepted the name PATCH.');
+    });
+
+    // F-7 (M-7): pinned regression for the partial-success messaging fix.
+    //
+    // Before this fix `saveChanges` dropped the rename-committed signal: if
+    // the name PATCH succeeded but the settings PUT then failed, the catch
+    // block reported a generic "Lỗi: ..." error. The screen surfaced this
+    // as a red snackbar even though the rename had already persisted on the
+    // server, leaving the user convinced their change was rolled back.
+    //
+    // The new contract is:
+    //   * `errorMessage` calls out the partial success ("Đã đổi tên ...”)
+    //     while still embedding the underlying exception text for QA.
+    //   * `hasPartialSuccess` is true so the screen can tint the snackbar
+    //     warning instead of critical.
+    //   * `_nameDirty` is cleared so a retry hits ONLY the failing settings
+    //     endpoint — verified indirectly here by flipping the fake to
+    //     succeed and asserting `updateNameCalls` stays at one.
+    test(
+        'partial success: name PATCH committed but settings PUT failed — '
+        'errorMessage flags the partial success, hasPartialSuccess is true, '
+        'and a retry skips the already-committed name PATCH', () async {
+      final repo = _FakeDeviceRepository(
+        failUpdateWith: Exception('Khong luu duoc cai dat'),
+      );
+      final provider =
+          DeviceConfigureProvider(_device(id: 808), repository: repo);
+
+      provider.updateName('Dong ho moi');
+      provider.updateNotifyHighHr(false);
+      final firstResult = await provider.saveChanges();
+
+      expect(firstResult, isFalse);
+      expect(repo.updateNameCalls, hasLength(1),
+          reason: 'Name PATCH must run first.');
+      expect(repo.updateSettingsCalls, hasLength(1),
+          reason: 'Settings PUT must be attempted after name succeeds.');
+      expect(provider.hasPartialSuccess, isTrue,
+          reason:
+              'Caller can surface partial-success UI instead of a hard '
+              'error.');
+      expect(provider.errorMessage, contains('Khong luu duoc cai dat'),
+          reason:
+              'Underlying error text must still appear so QA can debug the '
+              'real settings failure.');
+      expect(provider.errorMessage, contains('Đã đổi tên'),
+          reason:
+              'Message must tell the user the rename did persist so the '
+              'red snackbar from M-7 stops misleading them.');
+      expect(provider.isDirty, isTrue,
+          reason:
+              'Form stays dirty so the user can retry the failing settings '
+              'PUT without re-entering anything.');
+
+      // Retry path: flip the fake to succeed and call saveChanges again.
+      // The name PATCH must NOT fire again because _nameDirty was cleared
+      // after the first PATCH committed — firing it twice would create the
+      // bug where the user sees two PATCH requests for one rename.
+      repo.failUpdateWith = null;
+      final retryResult = await provider.saveChanges();
+
+      expect(retryResult, isTrue);
+      expect(repo.updateNameCalls, hasLength(1),
+          reason:
+              'Name PATCH must NOT re-fire on retry: _nameDirty was cleared '
+              'when the first PATCH committed, so the rename is already on '
+              'the server.');
+      expect(repo.updateSettingsCalls, hasLength(2),
+          reason: 'Settings PUT runs again because that is what failed.');
+      expect(provider.hasPartialSuccess, isFalse,
+          reason: 'A clean save resets the partial-success flag.');
+      expect(provider.errorMessage, isNull);
+      expect(provider.isDirty, isFalse);
     });
   });
 
@@ -343,7 +425,89 @@ void main() {
     });
   });
 
-  // Phase 6a: DeviceModel.fromJson round-trips calibration_data.
+  // Bug 2 (QA): tester reported "tắt cảnh báo nhịp tim cao thì bật lại
+  // không được". Root cause was `_markDirty()` only firing
+  // notifyListeners() on the false→true _isDirty transition, so the
+  // second toggle on the same Switch silently updated provider state
+  // but never rebuilt the controlled SwitchListTile. These tests pin
+  // the contract that every value-changing update notifies, every time.
+  group('DeviceConfigureProvider notifies on every field change (Bug 2)', () {
+    test('toggling the same Switch twice fires notifyListeners both times',
+        () {
+      final provider = DeviceConfigureProvider(
+        _device(calibrationData: <String, dynamic>{
+          'notify_high_hr': true,
+        }),
+        repository: _FakeDeviceRepository(),
+      );
+
+      var notifyCount = 0;
+      provider.addListener(() => notifyCount++);
+
+      provider.updateNotifyHighHr(false); // tắt
+      expect(notifyCount, 1,
+          reason: 'First toggle must notify so the Switch rebuilds OFF.');
+      expect(provider.notifyHighHr, isFalse);
+      expect(provider.isDirty, isTrue);
+
+      provider.updateNotifyHighHr(true); // bật lại
+      expect(notifyCount, 2,
+          reason:
+              'Second toggle must ALSO notify — without this, '
+              'context.watch<DeviceConfigureProvider>() never rebuilds '
+              'and the Switch appears stuck in the OFF position.');
+      expect(provider.notifyHighHr, isTrue);
+    });
+
+    test('every notify_* updater notifies independently when isDirty is '
+        'already true', () {
+      final provider = DeviceConfigureProvider(
+        _device(),
+        repository: _FakeDeviceRepository(),
+      );
+
+      var notifyCount = 0;
+      provider.addListener(() => notifyCount++);
+
+      provider.updateNotifyHighHr(false);
+      provider.updateNotifyLowSpo2(false);
+      provider.updateNotifyHighBp(false);
+
+      expect(notifyCount, 3,
+          reason:
+              'Three independent toggles, three rebuilds — one notify '
+              'per state change.');
+    });
+
+    test('updateName notifies on every value change but is idempotent for '
+        'no-op edits', () {
+      final provider = DeviceConfigureProvider(
+        _device(deviceName: 'Watch'),
+        repository: _FakeDeviceRepository(),
+      );
+
+      var notifyCount = 0;
+      provider.addListener(() => notifyCount++);
+
+      provider.updateName('Watch1');
+      provider.updateName('Watch12');
+      expect(notifyCount, 2,
+          reason:
+              'Each new name string must notify so any consumer that '
+              'depends on `provider.deviceName` keeps in sync.');
+
+      // Same value as current — the early-return guard in updateName
+      // must short-circuit BEFORE _markDirty so we do not produce a
+      // spurious rebuild for an idempotent edit.
+      provider.updateName('Watch12');
+      expect(notifyCount, 2,
+          reason:
+              'Idempotent edit must not produce a spurious rebuild — the '
+              'notify guard belongs in the caller, not in _markDirty.');
+    });
+  });
+
+  // Phase 6a: DeviceModel.fromJson calibration_data.
   group('DeviceModel.fromJson calibration_data', () {
     test('parses a JSON object into a Map<String, dynamic>', () {
       final model = DeviceModel.fromJson(<String, dynamic>{
