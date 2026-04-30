@@ -7,7 +7,19 @@ import '../../../../shared/presentation/theme/app_text_styles.dart';
 class RecommendationPreviewCard extends StatelessWidget {
   final List<String> recommendations;
 
-  const RecommendationPreviewCard({super.key, required this.recommendations});
+  /// F-10 (M-2): callback the host screen wires to a "show all
+  /// recommendations" navigation. When `null`, the "Xem đầy đủ" CTA is
+  /// hidden entirely instead of rendering a clickable-looking label that
+  /// silently does nothing (the original bug). Hosts that have a real
+  /// destination pass a non-null callback; hosts that don't, omit the
+  /// argument and the user never sees a dead link.
+  final VoidCallback? onSeeAll;
+
+  const RecommendationPreviewCard({
+    super.key,
+    required this.recommendations,
+    this.onSeeAll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -28,12 +40,27 @@ class RecommendationPreviewCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Khuyến nghị', style: AppTextStyles.sectionTitle),
-              Text(
-                'Xem đầy đủ',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.brandPrimary,
+              if (onSeeAll != null)
+                InkWell(
+                  key: const ValueKey('recommendation-preview-see-all'),
+                  onTap: onSeeAll,
+                  borderRadius: AppRadii.pillRadius,
+                  child: Padding(
+                    // Pad so the tap target meets the 48dp accessibility
+                    // floor even when the visual chrome stays minimal.
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.gapSm,
+                      vertical: AppSpacing.gapXs,
+                    ),
+                    child: Text(
+                      'Xem đầy đủ',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.brandPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
                 ),
-              ),
             ],
           ),
           const SizedBox(height: AppSpacing.gapMd),

@@ -2,6 +2,7 @@ import 'package:healthguard/core/network/api_client.dart';
 import '../domain/entities/risk_history_entity.dart';
 import '../domain/entities/risk_report_detail_entity.dart';
 import '../domain/entities/risk_report_entity.dart';
+import '../utils/factor_reason_prettifier.dart';
 
 class RiskAnalysisRepository {
   RiskAnalysisRepository({ApiClient? apiClient})
@@ -83,7 +84,9 @@ class RiskAnalysisRepository {
       unit: json['unit'] as String? ?? '',
       routeTarget: json['route_target'] as String? ?? '',
       direction: json['direction'] as String? ?? '',
-      reason: json['reason'] as String? ?? '',
+      // F-14 (M-1): rewrite raw `feature_key=value` segments into
+      // Vietnamese before any consumer renders the reason.
+      reason: prettifyFactorReason(json['reason'] as String? ?? ''),
     );
   }
 
@@ -93,7 +96,11 @@ class RiskAnalysisRepository {
       label: json['label'] as String? ?? '',
       impact: _parseDouble(json['impact']),
       direction: json['direction'] as String? ?? '',
-      reason: json['reason'] as String? ?? '',
+      // F-14 (M-1): same prettifier as the breakdown path so the
+      // `RiskQuickExplanationCard` summary and the `TopFactorChips`
+      // subtitle both read as natural Vietnamese instead of leaking
+      // the model API contract.
+      reason: prettifyFactorReason(json['reason'] as String? ?? ''),
       featureValue: json['feature_value'] as String? ?? '',
     );
   }
@@ -344,7 +351,12 @@ class RiskAnalysisRepository {
               displayStatus:
                   item['display_status'] as String? ?? 'Không xác định',
               analyzedAt: DateTime.parse(item['analyzed_at'] as String),
-              reasonPreview: item['reason_preview'] as String? ?? '',
+              // F-14 (M-1): risk-history rows can also leak the raw
+              // `feature_key=value` template via reason_preview when
+              // the explanation falls back to the SHAP reason instead
+              // of the Gemini short_text. Prettify here too.
+              reasonPreview:
+                  prettifyFactorReason(item['reason_preview'] as String? ?? ''),
               isStale: item['is_stale'] as bool? ?? true,
             ),
           )
