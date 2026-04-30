@@ -87,7 +87,12 @@ class _EmergencySOSReceivedListScreenState
     WidgetsBinding.instance.addObserver(this);
     _searchController.addListener(() {
       setState(() {
-        _searchQuery = _searchController.text.toLowerCase();
+        // F-9 (G-6): trim before lowercasing so an accidental trailing space
+        // (very common on touch keyboards after autocorrect) doesn't filter
+        // out every patient. QA reported typing "Mih " hid the patient
+        // "Mih" from the list because the contains() check was comparing
+        // "mih" against "mih " — the trailing space was load-bearing.
+        _searchQuery = _searchController.text.trim().toLowerCase();
       });
     });
   }

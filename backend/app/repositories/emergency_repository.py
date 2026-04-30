@@ -90,11 +90,19 @@ class EmergencyRepository:
         Returns:
             Tuple of (sos_events, total_count, active_count, resolved_count)
         """
+        # Bug fix G-4: gate the SOS list by ``can_receive_alerts`` so a
+        # caregiver who has been revoked from receiving alerts also stops
+        # seeing the underlying SOS event in their list. Previously this
+        # only filtered the push fan-out (see
+        # ``get_alert_recipient_user_ids``), which left an asymmetric leak
+        # where the SOS-list tab still showed events the caregiver was no
+        # longer entitled to.
         caregiver_rel_exists = exists().where(
             and_(
                 UserRelationship.caregiver_id == caregiver_user_id,
                 UserRelationship.patient_id == SOSEvent.user_id,
                 UserRelationship.status == "accepted",
+                UserRelationship.can_receive_alerts.is_(True),
                 SOSEvent.triggered_at >= UserRelationship.created_at
             )
         )
@@ -103,6 +111,7 @@ class EmergencyRepository:
                 UserRelationship.patient_id == caregiver_user_id,
                 UserRelationship.caregiver_id == SOSEvent.user_id,
                 UserRelationship.status == "accepted",
+                UserRelationship.can_receive_alerts.is_(True),
                 SOSEvent.triggered_at >= UserRelationship.created_at
             )
         )
@@ -288,3 +297,123 @@ class EmergencyRepository:
                 recipient_ids.add(int(caregiver_id))
 
         return list(recipient_ids)
+
+    @staticmethod
+    def get_sos_alert_recipients_with_permissions(
+        db: Session,
+        patient_user_id: int,
+    ) -> List[Tuple[int, bool]]:
+        """Return ``[(caregiver_user_id, can_view_location), ...]`` for caregivers
+        that should receive SOS/fall alerts for ``patient_user_id``.
+
+        Bug fix G-3: callers previously used
+        :meth:`get_alert_recipient_user_ids` and then leaked
+        ``latitude/longitude/address`` to every recipient regardless of
+        ``can_view_location``. This helper surfaces both flags in one query so
+        :meth:`EmergencyService._create_alerts_for_sos_event` can redact the
+        location fields per recipient instead of trusting the patient's row.
+        """
+        rows = (
+            db.query(
+                UserRelationship.caregiver_id,
+                UserRelationship.can_view_location,
+            )
+            .filter(
+                UserRelationship.patient_id == patient_user_id,
+                UserRelationship.status == "accepted",
+                UserRelationship.can_receive_alerts.is_(True),
+                UserRelationship.deleted_at.is_(None),
+            )
+            .all()
+        )
+
+        # Collapse duplicate caregiver rows (legacy data may have multiple
+        # accepted rows per pair). Grant the most permissive view we can find
+        # so a caregiver with at least one row that allows location still sees
+        # it; a caregiver whose every row revoked location stays redacted.
+        seen: dict[int, bool] = {}
+        for caregiver_id, can_view_location in rows:
+            if caregiver_id is None:
+                continue
+            cid = int(caregiver_id)
+            seen[cid] = seen.get(cid, False) or bool(can_view_location)
+
+        return list(seen.items())
+
+    @staticmethod
+    def get_caregiver_view_permissions(
+        db: Session,
+        *,
+        patient_user_id: int,
+        caregiver_user_id: int,
+    ) -> Optional[Tuple[bool, bool]]:
+        """Return ``(can_receive_alerts, can_view_location)`` for the accepted
+        relationship row where ``caregiver_user_id`` is the caregiver of
+        ``patient_user_id``, or ``None`` if no such row exists.
+
+        Bug fix G-3: used by the SOS read endpoints
+        (:meth:`EmergencyService.get_sos_alerts_for_caregiver`,
+        :meth:`EmergencyService.get_sos_detail`) to gate the
+        ``LocationInfo`` field per viewer. Patients viewing their own SOS and
+        admins bypass this lookup at the service layer.
+        """
+        rel = (
+            db.query(UserRelationship)
+            .filter(
+                UserRelationship.patient_id == patient_user_id,
+                UserRelationship.caregiver_id == caregiver_user_id,
+                UserRelationship.status == "accepted",
+                UserRelationship.deleted_at.is_(None),
+            )
+            .first()
+        )
+        if rel is None:
+            return None
+        return bool(rel.can_receive_alerts), bool(rel.can_view_location)
+
+    @staticmethod
+    def get_caregiver_location_visibility(
+        db: Session,
+        *,
+        caregiver_user_id: int,
+        patient_user_ids: List[int],
+    ) -> dict[int, bool]:
+        """Return ``{patient_user_id: can_view_location}`` for all accepted
+        relationships where ``caregiver_user_id`` is the caregiver.
+
+        Bug fix G-3: batches the per-patient location-permission lookup that
+        :meth:`EmergencyService.get_sos_alerts_for_caregiver` needs when
+        rendering a SOS list spanning multiple patients. Patients absent from
+        the result map have no accepted relationship with this caregiver and
+        the caller should default to ``False`` (redact location).
+        """
+        if not patient_user_ids:
+            return {}
+
+        rows = (
+            db.query(
+                UserRelationship.patient_id,
+                UserRelationship.can_view_location,
+            )
+            .filter(
+                UserRelationship.caregiver_id == caregiver_user_id,
+                UserRelationship.patient_id.in_(patient_user_ids),
+                UserRelationship.status == "accepted",
+                UserRelationship.deleted_at.is_(None),
+            )
+            .all()
+        )
+
+        visibility: dict[int, bool] = {}
+        for patient_id, can_view_location in rows:
+            if patient_id is None:
+                continue
+            pid = int(patient_id)
+            # Match the ``OR`` semantics of
+            # :meth:`get_sos_alert_recipients_with_permissions`: if the
+            # caregiver has *any* accepted row with the flag granted, they
+            # can see location.
+            visibility[pid] = visibility.get(pid, False) or bool(
+                can_view_location
+            )
+        return visibility

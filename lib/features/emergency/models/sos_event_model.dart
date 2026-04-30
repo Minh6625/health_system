@@ -33,7 +33,13 @@ class SOSEventModel {
         json['patient'] as Map<String, dynamic>,
       ),
       triggerType: json['trigger_type'] as String,
-      triggerTime: DateTime.parse(json['trigger_time'] as String),
+      // Bug fix G-7: backend serialises ``trigger_time`` in UTC (ISO 8601 with
+      // ``Z`` or ``+00:00``). ``DateTime.parse`` preserves that timezone, and
+      // ``DateFormat.format`` then prints in whatever timezone the DateTime
+      // is in — which produced UTC strings on a VN device. ``.toLocal()``
+      // shifts the value to the device's local zone (UTC+7 for VN) so the
+      // SOS detail card shows ``HH:mm:ss`` matching the user's clock.
+      triggerTime: DateTime.parse(json['trigger_time'] as String).toLocal(),
       status: json['status'] as String,
       location: json['location'] != null
           ? LocationInfoModel.fromJson(json['location'] as Map<String, dynamic>)
@@ -146,8 +152,11 @@ class LocationInfoModel {
           ? (json['accuracy'] as num).toDouble()
           : null,
       address: json['address'] as String?,
+      // Bug fix G-7: see ``SOSEventModel.fromJson`` for the rationale —
+      // ``last_updated`` is also UTC on the wire and must be converted to
+      // local time before downstream ``DateFormat`` calls.
       lastUpdated: json['last_updated'] != null
-          ? DateTime.parse(json['last_updated'] as String)
+          ? DateTime.parse(json['last_updated'] as String).toLocal()
           : DateTime.now(),
     );
   }
@@ -246,7 +255,10 @@ class ResolutionInfoModel {
     return ResolutionInfoModel(
       resolutionStatus: json['resolution_status'] as String? ?? 'safe',
       resolvedBy: json['resolved_by_name'] as String,
-      resolvedTime: DateTime.parse(json['resolved_at'] as String),
+      // Bug fix G-7: see ``SOSEventModel.fromJson`` for the rationale —
+      // ``resolved_at`` arrives in UTC and must be normalised to the device's
+      // local zone for the resolution-info card.
+      resolvedTime: DateTime.parse(json['resolved_at'] as String).toLocal(),
       notes: json['notes'] as String?,
     );
   }

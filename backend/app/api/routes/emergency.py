@@ -76,14 +76,23 @@ def get_sos_detail(
     Returns:
         Complete SOS event details including patient info, location, XAI data, resolution info
     """
-    sos_detail = EmergencyService.get_sos_detail(db, sos_id)
-    
+    # Bug fix G-3: pass the viewer's identity so the service can redact
+    # ``LocationInfo`` for caregivers whose relationship row has
+    # ``can_view_location=False``. Owners (patient viewing their own SOS) and
+    # admins see the full payload.
+    sos_detail = EmergencyService.get_sos_detail(
+        db,
+        sos_id,
+        viewer_user_id=int(current_user.id),
+        viewer_is_admin=(current_user.role == "admin"),
+    )
+
     if not sos_detail:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy sự kiện SOS"
         )
-    
+
     from app.repositories.emergency_repository import EmergencyRepository
     # Check authorization (must be owner or linked profile)
     has_access = EmergencyRepository.check_user_has_access(db, current_user.id, sos_detail.patient.user_id)
@@ -92,7 +101,7 @@ def get_sos_detail(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bạn không có quyền xem chi tiết SOS này"
         )
-    
+
     return sos_detail
 
 
