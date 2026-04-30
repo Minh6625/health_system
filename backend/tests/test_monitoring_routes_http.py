@@ -18,6 +18,8 @@ from app.schemas.monitoring import (
     SleepSessionResponse,
     SnapshotMetricsResponse,
     VitalSignsResponse,
+    VitalsTimeseriesPointResponse,
+    VitalsTimeseriesResponse,
 )
 from app.services.monitoring_service import MonitoringService
 
@@ -301,3 +303,127 @@ def test_main_app_registers_single_mobile_risk_reports_route() -> None:
     assert matching_routes == [
         ("/mobile/analysis/risk-reports", ("GET",)),
     ]
+
+
+# ----------------------------------------------------------------------
+# F-12 (M-6): vitals time-series HTTP route.
+#
+# Lives in its own test rather than the canonical-shape mega-test above
+# because that test asserts on an exact call list — extending it would
+# touch many unrelated assertions and risk muddying the diff. The
+# isolated test pins three things end-to-end: the route is mounted at
+# the documented path, the `range` query param flows through to the
+# service, and the JSON payload preserves `null` channels (a zero in a
+# missing-data bucket would render a misleading cliff in the chart).
+# ----------------------------------------------------------------------
+
+
+def test_vitals_timeseries_route_passes_range_through_and_preserves_nulls(
+    monkeypatch,
+) -> None:
+    client = _build_test_client()
+
+    captured: dict[str, object] = {}
+
+    bucket_a = datetime(2026, 4, 29, 6, 0, tzinfo=UTC)
+    bucket_b = datetime(2026, 4, 29, 6, 15, tzinfo=UTC)
+
+    def _stub_get_vitals_timeseries(patient_id, db, range_key="24h"):
+        captured["patient_id"] = patient_id
+        captured["range_key"] = range_key
+        return VitalsTimeseriesResponse(
+            range=range_key,
+            bucket_minutes=15,
+            data=[
+                VitalsTimeseriesPointResponse(
+                    ts=bucket_a,
+                    heart_rate=72.0,
+                    spo2=98.0,
+                    temperature=36.7,
+                    respiratory_rate=16.0,
+                    blood_pressure_sys=118.0,
+                    blood_pressure_dia=76.0,
+                ),
+                VitalsTimeseriesPointResponse(
+                    ts=bucket_b,
+                    heart_rate=74.5,
+                    spo2=None,
+                    temperature=36.8,
+                    respiratory_rate=17.0,
+                    blood_pressure_sys=None,
+                    blood_pressure_dia=None,
+                ),
+            ],
+        )
+
+    monkeypatch.setattr(
+        MonitoringService,
+        "get_vitals_timeseries",
+        staticmethod(_stub_get_vitals_timeseries),
+    )
+
+    # Default range — confirms the route mounts at the documented path
+    # and that `range_key` defaults to "24h" when the client omits it.
+    default_response = client.get("/mobile/metrics/vitals/timeseries")
+    assert default_response.status_code == 200
+    default_payload = default_response.json()
+    assert captured["patient_id"] == 7
+    assert captured["range_key"] == "24h"
+    assert default_payload["range"] == "24h"
+    assert default_payload["bucket_minutes"] == 15
+    assert len(default_payload["data"]) == 2
+    # Channel-level null MUST round-trip as `null`, not 0 — a zero
+    # would draw a misleading "SpO2 dropped to 0" cliff. This is the
+    # precise regression M-6's chart wiring is meant to avoid.
+    assert default_payload["data"][1]["spo2"] is None
+    assert default_payload["data"][1]["blood_pressure_sys"] is None
+
+    # Explicit `range` param flows through to the service so the future
+    # 7d / 30d tabs can be wired without further route changes.
+    seven_day_response = client.get(
+        "/mobile/metrics/vitals/timeseries?range=7d"
+    )
+    assert seven_day_response.status_code == 200
+    assert captured["range_key"] == "7d"
+
+
+def test_vitals_timeseries_route_respects_target_profile_header(
+    monkeypatch,
+) -> None:
+    client = _build_test_client()
+
+    captured_patient_ids: list[int] = []
+
+    def _stub_get_vitals_timeseries(patient_id, db, range_key="24h"):
+        captured_patient_ids.append(patient_id)
+        return VitalsTimeseriesResponse(range="24h", bucket_minutes=15, data=[])
+
+    monkeypatch.setattr(
+        MonitoringService,
+        "get_vitals_timeseries",
+        staticmethod(_stub_get_vitals_timeseries),
+    )
+
+    # Self profile (no header).
+    self_resp = client.get("/mobile/metrics/vitals/timeseries")
+    assert self_resp.status_code == 200
+
+    # Linked profile (allowed).
+    linked_resp = client.get(
+        "/mobile/metrics/vitals/timeseries",
+        headers={"X-Target-Profile-Id": "42"},
+    )
+    assert linked_resp.status_code == 200
+
+    # Forbidden profile MUST 403 like every other monitoring route —
+    # this is the exact gate that keeps a caregiver from snooping a
+    # non-linked patient's vitals time-series. Drift here would be a
+    # security regression.
+    forbidden_resp = client.get(
+        "/mobile/metrics/vitals/timeseries",
+        headers={"X-Target-Profile-Id": "999"},
+    )
+    assert forbidden_resp.status_code == 403
+
+    # Service was only called for the two allowed profiles.
+    assert captured_patient_ids == [7, 42]

@@ -25,6 +25,8 @@ from app.schemas.monitoring import (
     SnapshotMetricsResponse,
     TopFactorResponse,
     VitalSignsResponse,
+    VitalsTimeseriesPointResponse,
+    VitalsTimeseriesResponse,
 )
 from app.services.normalized_risk_row import NormalizedRiskRow
 from app.services.risk_inference_service import (
@@ -748,6 +750,138 @@ class MonitoringService:
             if 'relation "vitals" does not exist' in str(error):
                 raise ValueError("Vital signs table not initialized")
             raise
+
+    # F-12 (M-6): supported (window_hours, bucket_minutes) per range key.
+    # Only "24h" is wired into the mobile UI today; "7d" / "30d" are
+    # reserved for future ticket scope and currently coerced to 24h. The
+    # bucket sizes are tuned so each chart renders ~50–170 points: large
+    # enough to show diurnal variation, small enough to keep the JSON
+    # payload under ~10 KB and the fl_chart line smooth on a phone.
+    _VITALS_TIMESERIES_RANGES: dict[str, tuple[int, int]] = {
+        "24h": (24, 15),  # 96 buckets
+        "7d": (24 * 7, 60),  # 168 buckets — reserved for future range tab
+        "30d": (24 * 30, 6 * 60),  # 120 buckets — reserved for future range tab
+    }
+
+    @staticmethod
+    def get_vitals_timeseries(
+        patient_id: int,
+        db: Session,
+        range_key: str = "24h",
+    ) -> VitalsTimeseriesResponse:
+        """Return downsampled vitals time-series for the chart UI.
+
+        F-12 (M-6) — backs the new ``GET /mobile/metrics/vitals/timeseries``
+        endpoint. The mobile ``vital_detail_screen.dart`` previously
+        rendered an "EmptyChartPlaceholder" because
+        :attr:`VitalSignsProvider.chartData` was hardcoded to ``const []``.
+        This method re-buckets raw ``vitals`` rows into ~96 points (15 min
+        × 24 h) using TimescaleDB ``time_bucket`` and returns one row per
+        bucket with every channel populated, so the screen can switch
+        between heart_rate / SpO₂ / blood-pressure tabs without an extra
+        round trip.
+
+        Returns an empty payload (200 with ``data: []``) when:
+          * the patient has no vitals in the window, or
+          * the ``vitals`` hypertable doesn't exist yet (e.g. fresh DB).
+
+        We deliberately return 200 + empty list rather than 404 so the
+        mobile chart can render its "no data" placeholder without an
+        error toast — same convention the existing
+        ``MonitoringService.get_sleep_history`` uses.
+        """
+        normalized_range = (
+            range_key
+            if range_key in MonitoringService._VITALS_TIMESERIES_RANGES
+            else "24h"
+        )
+        window_hours, bucket_minutes = MonitoringService._VITALS_TIMESERIES_RANGES[
+            normalized_range
+        ]
+
+        # `time_bucket(:bucket_interval, ...)` expects a string interval
+        # like '15 minutes'. Building it server-side (rather than as a
+        # raw f-string) keeps the column list parameterised so a malicious
+        # bucket value can't smuggle SQL through the route.
+        bucket_interval = f"{bucket_minutes} minutes"
+        window_interval = f"{window_hours} hours"
+
+        try:
+            rows = db.execute(
+                text(
+                    """
+                    SELECT
+                        time_bucket(CAST(:bucket_interval AS interval), v.time) AS bucket_ts,
+                        AVG(v.heart_rate) AS heart_rate,
+                        AVG(v.spo2) AS spo2,
+                        AVG(v.temperature) AS temperature,
+                        AVG(v.respiratory_rate) AS respiratory_rate,
+                        AVG(v.blood_pressure_sys) AS blood_pressure_sys,
+                        AVG(v.blood_pressure_dia) AS blood_pressure_dia
+                    FROM vitals v
+                    INNER JOIN devices d ON v.device_id = d.id
+                    WHERE d.user_id = :user_id
+                      AND v.time > NOW() - CAST(:window_interval AS interval)
+                    GROUP BY bucket_ts
+                    ORDER BY bucket_ts ASC
+                    """
+                ),
+                {
+                    "bucket_interval": bucket_interval,
+                    "user_id": patient_id,
+                    "window_interval": window_interval,
+                },
+            ).mappings().all()
+        except ProgrammingError as error:
+            db.rollback()
+            message = str(error)
+            # Fresh DB without the hypertable — return an empty envelope
+            # rather than 500-ing the chart screen.
+            if 'relation "vitals" does not exist' in message:
+                return VitalsTimeseriesResponse(
+                    range=normalized_range,
+                    bucket_minutes=bucket_minutes,
+                )
+            raise
+
+        points: list[VitalsTimeseriesPointResponse] = []
+        for row in rows:
+            row_dict = dict(row)
+            points.append(
+                VitalsTimeseriesPointResponse(
+                    ts=row_dict["bucket_ts"],
+                    heart_rate=MonitoringService._safe_float(row_dict.get("heart_rate"))
+                    if row_dict.get("heart_rate") is not None
+                    else None,
+                    spo2=MonitoringService._safe_float(row_dict.get("spo2"))
+                    if row_dict.get("spo2") is not None
+                    else None,
+                    temperature=MonitoringService._safe_float(row_dict.get("temperature"))
+                    if row_dict.get("temperature") is not None
+                    else None,
+                    respiratory_rate=MonitoringService._safe_float(
+                        row_dict.get("respiratory_rate")
+                    )
+                    if row_dict.get("respiratory_rate") is not None
+                    else None,
+                    blood_pressure_sys=MonitoringService._safe_float(
+                        row_dict.get("blood_pressure_sys")
+                    )
+                    if row_dict.get("blood_pressure_sys") is not None
+                    else None,
+                    blood_pressure_dia=MonitoringService._safe_float(
+                        row_dict.get("blood_pressure_dia")
+                    )
+                    if row_dict.get("blood_pressure_dia") is not None
+                    else None,
+                )
+            )
+
+        return VitalsTimeseriesResponse(
+            range=normalized_range,
+            bucket_minutes=bucket_minutes,
+            data=points,
+        )
 
     @staticmethod
     def get_latest_sleep_session(patient_id: int, db: Session) -> SleepSessionResponse | None:
