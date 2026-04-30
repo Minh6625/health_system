@@ -25,6 +25,11 @@ class UserRelationship(Base):
     can_view_vitals: Mapped[bool] = mapped_column(Boolean, default=False)
     can_receive_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
     can_view_location: Mapped[bool] = mapped_column(Boolean, default=False)
+    # P-4: caregiver can read patient's self-filled medical profile
+    # (blood type, height, weight, medications, allergies, medical conditions).
+    # Defaults to False so the privacy posture is opt-in; the patient must
+    # explicitly toggle this on per linked contact.
+    can_view_medical_info: Mapped[bool] = mapped_column(Boolean, default=False)
     
     # Metadata
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_current_time)

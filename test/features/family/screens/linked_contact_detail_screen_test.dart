@@ -88,4 +88,57 @@ void main() {
       expect(repository.removedRelationshipIds, <int>[91]);
     },
   );
+
+  testWidgets(
+    'P-4: medical-info toggle reflects current value and writes correct key',
+    (tester) async {
+      // Pin the new permission row: the toggle must read the current
+      // ``can_view_medical_info`` flag from ``permissions`` and write the
+      // exact same key when flipped. A typo in either direction silently
+      // breaks the patient's privacy contract, hence the explicit pin.
+      final repository = FakeFamilyRepository(
+        detailById: <String, LinkedContactModel>{
+          '91': LinkedContactModel(
+            id: '91',
+            displayName: 'An Nguyen',
+            email: 'an@example.com',
+            primaryRelationshipLabel: 'Mẹ',
+            tags: <ContactTag>[ContactTagsConfig.defaultTags.first],
+            // Start without medical-info permission so flipping the
+            // toggle issues an "enable" write.
+            permissions: const <String>['can_view_vitals'],
+          ),
+        },
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: LinkedContactDetailScreen(
+            contactId: '91',
+            repository: repository,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Toggle lives below the fold once the hero + 3 prior toggles
+      // render — scroll the title text into view before tapping it.
+      final medicalToggleFinder = find.text('Cho phép xem hồ sơ y tế của tôi');
+      await scrollTo(tester, medicalToggleFinder);
+      expect(medicalToggleFinder, findsOneWidget);
+
+      await tester.tap(medicalToggleFinder);
+      await tester.pumpAndSettle();
+
+      // The provider sends the optimistic update through the repository
+      // with ``can_view_medical_info: true``. We assert on both the key
+      // (typo guard) and the value (no inverted boolean).
+      final lastUpdate = repository.updateCalls.last;
+      expect(lastUpdate['relationshipId'], 91);
+      expect(
+        (lastUpdate['data'] as Map<String, dynamic>)['can_view_medical_info'],
+        isTrue,
+      );
+    },
+  );
 }

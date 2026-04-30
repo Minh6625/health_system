@@ -254,7 +254,11 @@ class RelationshipService:
                 status="accepted",
                 can_view_vitals=True,
                 can_receive_alerts=True,
-                can_view_location=False
+                can_view_location=False,
+                # P-4: medical info is opt-in (privacy-preserving default).
+                # Patient must explicitly toggle this on per partner via
+                # LinkedContactDetailScreen; we never auto-grant it on accept.
+                can_view_medical_info=False,
             )
             RelationshipRepository.create(db, inverse_rel)
             
@@ -283,11 +287,47 @@ class RelationshipService:
         rel = RelationshipRepository.get_by_id(db, relationship_id)
         if not rel:
             raise HTTPException(status_code=404, detail="Không tìm thấy liên kết")
-            
+
         if rel.patient_id != current_user.id and rel.caregiver_id != current_user.id:
             raise HTTPException(status_code=403, detail="Không có quyền cập nhật liên kết này")
-            
+
         update_data = payload.dict(exclude_unset=True)
+
+        # Bug fix G-5: ``primary_relationship_label`` represents what *the
+        # current user* calls their partner (e.g. A labelling B as "Bố"). It
+        # must therefore live on the row where the current user is the
+        # caregiver (``caregiver_id == current_user.id``), regardless of
+        # which side of the pair ``relationship_id`` happens to point at.
+        # Before this fix the label landed on whatever row was passed in,
+        # which for the dashboard PUT was the patient-side row, and
+        # ``format_relationships`` then surfaced the partner's label as the
+        # current user's own. Net effect: A's relabel of B showed up only on
+        # B's dashboard ("nó bị ngược"). We pop the label from the generic
+        # update payload and route it to the correct row; permissions and
+        # other fields keep their existing per-row semantics.
+        label_value = update_data.pop("primary_relationship_label", None)
+        if label_value is not None:
+            partner_id = (
+                rel.caregiver_id
+                if rel.patient_id == current_user.id
+                else rel.patient_id
+            )
+            caregiver_side_rel = (
+                db.query(UserRelationship)
+                .filter(
+                    UserRelationship.caregiver_id == current_user.id,
+                    UserRelationship.patient_id == partner_id,
+                )
+                .first()
+            )
+            target_for_label = caregiver_side_rel or rel
+            target_for_label.primary_relationship_label = label_value
+            if target_for_label is not rel:
+                # Persist the label change in the same transaction as the
+                # generic field updates below so a single PUT either applies
+                # both halves or neither.
+                db.flush()
+
         for key, value in update_data.items():
             setattr(rel, key, value)
 
@@ -328,7 +368,19 @@ class RelationshipService:
                 continue
                 
             inverse_rel = next((r for r in partner_rels if r.caregiver_id == user_id), None)
-            
+
+            # Bug fix G-5: ``primary_relationship_label`` is "what
+            # ``user_id`` calls the partner". It therefore lives on the row
+            # where ``user_id`` is the caregiver (``inverse_rel`` here).
+            # ``primary_rel`` is the patient-side row used for permission
+            # bookkeeping ("của tôi"); reading the label off it caused the
+            # current user to see the *partner's* chosen label instead of
+            # their own. Fall back to ``primary_rel.primary_relationship_label``
+            # when no caregiver-side row exists yet (e.g. legacy data or
+            # outgoing requests where only one row is present).
+            label_source = inverse_rel or primary_rel
+            display_label = label_source.primary_relationship_label
+
             res_dict = {
                 "id": primary_rel.id,
                 "patient_id": primary_rel.patient_id,
@@ -339,11 +391,20 @@ class RelationshipService:
                 "caregiver_email": caregiver.email,
                 "relationship_type": primary_rel.relationship_type,
                 "status": primary_rel.status,
-                "primary_relationship_label": primary_rel.primary_relationship_label,
+                "primary_relationship_label": display_label,
                 "tags": primary_rel.tags if primary_rel.tags else [],
                 "can_view_vitals": primary_rel.can_view_vitals,
                 "can_receive_alerts": primary_rel.can_receive_alerts,
                 "can_view_location": primary_rel.can_view_location,
+                # P-4: read off ``primary_rel`` (= row where current user is
+                # the patient) because this trio represents "what I am
+                # sharing with the partner". ``getattr`` keeps backward
+                # compatibility with rows produced before the migration
+                # landed (column may still be missing in legacy DB snapshots
+                # used in unit tests).
+                "can_view_medical_info": getattr(
+                    primary_rel, "can_view_medical_info", False
+                ),
                 "created_at": primary_rel.created_at
             }
             
@@ -351,10 +412,14 @@ class RelationshipService:
                 res_dict["has_view_vitals_permission"] = inverse_rel.can_view_vitals
                 res_dict["has_receive_alerts_permission"] = inverse_rel.can_receive_alerts
                 res_dict["has_view_location_permission"] = inverse_rel.can_view_location
+                res_dict["has_view_medical_info_permission"] = getattr(
+                    inverse_rel, "can_view_medical_info", False
+                )
             else:
                 res_dict["has_view_vitals_permission"] = False
                 res_dict["has_receive_alerts_permission"] = False
                 res_dict["has_view_location_permission"] = False
+                res_dict["has_view_medical_info_permission"] = False
                 
             result.append(res_dict)
             
@@ -551,25 +616,155 @@ class RelationshipService:
         primary_rel = next((r for r in rels if r.patient_id == current_user.id), rels[0])
 
         permissions = []
-        for p in ['can_view_vitals', 'can_receive_alerts', 'can_view_location']:
-            # The permissions here refer to what the OTHER person can do to CURRENT user ("của tôi")
-            # So we check the row where current_user is the patient.
+        # P-4 added ``can_view_medical_info`` to the trio. Each entry is
+        # a permission the *partner* holds against the *current user*
+        # ("của tôi"), so we always check rows where current_user is the
+        # patient — same gating shape as the other three flags.
+        for p in [
+            'can_view_vitals',
+            'can_receive_alerts',
+            'can_view_location',
+            'can_view_medical_info',
+        ]:
             if any((r.patient_id == current_user.id and getattr(r, p, False)) for r in rels):
                 permissions.append(p)
 
         tags = primary_rel.tags if isinstance(primary_rel.tags, list) else []
         role_label = primary_rel.relationship_type if primary_rel.relationship_type else 'unclassified'
 
+        # Bug fix G-5: see ``format_relationships`` for the full rationale.
+        # ``primaryRelationshipLabel`` must come from the row where the
+        # current user is the caregiver, otherwise the contact-detail card
+        # shows what the partner labelled the current user with.
+        caregiver_side_rel = next(
+            (r for r in rels if r.caregiver_id == current_user.id),
+            None,
+        )
+        display_label = (
+            caregiver_side_rel.primary_relationship_label
+            if caregiver_side_rel is not None
+            else primary_rel.primary_relationship_label
+        )
+
         return {
             "id": str(primary_rel.id),
             "displayName": contact.full_name or "Người dùng",
             "email": contact.email,
             "avatarUrl": contact.avatar_url or "",
-            "primaryRelationshipLabel": primary_rel.primary_relationship_label,
+            "primaryRelationshipLabel": display_label,
             "tags": tags,
             "role": role_label,
             "status": primary_rel.status,
             "permissions": permissions,
             "isIncomingRequest": False
+        }
+
+    @staticmethod
+    def get_linked_contact_medical_info(
+        db: Session, current_user: User, contact_id: int
+    ) -> dict:
+        """P-4: return ``contact_id``'s self-filled medical profile when
+        the patient (= ``contact_id``) granted ``can_view_medical_info`` to
+        the requesting caregiver (= ``current_user``).
+
+        Permission shape: we look for a row where ``patient_id ==
+        contact_id`` *and* ``caregiver_id == current_user.id`` *and*
+        ``can_view_medical_info == True``. This mirrors how
+        ``get_linked_contact_detail`` reads the trio — the granter is
+        always the patient on the row.
+
+        Errors:
+            * 404 if no accepted relationship exists in either direction.
+            * 403 if the relationship exists but the medical_info bit is off.
+            * 404 if ``contact_id`` resolves to a deleted user.
+        """
+
+        relationships = RelationshipRepository.get_user_relationships(
+            db, current_user.id
+        )
+
+        # Mirror ``get_linked_contact_detail``'s contact_id resolution so
+        # callers can pass either a real user_id or a relationship_id and
+        # get the same UX behaviour.
+        rels = [
+            r
+            for r in relationships
+            if r.status == "accepted"
+            and (r.patient_id == contact_id or r.caregiver_id == contact_id)
+        ]
+        real_contact_id = contact_id
+        if not rels:
+            rel_by_id = next(
+                (
+                    r
+                    for r in relationships
+                    if r.status == "accepted" and r.id == contact_id
+                ),
+                None,
+            )
+            if rel_by_id:
+                real_contact_id = (
+                    rel_by_id.caregiver_id
+                    if rel_by_id.patient_id == current_user.id
+                    else rel_by_id.patient_id
+                )
+                rels = [
+                    r
+                    for r in relationships
+                    if r.status == "accepted"
+                    and (
+                        r.patient_id == real_contact_id
+                        or r.caregiver_id == real_contact_id
+                    )
+                ]
+
+        if not rels:
+            raise HTTPException(
+                status_code=404,
+                detail="Không tìm thấy dữ liệu liên hệ này",
+            )
+
+        contact = UserRepository.get_by_id(db, real_contact_id)
+        if not contact:
+            raise HTTPException(
+                status_code=404,
+                detail="Không tìm thấy tài khoản liên hệ",
+            )
+
+        # Gating: the row that authorises caregiver access is the one where
+        # ``contact`` is the patient and ``current_user`` is the caregiver.
+        # Looking at any other row would let A read B's medical info just
+        # because B granted A vitals access on the inverse direction.
+        granting_rel = next(
+            (
+                r
+                for r in rels
+                if r.patient_id == real_contact_id
+                and r.caregiver_id == current_user.id
+                and getattr(r, "can_view_medical_info", False)
+            ),
+            None,
+        )
+        if granting_rel is None:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "Người này chưa cho phép bạn xem hồ sơ y tế. "
+                    "Hãy yêu cầu họ bật quyền 'Cho phép xem hồ sơ y tế' "
+                    "trong cài đặt liên hệ."
+                ),
+            )
+
+        # ARRAY columns surface as Python lists already; coerce defensively
+        # for legacy rows that may have ``None`` from pre-migration snapshots.
+        return {
+            "contact_id": contact.id,
+            "display_name": contact.full_name or "Người dùng",
+            "blood_type": contact.blood_type,
+            "height_cm": contact.height_cm,
+            "weight_kg": contact.weight_kg,
+            "medications": list(contact.medications or []),
+            "allergies": list(contact.allergies or []),
+            "medical_conditions": list(contact.medical_conditions or []),
         }
 

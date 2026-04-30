@@ -9,6 +9,7 @@ from app.schemas.relationship import (
     AccessProfileResponse,
     FamilyProfileSnapshot,
     LinkedContactDetailResponse,
+    LinkedContactMedicalInfoResponse,
     RelationshipAcceptRequest,
     RelationshipRequestCreate,
     RelationshipResponse,
@@ -42,6 +43,24 @@ def get_linked_contact_detail(
     db: Session = Depends(get_db)
 ):
     return RelationshipService.get_linked_contact_detail(db, current_user, contact_id)
+
+
+@router.get(
+    "/relationships/{contact_id}/medical-info",
+    response_model=LinkedContactMedicalInfoResponse,
+    summary="Get a linked contact's self-filled medical profile",
+)
+def get_linked_contact_medical_info(
+    contact_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """P-4: read the patient's medical info when they granted
+    ``can_view_medical_info`` to the current caregiver. Returns 403 if
+    the bit is off, 404 if no relationship exists."""
+    return RelationshipService.get_linked_contact_medical_info(
+        db, current_user, contact_id
+    )
 
 @router.get(
     "/access-profiles",

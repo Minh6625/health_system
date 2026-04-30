@@ -40,6 +40,8 @@ class RelationshipUpdate(BaseModel):
     can_view_vitals: Optional[bool] = None
     can_receive_alerts: Optional[bool] = None
     can_view_location: Optional[bool] = None
+    # P-4: opt-in permission for caregiver to read the patient's medical profile.
+    can_view_medical_info: Optional[bool] = None
     relationship_type: Optional[str] = None
     primary_relationship_label: Optional[str] = None
     tags: Optional[list] = None
@@ -69,13 +71,37 @@ class RelationshipResponse(BaseModel):
     can_view_vitals: bool = False
     can_receive_alerts: bool = False
     can_view_location: bool = False
+    # P-4: granted by current user to partner. Mirrors the can_view_* trio.
+    can_view_medical_info: bool = False
     has_view_vitals_permission: bool = False
     has_receive_alerts_permission: bool = False
     has_view_location_permission: bool = False
+    # P-4: granted by partner to current user (inverse direction). Defaults
+    # False so legacy clients/parsers ignoring the field still see the
+    # privacy-preserving outcome.
+    has_view_medical_info_permission: bool = False
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class LinkedContactMedicalInfoResponse(BaseModel):
+    """P-4: caregiver-facing read-only view of the patient's medical
+    profile. Only returned when the patient granted
+    ``can_view_medical_info`` to the requesting caregiver; otherwise the
+    route raises 403 — the schema itself never carries a "denied" state
+    so deserializers stay simple.
+    """
+
+    contact_id: int
+    display_name: str
+    blood_type: Optional[str] = None
+    height_cm: Optional[int] = None
+    weight_kg: Optional[float] = None
+    medications: List[str] = []
+    allergies: List[str] = []
+    medical_conditions: List[str] = []
 
 class FamilyProfileSnapshot(BaseModel):
     id: str

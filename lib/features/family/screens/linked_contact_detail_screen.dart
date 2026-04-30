@@ -267,6 +267,19 @@ class _LinkedContactDetailContent extends StatelessWidget {
           onChanged: (val) =>
               provider.togglePermission('can_view_location', val),
         ),
+        // P-4: opt-in sharing of self-filled medical profile (blood type,
+        // height/weight, medications, allergies, conditions). Defaults
+        // OFF; the patient must flip this for each linked contact who
+        // they want to share their medical info with (typically a
+        // doctor or primary caregiver).
+        PermissionToggleCard(
+          title: 'Cho phép xem hồ sơ y tế của tôi',
+          description:
+              'Người này sẽ xem được nhóm máu, chiều cao/cân nặng, thuốc đang dùng, dị ứng và tiền sử bệnh bạn đã khai báo.',
+          value: contact.permissions.contains('can_view_medical_info'),
+          onChanged: (val) =>
+              provider.togglePermission('can_view_medical_info', val),
+        ),
 
         SizedBox(height: AppSpacing.gapLg),
         LabelManagementCard(

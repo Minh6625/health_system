@@ -72,6 +72,12 @@ class PersonDetailScreen extends StatelessWidget {
             if (!profile.hasVitalsData) _buildNoVitalsDataBanner(profile),
             _buildLiveVitals(context, profile),
             _buildHealthScoreBanner(context, profile),
+            // P-4: entry point to caregiver-facing medical-info screen.
+            // Always rendered — the target screen handles the 403 (no
+            // permission) state with a friendly empty banner. Surfacing
+            // the entry consistently is better UX than hiding it based
+            // on a stale permission cache.
+            _buildMedicalInfoEntry(context, profile),
             _buildSleepCard(context, profile),
             _buildAlertHistory(profile),
           ],
@@ -619,6 +625,91 @@ class PersonDetailScreen extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// P-4: compact "open medical info" card. The card is always shown so
+  /// caregivers learn the feature exists; gating happens behind the
+  /// route push (the target screen renders an explanatory empty state on
+  /// 403 instead of silently hiding the entry).
+  Widget _buildMedicalInfoEntry(
+    BuildContext context,
+    FamilyProfileSnapshot profile,
+  ) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.gapLg,
+        AppSpacing.gapLg,
+        AppSpacing.gapLg,
+        0,
+      ),
+      child: Material(
+        color: AppColors.bgSurface,
+        borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+          onTap: () => Navigator.pushNamed(
+            context,
+            AppRouter.linkedContactMedicalInfo,
+            arguments: {
+              'contactId': profile.id,
+              'displayName': profile.name,
+            },
+          ),
+          child: Container(
+            padding: EdgeInsets.all(AppSpacing.gapLg),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(AppRadii.radiusLg),
+              border: Border.all(color: AppColors.strokeSoft),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(AppSpacing.gapSm),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgElevated,
+                    borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+                  ),
+                  child: const Icon(
+                    Icons.medical_information_outlined,
+                    color: AppColors.brandPrimary,
+                    size: 24,
+                  ),
+                ),
+                SizedBox(width: AppSpacing.gapLg),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Hồ sơ y tế',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Nhóm máu, thuốc đang dùng, dị ứng, tiền sử bệnh',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.textSecondary,
+                  size: 22,
+                ),
+              ],
             ),
           ),
         ),
