@@ -112,7 +112,7 @@ class RiskAnalysisRepository {
       shortText: json['short_text'] as String? ?? '',
       clinicalNote: json['clinical_note'] as String? ?? '',
       recommendedActions: actionsRaw
-          .map((item) => item?.toString() ?? '')
+          .map((item) => prettifyRecommendedAction(item?.toString() ?? ''))
           .where((item) => item.isNotEmpty)
           .toList(),
     );
@@ -150,7 +150,7 @@ class RiskAnalysisRepository {
       level: _parseRiskLevel(json['risk_level'] as String?),
       displayStatus: json['display_status'] as String? ?? 'Không xác định',
       summary: json['summary'] as String? ?? '',
-      analyzedAt: DateTime.parse(json['timestamp'] as String),
+      analyzedAt: DateTime.parse(json['timestamp'] as String).toLocal(),
       previousScore: _parseNullableScore(json['previous_score']),
       trend7d: _parseTrend(json['trend_7d']),
       topFactors: topFactors,
@@ -207,7 +207,7 @@ class RiskAnalysisRepository {
       level: _parseRiskLevel(json['risk_level'] as String?),
       displayStatus: json['display_status'] as String? ?? 'Không xác định',
       summary: json['summary'] as String? ?? '',
-      analyzedAt: DateTime.parse(json['timestamp'] as String),
+      analyzedAt: DateTime.parse(json['timestamp'] as String).toLocal(),
       previousScore: _parseNullableScore(json['previous_score']),
       trend7d: _parseTrend(json['trend_7d']),
       breakdown: (json['breakdown'] as List? ?? const [])
@@ -350,7 +350,7 @@ class RiskAnalysisRepository {
               level: _parseRiskLevel(item['risk_level'] as String?),
               displayStatus:
                   item['display_status'] as String? ?? 'Không xác định',
-              analyzedAt: DateTime.parse(item['analyzed_at'] as String),
+              analyzedAt: DateTime.parse(item['analyzed_at'] as String).toLocal(),
               // F-14 (M-1): risk-history rows can also leak the raw
               // `feature_key=value` template via reason_preview when
               // the explanation falls back to the SHAP reason instead

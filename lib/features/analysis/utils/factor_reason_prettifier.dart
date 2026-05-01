@@ -63,6 +63,45 @@ final RegExp _featureValueToken = RegExp(
   caseSensitive: false,
 );
 
+/// Verb-suffix rewrites for old cached DB records that were persisted
+/// while Gemini was unavailable and the no-diacritic fallback fired.
+/// Keys are exact ASCII substrings; values are their proper Vietnamese.
+/// Applied after the regex pass so we don't interfere with `=`-detection.
+const Map<String, String> _verbRewrites = {
+  ' dang lam tang nguy co': ' đang làm tăng nguy cơ',
+  ' dang lam giam nguy co': ' đang làm giảm nguy cơ',
+  ' dang lam tang muc do canh bao': ' đang làm tăng mức độ cảnh báo',
+  ' la cac tin hieu dang duoc model uu tien theo doi': ' là các tín hiệu đang được model ưu tiên theo dõi',
+  ' dang keo sleep score xuong': ' đang kéo điểm giấc ngủ xuống',
+  ' dang ho tro sleep score on dinh hon': ' đang hỗ trợ điểm giấc ngủ ổn định hơn',
+};
+
+/// Exact-match rewrites for old ``recommended_actions`` strings persisted
+/// by the no-diacritic fallback.  Keys are the ASCII originals; values are
+/// proper Vietnamese.  Passthrough for anything not in this map.
+const Map<String, String> _actionRewrites = {
+  'do lai chi so': 'Đo lại chỉ số',
+  'doi chieu trieu chung': 'Đối chiếu triệu chứng',
+  'lien he nhan vien y te': 'Liên hệ nhân viên y tế',
+  'theo doi them 30-60 phut': 'Theo dõi thêm 30-60 phút',
+  'tiep tuc theo doi dinh ky': 'Tiếp tục theo dõi định kỳ',
+  'duy tri routine do': 'Duy trì thói quen đo',
+  'kiem tra an toan ngay': 'Kiểm tra an toàn ngay',
+  'xac minh voi nguoi dung': 'Xác minh với người dùng',
+  'khoi dong quy trinh canh bao': 'Khởi động quy trình cảnh báo',
+  'xac minh event': 'Xác minh sự kiện',
+  'theo doi them cac cua so lien tiep': 'Theo dõi thêm các cửa sổ liên tiếp',
+  'tiep tuc giam sat': 'Tiếp tục giám sát',
+  'doi chieu neu co bao dong khac': 'Đối chiếu nếu có báo động khác',
+  'xem lai hieu suat ngu': 'Xem lại hiệu suất ngủ',
+  'giam stress va screen time truoc khi ngu': 'Giảm stress và screen time trước khi ngủ',
+  'doi chieu cac yeu to gay giac': 'Đối chiếu các yếu tố gây giấc',
+  'duy tri gio ngu deu': 'Duy trì giờ ngủ đều',
+  'theo doi xu huong them vai dem': 'Theo dõi xu hướng thêm vài đêm',
+  'duy tri thoi quen ngu deu': 'Duy trì thói quen ngủ đều',
+  'tiep tuc theo doi xu huong': 'Tiếp tục theo dõi xu hướng',
+};
+
 /// Replaces every `feature_key=value` occurrence in [reason] with the
 /// Vietnamese label + value + unit looked up in `_factorLabels`.
 ///
@@ -75,7 +114,7 @@ final RegExp _featureValueToken = RegExp(
 /// zeros via `_reason_value`).
 String prettifyFactorReason(String reason) {
   if (reason.isEmpty) return reason;
-  return reason.replaceAllMapped(_featureValueToken, (match) {
+  String result = reason.replaceAllMapped(_featureValueToken, (match) {
     final key = match.group(1)!.toLowerCase();
     final value = match.group(2)!;
     final mapped = _factorLabels[key];
@@ -83,9 +122,6 @@ String prettifyFactorReason(String reason) {
       final unit = mapped.unit.isEmpty ? '' : ' ${mapped.unit}';
       return '${mapped.label} $value$unit';
     }
-    // Unknown feature — at least drop the `=` so the user does not see
-    // the API contract leaking. Title-case the snake_case key so it
-    // reads like a label, not a column name.
     final pretty = key
         .split('_')
         .where((part) => part.isNotEmpty)
@@ -93,4 +129,20 @@ String prettifyFactorReason(String reason) {
         .join(' ');
     return '$pretty $value';
   });
+  for (final entry in _verbRewrites.entries) {
+    if (result.contains(entry.key)) {
+      result = result.replaceAll(entry.key, entry.value);
+    }
+  }
+  return result;
+}
+
+/// Rewrites a single ``recommended_actions`` item from old cached DB
+/// records (persisted when Gemini was unavailable) to proper Vietnamese.
+///
+/// Idempotent: already-correct strings pass through unchanged because
+/// they are not in the [_actionRewrites] map keys.
+String prettifyRecommendedAction(String action) {
+  if (action.isEmpty) return action;
+  return _actionRewrites[action.trim()] ?? action;
 }

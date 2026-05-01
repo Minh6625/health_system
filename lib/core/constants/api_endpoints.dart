@@ -26,5 +26,9 @@ class ApiEndpoints {
   /// ``/fall-events/17/dismiss``.
   static String fallEventDismiss(int id) => '$fallEvents/$id/dismiss';
 
+  /// Build the post-dismiss survey path for one fall event, e.g.
+  /// ``/fall-events/17/survey``.  Module FA-2 (Option 3-Lite).
+  static String fallEventSurvey(int id) => '$fallEvents/$id/survey';
+
   const ApiEndpoints._();
 }

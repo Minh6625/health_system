@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:healthguard/core/constants/app_strings.dart';
+import 'package:healthguard/shared/widgets/app_loading_screen.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/core/theme/app_theme.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
@@ -13,6 +14,7 @@ import 'package:healthguard/features/auth/screens/auth_pages_screen.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
+import 'package:healthguard/features/fall/providers/fall_event_provider.dart';
 import 'package:healthguard/features/profile/providers/clinician_audience_provider.dart';
 import 'package:healthguard/features/emergency/services/sos_realtime_alert_service.dart';
 import 'package:healthguard/features/home/providers/home_dashboard_provider.dart';
@@ -36,6 +38,8 @@ class HealthSystemApp extends StatefulWidget {
 
 class _HealthSystemAppState extends State<HealthSystemApp> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+  final GlobalKey<ScaffoldMessengerState> _scaffoldMessengerKey =
+      GlobalKey<ScaffoldMessengerState>();
   final SOSRealtimeAlertService _sosRealtimeAlertService =
       SOSRealtimeAlertService.instance;
   late final NotificationRuntimeService _notificationRuntimeService;
@@ -63,6 +67,9 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     _sosRealtimeAlertService.bindNavigatorKey(_navigatorKey);
     _sosRealtimeAlertService.bindNotificationRuntimeCriticalAlertRedirector(
       _notificationRuntimeService.redirectCriticalAlertToAuth,
+    );
+    _notificationRuntimeService.setOnFullScreenIntentPermissionDenied(
+      _onFullScreenIntentPermissionDenied,
     );
     unawaited(_notificationRuntimeService.initialize());
     _initDeepLinks();
@@ -171,6 +178,26 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
     }
   }
 
+  void _onFullScreenIntentPermissionDenied() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(
+          content: const Text(
+            '⚠️ Chưa cấp quyền hiển thị toàn màn hình — '
+            'cảnh báo khẩn cấp sẽ không tự mở khi đang dùng app khác.',
+          ),
+          duration: const Duration(seconds: 10),
+          action: SnackBarAction(
+            label: 'Cài đặt',
+            onPressed: () {
+              _notificationRuntimeService.openFullScreenIntentSettings();
+            },
+          ),
+        ),
+      );
+    });
+  }
+
   @override
   void dispose() {
     unawaited(_notificationRuntimeService.dispose());
@@ -196,6 +223,7 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
           create: (_) =>
               EmergencyCaregiverProvider(EmergencyCaregiverRepository()),
         ),
+        ChangeNotifierProvider(create: (_) => FallEventProvider()),
         // Phase 8 / slice 4a: persistent clinician audience toggle.
         // ``init()`` reads the secure-storage value asynchronously; the
         // settings screen's switch is disabled until isInitialized is
@@ -208,10 +236,14 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
         service: _notificationRuntimeService,
         child: MaterialApp(
           navigatorKey: _navigatorKey,
+          scaffoldMessengerKey: _scaffoldMessengerKey,
           debugShowCheckedModeBanner: false,
           title: AppStrings.appName,
           theme: AppTheme.lightTheme,
-          home: AuthBootstrapGate(bootstrapFuture: _bootstrapAuthFuture),
+          home: AuthBootstrapGate(
+            bootstrapFuture: _bootstrapAuthFuture,
+            loadingBuilder: (_) => const AppLoadingScreen(),
+          ),
           onGenerateRoute: AppRouter.onGenerateRoute,
         ),
       ),
