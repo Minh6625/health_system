@@ -8,7 +8,7 @@ import 'package:healthguard/shared/presentation/theme/app_radii.dart';
 import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 
 /// Thời gian đếm ngược mặc định (giây) trước khi tự động leo thang.
-const int _kDefaultCountdownSeconds = 60;
+const int _kDefaultCountdownSeconds = 30;
 
 /// Full-screen overlay hiển thị khi phát hiện chỉ số sức khỏe bất thường
 /// (risk_high / risk_critical).
@@ -75,7 +75,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
   Timer? _countdownTimer;
   late int _remainingSeconds;
   bool _isActionInProgress = false;
-  final SosAudioService _audio = SosAudioService();
+  final SosAudioService _audio = SosAudioService(AudioAlertType.healthEmergency);
 
   bool get _isCritical => widget.riskLevel.toLowerCase() == 'critical';
 
@@ -135,7 +135,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
 
     _countdownTimer?.cancel();
     _countdownTimer = null;
-    _audio.stop();
+    unawaited(_audio.stop());
 
     try {
       await action();
@@ -151,7 +151,7 @@ class _RiskAlertFullScreenOverlayState extends State<RiskAlertFullScreenOverlay>
   @override
   void dispose() {
     _countdownTimer?.cancel();
-    _audio.stop();
+    unawaited(_audio.stop());
     _pulseController.dispose();
     super.dispose();
   }

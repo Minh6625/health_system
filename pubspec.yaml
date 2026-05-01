@@ -62,6 +62,7 @@ dependencies:
   image: ^4.5.4
   yomu: ^1.0.0
   supabase_flutter: ^2.8.0
+  audioplayers: ^6.1.0
 
   flutter_native_splash: any
 dev_dependencies:
@@ -93,6 +94,7 @@ flutter:
   assets:
     - assets/images/
     - assets/lottie/
+    - assets/audio/
     - .env.dev
     - .env.prod
 
@@ -126,17 +128,15 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo.png"
+  image_path: "assets/images/app_icon.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/logo.png"
+  adaptive_icon_foreground: "assets/images/app_icon.png"
 
 # Splash Screen configuration
 flutter_native_splash:
   color: "#FFFFFF"
-  image: assets/images/logo_rmbg.png
   android: true
   ios: true
   web: false
   android_12:
-    image: assets/images/logo_rmbg.png
     color: "#FFFFFF"

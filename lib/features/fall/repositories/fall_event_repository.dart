@@ -33,6 +33,26 @@ abstract class FallEventRepository {
   /// GET. Returns ``null`` when the event is not found / not owned
   /// (HTTP 404).
   Future<FallEvent?> dismiss(int id, {String? reason, String? patientId});
+
+  /// Module FA-2 (Option 3-Lite): submit the post-dismiss stand-up
+  /// survey answer.  Called from [FallStandUpSurveyScreen] after the
+  /// user has tapped "Tôi ổn" on the initial fall alert.
+  ///
+  /// * ``canStand=true``  — user stood up.
+  /// * ``canStand=false`` — user said OK but cannot stand; backend
+  ///                      fans a softer follow-up push to caregivers.
+  /// * ``canStand=null + skipped=true`` — user tapped "Bỏ qua" or
+  ///                      the 15s timer expired.
+  ///
+  /// Returns the updated event (with ``surveyAnswers`` populated) on
+  /// success.  Returns ``null`` on 404; rethrows on anything else so
+  /// the caller can decide whether to retry.
+  Future<FallEvent?> submitSurvey(
+    int id, {
+    required bool? canStand,
+    required bool skipped,
+    String? patientId,
+  });
 }
 
 class FallEventRepositoryImpl implements FallEventRepository {
@@ -93,6 +113,39 @@ class FallEventRepositoryImpl implements FallEventRepository {
       final response = await _client.post(
         ApiEndpoints.fallEventDismiss(id),
         body: body.isEmpty ? null : body,
+        targetProfileId: _parseTargetProfileId(patientId),
+      );
+      if (response is! Map<String, dynamic>) {
+        return null;
+      }
+      final inner = response['fall_event'];
+      if (inner is! Map<String, dynamic>) {
+        return null;
+      }
+      return FallEvent.fromJson(inner);
+    } catch (e) {
+      if (_is404(e)) {
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<FallEvent?> submitSurvey(
+    int id, {
+    required bool? canStand,
+    required bool skipped,
+    String? patientId,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'can_stand': canStand,
+        'skipped': skipped,
+      };
+      final response = await _client.post(
+        ApiEndpoints.fallEventSurvey(id),
+        body: body,
         targetProfileId: _parseTargetProfileId(patientId),
       );
       if (response is! Map<String, dynamic>) {

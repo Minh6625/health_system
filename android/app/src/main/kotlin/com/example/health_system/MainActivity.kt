@@ -91,7 +91,9 @@ class MainActivity : FlutterActivity() {
                 json.optString("risk_level", ""),
             )
             if (alertType.equals("risk_critical", ignoreCase = true) ||
-                riskLevel.equals("critical", ignoreCase = true)
+                riskLevel.equals("critical", ignoreCase = true) ||
+                alertType.equals("fall_detected", ignoreCase = true) ||
+                alertType.equals("fall_detection", ignoreCase = true)
             ) {
                 payload
             } else {

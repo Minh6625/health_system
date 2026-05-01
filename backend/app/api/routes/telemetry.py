@@ -3,7 +3,7 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -23,6 +23,7 @@ from app.schemas.fall_telemetry import ImuWindowRequest, ImuWindowResponse
 from app.schemas.sleep_telemetry import SleepRiskRequest, SleepRiskResponse
 from app.services.emergency_service import EmergencyService
 from app.services.model_api_client import get_model_api_client
+from app.services.push_notification_service import PushNotificationService
 from app.services.risk_alert_service import calculate_device_risk, dispatch_risk_alerts
 from app.services.settings_service import SettingsService
 
@@ -402,6 +403,46 @@ def ingest_alert(
                     address=_pick_value(metadata, "address"),
                     fall_event_id=fall_event_id,
                 )
+                # Flip the parent FallEvent's escalation flags so
+                # ``derive_status`` projects ``status='escalated'`` for
+                # the mobile UI.  Without this, the SOSEvent row is
+                # created with ``fall_event_id`` set but the parent
+                # row's ``sos_triggered`` stays False forever, leaving
+                # the fall card stuck on "detected".
+                fall_event.sos_triggered = True
+                fall_event.sos_triggered_at = datetime.now(timezone.utc)
+                db.commit()
+
+                # Module FA-2 patient-facing push.  ``trigger_sos`` only
+                # pushes SOS notifications to *caregivers*; the patient
+                # device receives nothing through that path.  We fire a
+                # dedicated ``fall_critical`` data-only push to the
+                # patient so their phone shows the full-screen FallAlert
+                # takeover with sound + vibration + 30s countdown.  If
+                # FCM creds are absent or the patient has no active
+                # push token the helper logs + returns silently — never
+                # raises — so a missing push does not block the SOS
+                # escalation we already committed above.
+                try:
+                    PushNotificationService.send_fall_critical_alert(
+                        db=db,
+                        recipient_user_ids=[int(resolved_user_id)],
+                        fall_event_id=int(fall_event_id),
+                        fall_event_uuid=str(fall_event.uuid),
+                        title="Phát hiện té ngã",
+                        body=(
+                            "Hệ thống phát hiện bạn có thể đã té ngã. "
+                            "Nhấn 'Tôi ổn' nếu bạn vẫn ổn."
+                        ),
+                        confidence=float(confidence_value),
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "Fall critical push failed for fall_event_id=%s patient=%s",
+                        fall_event_id,
+                        resolved_user_id,
+                    )
+
                 ingested += 1
                 return IngestResponse(ingested=ingested, errors=errors)
 

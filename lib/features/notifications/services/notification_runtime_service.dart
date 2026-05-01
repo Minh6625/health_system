@@ -23,10 +23,35 @@ const String _androidOnCriticalAlertLaunchMethod = 'onCriticalAlertLaunch';
 const String _androidConsumePendingCriticalAlertLaunchMethod =
     'consumePendingCriticalAlertLaunch';
 const String _androidDefaultNotificationIcon = '@mipmap/ic_launcher';
-const String _backgroundRiskCriticalChannelId = 'risk_critical_alerts';
+// Channel IDs are bumped to ``_v2`` so we can ship channels with
+// explicit sound + vibration settings.  Android 8+ locks notification
+// channel settings on the first ``createNotificationChannel`` call
+// (per-notification overrides are ignored after that), so we cannot
+// retroactively patch the original ``sos_fullscreen_alerts`` /
+// ``risk_critical_alerts`` channels that shipped without sound +
+// vibrationPattern set.  Bumping to a new id forces Android to honour
+// our explicit settings; the legacy channel is deleted on init.
+const String _backgroundRiskCriticalChannelId = 'risk_critical_alerts_v3';
 const String _backgroundRiskCriticalChannelName = 'Risk Critical Alerts';
-const String _backgroundSosChannelId = 'sos_fullscreen_alerts';
+const String _backgroundSosChannelId = 'sos_fullscreen_alerts_v3';
 const String _backgroundSosChannelName = 'SOS Fullscreen Alerts';
+const String _backgroundFallChannelId = 'fall_alerts_v1';
+const String _backgroundFallChannelName = 'Fall Alerts';
+
+// Legacy IDs kept for one-shot deletion on init so old installs don't
+// leave a silent channel lingering in Android Settings.
+const String _legacyBackgroundRiskCriticalChannelId = 'risk_critical_alerts';
+const String _legacyBackgroundRiskCriticalChannelIdV2 = 'risk_critical_alerts_v2';
+const String _legacyBackgroundSosChannelId = 'sos_fullscreen_alerts';
+const String _legacyBackgroundSosChannelIdV2 = 'sos_fullscreen_alerts_v2';
+
+/// Per-type notification sounds — each maps to a file in android/app/src/main/res/raw/.
+const _emergencyAlertSound =
+    RawResourceAndroidNotificationSound('emergency_alert');
+const _healthEmergencySound =
+    RawResourceAndroidNotificationSound('health_emergency');
+const _fallAlertSound =
+    RawResourceAndroidNotificationSound('fall_alert');
 
 final FlutterLocalNotificationsPlugin _backgroundNotifications =
     FlutterLocalNotificationsPlugin();
@@ -45,6 +70,16 @@ abstract interface class NotificationEmergencyAdapter {
     required String subjectId,
   });
   Future<void> redirectCriticalAlertToAuth(NotificationOpenTarget target);
+
+  /// Module FA-2: open the patient-facing [FallAlertScreen] in response
+  /// to a ``fall_alert`` push.  Distinct from [openSosDetail] because
+  /// the fall flow has its own 30s countdown + dismiss + survey UX
+  /// that must not be hijacked by the SOS state-machine.
+  Future<void> presentFallAlert({
+    required int fallEventId,
+    String? fallEventUuid,
+    double confidence = 0.0,
+  });
 }
 
 int _deriveCriticalRiskNotificationId(String notificationId) {
@@ -69,21 +104,83 @@ Future<void> _initializeBackgroundNotifications() async {
       .resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin
       >();
+  // One-shot cleanup: drop legacy v1 + v2 channels so Android Settings
+  // doesn't keep a stale silent entry. Safe no-op if they don't exist.
+  await androidPlugin?.deleteNotificationChannel(
+    _legacyBackgroundRiskCriticalChannelId,
+  );
+  await androidPlugin?.deleteNotificationChannel(
+    _legacyBackgroundRiskCriticalChannelIdV2,
+  );
+  await androidPlugin?.deleteNotificationChannel(
+    _legacyBackgroundSosChannelId,
+  );
+  await androidPlugin?.deleteNotificationChannel(
+    _legacyBackgroundSosChannelIdV2,
+  );
+
+  // Both channels register with the SAME loud vibration pattern + sound
+  // as the per-notification ``AndroidNotificationDetails`` payload below
+  // — channel settings win on Android 8+, so this is the only place
+  // these values actually take effect.
+  // NOTE: Android 8+ locks channel settings on first creation.
+  // If the device previously had a v1 channel without sound, we
+  // deleted it above and re-create here with explicit sound+vibration.
+  // If sound is still silent after the first run, the user must
+  // UNINSTALL + REINSTALL the app to clear all cached channel state.
   await androidPlugin?.createNotificationChannel(
-    const AndroidNotificationChannel(
+    AndroidNotificationChannel(
       _backgroundRiskCriticalChannelId,
       _backgroundRiskCriticalChannelName,
       description: 'Cảnh báo chỉ số sức khỏe nguy hiểm',
       importance: Importance.max,
+      playSound: true,
+      sound: _healthEmergencySound,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList(
+        const <int>[0, 900, 400, 900, 400, 1400],
+      ),
     ),
   );
+  debugPrint(
+    'Background channel registered: $_backgroundRiskCriticalChannelId '
+    '(sound=health_emergency vibration=true)',
+  );
   await androidPlugin?.createNotificationChannel(
-    const AndroidNotificationChannel(
+    AndroidNotificationChannel(
       _backgroundSosChannelId,
       _backgroundSosChannelName,
-      description: 'Cảnh báo SOS và té ngã toàn màn hình',
+      description: 'Cảnh báo SOS khẩn cấp toàn màn hình',
       importance: Importance.max,
+      playSound: true,
+      sound: _emergencyAlertSound,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList(
+        const <int>[0, 900, 400, 900, 400, 1400],
+      ),
     ),
+  );
+  debugPrint(
+    'Background channel registered: $_backgroundSosChannelId '
+    '(sound=emergency_alert vibration=true)',
+  );
+  await androidPlugin?.createNotificationChannel(
+    AndroidNotificationChannel(
+      _backgroundFallChannelId,
+      _backgroundFallChannelName,
+      description: 'Cảnh báo phát hiện té ngã',
+      importance: Importance.max,
+      playSound: true,
+      sound: _fallAlertSound,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList(
+        const <int>[0, 900, 400, 900, 400, 1400],
+      ),
+    ),
+  );
+  debugPrint(
+    'Background channel registered: $_backgroundFallChannelId '
+    '(sound=fall_alert vibration=true)',
   );
 
   _backgroundNotificationsInitialized = true;
@@ -113,14 +210,14 @@ Future<void> _showBackgroundCriticalRiskNotification(
       channelDescription: 'Cảnh báo chỉ số sức khỏe nguy hiểm',
       importance: Importance.max,
       priority: Priority.max,
-      category: AndroidNotificationCategory.call,
+      category: AndroidNotificationCategory.alarm,
       fullScreenIntent: true,
       playSound: true,
+      sound: _healthEmergencySound,
       enableVibration: true,
       vibrationPattern: Int64List.fromList([0, 900, 400, 900, 400, 1400]),
       visibility: NotificationVisibility.public,
       autoCancel: true,
-      ongoing: true,
     ),
   );
 
@@ -151,22 +248,34 @@ Future<void> _showBackgroundSosNotification(RemoteMessage message) async {
   if (sosId.isEmpty) {
     return;
   }
+
+  final alertType = (message.data['alert_type'] as String? ?? '').toLowerCase();
+  final isFall = isFallAlertType(alertType);
+  final channelId =
+      isFall ? _backgroundFallChannelId : _backgroundSosChannelId;
+  final channelName =
+      isFall ? _backgroundFallChannelName : _backgroundSosChannelName;
+  final channelDesc = isFall
+      ? 'Cảnh báo phát hiện té ngã'
+      : 'Cảnh báo SOS khẩn cấp toàn màn hình';
+  final sound = isFall ? _fallAlertSound : _emergencyAlertSound;
+
   final notificationId = _deriveSosNotificationId(sosId);
   final details = NotificationDetails(
     android: AndroidNotificationDetails(
-      _backgroundSosChannelId,
-      _backgroundSosChannelName,
-      channelDescription: 'Cảnh báo SOS và té ngã toàn màn hình',
+      channelId,
+      channelName,
+      channelDescription: channelDesc,
       importance: Importance.max,
       priority: Priority.max,
-      category: AndroidNotificationCategory.call,
+      category: AndroidNotificationCategory.alarm,
       fullScreenIntent: true,
       playSound: true,
+      sound: sound,
       enableVibration: true,
       vibrationPattern: Int64List.fromList([0, 900, 400, 900, 400, 1400]),
       visibility: NotificationVisibility.public,
       autoCancel: true,
-      ongoing: true,
     ),
   );
 
@@ -212,14 +321,24 @@ class NotificationRuntimeService {
            const MethodChannel(_androidCriticalAlertChannel),
        _reLoginRingingWindow = reLoginRingingWindow;
 
-  static const String _fullScreenChannelId = 'sos_fullscreen_alerts';
+  // Channel IDs are bumped to ``_v2`` so we can register them with
+  // explicit sound + vibration patterns; the legacy ids are deleted in
+  // ``_ensureNotificationChannels`` to avoid lingering silent entries
+  // in Android Settings.  See top-level comment in this file.
+  static const String _fullScreenChannelId = 'sos_fullscreen_alerts_v3';
   static const String _fullScreenChannelName = 'SOS Fullscreen Alerts';
+  static const String _fallChannelId = 'fall_alerts_v1';
+  static const String _fallChannelName = 'Fall Alerts';
+  static const String _legacyFullScreenChannelId = 'sos_fullscreen_alerts';
+  static const String _legacyFullScreenChannelIdV2 = 'sos_fullscreen_alerts_v2';
   static const String _missedChannelId = 'sos_missed_alerts';
   static const String _missedChannelName = 'SOS Missed Alerts';
   static const String _riskChannelId = 'risk_alerts';
   static const String _riskChannelName = 'Risk Alerts';
-  static const String _riskCriticalChannelId = 'risk_critical_alerts';
+  static const String _riskCriticalChannelId = 'risk_critical_alerts_v3';
   static const String _riskCriticalChannelName = 'Risk Critical Alerts';
+  static const String _legacyRiskCriticalChannelId = 'risk_critical_alerts';
+  static const String _legacyRiskCriticalChannelIdV2 = 'risk_critical_alerts_v2';
 
   static const String _lastSeenAtKey = 'sos_last_seen_alert_created_at';
   static const String _lastPresentedIdKey =
@@ -256,9 +375,30 @@ class NotificationRuntimeService {
   String? _currentFcmToken;
   bool? _hasFullScreenIntentPermission;
   bool? _deferredAuthState;
+  VoidCallback? _onFullScreenIntentPermissionDenied;
+
+  /// `true` if USE_FULL_SCREEN_INTENT is granted (Android 14+).
+  /// `null` means the check hasn't run yet or is not applicable (Android < 14).
+  /// `false` means explicitly denied — full-screen takeover will not work.
+  bool? get fullScreenIntentPermission => _hasFullScreenIntentPermission;
+
+  /// Register a callback invoked once when USE_FULL_SCREEN_INTENT is found
+  /// to be denied.  Useful for showing an in-app warning banner.
+  void setOnFullScreenIntentPermissionDenied(VoidCallback callback) {
+    _onFullScreenIntentPermissionDenied = callback;
+  }
+
+  /// Re-trigger the USE_FULL_SCREEN_INTENT permission dialog (Android 14+).
+  /// On Android ≤ 13 this is a no-op; the manifest declaration is sufficient.
+  Future<void> openFullScreenIntentSettings() async {
+    if (kIsWeb) return;
+    await _ensureAndroidAlertPermissions(requestFullScreenIntent: true);
+  }
+
   String _activeStorageScope = 'signed_out';
   final Map<String, DateTime> _recentAlertPresentation = {};
   NotificationOpenTarget? _pendingCriticalAlertAfterAuth;
+  String? _pendingNotificationTapPayload;
 
   Future<void> initialize() async {
     if (_isInitialized) {
@@ -284,12 +424,39 @@ class NotificationRuntimeService {
 
     await _ensureAndroidAlertPermissions(requestFullScreenIntent: true);
 
+    // Drop legacy v1 + v2 channels so Settings doesn't keep stale silent entries.
+    // Safe no-op if they don't exist.
+    await androidPlugin?.deleteNotificationChannel(_legacyFullScreenChannelId);
+    await androidPlugin?.deleteNotificationChannel(_legacyFullScreenChannelIdV2);
+    await androidPlugin?.deleteNotificationChannel(_legacyRiskCriticalChannelId);
+    await androidPlugin?.deleteNotificationChannel(_legacyRiskCriticalChannelIdV2);
+
     await androidPlugin?.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         _fullScreenChannelId,
         _fullScreenChannelName,
-        description: 'Cảnh báo SOS và té ngã toàn màn hình',
+        description: 'Cảnh báo SOS khẩn cấp toàn màn hình',
         importance: Importance.max,
+        playSound: true,
+        sound: _emergencyAlertSound,
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList(
+          const <int>[0, 900, 400, 900, 400, 1400],
+        ),
+      ),
+    );
+    await androidPlugin?.createNotificationChannel(
+      AndroidNotificationChannel(
+        _fallChannelId,
+        _fallChannelName,
+        description: 'Cảnh báo phát hiện té ngã',
+        importance: Importance.max,
+        playSound: true,
+        sound: _fallAlertSound,
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList(
+          const <int>[0, 900, 400, 900, 400, 1400],
+        ),
       ),
     );
     await androidPlugin?.createNotificationChannel(
@@ -309,19 +476,43 @@ class NotificationRuntimeService {
       ),
     );
     await androidPlugin?.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         _riskCriticalChannelId,
         _riskCriticalChannelName,
         description: 'Cảnh báo chỉ số sức khỏe nguy hiểm',
         importance: Importance.max,
+        playSound: true,
+        sound: _healthEmergencySound,
+        enableVibration: true,
+        vibrationPattern: Int64List.fromList(
+          const <int>[0, 900, 400, 900, 400, 1400],
+        ),
       ),
     );
 
     _lastPresentedNotificationId = null;
 
+    // Cold-start: check if the app was launched by tapping a local notification.
+    // flutter_local_notifications fires onDidReceiveNotificationResponse for
+    // background-tap case, but not always for the truly-killed state.
+    final launchDetails = await _notifications.getNotificationAppLaunchDetails();
+    if (launchDetails?.didNotificationLaunchApp == true) {
+      final coldPayload = launchDetails?.notificationResponse?.payload;
+      if (coldPayload != null && coldPayload.trim().isNotEmpty) {
+        _pendingNotificationTapPayload = coldPayload;
+        debugPrint('Cold-start notification tap detected — payload stored for replay');
+      }
+    }
+
     await _initializeAndroidCriticalAlertBridge();
     await _initializeFcm();
     _isInitialized = true;
+
+    // Replay any notification tap that arrived before init finished.
+    // (onAuthStateChanged will also call this once auth completes.)
+    if (_isRealtimeEnabled) {
+      await _restorePendingNotificationTap();
+    }
 
     final deferredAuthState = _deferredAuthState;
     _deferredAuthState = null;
@@ -362,6 +553,7 @@ class NotificationRuntimeService {
     await _dispatchMissedAlertsOnReLogin();
     await _connectWebSocket();
     await _restorePendingCriticalAlertAfterAuth();
+    await _restorePendingNotificationTap();
   }
 
   @visibleForTesting
@@ -482,12 +674,48 @@ class NotificationRuntimeService {
   }
 
   Future<void> _handleAndroidCriticalAlertLaunch(dynamic rawPayload) async {
-    final target = parseNotificationAndroidCriticalRiskLaunchPayload(rawPayload);
-    if (target == null) {
+    final riskTarget =
+        parseNotificationAndroidCriticalRiskLaunchPayload(rawPayload);
+    if (riskTarget != null) {
+      await _presentCriticalRiskTarget(riskTarget);
       return;
     }
 
-    await _presentCriticalRiskTarget(target);
+    final target = parseNotificationOpenTarget(_decodePayloadMap(rawPayload));
+    if (target == null) return;
+
+    final alertType = target.alertType?.trim().toLowerCase() ?? '';
+    if (alertType == 'fall_detected' || alertType == 'fall_detection') {
+      final fallEventId = int.tryParse(target.sosId ?? '');
+      if (fallEventId == null) return;
+      await _emergencyAdapter.presentFallAlert(fallEventId: fallEventId);
+      return;
+    }
+
+    final sosId = target.sosId?.trim();
+    if (sosId != null && sosId.isNotEmpty) {
+      await _emergencyAdapter.openSosDetail(sosId);
+    }
+  }
+
+  static Map<String, dynamic> _decodePayloadMap(dynamic rawPayload) {
+    if (rawPayload is Map<String, dynamic>) return rawPayload;
+    if (rawPayload is Map) {
+      return rawPayload.map(
+        (dynamic k, dynamic v) => MapEntry(k.toString(), v),
+      );
+    }
+    if (rawPayload is String) {
+      try {
+        final decoded = jsonDecode(rawPayload);
+        if (decoded is Map) {
+          return decoded.map(
+            (dynamic k, dynamic v) => MapEntry(k.toString(), v),
+          );
+        }
+      } catch (_) {}
+    }
+    return {};
   }
 
   Future<void> _ensureAndroidAlertPermissions({
@@ -523,9 +751,19 @@ class NotificationRuntimeService {
       final hasFullScreenPermission = await androidPlugin
           .requestFullScreenIntentPermission();
       _hasFullScreenIntentPermission = hasFullScreenPermission;
-      debugPrint(
-        'Notification runtime full-screen permission: ${hasFullScreenPermission ?? false}',
-      );
+      if (hasFullScreenPermission == false) {
+        debugPrint(
+          '⚠️ USE_FULL_SCREEN_INTENT permission DENIED — '
+          'fullscreen alerts will show as HUD banners only. '
+          'User must grant via Settings → Apps → HealthGuard → '
+          'Special app access → Display over other apps / Alarms.',
+        );
+        _onFullScreenIntentPermissionDenied?.call();
+      } else {
+        debugPrint(
+          'Notification runtime full-screen permission: ${hasFullScreenPermission ?? 'n/a (Android < 14)'}',
+        );
+      }
     } catch (e) {
       debugPrint(
         'Notification runtime full-screen permission request skipped: $e',
@@ -756,6 +994,31 @@ class NotificationRuntimeService {
       } else {
         await _emergencyAdapter.openNotifications();
       }
+      return;
+    }
+
+    // Module FA-2: fall pushes share the SOS subjectId slot but the
+    // tap target is FallAlertScreen, not SosDetail.  Detect via the
+    // alertType marker we set in parseNotificationOpenTarget.
+    final alertType = target.alertType?.trim().toLowerCase() ?? '';
+    if (alertType == 'fall_detected' || alertType == 'fall_detection') {
+      final fallEventIdRaw =
+          (data['fall_event_id'] ?? data['fallEventId'] ?? target.sosId)
+              ?.toString();
+      final fallEventId = int.tryParse(fallEventIdRaw ?? '');
+      if (fallEventId == null) {
+        return;
+      }
+      final fallEventUuid =
+          (data['fall_event_uuid'] ?? data['fallEventUuid'])?.toString();
+      final confidence = double.tryParse(
+        (data['confidence'] ?? '').toString(),
+      ) ?? 0.0;
+      await _emergencyAdapter.presentFallAlert(
+        fallEventId: fallEventId,
+        fallEventUuid: fallEventUuid,
+        confidence: confidence,
+      );
       return;
     }
 
@@ -1144,6 +1407,19 @@ class NotificationRuntimeService {
       return;
     }
 
+    // Guard: if initialisation hasn't finished yet (cold-start race) or the
+    // user is not authenticated yet, stash the payload and replay it once
+    // both conditions are satisfied (see _restorePendingNotificationTap).
+    if (!_isInitialized || !_isRealtimeEnabled) {
+      _pendingNotificationTapPayload = payload;
+      debugPrint('Notification tap deferred — not ready yet (init=$_isInitialized realtime=$_isRealtimeEnabled)');
+      return;
+    }
+
+    await _dispatchNotificationTapPayload(payload);
+  }
+
+  Future<void> _dispatchNotificationTapPayload(String payload) async {
     try {
       final decoded = jsonDecode(payload);
       if (decoded is! Map) {
@@ -1157,6 +1433,15 @@ class NotificationRuntimeService {
     } catch (_) {
       // Ignore tap payload errors.
     }
+  }
+
+  Future<void> _restorePendingNotificationTap() async {
+    if (!_isRealtimeEnabled) return;
+    final payload = _pendingNotificationTapPayload;
+    if (payload == null || payload.trim().isEmpty) return;
+    _pendingNotificationTapPayload = null;
+    debugPrint('Replaying deferred notification tap after auth/init');
+    await _dispatchNotificationTapPayload(payload);
   }
 
   Future<DateTime?> _readLastSeenAt() async {

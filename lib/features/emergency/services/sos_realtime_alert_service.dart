@@ -12,6 +12,8 @@ import '../repositories/emergency_caregiver_repository.dart';
 import '../screens/sos_confirm_screen.dart';
 import '../../family/models/family_profile_snapshot.dart';
 import '../../family/widgets/family_sos_full_screen_overlay.dart';
+import '../../fall/models/fall_event.dart';
+import '../../fall/screens/fall_alert_screen.dart';
 import '../../notifications/models/notification_open_target.dart';
 import '../../notifications/services/notification_event_mapper.dart';
 import '../../notifications/services/notification_open_router.dart';
@@ -120,7 +122,12 @@ class SOSRealtimeAlertService implements NotificationEmergencyAdapter {
     );
   }
 
-  static const String _fullScreenChannelId = 'sos_fullscreen_alerts';
+  // Channel IDs are bumped to ``_v2`` so they match the loud-vibration
+  // channel registered by NotificationRuntimeService.  Per-notification
+  // sound + vibration overrides are ignored on Android 8+ once the
+  // channel has been created without them, so we must show on the new
+  // channel for the user to actually hear / feel the alert.
+  static const String _fullScreenChannelId = 'sos_fullscreen_alerts_v3';
   static const String _fullScreenChannelName = 'SOS Fullscreen Alerts';
   static const String _missedChannelId = 'sos_missed_alerts';
   static const String _missedChannelName = 'SOS Missed Alerts';
@@ -128,7 +135,7 @@ class SOSRealtimeAlertService implements NotificationEmergencyAdapter {
   // Risk alert notification channels (A7)
   static const String _riskChannelId = 'risk_alerts';
   static const String _riskChannelName = 'Risk Alerts';
-  static const String _riskCriticalChannelId = 'risk_critical_alerts';
+  static const String _riskCriticalChannelId = 'risk_critical_alerts_v3';
   static const String _riskCriticalChannelName = 'Risk Critical Alerts';
 
   static const Duration _defaultOverlayVibrationInterval = Duration(
@@ -192,20 +199,93 @@ class SOSRealtimeAlertService implements NotificationEmergencyAdapter {
     Map<String, dynamic> item, {
     required String subjectId,
   }) async {
-    await _showFullScreenAlert(item, sosId: subjectId);
-
     final alertType =
         (item['alert_type'] as String?)?.toLowerCase().trim() ?? '';
     if (_isRiskAlertType(alertType)) {
+      await _showFullScreenAlert(item, sosId: subjectId);
       return;
     }
 
+    // Module FA-2: fall pushes share the same fullscreen channel +
+    // local notification as SOS, but the deep-link target is the
+    // FallAlertScreen (with its own 30s countdown + survey UX), NOT
+    // the SOS emergency alert / detail screen.
+    // NOTE: skip _showFullScreenAlert for fall alerts — FallAlertScreen
+    // plays its own alarm audio via SosAudioService; showing the local
+    // notification on top would cause duplicate sounds in foreground.
+    if (isFallAlertType(alertType)) {
+      final dataMap = _toMap(item['data']);
+      final fallEventIdRaw =
+          (dataMap['fall_event_id'] ??
+                  item['fall_event_id'] ??
+                  subjectId)
+              ?.toString();
+      final fallEventId = int.tryParse(fallEventIdRaw ?? '');
+      if (fallEventId == null) {
+        return;
+      }
+      final fallEventUuid =
+          (dataMap['fall_event_uuid'] ?? item['fall_event_uuid'])
+              ?.toString();
+      final confidence = double.tryParse(
+        (dataMap['confidence'] ?? item['confidence'] ?? '').toString(),
+      ) ?? 0.0;
+      await presentFallAlert(
+        fallEventId: fallEventId,
+        fallEventUuid: fallEventUuid,
+        confidence: confidence,
+      );
+      return;
+    }
+
+    await _showFullScreenAlert(item, sosId: subjectId);
     await _navigateToEmergencyAlertScreen(
       sosId: subjectId,
       title: (item['title'] as String?) ?? 'Canh bao khan cap',
       message:
           (item['message'] as String?) ??
           'Phat hien tinh huong khan cap. Nhan de xem chi tiet.',
+    );
+  }
+
+  @override
+  Future<void> presentFallAlert({
+    required int fallEventId,
+    String? fallEventUuid,
+    double confidence = 0.0,
+  }) async {
+    final navigatorState = _navigatorKey?.currentState;
+    if (navigatorState == null) {
+      return;
+    }
+
+    // Dedup: don't re-push FallAlertScreen if it's already on top.
+    final dedupeKey = 'fall-alert:$fallEventId';
+    if (_wasAlertPresentedRecently(dedupeKey)) {
+      return;
+    }
+    _rememberPresentedAlert(dedupeKey);
+
+    final synthesized = FallEvent(
+      id: fallEventId,
+      uuid: fallEventUuid ?? '',
+      // ``deviceId`` isn't in the push envelope; the FallAlertScreen
+      // re-fetches the full row via FallEventRepository on dismiss, at
+      // which point the canonical device_id lands too.
+      deviceId: 0,
+      detectedAt: DateTime.now(),
+      confidence: confidence.clamp(0.0, 1.0).toDouble(),
+      status: FallEventStatus.detected,
+    );
+
+    await navigatorState.push<void>(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: FallAlertScreen.routeName),
+        builder: (_) => FallAlertScreen(event: synthesized),
+        // Fullscreen so back-button + system gestures defer to the
+        // PopScope guard inside FallAlertScreen.
+        fullscreenDialog: true,
+      ),
     );
   }
 
@@ -793,18 +873,33 @@ class SOSRealtimeAlertService implements NotificationEmergencyAdapter {
       'message': body,
     });
 
-    // Use risk-specific channel for risk alerts.
-    final channelId = isRisk
-        ? (riskLevel == 'critical' ? _riskCriticalChannelId : _riskChannelId)
-        : _fullScreenChannelId;
-    final channelName = isRisk
-        ? (riskLevel == 'critical'
-              ? _riskCriticalChannelName
-              : _riskChannelName)
-        : _fullScreenChannelName;
-    final channelDesc = isRisk
-        ? 'Cảnh báo chỉ số sức khỏe bất thường'
-        : 'Cảnh báo SOS và té ngã toàn màn hình';
+    final isFall = isFallAlertType(alertType);
+
+    // Route to the correct channel + sound based on alert type.
+    final String channelId;
+    final String channelName;
+    final String channelDesc;
+    final RawResourceAndroidNotificationSound notifSound;
+    if (isRisk) {
+      channelId =
+          riskLevel == 'critical' ? _riskCriticalChannelId : _riskChannelId;
+      channelName = riskLevel == 'critical'
+          ? _riskCriticalChannelName
+          : _riskChannelName;
+      channelDesc = 'Cảnh báo chỉ số sức khỏe bất thường';
+      notifSound =
+          const RawResourceAndroidNotificationSound('health_emergency');
+    } else if (isFall) {
+      channelId = 'fall_alerts_v1';
+      channelName = 'Fall Alerts';
+      channelDesc = 'Cảnh báo phát hiện té ngã';
+      notifSound = const RawResourceAndroidNotificationSound('fall_alert');
+    } else {
+      channelId = _fullScreenChannelId;
+      channelName = _fullScreenChannelName;
+      channelDesc = 'Cảnh báo SOS khẩn cấp toàn màn hình';
+      notifSound = const RawResourceAndroidNotificationSound('emergency_alert');
+    }
 
     final details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -813,14 +908,14 @@ class SOSRealtimeAlertService implements NotificationEmergencyAdapter {
         channelDescription: channelDesc,
         importance: Importance.max,
         priority: Priority.max,
-        category: AndroidNotificationCategory.call,
+        category: AndroidNotificationCategory.alarm,
         fullScreenIntent: true,
         playSound: true,
+        sound: notifSound,
         enableVibration: true,
         vibrationPattern: Int64List.fromList([0, 900, 400, 900, 400, 1400]),
         visibility: NotificationVisibility.public,
         autoCancel: true,
-        ongoing: true,
       ),
     );
 

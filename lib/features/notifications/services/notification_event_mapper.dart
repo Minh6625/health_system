@@ -17,6 +17,14 @@ bool isActionableNotificationType(String alertType) {
       isRiskAlertType(normalized);
 }
 
+/// True when the alert is a fall detection (Module FA-2).  Mirrors
+/// the discriminators set by the backend's ``send_fall_critical_alert``
+/// helper: ``alert_type='fall_detected'`` or ``data.type='fall_alert'``.
+bool isFallAlertType(String alertType) {
+  final normalized = alertType.trim().toLowerCase();
+  return normalized == 'fall_detected' || normalized == 'fall_detection';
+}
+
 String? extractNotificationSubjectId(Map<String, dynamic> item) {
   final data = _toMap(item['data']);
   final candidates = <Object?>[
@@ -27,6 +35,12 @@ String? extractNotificationSubjectId(Map<String, dynamic> item) {
     data['sosId'],
     data['sosEventId'],
     data['event_id'],
+    // Module FA-2: fall pushes carry ``fall_event_id`` instead of
+    // ``sos_id``; fall back to it so ``_isEmergencyAlert`` accepts the
+    // push and the foreground pipeline runs the fullscreen presenter.
+    item['fall_event_id'],
+    data['fall_event_id'],
+    data['fallEventId'],
   ];
 
   for (final candidate in candidates) {
@@ -80,6 +94,14 @@ NotificationEvent? mapNotificationEventFromPushData(
   final sosId = (data['sos_id'] ?? data['sos_event_id'] ?? data['event_id'])
       ?.toString()
       .trim();
+  // Module FA-2: fall pushes carry ``fall_event_id`` instead of
+  // ``sos_id``.  We let the fall path borrow the SOS subjectId slot so
+  // the foreground dedup + presentation pipeline runs unchanged; the
+  // adapter (presentFullscreenAlert) inspects alert_type / data.type
+  // separately to decide whether to deep-link to FallAlertScreen vs
+  // SosDetailScreen.
+  final fallEventId = data['fall_event_id']?.toString().trim();
+  final isFall = isFallAlertType(alertType);
   final notificationId = (data['notification_id'] ?? data['id'])
       ?.toString()
       .trim();
@@ -89,6 +111,10 @@ NotificationEvent? mapNotificationEventFromPushData(
     effectiveId = (notificationId?.isNotEmpty ?? false)
         ? notificationId!
         : null;
+  } else if (isFall) {
+    effectiveId = (fallEventId?.isNotEmpty ?? false)
+        ? fallEventId!
+        : (sosId?.isNotEmpty ?? false) ? sosId! : null;
   } else {
     effectiveId = (sosId?.isNotEmpty ?? false) ? sosId! : null;
   }
@@ -105,7 +131,9 @@ NotificationEvent? mapNotificationEventFromPushData(
   final body = _resolveBody(message: message, data: data, isRisk: isRisk);
 
   return NotificationEvent(
-    id: notificationId ?? '$alertType-$effectiveId',
+    id: (notificationId?.isNotEmpty ?? false)
+        ? notificationId!
+        : '$alertType-$effectiveId',
     alertType: alertType,
     severity: isRisk ? riskLevel ?? 'medium' : 'critical',
     title: title,
@@ -119,6 +147,13 @@ NotificationEvent? mapNotificationEventFromPushData(
       if (sosId != null && sosId.isNotEmpty) 'sos_event_id': sosId,
       if (data['event_id'] != null) 'event_id': data['event_id'],
       if (data['trigger_type'] != null) 'trigger_type': data['trigger_type'],
+      // Module FA-2: keep the fall_event_id around so the adapter can
+      // open FallAlertScreen instead of SosDetailScreen when the user
+      // taps the foreground notification.
+      if (isFall && fallEventId != null && fallEventId.isNotEmpty)
+        'fall_event_id': fallEventId,
+      if (isFall && data['fall_event_uuid'] != null)
+        'fall_event_uuid': data['fall_event_uuid'].toString(),
       if (isRisk) 'risk_level': riskLevel ?? 'medium',
       if (isRisk && notificationId != null) 'notification_id': notificationId,
       if (isRisk && data['risk_score_id'] != null)

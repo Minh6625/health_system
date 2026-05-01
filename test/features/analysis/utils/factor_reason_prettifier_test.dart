@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:healthguard/features/analysis/utils/factor_reason_prettifier.dart';
+// ignore_for_file: lines_longer_than_80_chars
 
 /// F-14 (M-1) regression tests.
 ///
@@ -174,6 +175,64 @@ void main() {
               'Token requires no whitespace between key, `=`, and value. '
               'Free-form prose with `key = value` (with spaces) is left '
               'alone.');
+    });
+  });
+
+  group('prettifyFactorReason — verb-rewrite for old cached DB data', () {
+    test(
+        'fixes no-diacritic "dang lam tang nguy co" suffix from old '
+        'fallback template (risk_up, feature not in overrides)', () {
+      const raw = 'heart_rate=68.6 dang lam tang nguy co';
+
+      final result = prettifyFactorReason(raw);
+
+      expect(result, 'Nhịp tim 68.6 BPM đang làm tăng nguy cơ');
+    });
+
+    test(
+        'fixes no-diacritic "dang lam giam nguy co" suffix from old '
+        'fallback template (risk_down direction)', () {
+      const raw = 'spo2=94.5 dang lam giam nguy co';
+
+      final result = prettifyFactorReason(raw);
+
+      expect(result, 'SpO₂ 94.5 % đang làm giảm nguy cơ');
+    });
+
+    test(
+        'verb-rewrite is idempotent — already-correct Vietnamese verb '
+        'passes through untouched', () {
+      const clean = 'Nhịp tim 68.6 BPM đang làm giảm nguy cơ';
+
+      expect(prettifyFactorReason(clean), clean);
+    });
+  });
+
+  group('prettifyRecommendedAction', () {
+    test('rewrites known no-diacritic action to proper Vietnamese', () {
+      expect(prettifyRecommendedAction('do lai chi so'), 'Đo lại chỉ số');
+      expect(prettifyRecommendedAction('doi chieu trieu chung'), 'Đối chiếu triệu chứng');
+      expect(prettifyRecommendedAction('lien he nhan vien y te'), 'Liên hệ nhân viên y tế');
+      expect(prettifyRecommendedAction('tiep tuc giam sat'), 'Tiếp tục giám sát');
+      expect(prettifyRecommendedAction('duy tri thoi quen ngu deu'), 'Duy trì thói quen ngủ đều');
+    });
+
+    test('passes through already-correct Vietnamese action unchanged', () {
+      const clean = 'Đo lại chỉ số';
+      expect(prettifyRecommendedAction(clean), clean);
+    });
+
+    test('passes through unknown action unchanged', () {
+      const unknown = 'Một hành động không có trong map';
+      expect(prettifyRecommendedAction(unknown), unknown);
+    });
+
+    test('returns empty string for empty input', () {
+      expect(prettifyRecommendedAction(''), '');
+    });
+
+    test('trims leading/trailing whitespace before lookup', () {
+      expect(prettifyRecommendedAction('  do lai chi so  '), 'Đo lại chỉ số');
     });
   });
 }

@@ -494,6 +494,11 @@ class PushNotificationService:
                 # Discriminator that the mobile fall_event_handler keys on.
                 "type": "fall_alert",
                 "event_type": "fall_detected",
+                # ``alert_type`` is required by the mobile foreground
+                # mapper (``isActionableNotificationType``) — without it,
+                # ``_handleFcmForegroundMessage`` silently drops the push
+                # because the mapper rejects empty alert_type.
+                "alert_type": "fall_detected",
                 "fall_event_id": str(fall_event_id),
                 "fall_event_uuid": str(fall_event_uuid),
                 "confidence": f"{float(confidence):.3f}",
@@ -534,4 +539,152 @@ class PushNotificationService:
             response.success_count,
             response.failure_count,
             fall_event_id,
+        )
+
+    # ------------------------------------------------------------------
+    # Module FA-2 — Option 3-Lite follow-up concern push
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def send_fall_followup_concern(
+        cls,
+        db: Session,
+        *,
+        patient_user_id: int,
+        fall_event_id: int,
+        fall_event_uuid: str,
+    ) -> None:
+        """Caregiver-facing soft push when patient said OK but cannot stand.
+
+        Distinct from :meth:`send_fall_critical_alert`:
+
+        * **NOT** a full-screen takeover.  Patient already confirmed
+          they're conscious; this is a *check-in* nudge, not an SOS.
+        * Goes through the normal FCM ``notification`` payload (not
+          data-only) so the OS shows it as a regular noti — caregiver
+          can read on their lock screen and decide whether to call /
+          visit.
+        * Does NOT push to the patient (would defeat the purpose;
+          they're the one being checked on).
+        * Severity ``warning`` so the caregiver app's noti center
+          renders it distinctly from a real SOS.
+        """
+        # Lazy import to dodge the circular dependency with
+        # ``emergency_repository`` (which itself imports models that
+        # transitively import this module via ``alert_constants``).
+        from app.repositories.emergency_repository import EmergencyRepository
+
+        caregivers = EmergencyRepository.get_alert_recipient_user_ids(
+            db, patient_user_id=int(patient_user_id)
+        )
+        if not caregivers:
+            logger.info(
+                "Fall follow-up concern skipped: no caregivers for patient_user_id=%s",
+                patient_user_id,
+            )
+            return
+
+        if cls._push_disabled_for_e2e():
+            logger.info(
+                "Skipping fall follow-up concern fan-out because E2E_DISABLE_PUSH=1 "
+                "(would have notified caregivers=%s patient_user_id=%s)",
+                caregivers,
+                patient_user_id,
+            )
+            return
+
+        if not cls._ensure_initialized():
+            logger.warning(
+                "Fall follow-up concern skipped: FCM unavailable for fall_event_id=%s caregivers=%s",
+                fall_event_id,
+                caregivers,
+            )
+            return
+
+        rows = (
+            db.query(UserPushToken)
+            .filter(
+                UserPushToken.user_id.in_(list(caregivers)),
+                UserPushToken.is_active.is_(True),
+            )
+            .all()
+        )
+        if not rows:
+            logger.warning(
+                "Fall follow-up concern skipped: no active tokens for fall_event_id=%s caregivers=%s",
+                fall_event_id,
+                caregivers,
+            )
+            return
+
+        # Resolve patient name once so the noti is operator-friendly.
+        from app.models.user_model import User  # local to avoid widening top-level imports
+
+        patient_row = (
+            db.query(User).filter(User.id == int(patient_user_id)).first()
+        )
+        patient_name = (
+            patient_row.full_name if patient_row and patient_row.full_name else f"Người dùng #{patient_user_id}"
+        )
+
+        title = f"{patient_name} cần kiểm tra"
+        body = (
+            "Đã té ngã và xác nhận tỉnh táo nhưng không thể tự đứng dậy. "
+            "Hãy gọi điện hỏi thăm hoặc đến nhà ngay khi có thể."
+        )
+        created_at = datetime.now(timezone.utc).isoformat()
+
+        logger.info(
+            "Preparing FCM fall follow-up concern push: caregivers=%s active_tokens=%s fall_event_id=%s patient_user_id=%s",
+            caregivers,
+            len(rows),
+            fall_event_id,
+            patient_user_id,
+        )
+
+        messages: list[Any] = []
+        sent_token_refs: list[tuple[int, str]] = []
+        for row in rows:
+            data = {
+                # Distinct discriminator so the mobile handler doesn't
+                # confuse this with the takeover ``fall_alert`` push.
+                "type": "fall_followup",
+                "event_type": "fall_followup_concern",
+                "fall_event_id": str(fall_event_id),
+                "fall_event_uuid": str(fall_event_uuid),
+                "patient_user_id": str(patient_user_id),
+                "severity": "warning",
+                "created_at": created_at,
+                "title": title,
+                "body": body,
+                "click_action": "FLUTTER_NOTIFICATION_CLICK",
+            }
+            messages.append(
+                messaging.Message(
+                    token=row.token,
+                    # Soft path: regular notification payload so the OS
+                    # shows it on the lock screen.  No full-screen intent.
+                    notification=messaging.Notification(title=title, body=body),
+                    data=data,
+                    android=messaging.AndroidConfig(priority="normal"),
+                )
+            )
+            sent_token_refs.append((row.id, row.token))
+
+        if not messages:
+            return
+
+        try:
+            response = messaging.send_each(messages)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("FCM fall follow-up concern send failed: %s", exc)
+            return
+
+        cls._invalidate_stale_tokens(db, response, sent_token_refs)
+        logger.info(
+            "FCM fall follow-up concern push sent: success=%s failure=%s fall_event_id=%s patient_user_id=%s",
+            response.success_count,
+            response.failure_count,
+            fall_event_id,
+            patient_user_id,
         )

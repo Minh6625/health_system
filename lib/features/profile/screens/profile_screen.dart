@@ -5,6 +5,7 @@ import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/profile/models/user_profile_model.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
+import 'package:healthguard/features/profile/widgets/permissions_section.dart';
 import 'package:healthguard/features/profile/widgets/profile_widgets.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
@@ -216,7 +217,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
+
+          // ── Quyền truy cập ─────────────────────────────────────────
+          const PermissionsSection(),
+          const SizedBox(height: 20),
 
           // ── Danger Zone ────────────────────────────────────────────
           const ProfileSectionLabel('Vùng nguy hiểm'),
