@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
@@ -105,6 +105,7 @@ def upsert_push_token(
 @router.post("/notifications/push-token/unregister", response_model=PushTokenResponse)
 def unregister_push_token(
     payload: PushTokenUnregisterRequest,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> PushTokenResponse:
     NotificationService.unregister_push_token_any_user(
@@ -169,7 +170,7 @@ async def stream_notifications(websocket: WebSocket):
                         "type": "notifications.update",
                         "unread_count": unread_count,
                         "latest_notification": _serialize_notification(latest),
-                        "sent_at": datetime.utcnow().isoformat(),
+                        "sent_at": datetime.now(timezone.utc).isoformat(),
                     }
                     await websocket.send_json(payload_json)
                     last_signature = signature

@@ -114,7 +114,11 @@ def request_relationship(
 ):
     """Send a request to a family member or friend by email/phone"""
     rel = RelationshipService.request_relationship(db, current_user, payload)
-    return RelationshipService.format_relationships(db, current_user.id)[-1]  # Return fully formatted
+    all_rels = RelationshipService.format_relationships(db, current_user.id)
+    for r in all_rels:
+        if r["id"] == rel.id:
+            return r
+    return all_rels[-1]  # fallback
 
 
 @router.post(
@@ -129,12 +133,11 @@ def accept_relationship(
 ):
     """Accept an incoming request from someone wanting to view your data"""
     rel = RelationshipService.accept_relationship(db, current_user, payload.relationship_id)
-    # Find and return fully formatted
     rels = RelationshipService.format_relationships(db, current_user.id)
     for r in rels:
         if r["id"] == rel.id:
             return r
-    raise HTTPException(status_code=404, detail="Error formatting response")
+    raise HTTPException(status_code=404, detail="Relationship not found after accept")
 
 @router.put(
     "/relationships/{relationship_id}",

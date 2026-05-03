@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Optional, List
 from datetime import datetime, timedelta, timezone
 
@@ -18,6 +19,10 @@ from app.schemas.emergency import (
     TimelineEvent,
     ResolutionInfo,
 )
+
+logger = logging.getLogger(__name__)
+
+SOS_DEDUP_WINDOW_SECONDS: int = 60
 
 
 class EmergencyService:
@@ -76,6 +81,34 @@ class EmergencyService:
         send_push: bool = True,
     ) -> tuple[SOSEvent, dict[str, Any]]:
         """Trigger a new SOS event and fan out alerts."""
+
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=SOS_DEDUP_WINDOW_SECONDS)
+        existing = (
+            db.query(SOSEvent)
+            .filter(
+                SOSEvent.user_id == int(user_id),
+                SOSEvent.status == "active",
+                SOSEvent.triggered_at >= cutoff,
+            )
+            .first()
+        )
+        if existing is not None:
+            logger.warning(
+                "SOS dedup: active SOS %s already exists for user %s within %ds window — skipping",
+                existing.id,
+                user_id,
+                SOS_DEDUP_WINDOW_SECONDS,
+            )
+            return existing, {
+                "recipient_user_ids": [],
+                "title": "",
+                "body": "",
+                "alert_type": "",
+                "trigger_type": trigger_type,
+                "notification_id_by_user": {},
+                "recipient_count": 0,
+                "skipped": True,
+            }
 
         resolved_device_id = device_id
         if resolved_device_id is None:
@@ -233,6 +266,7 @@ class EmergencyService:
         longitude: Optional[float] = None,
         address: Optional[str] = None,
         notes: Optional[str] = None,
+        background_tasks: Optional[Any] = None,
     ) -> dict[str, Any]:
         """Handle a terminal response for an initial risk alert."""
         alert = EmergencyRepository.get_alert_by_id(db, notification_id)
@@ -328,8 +362,7 @@ class EmergencyService:
             response_row.sos_event_id = int(sos_event.id)
             db.commit()
 
-            PushNotificationService.send_sos_push_alerts(
-                db,
+            _push_kwargs = dict(
                 recipient_user_ids=dispatch_info["recipient_user_ids"],
                 title=dispatch_info["title"],
                 body=dispatch_info["body"],
@@ -338,6 +371,12 @@ class EmergencyService:
                 trigger_type=dispatch_info["trigger_type"],
                 notification_id_by_user=dispatch_info["notification_id_by_user"],
             )
+            if background_tasks is not None:
+                background_tasks.add_task(
+                    PushNotificationService.send_sos_push_alerts, db, **_push_kwargs
+                )
+            else:
+                PushNotificationService.send_sos_push_alerts(db, **_push_kwargs)
 
             return {
                 "success": True,
@@ -403,10 +442,17 @@ class EmergencyService:
             )
         )
 
+        all_patient_ids = list({int(sos.user_id) for sos in sos_events if sos.user_id is not None})
+        from app.models.user_model import User as _User
+        patient_by_id = {
+            int(u.id): u
+            for u in db.query(_User).filter(_User.id.in_(all_patient_ids)).all()
+        }
+
         sos_list_items = []
         for sos in sos_events:
-            # Get patient info
-            patient = EmergencyRepository.get_user_by_id(db, sos.user_id)
+            # Get patient info (from pre-fetched batch)
+            patient = patient_by_id.get(int(sos.user_id)) if sos.user_id is not None else None
             if not patient:
                 continue
 

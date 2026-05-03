@@ -1,3 +1,6 @@
+import logging
+import os
+
 from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import HTTPBearer
 from fastapi.security.http import HTTPAuthorizationCredentials
@@ -59,6 +62,14 @@ def _resolve_user_from_credentials(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tài khoản đã bị khóa",
+        )
+
+    token_version = payload.get("token_version")
+    if token_version is not None and token_version != user.token_version:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token không còn hợp lệ. Vui lòng đăng nhập lại.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return user
@@ -123,11 +134,28 @@ def get_target_profile_id(
     return x_target_profile_id
 
 
+_logger = logging.getLogger(__name__)
+
+_INTERNAL_SERVICE_SECRET: str = os.getenv("INTERNAL_SERVICE_SECRET", "")
+if not _INTERNAL_SERVICE_SECRET:
+    _logger.warning(
+        "INTERNAL_SERVICE_SECRET is not set. Internal endpoints are protected "
+        "only by the X-Internal-Service header, which is trivially spoofable. "
+        "Set INTERNAL_SERVICE_SECRET in your environment to enable secret verification."
+    )
+
+
 def require_internal_service(
-    x_internal_service: str | None = Header(default=None, alias="X-Internal-Service")
+    x_internal_service: str | None = Header(default=None, alias="X-Internal-Service"),
+    x_internal_secret: str | None = Header(default=None, alias="X-Internal-Secret"),
 ) -> None:
     if x_internal_service != "iot-simulator":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Endpoint này chỉ dành cho IoT Simulator internal service",
+        )
+    if _INTERNAL_SERVICE_SECRET and x_internal_secret != _INTERNAL_SERVICE_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid internal service credentials",
         )

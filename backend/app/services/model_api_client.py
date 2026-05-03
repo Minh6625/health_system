@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from typing import Any
 
 import httpx
@@ -68,6 +69,7 @@ class ModelApiClient:
         self._health_breaker = health_breaker or CircuitBreaker("model_api_health")
         self._fall_breaker = fall_breaker or CircuitBreaker("model_api_fall")
         self._sleep_breaker = sleep_breaker or CircuitBreaker("model_api_sleep")
+        self._client_lock = threading.Lock()
 
     @property
     def health_breaker(self) -> CircuitBreaker:
@@ -91,11 +93,13 @@ class ModelApiClient:
 
     def _ensure_client(self) -> httpx.Client:
         if self._client is None:
-            self._client = httpx.Client(
-                base_url=self._base_url,
-                timeout=self._timeout,
-                headers={"X-Internal-Service": "health-system-backend"},
-            )
+            with self._client_lock:
+                if self._client is None:
+                    self._client = httpx.Client(
+                        base_url=self._base_url,
+                        timeout=self._timeout,
+                        headers={"X-Internal-Service": "health-system-backend"},
+                    )
         return self._client
 
     def close(self) -> None:

@@ -1,7 +1,7 @@
 from typing import List, Optional, Tuple
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, or_, func, exists
+from sqlalchemy import and_, or_, func, exists, case
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.device_model import Device
@@ -127,16 +127,15 @@ class EmergencyRepository:
             query = query.filter(SOSEvent.status == 'resolved')
         # "all" = no filter
 
-        # Get counts
-        total_count = query.count()
-        active_count = db.query(func.count(SOSEvent.id)).filter(
-            base_filter,
-            SOSEvent.status == 'active'
-        ).scalar()
-        resolved_count = db.query(func.count(SOSEvent.id)).filter(
-            base_filter,
-            SOSEvent.status == 'resolved'
-        ).scalar()
+        # Get all counts in a single aggregation query to reduce round-trips
+        counts_row = db.query(
+            func.count(SOSEvent.id).label("total"),
+            func.sum(case((SOSEvent.status == "active", 1), else_=0)).label("active"),
+            func.sum(case((SOSEvent.status == "resolved", 1), else_=0)).label("resolved"),
+        ).filter(base_filter).first()
+        total_count = int(counts_row.total or 0)
+        active_count = int(counts_row.active or 0)
+        resolved_count = int(counts_row.resolved or 0)
         # Get paginated results, ordered by most recent first
         sos_events = (
             query

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, Numeric, Text, CheckConstraint
+from sqlalchemy import Index, String, Boolean, DateTime, Integer, ForeignKey, Numeric, Text, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import text
@@ -14,9 +14,13 @@ class FallEvent(Base):
     """Model for fall detection events from AI."""
     __tablename__ = "fall_events"
 
+    __table_args__ = (
+        Index("ix_fall_events_device_id_detected_at", "device_id", "detected_at"),
+    )
+
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     uuid: Mapped[str] = mapped_column(UUID, unique=True, server_default=text("gen_random_uuid()"))
-    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"))
+    device_id: Mapped[int] = mapped_column(ForeignKey("devices.id", ondelete="CASCADE"), index=True)
     
     # Detection
     detected_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
@@ -59,6 +63,7 @@ class Alert(Base):
 
     __table_args__ = (
         CheckConstraint("severity IN ('normal', 'high', 'critical')", name="check_alert_severity"),
+        Index("ix_alerts_device_alert_type_created", "device_id", "alert_type", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
@@ -103,6 +108,7 @@ class SOSEvent(Base):
     __table_args__ = (
         CheckConstraint("trigger_type IN ('auto', 'manual')", name="check_trigger_type"),
         CheckConstraint("status IN ('active', 'responded', 'cancelled', 'resolved')", name="check_status"),
+        Index("ix_sos_events_user_id_status_triggered_at", "user_id", "status", "triggered_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)

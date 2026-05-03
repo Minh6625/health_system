@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -29,6 +29,11 @@ def update_general_settings(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> GeneralSettingsResponse:
+    if payload.maintenance_mode is not None and getattr(current_user, "role", None) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Chỉ admin mới có thể bật/tắt chế độ bảo trì",
+        )
     updated = SettingsService.update_general_settings(
         db,
         user_id=current_user.id,

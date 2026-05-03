@@ -118,6 +118,7 @@ class TestTelemetryRiskPipeline:
             risk_level="medium",
             score=84.0,
             risk_score_id=902,
+            post_fall=False,
         )
         db.add.assert_not_called()
 
@@ -157,6 +158,7 @@ class TestTelemetryRiskPipeline:
             risk_level="critical",
             score=97.0,
             risk_score_id=903,
+            post_fall=False,
         )
 
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 
-from sqlalchemy import String, DateTime, Integer, ForeignKey, Numeric, CheckConstraint
+from sqlalchemy import Index, String, DateTime, Integer, ForeignKey, Numeric, CheckConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -26,6 +26,7 @@ class RiskScore(Base):
             "risk_level IN ('low', 'medium', 'critical')",
             name="check_risk_level",
         ),
+        Index("ix_risk_scores_user_id_calculated_at", "user_id", "calculated_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)

@@ -568,30 +568,15 @@ class MonitoringService:
 
     @staticmethod
     def _refresh_latest_risk_row(patient_id: int, db: Session) -> dict[str, Any] | None:
-        latest_risk_row = MonitoringService._select_latest_risk_row(patient_id, db)
-        latest_device = MonitoringService._select_latest_active_device(patient_id, db)
-        latest_vitals_at = latest_device.get("latest_vitals_at") if latest_device else None
+        """Return the latest persisted risk row without triggering inline ML inference.
 
-        if not MonitoringService._should_refresh_risk_report(latest_risk_row, latest_vitals_at):
-            return latest_risk_row
-
-        try:
-            from app.services.risk_alert_service import calculate_device_risk
-
-            calculate_device_risk(
-                db,
-                device_id=int(latest_device["device_id"]),
-                user_id=patient_id,
-                allow_cached=False,
-                dispatch_alerts=False,
-            )
-            return MonitoringService._select_latest_risk_row(patient_id, db)
-        except Exception:
-            logger.exception(
-                "Health report refresh failed for patient_id=%s; falling back to latest persisted risk row",
-                patient_id,
-            )
-            return latest_risk_row
+        Inline ``calculate_device_risk`` inside a GET read path blocks the
+        request thread on a full model-api round-trip for every stale contact
+        in the dashboard.  Risk scores are refreshed by the telemetry ingest
+        pipeline on every vitals batch — the read path should only surface
+        what is already persisted.
+        """
+        return MonitoringService._select_latest_risk_row(patient_id, db)
 
     @staticmethod
     def _previous_risk_score(

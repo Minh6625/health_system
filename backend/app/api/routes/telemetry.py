@@ -3,10 +3,10 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -16,6 +16,7 @@ from app.adapters import (
     RiskPersistenceAdapter,
     SleepRiskAdapter,
 )
+from app.core.dependencies import require_internal_service
 from app.db.database import get_db
 from app.models.device_model import Device
 from app.models.sos_event_model import Alert, FallEvent
@@ -29,6 +30,26 @@ from app.services.settings_service import SettingsService
 
 router = APIRouter(prefix="/telemetry", tags=["mobile-telemetry"])
 logger = logging.getLogger(__name__)
+
+# Post-fall monitoring window used to bypass risk-alert cooldown after SOS.
+# Stored in the DB via FallEvent.sos_triggered_at so multi-worker deployments
+# all see the same state (replaces the old in-process ``_post_fall_until`` dict).
+_POST_FALL_WINDOW_SECONDS: int = 3600
+
+
+def _is_in_post_fall_window(db: Session, device_id: int) -> bool:
+    """Return True when a fall-triggered SOS occurred within the last hour for this device."""
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=_POST_FALL_WINDOW_SECONDS)
+    return (
+        db.query(FallEvent)
+        .filter(
+            FallEvent.device_id == device_id,
+            FallEvent.sos_triggered.is_(True),
+            FallEvent.sos_triggered_at >= cutoff,
+        )
+        .first()
+    ) is not None
+
 
 # Fall detection secondary-validation gate (P0). Confidence reported by the simulator
 # / device must meet this threshold before the backend escalates to a full SOS event.
@@ -188,7 +209,7 @@ def _build_alert_title(event_type: str, severity: str) -> str:
     return normalized.replace("_", " ").strip().title() or "Telemetry alert"
 
 
-@router.post("/ingest", response_model=IngestResponse)
+@router.post("/ingest", response_model=IngestResponse, dependencies=[Depends(require_internal_service)])
 def ingest_vitals(
     payload: VitalIngestRequest,
     db: Session = Depends(get_db),
@@ -294,7 +315,7 @@ def ingest_vitals(
                         db,
                         device_id=int(device_id),
                         user_id=int(resolved_user_id),
-                        allow_cached=False,
+                        allow_cached=True,
                         dispatch_alerts=True,
                     )
                 except Exception as exc:
@@ -313,9 +334,10 @@ def ingest_vitals(
     return IngestResponse(ingested=ingested, errors=errors)
 
 
-@router.post("/alert", response_model=IngestResponse)
+@router.post("/alert", response_model=IngestResponse, dependencies=[Depends(require_internal_service)])
 def ingest_alert(
     payload: AlertIngestRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> IngestResponse:
     errors: list[str] = []
@@ -402,6 +424,7 @@ def ingest_alert(
                     longitude=_pick_float(metadata, "longitude"),
                     address=_pick_value(metadata, "address"),
                     fall_event_id=fall_event_id,
+                    send_push=True,
                 )
                 # Flip the parent FallEvent's escalation flags so
                 # ``derive_status`` projects ``status='escalated'`` for
@@ -413,6 +436,24 @@ def ingest_alert(
                 fall_event.sos_triggered_at = datetime.now(timezone.utc)
                 db.commit()
 
+                # Post-fall risk snapshot: evaluate vitals immediately after
+                # confirmed fall so caregivers get an up-to-date risk score
+                # alongside the SOS notification. Non-fatal — a failure here
+                # must never block the SOS push that follows.
+                try:
+                    calculate_device_risk(
+                        db,
+                        device_id=int(payload.db_device_id),
+                        user_id=int(resolved_user_id),
+                        allow_cached=False,
+                        dispatch_alerts=False,
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "Post-fall risk calculation failed for device %s (non-fatal)",
+                        payload.db_device_id,
+                    )
+
                 # Module FA-2 patient-facing push.  ``trigger_sos`` only
                 # pushes SOS notifications to *caregivers*; the patient
                 # device receives nothing through that path.  We fire a
@@ -423,25 +464,19 @@ def ingest_alert(
                 # push token the helper logs + returns silently — never
                 # raises — so a missing push does not block the SOS
                 # escalation we already committed above.
-                try:
-                    PushNotificationService.send_fall_critical_alert(
-                        db=db,
-                        recipient_user_ids=[int(resolved_user_id)],
-                        fall_event_id=int(fall_event_id),
-                        fall_event_uuid=str(fall_event.uuid),
-                        title="Phát hiện té ngã",
-                        body=(
-                            "Hệ thống phát hiện bạn có thể đã té ngã. "
-                            "Nhấn 'Tôi ổn' nếu bạn vẫn ổn."
-                        ),
-                        confidence=float(confidence_value),
-                    )
-                except Exception:  # noqa: BLE001
-                    logger.exception(
-                        "Fall critical push failed for fall_event_id=%s patient=%s",
-                        fall_event_id,
-                        resolved_user_id,
-                    )
+                background_tasks.add_task(
+                    PushNotificationService.send_fall_critical_alert,
+                    db,
+                    recipient_user_ids=[int(resolved_user_id)],
+                    fall_event_id=int(fall_event_id),
+                    fall_event_uuid=str(fall_event.uuid),
+                    title="Phát hiện té ngã",
+                    body=(
+                        "Hệ thống phát hiện bạn có thể đã té ngã. "
+                        "Nhấn 'Tôi ổn' nếu bạn vẫn ổn."
+                    ),
+                    confidence=float(confidence_value),
+                )
 
                 ingested += 1
                 return IngestResponse(ingested=ingested, errors=errors)
@@ -468,6 +503,7 @@ def ingest_alert(
                     payload.db_device_id,
                 )
 
+            _in_post_fall = _is_in_post_fall_window(db, int(payload.db_device_id))
             dispatch_risk_alerts(
                 db,
                 device_id=int(payload.db_device_id),
@@ -483,6 +519,7 @@ def ingest_alert(
                     if risk_result is not None
                     else _pick_int(metadata, "risk_score_id")
                 ),
+                post_fall=_in_post_fall,
             )
             ingested += 1
             return IngestResponse(ingested=ingested, errors=errors)

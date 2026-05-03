@@ -39,8 +39,8 @@ def get_latest_vital_signs(
             patient_id=target_profile_id,
             db=db,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dữ liệu sinh hiệu")
 
 
 @metrics_router.get(
@@ -102,7 +102,7 @@ def get_sleep_history(
     db: Session = Depends(get_db),
     from_date: str | None = None,
     to_date: str | None = None,
-    limit: int = 30,
+    limit: int = Query(default=30, ge=1, le=90),
 ) -> SleepHistoryResponse:
     """Get sleep session history within a date range."""
     sessions = MonitoringService.get_sleep_history(
@@ -137,7 +137,7 @@ def get_health_report(
 def list_risk_reports(
     target_profile_id: int = Depends(get_target_profile_id),
     db: Session = Depends(get_db),
-    limit: int = 10,
+    limit: int = Query(default=10, ge=1, le=50),
 ) -> list[RiskReportResponse]:
     """Get recent risk reports from AI analysis."""
     return MonitoringService.get_risk_reports(

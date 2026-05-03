@@ -6,7 +6,7 @@ load_dotenv()
 
 
 class Settings:
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://postgres:88888888@0.tcp.ngrok.io:18304/hg_db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql://localhost:5432/hg_db")
     
     # Heroku Postgres sets DATABASE_URL with "postgres://" but SQLAlchemy 2.x requires "postgresql://"
     if DATABASE_URL.startswith("postgres://"):

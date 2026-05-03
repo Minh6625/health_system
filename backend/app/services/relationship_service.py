@@ -19,7 +19,10 @@ class RelationshipService:
         
         q = query.strip().lower()
         users = db.query(User).filter(
-            (User.id != current_user.id) & 
+            (User.id != current_user.id) &
+            (User.deleted_at == None) &  # noqa: E711 — SQLAlchemy requires == None
+            (User.is_active == True) &
+            (User.is_verified == True) &
             (
                 (User.email.ilike(f"%{q}%")) | 
                 (User.phone.ilike(f"%{q}%")) | 
@@ -109,18 +112,23 @@ class RelationshipService:
         return "Trung bình"
 
     @staticmethod
-    def _family_vitals_unavailable_message(db: Session, user_id: int) -> str:
-        has_device = db.execute(
-            text(
-                """
-                SELECT 1
-                FROM devices
-                WHERE user_id = :user_id
-                LIMIT 1
-                """
-            ),
-            {"user_id": user_id},
-        ).first() is not None
+    def _family_vitals_unavailable_message(
+        db: Session,
+        user_id: int,
+        has_device: bool | None = None,
+    ) -> str:
+        if has_device is None:
+            has_device = db.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM devices
+                    WHERE user_id = :user_id
+                    LIMIT 1
+                    """
+                ),
+                {"user_id": user_id},
+            ).first() is not None
         if has_device:
             return "Thiết bị đã kết nối nhưng chưa có dữ liệu đo."
         return "Người dùng chưa kết nối thiết bị với tài khoản."
@@ -142,8 +150,13 @@ class RelationshipService:
         
         # 2. Add linked profiles (where current_user is the caregiver, and status is accepted)
         linked_relationships = RelationshipRepository.get_viewable_profiles(db, current_user.id)
+        patient_ids = [r.patient_id for r in linked_relationships]
+        patients_map = {
+            u.id: u
+            for u in db.query(User).filter(User.id.in_(patient_ids)).all()
+        } if patient_ids else {}
         for rel in linked_relationships:
-            patient = UserRepository.get_by_id(db, rel.patient_id)
+            patient = patients_map.get(rel.patient_id)
             if patient:
                 profiles.append(AccessProfileResponse(
                     id=patient.id,
@@ -174,12 +187,18 @@ class RelationshipService:
             # Assumes we have a get_by_phone method, fallback to query
             target_user = db.query(User).filter(User.phone == payload.phone).first()
             
-        if not target_user:
+        if not target_user or target_user.deleted_at is not None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Không tìm thấy người dùng với thông tin này"
             )
-            
+
+        if not target_user.is_active or not target_user.is_verified:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Tài khoản người dùng này chưa được kích hoạt hoặc xác thực"
+            )
+
         if target_user.id == current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -348,6 +367,16 @@ class RelationshipService:
                 grouped[partner_id] = []
             grouped[partner_id].append(r)
             
+        all_user_ids = set()
+        for partner_rels in grouped.values():
+            for r in partner_rels:
+                all_user_ids.add(r.patient_id)
+                all_user_ids.add(r.caregiver_id)
+        users_map = {
+            u.id: u
+            for u in db.query(User).filter(User.id.in_(list(all_user_ids))).all()
+        } if all_user_ids else {}
+
         result = []
         for partner_id, partner_rels in grouped.items():
             primary_rel = None
@@ -361,9 +390,9 @@ class RelationshipService:
                     primary_rel = partner_rels[0]
             else:
                 primary_rel = partner_rels[0]
-                
-            patient = UserRepository.get_by_id(db, primary_rel.patient_id)
-            caregiver = UserRepository.get_by_id(db, primary_rel.caregiver_id)
+
+            patient = users_map.get(primary_rel.patient_id)
+            caregiver = users_map.get(primary_rel.caregiver_id)
             if not patient or not caregiver:
                 continue
                 
@@ -456,9 +485,27 @@ class RelationshipService:
         for event in active_sos_events:
             latest_active_sos_by_user.setdefault(event.user_id, event)
 
+        contact_ids = list(contact_rels.keys())
+        contacts_map = {
+            u.id: u
+            for u in db.query(User).filter(User.id.in_(contact_ids)).all()
+        } if contact_ids else {}
+
+        from sqlalchemy import text as _text
+        contacts_with_devices: set[int] = set()
+        if contact_ids:
+            rows = db.execute(
+                _text(
+                    "SELECT DISTINCT user_id FROM devices "
+                    "WHERE user_id = ANY(:ids) AND deleted_at IS NULL"
+                ),
+                {"ids": contact_ids},
+            ).all()
+            contacts_with_devices = {r[0] for r in rows}
+
         snapshots = []
         for contact_id, rels in contact_rels.items():
-            contact = UserRepository.get_by_id(db, contact_id)
+            contact = contacts_map.get(contact_id)
             if not contact:
                 continue
 
@@ -514,6 +561,7 @@ class RelationshipService:
                     vitals_data_message = RelationshipService._family_vitals_unavailable_message(
                         db,
                         contact.id,
+                        has_device=contact.id in contacts_with_devices,
                     )
 
                 sleep_session = MonitoringService.get_latest_sleep_session(contact.id, db)
@@ -552,6 +600,7 @@ class RelationshipService:
                 vitals_data_message = RelationshipService._family_vitals_unavailable_message(
                     db,
                     contact.id,
+                    has_device=contact.id in contacts_with_devices,
                 )
 
             if active_sos is not None:

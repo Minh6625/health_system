@@ -19,7 +19,7 @@ from app.utils.jwt import (
 )
 from app.utils.datetime_helper import get_current_time
 from app.utils.email_service import EmailService
-from app.utils.password import validate_password_strength
+from app.utils.password import validate_password_strength, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +148,7 @@ class AuthService:
                 # Update their information with the new data
                 try:
                     from app.utils.password import hash_password
-                    existing_user.hashed_password = hash_password(password)
+                    existing_user.password_hash = hash_password(password)
                     existing_user.full_name = full_name.strip()
                     existing_user.role = role
                     existing_user.date_of_birth = date_of_birth
@@ -270,10 +270,14 @@ class AuthService:
             )
             return False, "Email không hợp lệ", None
 
+        _MAX_FAILED_ATTEMPTS = 5
+        _LOCKOUT_MINUTES = 15
+
         try:
-            user = UserRepository.verify_login(db, email, password)
-            
-            if not user:
+            # Fetch user first to apply per-account lockout checks
+            user = UserRepository.get_by_email(db, email)
+
+            if not user or user.deleted_at is not None:
                 AuditLogRepository.log_action(
                     db,
                     action="user.login",
@@ -283,7 +287,7 @@ class AuthService:
                     details={"email": email, "reason": "Wrong email or password"},
                 )
                 return False, "Sai email hoặc mật khẩu", None
-            
+
             # Check if account is active
             if not user.is_active:
                 AuditLogRepository.log_action(
@@ -298,7 +302,13 @@ class AuthService:
                     details={"email": email, "reason": "Account locked/inactive"},
                 )
                 return False, "Tài khoản đã bị khóa", None
-            
+
+            # Check per-account lockout (brute-force protection)
+            now = get_current_time()
+            if user.locked_until is not None and user.locked_until > now:
+                remaining = int((user.locked_until - now).total_seconds() / 60) + 1
+                return False, f"Tài khoản tạm khóa. Thử lại sau {remaining} phút.", None
+
             # Check if email is verified
             if not user.is_verified:
                 AuditLogRepository.log_action(
@@ -313,9 +323,46 @@ class AuthService:
                     details={"email": email, "reason": "Email not verified"},
                 )
                 return False, "Vui lòng xác thực email trước khi đăng nhập", None
-            
+
+            # Verify password
+            if not verify_password(password, user.password_hash):
+                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+                if user.failed_login_attempts >= _MAX_FAILED_ATTEMPTS:
+                    user.locked_until = now + timedelta(minutes=_LOCKOUT_MINUTES)
+                    db.commit()
+                    AuditLogRepository.log_action(
+                        db,
+                        action="user.login",
+                        status="failure",
+                        user_id=user.id,
+                        resource_type="user",
+                        resource_id=user.id,
+                        ip_address=ip_address,
+                        user_agent=user_agent,
+                        details={"email": email, "reason": "Account locked after too many failures"},
+                    )
+                    return False, f"Quá nhiều lần thử. Tài khoản bị khóa {_LOCKOUT_MINUTES} phút.", None
+                db.commit()
+                AuditLogRepository.log_action(
+                    db,
+                    action="user.login",
+                    status="failure",
+                    user_id=user.id,
+                    resource_type="user",
+                    resource_id=user.id,
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={"email": email, "reason": "Wrong password"},
+                )
+                return False, "Sai email hoặc mật khẩu", None
+
+            # Success — reset failed attempts counter
+            user.failed_login_attempts = 0
+            user.locked_until = None
+
             # Update last login timestamp
-            UserRepository.update_last_login(db, user.id)
+            user.last_login_at = now
+            db.commit()
             
             # Generate tokens
             access_token = create_access_token(
@@ -323,6 +370,7 @@ class AuthService:
                     "user_id": user.id,
                     "email": user.email,
                     "role": user.role,
+                    "token_version": user.token_version,
                 }
             )
             
@@ -427,6 +475,7 @@ class AuthService:
                 "user_id": user.id,
                 "email": user.email,
                 "role": user.role,
+                "token_version": user.token_version,
             }
         )
         
@@ -560,7 +609,7 @@ class AuthService:
                 user_agent=user_agent,
                 details={"email": email, "error": str(e)},
             )
-            return False, f"Lỗi server: {str(e)}"
+            return False, "Đã xảy ra lỗi. Vui lòng thử lại sau."
 
     @classmethod
     def resend_verification_email(
@@ -656,7 +705,7 @@ class AuthService:
                 user_agent=user_agent,
                 details={"email": email, "error": str(e)},
             )
-            return False, f"Lỗi server: {str(e)}", None
+            return False, "Đã xảy ra lỗi. Vui lòng thử lại sau.", None
 
     @classmethod
     def forgot_password(
@@ -740,7 +789,7 @@ class AuthService:
                 user_agent=user_agent,
                 details={"email": email, "error": str(e)},
             )
-            return False, f"Lỗi server: {str(e)}", None
+            return False, "Đã xảy ra lỗi. Vui lòng thử lại sau.", None
 
     @classmethod
     def verify_reset_otp(
@@ -897,20 +946,22 @@ class AuthService:
             return False, "Mã đặt lại mật khẩu đã hết hạn. Vui lòng yêu cầu lại."
         
         try:
-            # Update password
+            # Update password and invalidate existing tokens
             UserRepository.update_password(db, user.id, new_password)
             
             # Clear the reset code to prevent reuse
             user.reset_code = None
             user.reset_code_expires_at = None
-            
-            # Use a slightly complex update flow - ensure we do a db refresh or commit
-            # (update_password does commit, but its best to ensure our manual changes save too)
             user.updated_at = get_current_time()
+            user.token_version = (user.token_version or 0) + 1
             db.commit()
-            
-            # Send notification email
-            EmailService.send_password_changed_notification(user.email)
+
+            # Send notification email — isolated so SMTP failure does not
+            # mask the already-committed password change.
+            try:
+                EmailService.send_password_changed_notification(user.email)
+            except Exception:
+                logger.warning("Password reset notification email failed for user %s", user.id)
             
             AuditLogRepository.log_action(
                 db,
@@ -934,9 +985,9 @@ class AuthService:
                 user_id=user.id,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"email": email, "error": str(e)},
+                details={"email": email, "error": type(e).__name__},
             )
-            return False, f"Lỗi server: {str(e)}"
+            return False, "Đã xảy ra lỗi. Vui lòng thử lại sau."
 
     @classmethod
     def change_password(
@@ -989,11 +1040,17 @@ class AuthService:
             return False, "Mật khẩu hiện tại không đúng"
         
         try:
-            # Update password
+            # Update password and invalidate existing tokens
             UserRepository.update_password(db, user_id, new_password)
-            
-            # Send notification email
-            EmailService.send_password_changed_notification(user.email)
+            user.token_version = (user.token_version or 0) + 1
+            db.commit()
+
+            # Send notification email — isolated so SMTP failure does not
+            # mask the already-committed password change.
+            try:
+                EmailService.send_password_changed_notification(user.email)
+            except Exception:
+                logger.warning("Password change notification email failed for user %s", user_id)
             
             AuditLogRepository.log_action(
                 db,
@@ -1017,6 +1074,6 @@ class AuthService:
                 user_id=user_id,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                details={"error": str(e)},
+                details={"error": type(e).__name__},
             )
-            return False, f"Lỗi server: {str(e)}"
+            return False, "Đã xảy ra lỗi. Vui lòng thử lại sau."

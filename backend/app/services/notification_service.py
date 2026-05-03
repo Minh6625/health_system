@@ -61,22 +61,27 @@ class NotificationService:
             .all()
         )
 
-        unread_count = (
-            db.query(func.count(Alert.id))
-            .outerjoin(
-                NotificationRead,
-                and_(
-                    NotificationRead.alert_id == Alert.id,
-                    NotificationRead.user_id == user_id,
-                ),
+        # When unread_only=True the base_query already filters to unread rows,
+        # so total_count == unread_count — no second query needed.
+        if unread_only:
+            unread_count = total_count
+        else:
+            unread_count = (
+                db.query(func.count(Alert.id))
+                .outerjoin(
+                    NotificationRead,
+                    and_(
+                        NotificationRead.alert_id == Alert.id,
+                        NotificationRead.user_id == user_id,
+                    ),
+                )
+                .filter(
+                    Alert.user_id == user_id,
+                    NotificationRead.read_at.is_(None),
+                )
+                .scalar()
+                or 0
             )
-            .filter(
-                Alert.user_id == user_id,
-                NotificationRead.read_at.is_(None),
-            )
-            .scalar()
-            or 0
-        )
 
         items = [
             NotificationItem(
@@ -292,8 +297,7 @@ class NotificationService:
         if details is not None:
             alert_details.update(details)
 
-        notification_id_by_user: dict[int, int] = {}
-
+        alert_by_uid: list[tuple[int, Alert]] = []
         for uid in recipient_user_ids:
             alert = Alert(
                 device_id=device_id,
@@ -305,9 +309,12 @@ class NotificationService:
                 details=alert_details,
             )
             db.add(alert)
-            db.flush()  # populate alert.id
-            notification_id_by_user[uid] = alert.id
+            alert_by_uid.append((uid, alert))
 
+        db.flush()  # single flush — all ids populated at once
+        notification_id_by_user: dict[int, int] = {
+            uid: alert.id for uid, alert in alert_by_uid
+        }
         db.commit()
         logger.info(
             "Created %d risk alerts (type=%s, device=%d, score=%.1f)",

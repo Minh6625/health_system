@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Request, HTTPException, status, BackgroundTasks
@@ -30,6 +31,8 @@ from app.utils.rate_limiter import (
 from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
+
+_EXPOSE_CODES_FOR_TESTING: bool = os.getenv("TESTING_EXPOSE_CODES", "").strip() == "1"
 
 
 def get_client_ip(request: Request) -> Optional[str]:
@@ -94,7 +97,7 @@ def register(
         return AuthResponse(
             success=True,
             message=message,
-            verification_code=token_data.get("verification_code"),
+            verification_code=token_data.get("verification_code") if _EXPOSE_CODES_FOR_TESTING else None,
             user=user_data,
         )
     else:
@@ -146,7 +149,7 @@ def resend_verification(
         return AuthResponse(
             success=True,
             message=message,
-            verification_code=token_data.get("verification_code") if token_data else None,
+            verification_code=token_data.get("verification_code") if (token_data and _EXPOSE_CODES_FOR_TESTING) else None,
         )
     else:
         return AuthResponse(success=False, message=message)

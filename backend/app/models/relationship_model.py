@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, UniqueConstraint, CheckConstraint, JSON
+from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, UniqueConstraint, CheckConstraint, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -38,4 +38,6 @@ class UserRelationship(Base):
     __table_args__ = (
         UniqueConstraint("patient_id", "caregiver_id", name="unique_patient_caregiver"),
         CheckConstraint("patient_id != caregiver_id", name="different_users"),
+        Index("ix_relationships_caregiver_status_deleted", "caregiver_id", "status", "deleted_at"),
+        Index("ix_relationships_patient_status_deleted", "patient_id", "status", "deleted_at"),
     )
