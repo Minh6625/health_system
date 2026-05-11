@@ -1,5 +1,6 @@
 ---
-trigger: always_on
+trigger: glob
+globs: lib/**/*.dart,test/**/*.dart,integration_test/**/*.dart,pubspec.yaml,pubspec.lock,analysis_options.yaml
 ---
 
 # Flutter Rules — health_system/lib
