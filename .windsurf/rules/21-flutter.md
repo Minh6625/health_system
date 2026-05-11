@@ -1,6 +1,6 @@
 ---
 trigger: glob
-globs: lib/**/*.dart,test/**/*.dart,integration_test/**/*.dart,pubspec.yaml,pubspec.lock,analysis_options.yaml
+globs: **/*.dart
 ---
 
 # Flutter Rules — health_system/lib

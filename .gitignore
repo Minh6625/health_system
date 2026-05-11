@@ -104,3 +104,9 @@ CLAUDE.md
 progress.md
 task_plan.md
 
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+
