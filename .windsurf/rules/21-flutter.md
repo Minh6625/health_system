@@ -1,5 +1,6 @@
 ---
-trigger: always_on
+trigger: glob
+globs: **/*.dart
 ---
 
 # Flutter Rules — health_system/lib
