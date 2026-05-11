@@ -9,7 +9,7 @@ trigger: always_on
 ## This repo
 
 - **Name:** `health_system`
-- **Path:** `d:\DoAn2\VSmartwatch\health_system`
+- **Path:** `D:\DoAn2\VSmartwatch\health_system`
 - **Stack:** Flutter (mobile), FastAPI (BE)
 - **Overlays applied:** `flutter, fastapi`
 - **Trunk branch:** `develop`
@@ -32,4 +32,4 @@ trigger: always_on
 
 ## Last sync
 
-Generated: 2026-05-11 19:20
+Generated: 2026-05-11 20:38
