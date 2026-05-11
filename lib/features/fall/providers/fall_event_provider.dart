@@ -127,6 +127,53 @@ class FallEventProvider extends ChangeNotifier {
     return _repository.getEvent(id, patientId: patientId);
   }
 
+  // ── Survey state (Module FA-2 — Option 3-Lite) ──────────────────────────
+
+  bool _surveyInFlight = false;
+  String? _surveyErrorMessage;
+
+  bool get isSubmittingSurvey => _surveyInFlight;
+  String? get surveyErrorMessage => _surveyErrorMessage;
+
+  /// Submit the post-dismiss stand-up survey answer (Option 3-Lite).
+  ///
+  /// Returns ``true`` on success.  Optimistically updates the local
+  /// list so the survey badge appears immediately.  ``null`` server
+  /// response (404 or wrong shape) yields ``false`` without throwing.
+  Future<bool> submitSurvey(
+    int eventId, {
+    required bool? canStand,
+    required bool skipped,
+    String? patientId,
+  }) async {
+    _surveyInFlight = true;
+    _surveyErrorMessage = null;
+    notifyListeners();
+
+    bool ok = false;
+    try {
+      final updated = await _repository.submitSurvey(
+        eventId,
+        canStand: canStand,
+        skipped: skipped,
+        patientId: patientId,
+      );
+      if (updated != null) {
+        _events = [
+          for (final event in _events)
+            if (event.id == updated.id) updated else event,
+        ];
+        ok = true;
+      }
+    } catch (e) {
+      _surveyErrorMessage = e.toString();
+    } finally {
+      _surveyInFlight = false;
+      notifyListeners();
+    }
+    return ok;
+  }
+
   /// Test hook so the FallAlertScreen can stub a known fall event in
   /// without going through the network. Public on the provider so
   /// integration tests that boot the real FallEventProvider can

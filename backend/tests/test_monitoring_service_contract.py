@@ -414,3 +414,132 @@ class TestMonitoringServiceContract:
         assert sql_params["from_date"] == date(2026, 4, 14)
         assert sql_params["to_date"] == date(2026, 4, 16)
         assert sql_params["limit"] == 10
+
+    # ------------------------------------------------------------------
+    # F-12 (M-6): vitals time-series endpoint contract.
+    #
+    # Pre-fix the mobile chart on `vital_detail_screen.dart` showed the
+    # empty placeholder forever because `VitalSignsProvider.chartData`
+    # returned `const []` and no endpoint produced time-series data.
+    # These tests pin the new `MonitoringService.get_vitals_timeseries`
+    # contract: range coercion for unsupported tab values, the SQL
+    # parameter shape (so a future refactor can't accidentally drop the
+    # device join), the empty-vs-missing-table semantics, and the per
+    # channel null-passthrough that lets the mobile chart draw gaps
+    # instead of zero floors when a sensor stops streaming.
+    # ------------------------------------------------------------------
+
+    def test_vitals_timeseries_returns_empty_envelope_when_table_missing(self) -> None:
+        from sqlalchemy.exc import ProgrammingError
+
+        db = MagicMock()
+        db.execute.side_effect = ProgrammingError(
+            statement="SELECT 1",
+            params={},
+            orig=Exception('relation "vitals" does not exist'),
+        )
+
+        result = MonitoringService.get_vitals_timeseries(patient_id=42, db=db)
+
+        # Service swallows the missing-table error and returns the same
+        # 200 + empty envelope shape used elsewhere (cf. sleep_history).
+        # 500-ing here would force the mobile chart to render an error
+        # toast on a fresh DB, which is what M-6 was about avoiding.
+        assert result.range == "24h"
+        assert result.bucket_minutes == 15
+        assert result.data == []
+        # Caller must rollback so the session can be reused — without
+        # this the next query in the same request would 500.
+        db.rollback.assert_called_once()
+
+    def test_vitals_timeseries_coerces_unknown_range_to_24h(self) -> None:
+        db = MagicMock()
+        db.execute.return_value = _FakeQueryResult(all_rows=[])
+
+        result = MonitoringService.get_vitals_timeseries(
+            patient_id=7, db=db, range_key="bogus"
+        )
+
+        # An unknown range MUST silently fall back to "24h" rather than
+        # 400-ing. Future range tabs will land progressively, and an
+        # older mobile build sending a not-yet-supported value should
+        # still get a sensible chart instead of a hard error.
+        assert result.range == "24h"
+        assert result.bucket_minutes == 15
+
+    def test_vitals_timeseries_passes_user_id_and_interval_strings_to_sql(self) -> None:
+        db = MagicMock()
+        db.execute.return_value = _FakeQueryResult(all_rows=[])
+
+        MonitoringService.get_vitals_timeseries(patient_id=11, db=db, range_key="24h")
+
+        # Verify the SQL parameter dict, not the rendered SQL: the row
+        # must be filtered by the patient (via the device join) and the
+        # bucket / window intervals must be passed as strings castable to
+        # Postgres `interval` so a refactor that breaks one of these
+        # silently is caught here instead of at runtime in production.
+        call_kwargs = db.execute.call_args.args[1]
+        assert call_kwargs["user_id"] == 11
+        assert call_kwargs["bucket_interval"] == "15 minutes"
+        assert call_kwargs["window_interval"] == "24 hours"
+
+    def test_vitals_timeseries_maps_rows_into_points_preserving_nulls(self) -> None:
+        bucket_a = datetime(2026, 4, 29, 6, 0, tzinfo=UTC)
+        bucket_b = datetime(2026, 4, 29, 6, 15, tzinfo=UTC)
+        db = MagicMock()
+        # Row B has spo2=None on purpose — when the sensor drops out
+        # mid-bucket the chart needs a null in that channel so the line
+        # draws a gap instead of crashing through to zero.
+        db.execute.return_value = _FakeQueryResult(
+            all_rows=[
+                {
+                    "bucket_ts": bucket_a,
+                    "heart_rate": 72.0,
+                    "spo2": 98.0,
+                    "temperature": 36.7,
+                    "respiratory_rate": 16.0,
+                    "blood_pressure_sys": 118.0,
+                    "blood_pressure_dia": 76.0,
+                },
+                {
+                    "bucket_ts": bucket_b,
+                    "heart_rate": 74.5,
+                    "spo2": None,
+                    "temperature": 36.8,
+                    "respiratory_rate": 17.0,
+                    "blood_pressure_sys": None,
+                    "blood_pressure_dia": None,
+                },
+            ]
+        )
+
+        result = MonitoringService.get_vitals_timeseries(patient_id=3, db=db)
+
+        assert len(result.data) == 2
+        assert result.data[0].ts == bucket_a
+        assert result.data[0].heart_rate == 72.0
+        assert result.data[0].spo2 == 98.0
+        assert result.data[1].ts == bucket_b
+        assert result.data[1].heart_rate == 74.5
+        # Channel-level null MUST round-trip as None, not 0.0, so the
+        # mobile chart can draw a gap; a zero would render a misleading
+        # "SpO2 dropped to 0" cliff in the line.
+        assert result.data[1].spo2 is None
+        assert result.data[1].blood_pressure_sys is None
+        assert result.data[1].blood_pressure_dia is None
+
+    def test_vitals_timeseries_7d_range_uses_hourly_buckets(self) -> None:
+        db = MagicMock()
+        db.execute.return_value = _FakeQueryResult(all_rows=[])
+
+        result = MonitoringService.get_vitals_timeseries(
+            patient_id=4, db=db, range_key="7d"
+        )
+
+        # Pin the bucket sizing so a future refactor can't silently
+        # change the payload shape and break the mobile X-axis labels.
+        assert result.range == "7d"
+        assert result.bucket_minutes == 60
+        call_kwargs = db.execute.call_args.args[1]
+        assert call_kwargs["bucket_interval"] == "60 minutes"
+        assert call_kwargs["window_interval"] == "168 hours"

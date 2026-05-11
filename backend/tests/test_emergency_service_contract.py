@@ -62,6 +62,13 @@ def test_get_sos_alerts_for_caregiver_marks_risk_origin_rows_as_vital_critical()
         "app.services.emergency_service.EmergencyRepository.get_risk_response_sos_event_ids",
         return_value={55},
         create=True,
+    ), patch(
+        # Bug fix G-3: the service now batches a per-patient location
+        # visibility lookup. The caregiver here (id=21) has location
+        # access on patient 7, matching the legacy behaviour where the
+        # response shipped LocationInfo whenever the SOS had coordinates.
+        "app.services.emergency_service.EmergencyRepository.get_caregiver_location_visibility",
+        return_value={7: True},
     ):
         result = EmergencyService.get_sos_alerts_for_caregiver(
             db,
@@ -71,6 +78,108 @@ def test_get_sos_alerts_for_caregiver_marks_risk_origin_rows_as_vital_critical()
 
     assert result.total_count == 1
     assert result.sos_alerts[0].trigger_type == "vital_critical"
+    assert result.sos_alerts[0].location is not None
+    assert result.sos_alerts[0].location.address == "123 Street"
+
+
+def test_get_sos_alerts_for_caregiver_redacts_location_when_permission_revoked() -> None:
+    """G-3 regression: caregivers without ``can_view_location`` no longer see
+    coordinates/address in the SOS list response, even when the SOS event
+    persisted them."""
+    db = object()
+    patient = _build_patient(user_id=7, full_name="Patient Elder")
+    sos = _build_sos(sos_id=55, trigger_type="manual")
+
+    with patch(
+        "app.services.emergency_service.EmergencyRepository.get_sos_alerts_by_caregiver",
+        return_value=([sos], 1, 1, 0),
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_user_by_id",
+        return_value=patient,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_risk_response_sos_event_ids",
+        return_value=set(),
+        create=True,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_caregiver_location_visibility",
+        return_value={7: False},
+    ):
+        result = EmergencyService.get_sos_alerts_for_caregiver(
+            db,
+            caregiver_user_id=21,
+            status="all",
+        )
+
+    assert result.total_count == 1
+    assert result.sos_alerts[0].location is None
+
+
+def test_get_sos_detail_redacts_location_for_caregiver_without_permission() -> None:
+    """G-3 regression: the SOS detail endpoint redacts ``LocationInfo`` when the
+    caregiver's relationship row has ``can_view_location=False``."""
+    db = object()
+    sos = _build_sos(sos_id=77, trigger_type="manual")
+    patient = _build_patient(user_id=7, full_name="Patient Elder")
+
+    with patch(
+        "app.services.emergency_service.EmergencyRepository.get_sos_detail",
+        return_value=sos,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_user_by_id",
+        return_value=patient,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_fall_event_by_id",
+        return_value=None,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_risk_alert_response_by_sos_event_id",
+        return_value=None,
+        create=True,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_caregiver_view_permissions",
+        return_value=(True, False),  # can_receive_alerts=True, can_view_location=False
+    ):
+        detail = EmergencyService.get_sos_detail(
+            db,
+            77,
+            viewer_user_id=21,
+            viewer_is_admin=False,
+        )
+
+    assert detail is not None
+    assert detail.location is None
+
+
+def test_get_sos_detail_keeps_location_for_patient_self_view() -> None:
+    """G-3 regression: a patient viewing their own SOS always sees the full
+    location regardless of relationship rows."""
+    db = object()
+    sos = _build_sos(sos_id=77, trigger_type="manual")
+    patient = _build_patient(user_id=7, full_name="Patient Elder")
+
+    with patch(
+        "app.services.emergency_service.EmergencyRepository.get_sos_detail",
+        return_value=sos,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_user_by_id",
+        return_value=patient,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_fall_event_by_id",
+        return_value=None,
+    ), patch(
+        "app.services.emergency_service.EmergencyRepository.get_risk_alert_response_by_sos_event_id",
+        return_value=None,
+        create=True,
+    ):
+        detail = EmergencyService.get_sos_detail(
+            db,
+            77,
+            viewer_user_id=7,  # same as patient.user_id ⇒ self-view
+            viewer_is_admin=False,
+        )
+
+    assert detail is not None
+    assert detail.location is not None
+    assert detail.location.address == "123 Street"
 
 
 def test_get_sos_detail_marks_risk_origin_and_parses_resolution_notes() -> None:

@@ -19,6 +19,7 @@ import 'package:healthguard/features/family/screens/family_shell_screen.dart';
 import 'package:healthguard/features/family/screens/family_dashboard_screen.dart';
 import 'package:healthguard/features/family/screens/add_contact_screen.dart';
 import 'package:healthguard/features/family/screens/linked_contact_detail_screen.dart';
+import 'package:healthguard/features/family/screens/linked_contact_medical_info_screen.dart';
 import 'package:healthguard/features/family/screens/person_detail_screen.dart';
 import 'package:healthguard/features/device/screens/device_screen.dart';
 import 'package:healthguard/features/sleep_analysis/screens/sleep_report_screen.dart';
@@ -67,6 +68,8 @@ class AppRouter {
   static const String healthReport = '/health-report';
   static const String addContact = '/add-contact';
   static const String linkedContactDetail = '/linked-contact-detail';
+  // P-4: caregiver-facing read-only medical-info screen.
+  static const String linkedContactMedicalInfo = '/linked-contact-medical-info';
   static const String familyDashboard = '/family-dashboard';
   static const String personDetail = '/person-detail';
   static const String manualSos = '/manual-sos';
@@ -203,6 +206,21 @@ class AppRouter {
             arguments: routeArgs,
           ),
           builder: (_) => LinkedContactDetailScreen(contactId: contactId),
+        );
+      case linkedContactMedicalInfo:
+        final contactId = routeArgs['contactId']?.toString() ?? '';
+        // ``displayName`` is optional — kept off the constructor's required
+        // list so deep links / push notifications can navigate without it.
+        final displayName = routeArgs['displayName'] as String?;
+        return MaterialPageRoute(
+          settings: RouteSettings(
+            name: linkedContactMedicalInfo,
+            arguments: routeArgs,
+          ),
+          builder: (_) => LinkedContactMedicalInfoScreen(
+            contactId: contactId,
+            prefilledName: displayName,
+          ),
         );
       case personDetail:
         return MaterialPageRoute(

@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Optional, List
 from datetime import datetime, timedelta, timezone
 
@@ -18,6 +19,10 @@ from app.schemas.emergency import (
     TimelineEvent,
     ResolutionInfo,
 )
+
+logger = logging.getLogger(__name__)
+
+SOS_DEDUP_WINDOW_SECONDS: int = 60
 
 
 class EmergencyService:
@@ -76,6 +81,34 @@ class EmergencyService:
         send_push: bool = True,
     ) -> tuple[SOSEvent, dict[str, Any]]:
         """Trigger a new SOS event and fan out alerts."""
+
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=SOS_DEDUP_WINDOW_SECONDS)
+        existing = (
+            db.query(SOSEvent)
+            .filter(
+                SOSEvent.user_id == int(user_id),
+                SOSEvent.status == "active",
+                SOSEvent.triggered_at >= cutoff,
+            )
+            .first()
+        )
+        if existing is not None:
+            logger.warning(
+                "SOS dedup: active SOS %s already exists for user %s within %ds window — skipping",
+                existing.id,
+                user_id,
+                SOS_DEDUP_WINDOW_SECONDS,
+            )
+            return existing, {
+                "recipient_user_ids": [],
+                "title": "",
+                "body": "",
+                "alert_type": "",
+                "trigger_type": trigger_type,
+                "notification_id_by_user": {},
+                "recipient_count": 0,
+                "skipped": True,
+            }
 
         resolved_device_id = device_id
         if resolved_device_id is None:
@@ -137,12 +170,18 @@ class EmergencyService:
             else "Người dùng đã kích hoạt SOS thủ công. Cần hỗ trợ ngay."
         )
 
-        base_details = {
+        # Bug fix G-3: location is now stamped per-recipient based on each
+        # caregiver's ``can_view_location`` flag. The shared metadata stays in
+        # ``base_details``; the optional location fields are merged in below
+        # only for caregivers that still hold the location permission.
+        base_details: dict[str, Any] = {
             "sos_id": sos_event.id,
             "sos_event_id": sos_event.id,
             "trigger_type": sos_event.trigger_type,
             "patient_user_id": sos_event.user_id,
             "patient_name": patient_name,
+        }
+        location_payload: dict[str, Any] = {
             "address": sos_event.address,
             "latitude": float(sos_event.latitude)
             if sos_event.latitude is not None
@@ -152,13 +191,22 @@ class EmergencyService:
             else None,
         }
 
-        recipient_user_ids = EmergencyRepository.get_alert_recipient_user_ids(
-            db,
-            sos_event.user_id,
+        recipients_with_perms = (
+            EmergencyRepository.get_sos_alert_recipients_with_permissions(
+                db,
+                sos_event.user_id,
+            )
         )
+        recipient_user_ids = [cid for cid, _ in recipients_with_perms]
 
         created_alerts: list[Alert] = []
-        for recipient_user_id in recipient_user_ids:
+        for recipient_user_id, can_view_location in recipients_with_perms:
+            recipient_details = {
+                **base_details,
+                "recipient_user_id": recipient_user_id,
+            }
+            if can_view_location:
+                recipient_details.update(location_payload)
             alert = Alert(
                 device_id=sos_event.device_id,
                 user_id=recipient_user_id,
@@ -167,7 +215,7 @@ class EmergencyService:
                 severity="critical",
                 title=title,
                 message=message,
-                details={**base_details, "recipient_user_id": recipient_user_id},
+                details=recipient_details,
             )
             db.add(alert)
             created_alerts.append(alert)
@@ -218,6 +266,7 @@ class EmergencyService:
         longitude: Optional[float] = None,
         address: Optional[str] = None,
         notes: Optional[str] = None,
+        background_tasks: Optional[Any] = None,
     ) -> dict[str, Any]:
         """Handle a terminal response for an initial risk alert."""
         alert = EmergencyRepository.get_alert_by_id(db, notification_id)
@@ -313,8 +362,7 @@ class EmergencyService:
             response_row.sos_event_id = int(sos_event.id)
             db.commit()
 
-            PushNotificationService.send_sos_push_alerts(
-                db,
+            _push_kwargs = dict(
                 recipient_user_ids=dispatch_info["recipient_user_ids"],
                 title=dispatch_info["title"],
                 body=dispatch_info["body"],
@@ -323,6 +371,12 @@ class EmergencyService:
                 trigger_type=dispatch_info["trigger_type"],
                 notification_id_by_user=dispatch_info["notification_id_by_user"],
             )
+            if background_tasks is not None:
+                background_tasks.add_task(
+                    PushNotificationService.send_sos_push_alerts, db, **_push_kwargs
+                )
+            else:
+                PushNotificationService.send_sos_push_alerts(db, **_push_kwargs)
 
             return {
                 "success": True,
@@ -370,23 +424,58 @@ class EmergencyService:
             db,
             [int(sos.id) for sos in sos_events],
         )
-        
+
+        # Bug fix G-3: per-patient location visibility. Caregivers viewing
+        # their own SOS events (rare but possible when looking at the SOS
+        # list while listed as a caregiver in another bidirectional pair)
+        # are treated as the patient and always see their own coordinates.
+        patient_ids_in_results = {
+            int(sos.user_id)
+            for sos in sos_events
+            if sos.user_id is not None and int(sos.user_id) != int(caregiver_user_id)
+        }
+        location_visibility = (
+            EmergencyRepository.get_caregiver_location_visibility(
+                db,
+                caregiver_user_id=int(caregiver_user_id),
+                patient_user_ids=list(patient_ids_in_results),
+            )
+        )
+
+        all_patient_ids = list({int(sos.user_id) for sos in sos_events if sos.user_id is not None})
+        from app.models.user_model import User as _User
+        patient_by_id = {
+            int(u.id): u
+            for u in db.query(_User).filter(_User.id.in_(all_patient_ids)).all()
+        }
+
         sos_list_items = []
         for sos in sos_events:
-            # Get patient info
-            patient = EmergencyRepository.get_user_by_id(db, sos.user_id)
+            # Get patient info (from pre-fetched batch)
+            patient = patient_by_id.get(int(sos.user_id)) if sos.user_id is not None else None
             if not patient:
                 continue
-            
+
             # Calculate elapsed time
             elapsed = datetime.now(timezone.utc) - sos.triggered_at
             elapsed_minutes = int(elapsed.total_seconds() / 60)
-            
+
             trigger_type = EmergencyService._normalize_read_trigger_type(
                 sos.trigger_type,
                 is_risk_origin=int(sos.id) in risk_origin_sos_ids,
             )
-            
+
+            # Bug fix G-3: redact location for caregivers without
+            # ``can_view_location``. Patients viewing their own SOS still see
+            # the full coordinates.
+            is_self_view = int(sos.user_id) == int(caregiver_user_id)
+            can_view_location = is_self_view or location_visibility.get(
+                int(sos.user_id), False
+            )
+            should_render_location = (
+                can_view_location and (sos.latitude or sos.address)
+            )
+
             sos_list_items.append(SOSEventListItem(
                 sos_id=sos.id,
                 patient=PatientInfo(
@@ -404,10 +493,10 @@ class EmergencyService:
                     longitude=float(sos.longitude) if sos.longitude else None,
                     address=sos.address,
                     last_updated=sos.triggered_at
-                ) if (sos.latitude or sos.address) else None,
+                ) if should_render_location else None,
                 time_elapsed_minutes=elapsed_minutes
             ))
-        
+
         return SOSAlertsResponse(
             sos_alerts=sos_list_items,
             total_count=total,
@@ -416,17 +505,30 @@ class EmergencyService:
         )
 
     @staticmethod
-    def get_sos_detail(db: Session, sos_id: int) -> Optional[SOSEventResponse]:
-        """Get detailed SOS event information."""
+    def get_sos_detail(
+        db: Session,
+        sos_id: int,
+        *,
+        viewer_user_id: Optional[int] = None,
+        viewer_is_admin: bool = False,
+    ) -> Optional[SOSEventResponse]:
+        """Get detailed SOS event information.
+
+        Bug fix G-3: ``viewer_user_id`` and ``viewer_is_admin`` are optional so
+        existing callers (tests, internal helpers) keep working without
+        gating. The route layer in ``app/api/routes/emergency.py`` always
+        passes the current user so caregivers without ``can_view_location``
+        receive ``location=None`` even when the SOS event has coordinates.
+        """
         sos = EmergencyRepository.get_sos_detail(db, sos_id)
         if not sos:
             return None
-        
+
         # Get patient info
         patient = EmergencyRepository.get_user_by_id(db, sos.user_id)
         if not patient:
             return None
-        
+
         risk_response = EmergencyRepository.get_risk_alert_response_by_sos_event_id(
             db,
             int(sos.id),
@@ -435,14 +537,14 @@ class EmergencyService:
             sos.trigger_type,
             is_risk_origin=risk_response is not None,
         )
-        
+
         # Get fall detection XAI if available — derived from FallEvent (no hardcoded mock).
         fall_xai = None
         if sos.fall_event_id:
             fall_event = EmergencyRepository.get_fall_event_by_id(db, sos.fall_event_id)
             if fall_event is not None:
                 fall_xai = EmergencyService._build_fall_detection_xai(fall_event)
-        
+
         # Get resolution info if resolved
         resolution_info = None
         if sos.status == 'resolved' and sos.resolved_at:
@@ -456,7 +558,34 @@ class EmergencyService:
                 resolution_status=resolution_status,
                 notes=cleaned_notes,
             )
-        
+
+        # Bug fix G-3: decide whether the viewer is allowed to see the
+        # ``LocationInfo`` block. Patients viewing their own SOS, admins, and
+        # any caller that didn't pass viewer context (legacy paths, tests)
+        # still see the full payload. Caregivers must hold ``can_view_location``
+        # on their accepted relationship row with this patient.
+        can_view_location = True
+        if (
+            viewer_user_id is not None
+            and not viewer_is_admin
+            and int(viewer_user_id) != int(sos.user_id)
+        ):
+            permissions = EmergencyRepository.get_caregiver_view_permissions(
+                db,
+                patient_user_id=int(sos.user_id),
+                caregiver_user_id=int(viewer_user_id),
+            )
+            # ``permissions is None`` means there is no accepted caregiver
+            # relationship — the route's authorization check handles the 403,
+            # but if we ever reach here without one we redact defensively.
+            can_view_location = bool(
+                permissions and permissions[1]
+            )
+
+        should_render_location = can_view_location and (
+            sos.latitude or sos.address
+        )
+
         return SOSEventResponse(
             sos_id=sos.id,
             patient=PatientInfo(
@@ -475,7 +604,7 @@ class EmergencyService:
                 address=sos.address,
                 accuracy=50.0 if sos.latitude else None,  # Mock accuracy only if coords exist
                 last_updated=sos.triggered_at
-            ) if (sos.latitude or sos.address) else None,
+            ) if should_render_location else None,
             fall_detection_xai=fall_xai,
             resolution=resolution_info
         )

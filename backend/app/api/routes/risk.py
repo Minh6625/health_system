@@ -7,7 +7,7 @@ from decimal import Decimal
 from datetime import UTC, date, datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import func, text
 from sqlalchemy.exc import ProgrammingError
@@ -34,7 +34,6 @@ from app.services.risk_alert_service import (
 
 
 logger = logging.getLogger(__name__)
-RISK_COOLDOWN_SECONDS = int(os.getenv("RISK_COOLDOWN_SECONDS", "60"))
 
 
 class _DecimalEncoder(json.JSONEncoder):
@@ -318,6 +317,7 @@ def _dispatch_risk_alerts(
 def respond_to_risk_alert(
     notification_id: int,
     payload: RiskAlertResponseRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> RiskAlertResponseResponse:
@@ -333,6 +333,7 @@ def respond_to_risk_alert(
         longitude=payload.longitude,
         address=payload.address,
         notes=payload.notes,
+        background_tasks=background_tasks,
     )
     return RiskAlertResponseResponse(**result)
 
@@ -372,13 +373,19 @@ def recalculate_risk(
             detail="Không tìm thấy thiết bị đang hoạt động cho tài khoản này",
         )
 
-    result = calculate_device_risk(
-        db,
-        device_id=int(row["id"]),
-        user_id=target_user_id,
-        allow_cached=False,
-        dispatch_alerts=True,
-    )
+    try:
+        result = calculate_device_risk(
+            db,
+            device_id=int(row["id"]),
+            user_id=target_user_id,
+            allow_cached=False,
+            dispatch_alerts=True,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy thiết bị hoặc chưa có dữ liệu sinh hiệu",
+        ) from exc
     return RiskCalculateResponse(
         risk_score_id=result.risk_score_id,
         score=result.score,
@@ -401,13 +408,19 @@ def calculate_risk(
         x_internal_service=x_internal_service,
         db=db,
     )
-    result = calculate_device_risk(
-        db,
-        device_id=int(payload.device_id),
-        user_id=int(context["user_id"]),
-        allow_cached=True,
-        dispatch_alerts=True,
-    )
+    try:
+        result = calculate_device_risk(
+            db,
+            device_id=int(payload.device_id),
+            user_id=int(context["user_id"]),
+            allow_cached=True,
+            dispatch_alerts=True,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy thiết bị hoặc chưa có dữ liệu sinh hiệu",
+        ) from exc
     return RiskCalculateResponse(
         risk_score_id=result.risk_score_id,
         score=result.score,

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.database import Base
@@ -11,6 +11,9 @@ class UserPushToken(Base):
     """FCM/APNs token registry for mobile push delivery."""
 
     __tablename__ = "user_push_tokens"
+    __table_args__ = (
+        Index("ix_push_tokens_user_id_active", "user_id", "is_active"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(

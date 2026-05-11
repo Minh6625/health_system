@@ -84,6 +84,15 @@ NotificationOpenTarget? parseNotificationOpenTarget(
     );
   }
 
+  // Module FA-2: fall pushes don't carry a sos_id — they use
+  // ``fall_event_id``/``fall_event_uuid``.  Fall back to fall_event_id
+  // as the subject id so the existing SOS-style payload + dedup
+  // pipeline runs unchanged; the runtime distinguishes fall vs SOS by
+  // inspecting the ``alertType`` field on the resulting target before
+  // navigating to FallAlertScreen instead of SosDetailScreen.
+  final fallEventId = (data['fall_event_id'] ?? data['fallEventId'])
+      ?.toString()
+      .trim();
   final sosId =
       (data['sos_id'] ??
               data['sos_event_id'] ??
@@ -91,13 +100,25 @@ NotificationOpenTarget? parseNotificationOpenTarget(
               data['sosId'])
           ?.toString()
           .trim();
-  if (sosId == null || sosId.isEmpty) {
+  final isFall =
+      rawType == 'fall_alert' ||
+      alertType == 'fall_detected' ||
+      alertType == 'fall_detection';
+
+  final subjectId =
+      (sosId?.isNotEmpty ?? false)
+          ? sosId!
+          : (isFall && (fallEventId?.isNotEmpty ?? false))
+          ? fallEventId!
+          : null;
+  if (subjectId == null || subjectId.isEmpty) {
     return null;
   }
 
   return NotificationOpenTarget(
     type: 'sos',
-    sosId: sosId,
+    sosId: subjectId,
+    alertType: isFall ? 'fall_detected' : (alertType.isEmpty ? null : alertType),
     title: data['title']?.toString(),
     message: (data['body'] ?? data['message'])?.toString(),
   );
@@ -168,6 +189,7 @@ Map<String, dynamic>? buildNotificationAndroidSosLaunchPayload(
   final data = rawData.map(
     (String key, dynamic value) => MapEntry(key.toString(), value),
   );
+  final rawType = (data['type'] ?? '').toString().trim().toLowerCase();
   final alertType = (data['alert_type'] ?? data['alertType'] ?? '')
       .toString()
       .trim()
@@ -178,11 +200,15 @@ Map<String, dynamic>? buildNotificationAndroidSosLaunchPayload(
       .toLowerCase();
   final notificationId =
       (data['notification_id'] ?? data['notificationId'])?.toString().trim();
+  final fallEventId =
+      (data['fall_event_id'] ?? data['fallEventId'])?.toString().trim();
+  final fallEventUuid =
+      (data['fall_event_uuid'] ?? data['fallEventUuid'])?.toString().trim();
 
   final isFall =
+      rawType == 'fall_alert' ||
       alertType == 'fall_detected' ||
       alertType == 'fall_detection' ||
-      triggerType == 'auto' ||
       triggerType == 'fall_detected' ||
       triggerType == 'fall_detection';
 
@@ -200,6 +226,9 @@ Map<String, dynamic>? buildNotificationAndroidSosLaunchPayload(
             : 'Có cảnh báo SOS khẩn cấp mới.');
 
   return <String, dynamic>{
+    // Keep ``type='sos'`` so the existing tap-handler (openSosDetail) is
+    // wired by default.  ``alertType`` discriminates fall vs SOS for any
+    // tap-routing logic that wants to deep-link into FallAlertScreen.
     'type': 'sos',
     'sosId': sosId,
     'sos_id': sosId,
@@ -212,6 +241,10 @@ Map<String, dynamic>? buildNotificationAndroidSosLaunchPayload(
     if (alertType.isNotEmpty) 'alert_type': alertType,
     if (triggerType.isNotEmpty) 'triggerType': triggerType,
     if (triggerType.isNotEmpty) 'trigger_type': triggerType,
+    if (isFall && fallEventId != null && fallEventId.isNotEmpty)
+      'fall_event_id': fallEventId,
+    if (isFall && fallEventUuid != null && fallEventUuid.isNotEmpty)
+      'fall_event_uuid': fallEventUuid,
     'title': title,
     'body': body,
     'message': body,

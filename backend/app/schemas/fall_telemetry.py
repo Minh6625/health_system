@@ -156,6 +156,18 @@ class FallEventResponse(BaseModel):
         ),
     )
 
+    # Option 3-Lite (Module FA-2) survey answers; NULL when the user did
+    # not reach step 2.  Surfaced so the caregiver-facing UI can render
+    # "patient said OK but cannot stand up" or "patient confirmed OK".
+    survey_answers: dict | None = Field(
+        default=None,
+        description=(
+            "Stand-up survey from FallStandUpSurveyScreen: "
+            "`{can_stand: bool|null, skipped: bool, answered_at: iso}`. "
+            "NULL when user did not reach step 2."
+        ),
+    )
+
     model_config = {
         # Allow construction directly from a SQLAlchemy ORM instance
         # so the service can ``FallEventResponse.model_validate(row)``.
@@ -203,6 +215,46 @@ class FallEventDismissResponse(BaseModel):
 
     Echoes back the updated event so the Flutter client doesn't need a
     second GET to refresh its local state.
+    """
+
+    fall_event: FallEventResponse
+
+
+class FallSurveySubmitRequest(BaseModel):
+    """Body for ``POST /mobile/fall-events/{id}/survey`` (Module FA-2).
+
+    Option 3-Lite stand-up survey shown after the user dismissed the
+    initial fall alert with "Tôi ổn".  Three possible outcomes:
+
+    * ``can_stand=True, skipped=False``  — user confirmed they're up.
+      Caregiver gets a soft check-in noti (no SOS).
+    * ``can_stand=False, skipped=False`` — user said OK but can't get
+      up.  Caregiver gets a *follow-up concern* push so they can call.
+    * ``can_stand=None, skipped=True``   — user tapped "Bỏ qua" or
+      the 15-second timer expired.  Default-to-safety: caregiver gets
+      the same check-in noti ("patient seems OK but did not answer
+      stand-up question").
+    """
+
+    can_stand: bool | None = Field(
+        default=None,
+        description=(
+            "True → patient stood up; False → cannot stand; None → user "
+            "skipped or timer expired."
+        ),
+    )
+    skipped: bool = Field(
+        default=False,
+        description="True when the survey was skipped or timed out.",
+    )
+
+
+class FallSurveySubmitResponse(BaseModel):
+    """Success body for ``POST /mobile/fall-events/{id}/survey``.
+
+    Echoes the persisted survey so the Flutter client can show the
+    confirmation chip without a follow-up GET.  Mirrors the
+    ``FallEventDismissResponse`` style.
     """
 
     fall_event: FallEventResponse

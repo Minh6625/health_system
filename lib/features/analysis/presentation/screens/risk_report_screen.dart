@@ -165,6 +165,22 @@ class _RiskReportScreenState extends State<RiskReportScreen> {
                 const SizedBox(height: AppSpacing.gapLg),
                 RecommendationPreviewCard(
                   recommendations: report.recommendationPreview,
+                  // F-10 (M-2): wire the previously-dead "Xem đầy đủ" CTA
+                  // to the same destination as the "Xem giải thích AI"
+                  // button below — the detail screen renders the full
+                  // RecommendationChecklistCard instead of a 2-item
+                  // preview, which is exactly what users expected from
+                  // the "see all" link.
+                  onSeeAll: () {
+                    Navigator.pushNamed(
+                      context,
+                      AppRouter.riskReportDetail,
+                      arguments: {
+                        'reportId': report.reportId,
+                        'profileId': widget.profileId,
+                      },
+                    );
+                  },
                 ),
                 const SizedBox(height: AppSpacing.gapLg),
                 Column(

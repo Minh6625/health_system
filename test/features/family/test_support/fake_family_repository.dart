@@ -1,5 +1,6 @@
 import 'package:healthguard/features/family/models/access_profile_model.dart';
 import 'package:healthguard/features/family/models/family_profile_snapshot.dart';
+import 'package:healthguard/features/family/models/linked_contact_medical_info_model.dart';
 import 'package:healthguard/features/family/models/linked_contact_model.dart';
 import 'package:healthguard/features/family/models/user_search_model.dart';
 import 'package:healthguard/features/family/repositories/family_repository.dart';
@@ -11,6 +12,8 @@ class FakeFamilyRepository extends FamilyRepository {
     this.dashboard = const [],
     this.detailById = const {},
     this.searchResultsByQuery = const {},
+    this.medicalInfoById = const {},
+    this.medicalInfoErrorById = const {},
   });
 
   List<Map<String, dynamic>> relationships;
@@ -18,6 +21,17 @@ class FakeFamilyRepository extends FamilyRepository {
   List<FamilyProfileSnapshot> dashboard;
   Map<String, LinkedContactModel> detailById;
   Map<String, List<UserSearchModel>> searchResultsByQuery;
+
+  /// Successful payloads keyed by ``contactId``. Lookup wins over
+  /// ``medicalInfoErrorById`` so a fixture can override an error to a
+  /// success without rebuilding the whole map.
+  Map<String, LinkedContactMedicalInfoModel> medicalInfoById;
+
+  /// Pre-baked exceptions to throw for a given ``contactId``. Use to drive
+  /// the 403 / 404 / generic-error branches of the screen under test.
+  Map<String, Exception> medicalInfoErrorById;
+
+  final List<String> medicalInfoFetchedIds = <String>[];
 
   final List<Map<String, dynamic>> updateCalls = <Map<String, dynamic>>[];
   final List<Map<String, dynamic>> requestCalls = <Map<String, dynamic>>[];
@@ -37,6 +51,22 @@ class FakeFamilyRepository extends FamilyRepository {
   @override
   Future<LinkedContactModel> getLinkedContactDetail(String id) async =>
       detailById[id]!;
+
+  @override
+  Future<LinkedContactMedicalInfoModel> getLinkedContactMedicalInfo(
+    String id,
+  ) async {
+    medicalInfoFetchedIds.add(id);
+    final hit = medicalInfoById[id];
+    if (hit != null) {
+      return hit;
+    }
+    final err = medicalInfoErrorById[id];
+    if (err != null) {
+      throw err;
+    }
+    throw Exception('FakeFamilyRepository: no fixture for medical info $id');
+  }
 
   @override
   Future<List<UserSearchModel>> searchUsers(String query) async {

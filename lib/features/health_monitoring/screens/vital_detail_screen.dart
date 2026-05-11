@@ -203,6 +203,12 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
 
   Widget _buildVitalValueCard(VitalSignsProvider provider, Color statusColor) {
     final updatedAt = provider.vitals?.timestamp;
+    // F-8 (M-9): when the backend marks the snapshot stale (no ingest in
+    // 5+ minutes), the value is forced to "--" by the provider and we want
+    // the user to see *why* — not just an unexplained dash. Without this
+    // banner QA reported users mistaking a dead watch for a healthy one
+    // because the previous reading was still painted on screen.
+    final isStale = provider.isStale;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
@@ -260,10 +266,37 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
           if (updatedAt != null) ...[
             SizedBox(height: AppSpacing.gapLg),
             Text(
-              'Cập nhật lúc ${DateFormat('HH:mm:ss').format(updatedAt.toLocal())}',
+              isStale
+                  // F-8 (M-9): rephrase the timestamp when stale so it reads
+                  // "last update was at HH:mm:ss" instead of pretending the
+                  // device just refreshed.
+                  ? 'Cập nhật cuối lúc ${DateFormat('HH:mm:ss').format(updatedAt.toLocal())}'
+                  : 'Cập nhật lúc ${DateFormat('HH:mm:ss').format(updatedAt.toLocal())}',
               style: AppTextStyles.caption.copyWith(
                 fontWeight: FontWeight.w600,
+                color: isStale ? AppColors.warning : null,
               ),
+            ),
+          ],
+          if (isStale) ...[
+            SizedBox(height: AppSpacing.gapSm),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.signal_wifi_off_rounded,
+                  size: 16,
+                  color: AppColors.warning,
+                ),
+                SizedBox(width: AppSpacing.gapXs),
+                Text(
+                  'Thiết bị mất kết nối',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.warning,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ],
         ],

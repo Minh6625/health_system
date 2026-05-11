@@ -14,6 +14,46 @@ class VitalSignsResponse(BaseModel):
     is_stale: bool = False
 
 
+# F-12 (M-6): vitals time-series chart payload. The mobile
+# `vital_detail_screen.dart` previously promised a "Biến động 24h qua"
+# chart but `VitalSignsProvider.chartData` always returned `const []`
+# because no endpoint existed. These schemas back the new
+# `GET /mobile/metrics/vitals/timeseries` endpoint that downsamples raw
+# `vitals` rows into ~96 buckets (15 min × 24 h) — small enough for a
+# fluid mobile chart, large enough to show real diurnal variation. Each
+# bucket carries every vital channel in a single row so the screen can
+# switch between heart_rate / spo2 / blood_pressure tabs without
+# refetching.
+class VitalsTimeseriesPointResponse(BaseModel):
+    """One downsampled bucket. Null channels mean no samples in the
+    bucket — the mobile chart treats those as gaps rather than zeros so
+    a stretch of missing data does not pull the line to the floor."""
+
+    ts: datetime
+    heart_rate: float | None = None
+    spo2: float | None = None
+    temperature: float | None = None
+    respiratory_rate: float | None = None
+    blood_pressure_sys: float | None = None
+    blood_pressure_dia: float | None = None
+
+
+class VitalsTimeseriesResponse(BaseModel):
+    """Envelope for the vitals time-series endpoint.
+
+    ``range`` echoes the validated query parameter so the client can
+    detect when the server fell back to the default (today only "24h"
+    is supported; "7d"/"30d" are reserved for future ranges and
+    currently silently coerced to "24h"). ``bucket_minutes`` lets the
+    client size its X-axis ticks correctly without hard-coding a value
+    that drifts from the server.
+    """
+
+    range: str
+    bucket_minutes: int
+    data: list[VitalsTimeseriesPointResponse] = Field(default_factory=list)
+
+
 class SleepSessionResponse(BaseModel):
     session_id: str = ""
     sleep_date: date

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, SmallInteger, CheckConstraint, Text
+from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, SmallInteger, CheckConstraint, Text, Index
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import text
@@ -17,6 +17,7 @@ class Device(Base):
     __table_args__ = (
         CheckConstraint("device_type IN ('smartwatch', 'fitness_band', 'medical_device')", name="check_device_type"),
         CheckConstraint("battery_level >= 0 AND battery_level <= 100", name="check_battery_level"),
+        Index("ix_devices_user_id_active_deleted", "user_id", "is_active", "deleted_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)

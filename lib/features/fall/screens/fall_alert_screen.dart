@@ -1,8 +1,13 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:healthguard/core/services/sos_audio_service.dart';
 import 'package:healthguard/features/fall/models/fall_event.dart';
 import 'package:healthguard/features/fall/providers/fall_event_provider.dart';
+import 'package:healthguard/features/fall/screens/fall_stand_up_survey_screen.dart';
+import 'package:healthguard/features/emergency/screens/sos_confirm_screen.dart';
 import 'package:healthguard/features/fall/widgets/fall_countdown_ring.dart';
 
 /// Full-screen "fall detected" overlay.
@@ -20,7 +25,7 @@ import 'package:healthguard/features/fall/widgets/fall_countdown_ring.dart';
 ///   without dismissing — the backend's auto-SOS still escalates).
 /// * Disclaimer strip at the bottom matches the existing risk surfaces
 ///   so users know this is an AI prediction, not a clinical diagnosis.
-class FallAlertScreen extends StatelessWidget {
+class FallAlertScreen extends StatefulWidget {
   /// The freshly-detected event the alert is rendering for.
   final FallEvent event;
 
@@ -41,6 +46,25 @@ class FallAlertScreen extends StatelessWidget {
   });
 
   static const String routeName = '/fall/alert';
+
+  @override
+  State<FallAlertScreen> createState() => _FallAlertScreenState();
+}
+
+class _FallAlertScreenState extends State<FallAlertScreen> {
+  final SosAudioService _audio = SosAudioService(AudioAlertType.fallAlert);
+
+  @override
+  void initState() {
+    super.initState();
+    _audio.start();
+  }
+
+  @override
+  void dispose() {
+    unawaited(_audio.stop());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,22 +99,20 @@ class FallAlertScreen extends StatelessWidget {
                 const Spacer(),
                 FallCountdownRing(
                   duration:
-                      testCountdownOverride ?? const Duration(seconds: 30),
+                      widget.testCountdownOverride ?? const Duration(seconds: 30),
                   onElapsed: () {
-                    final cb = onElapsed;
+                    final cb = widget.onElapsed;
                     if (cb != null) {
                       cb();
                       return;
                     }
-                    if (Navigator.of(context).canPop()) {
-                      Navigator.of(context).pop();
-                    }
+                    _onEscalated(context);
                   },
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Nếu bạn không phản hồi trong 30 giây, hệ thống sẽ tự '
-                  'động gửi cảnh báo SOS đến người thân.',
+                  'Cảnh báo SOS đã được gửi đến người thân. '
+                  'Nhấn \'Tôi ổn\' nếu đây là báo động giả.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: cs.onSurfaceVariant,
                   ),
@@ -164,7 +186,7 @@ class FallAlertScreen extends StatelessWidget {
   ) async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final ok = await provider.dismiss(event.id, reason: 'Tôi ổn');
+    final ok = await provider.dismiss(widget.event.id, reason: 'Tôi ổn');
     if (!ok && context.mounted) {
       messenger.showSnackBar(
         const SnackBar(
@@ -173,18 +195,36 @@ class FallAlertScreen extends StatelessWidget {
       );
       return;
     }
-    if (navigator.canPop()) {
-      navigator.pop();
-    }
+    // Module FA-2 (Option 3-Lite): user just confirmed they're OK.
+    // Push the stand-up survey so caregiver gets a richer signal
+    // ("standing OK" / "needs help getting up" / "skipped").  We use
+    // ``pushReplacement`` so Android back-button won't return to the
+    // already-dismissed alert (which would be confusing UX).
+    if (!context.mounted) return;
+    unawaited(_audio.stop());
+    await navigator.pushReplacement(
+      MaterialPageRoute(
+        settings: const RouteSettings(name: FallStandUpSurveyScreen.routeName),
+        builder: (_) => FallStandUpSurveyScreen(event: widget.event),
+        fullscreenDialog: true,
+      ),
+    );
   }
 
   void _onConfirm(BuildContext context) {
-    // Just close the alert; the backend's auto-SOS workflow already
-    // engaged when the fall was detected, so we don't need to fire a
-    // separate "I need help" call.
-    if (Navigator.of(context).canPop()) {
-      Navigator.of(context).pop();
-    }
+    _onEscalated(context);
+  }
+
+  void _onEscalated(BuildContext context) {
+    unawaited(_audio.stop());
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => const SosConfirmScreen(
+          mode: SosConfirmMode.fallEscalation,
+        ),
+        fullscreenDialog: true,
+      ),
+    );
   }
 }
 

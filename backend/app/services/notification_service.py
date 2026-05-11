@@ -3,12 +3,13 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, case, func
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.alert_constants import RISK_ALERT_COOLDOWN_SECONDS, EscalationRule
 from app.models.notification_read_model import NotificationRead
 from app.models.push_token_model import UserPushToken
+from app.models.risk_alert_response_model import RiskAlertResponse
 from app.models.sos_event_model import Alert
 from app.schemas.notification import NotificationItem
 from app.utils.datetime_helper import get_current_time
@@ -60,22 +61,27 @@ class NotificationService:
             .all()
         )
 
-        unread_count = (
-            db.query(func.count(Alert.id))
-            .outerjoin(
-                NotificationRead,
-                and_(
-                    NotificationRead.alert_id == Alert.id,
-                    NotificationRead.user_id == user_id,
-                ),
+        # When unread_only=True the base_query already filters to unread rows,
+        # so total_count == unread_count — no second query needed.
+        if unread_only:
+            unread_count = total_count
+        else:
+            unread_count = (
+                db.query(func.count(Alert.id))
+                .outerjoin(
+                    NotificationRead,
+                    and_(
+                        NotificationRead.alert_id == Alert.id,
+                        NotificationRead.user_id == user_id,
+                    ),
+                )
+                .filter(
+                    Alert.user_id == user_id,
+                    NotificationRead.read_at.is_(None),
+                )
+                .scalar()
+                or 0
             )
-            .filter(
-                Alert.user_id == user_id,
-                NotificationRead.read_at.is_(None),
-            )
-            .scalar()
-            or 0
-        )
 
         items = [
             NotificationItem(
@@ -184,14 +190,33 @@ class NotificationService:
         alert_type: str,
     ) -> bool:
         """Check whether a risk alert of *alert_type* for *device_id* was
-        created within the cooldown window.
+        created within the cooldown window AND has not yet been
+        acknowledged by the user.
 
         Uses ``RISK_ALERT_COOLDOWN_SECONDS`` from ``alert_constants``.
-        Returns ``True`` if a recent alert exists (i.e. should NOT send
-        another one yet).
+        Returns ``True`` if a recent unacknowledged alert exists (i.e.
+        a fresh notification would be redundant).
+
+        Issue 2b fix: when the patient clicks "Tôi ổn" on a risk alert,
+        the BE persists a ``RiskAlertResponse`` row with
+        ``response_action='safe'``.  That alert no longer represents
+        an open issue, so it must NOT count toward the cooldown — the
+        next event of the same type should fire a fresh push.  Without
+        this exclusion the user reports "click Tôi ổn once → no more
+        FCM for the next 5 minutes".
         """
         cutoff = datetime.now(timezone.utc) - timedelta(
             seconds=RISK_ALERT_COOLDOWN_SECONDS,
+        )
+
+        # Select alert ids that the user already marked safe — these
+        # are excluded from the cooldown count so a fresh test inject
+        # (or real follow-up event) fires its own push instead of
+        # being dedup-suppressed against an already-acknowledged
+        # alert.  Using ``select(...)`` explicitly avoids the SQLA 2.x
+        # deprecation warning around bare Subquery objects in ``in_()``.
+        acknowledged_alert_ids = select(RiskAlertResponse.notification_id).where(
+            RiskAlertResponse.response_action == "safe"
         )
 
         recent = (
@@ -200,6 +225,7 @@ class NotificationService:
                 Alert.device_id == device_id,
                 Alert.alert_type == alert_type,
                 Alert.created_at >= cutoff,
+                ~Alert.id.in_(acknowledged_alert_ids),
             )
             .limit(1)
             .first()
@@ -271,8 +297,7 @@ class NotificationService:
         if details is not None:
             alert_details.update(details)
 
-        notification_id_by_user: dict[int, int] = {}
-
+        alert_by_uid: list[tuple[int, Alert]] = []
         for uid in recipient_user_ids:
             alert = Alert(
                 device_id=device_id,
@@ -284,9 +309,12 @@ class NotificationService:
                 details=alert_details,
             )
             db.add(alert)
-            db.flush()  # populate alert.id
-            notification_id_by_user[uid] = alert.id
+            alert_by_uid.append((uid, alert))
 
+        db.flush()  # single flush — all ids populated at once
+        notification_id_by_user: dict[int, int] = {
+            uid: alert.id for uid, alert in alert_by_uid
+        }
         db.commit()
         logger.info(
             "Created %d risk alerts (type=%s, device=%d, score=%.1f)",

@@ -81,10 +81,7 @@ def load_device_owner_context(db: Session, device_id: int) -> dict[str, Any]:
     ).mappings().first()
 
     if row is None or row.get("deleted_at") is not None or not row.get("is_active", True):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không tìm thấy thiết bị",
-        )
+        raise ValueError(f"Device {device_id} not found or inactive")
 
     return dict(row)
 
@@ -241,6 +238,7 @@ def dispatch_risk_alerts(
     risk_level: str,
     score: float,
     risk_score_id: int | None = None,
+    post_fall: bool = False,
 ) -> bool:
     """Escalation -> cooldown check -> create alerts -> send push notifications."""
     rule = get_escalation_rule(risk_level)
@@ -251,7 +249,7 @@ def dispatch_risk_alerts(
     assert rule.alert_type is not None
     assert rule.severity is not None
 
-    if NotificationService.is_risk_alert_in_cooldown(
+    if not post_fall and NotificationService.is_risk_alert_in_cooldown(
         db,
         device_id=device_id,
         alert_type=rule.alert_type,
@@ -334,24 +332,19 @@ def calculate_device_risk(
     """
     risk_type = "general"
 
-    cached_result = _try_cached_risk_result(db, device_id, risk_type)
-    if cached_result is not None:
-        return cached_result
+    if allow_cached:
+        cached_result = _try_cached_risk_result(db, device_id, risk_type)
+        if cached_result is not None:
+            return cached_result
 
     if user_id is None:
         logger.warning("Risk calculation skipped: device %s has no assigned user", device_id)
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Device not assigned to any user",
-        )
+        raise ValueError(f"Device {device_id} is not assigned to any user")
 
     context = load_device_owner_context(db, device_id)
     vitals_row = _fetch_latest_vitals(db, device_id)
     if vitals_row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Không có vitals data cho device này",
-        )
+        raise ValueError(f"No vitals data found for device {device_id}")
 
     inference_payload, defaults_applied = _build_inference_payload(vitals_row, context)
     feature_snapshot = describe_feature_vector(inference_payload)

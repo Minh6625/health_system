@@ -9,6 +9,11 @@ class ApiEndpoints {
   static const String sleepHistory = '/metrics/sleep/history';
   static const String healthReport = '/metrics/health-report';
   static const String vitalsLatest = latestVitals;
+  // F-12 (M-6): downsampled vitals time-series for the chart on
+  // `vital_detail_screen.dart`. Path mirrors the FastAPI route mounted
+  // at `metrics_router.get("/vitals/timeseries", ...)` in
+  // `app/api/routes/monitoring.py`.
+  static const String vitalsTimeseries = '/metrics/vitals/timeseries';
   static const String profile = '/profile';
 
   // Fall events — Phase 4B-full slice 2c
@@ -20,6 +25,10 @@ class ApiEndpoints {
   /// Build the dismiss path for one fall event, e.g.
   /// ``/fall-events/17/dismiss``.
   static String fallEventDismiss(int id) => '$fallEvents/$id/dismiss';
+
+  /// Build the post-dismiss survey path for one fall event, e.g.
+  /// ``/fall-events/17/survey``.  Module FA-2 (Option 3-Lite).
+  static String fallEventSurvey(int id) => '$fallEvents/$id/survey';
 
   const ApiEndpoints._();
 }

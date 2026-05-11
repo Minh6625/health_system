@@ -16,7 +16,8 @@ class RelationshipRepository:
             or_(
                 UserRelationship.patient_id == user_id,
                 UserRelationship.caregiver_id == user_id
-            )
+            ),
+            UserRelationship.deleted_at.is_(None),
         ).all()
         
     @staticmethod
@@ -24,6 +25,7 @@ class RelationshipRepository:
         return db.query(UserRelationship).filter(
             UserRelationship.caregiver_id == caregiver_id,
             UserRelationship.status == 'accepted',
+            UserRelationship.deleted_at.is_(None),
             or_(
                 UserRelationship.can_view_vitals == True,
                 UserRelationship.can_receive_alerts == True,
@@ -35,7 +37,8 @@ class RelationshipRepository:
     def get_pending_requests(db: Session, user_id: int) -> List[UserRelationship]:
         return db.query(UserRelationship).filter(
             UserRelationship.patient_id == user_id,
-            UserRelationship.status == 'pending'
+            UserRelationship.status == 'pending',
+            UserRelationship.deleted_at.is_(None),
         ).all()
 
     @staticmethod

@@ -8,6 +8,7 @@ from app.schemas.monitoring import (
     SleepSessionResponse,
     SleepHistoryResponse,
     VitalSignsResponse,
+    VitalsTimeseriesResponse,
     HealthReportResponse,
     RiskReportResponse,
     RiskReportClinicianResponse,
@@ -38,8 +39,43 @@ def get_latest_vital_signs(
             patient_id=target_profile_id,
             db=db,
         )
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Không tìm thấy dữ liệu sinh hiệu")
+
+
+@metrics_router.get(
+    "/vitals/timeseries",
+    response_model=VitalsTimeseriesResponse,
+)
+def get_vitals_timeseries(
+    target_profile_id: int = Depends(get_target_profile_id),
+    db: Session = Depends(get_db),
+    range: str = Query(
+        default="24h",
+        description=(
+            "Time window the chart should cover. Currently only ``24h`` is "
+            "wired into the mobile UI; ``7d`` and ``30d`` are reserved for "
+            "future range tabs and are silently coerced to ``24h`` until "
+            "those tabs ship."
+        ),
+    ),
+) -> VitalsTimeseriesResponse:
+    """F-12 (M-6) — vitals time-series for the chart on `vital_detail_screen.dart`.
+
+    Returns a downsampled list of `{ts, heart_rate, spo2, temperature,
+    respiratory_rate, blood_pressure_sys, blood_pressure_dia}` rows. The
+    server picks a bucket size that matches the range (15 min for 24h,
+    1 h for 7d, 6 h for 30d) so each response stays well under 10 KB.
+
+    Always returns 200 — including when the patient has no vitals or the
+    `vitals` hypertable doesn't exist yet — so the mobile chart can render
+    its "no data" placeholder without an error toast.
+    """
+    return MonitoringService.get_vitals_timeseries(
+        patient_id=target_profile_id,
+        db=db,
+        range_key=range,
+    )
 
 
 @metrics_router.get(
@@ -66,7 +102,7 @@ def get_sleep_history(
     db: Session = Depends(get_db),
     from_date: str | None = None,
     to_date: str | None = None,
-    limit: int = 30,
+    limit: int = Query(default=30, ge=1, le=90),
 ) -> SleepHistoryResponse:
     """Get sleep session history within a date range."""
     sessions = MonitoringService.get_sleep_history(
@@ -101,7 +137,7 @@ def get_health_report(
 def list_risk_reports(
     target_profile_id: int = Depends(get_target_profile_id),
     db: Session = Depends(get_db),
-    limit: int = 10,
+    limit: int = Query(default=10, ge=1, le=50),
 ) -> list[RiskReportResponse]:
     """Get recent risk reports from AI analysis."""
     return MonitoringService.get_risk_reports(

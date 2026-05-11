@@ -37,6 +37,7 @@ from app.schemas.fall_telemetry import (
     FallEventListResponse,
     FallEventResponse,
 )
+from app.services.push_notification_service import PushNotificationService
 from app.utils.datetime_helper import get_current_time
 
 logger = logging.getLogger(__name__)
@@ -260,6 +261,111 @@ class FallEventService:
             raise
 
         # Convert the mutated ORM instance to the response DTO.
+        return FallEventService._orm_to_response(row)
+
+    # ------------------------------------------------------------------
+    # Module FA-2 — Option 3-Lite stand-up survey
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def submit_survey(
+        *,
+        user_id: int,
+        fall_event_id: int,
+        can_stand: bool | None,
+        skipped: bool,
+        db: Session,
+    ) -> FallEventResponse | None:
+        """Persist the FallStandUpSurveyScreen answer.
+
+        Behaviour:
+
+        * Idempotent: re-submitting overwrites ``survey_answers`` and
+          refreshes ``answered_at``.
+        * Ownership: same JOIN-through-devices pattern as ``dismiss``.
+          Returns ``None`` when the event is not found OR doesn't
+          belong to ``user_id``.
+        * Side-effect: when ``can_stand is False`` we fan a
+          ``send_fall_followup_concern`` push to the patient's
+          caregivers — a *softer* alert than the SOS takeover so the
+          caregiver can call/visit without the watch screaming.
+
+        Returns the updated event so the Flutter client can swap it
+        into local state without a follow-up GET.
+        """
+        row = (
+            db.query(FallEvent)
+            .filter(FallEvent.id == int(fall_event_id))
+            .with_for_update()
+            .first()
+        )
+        if row is None:
+            return None
+        owner_check = (
+            db.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM devices d
+                    WHERE d.id = :device_id AND d.user_id = :user_id
+                    LIMIT 1
+                    """
+                ),
+                {"device_id": int(row.device_id), "user_id": int(user_id)},
+            )
+            .mappings()
+            .first()
+        )
+        if owner_check is None:
+            return None
+
+        answered_at = get_current_time()
+        survey_payload: dict[str, Any] = {
+            "can_stand": can_stand,
+            "skipped": bool(skipped),
+            "answered_at": answered_at.isoformat(),
+        }
+        try:
+            row.survey_answers = survey_payload
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+        except SQLAlchemyError:
+            db.rollback()
+            logger.exception(
+                "Failed to persist survey for fall_event id=%s user=%s",
+                fall_event_id,
+                user_id,
+            )
+            raise
+
+        # Side-effect: caregiver follow-up push when patient said OK
+        # but cannot stand.  Best-effort — a failed push doesn't roll
+        # back the survey, the audit trail in DB is the source of
+        # truth.
+        if can_stand is False:
+            try:
+                PushNotificationService.send_fall_followup_concern(
+                    db=db,
+                    patient_user_id=int(user_id),
+                    fall_event_id=int(row.id),
+                    fall_event_uuid=str(row.uuid),
+                )
+            except Exception:  # noqa: BLE001
+                logger.exception(
+                    "Failed to fan follow-up concern for fall_event id=%s",
+                    fall_event_id,
+                )
+
+        return FallEventService._orm_to_response(row)
+
+    @staticmethod
+    def _orm_to_response(row: FallEvent) -> FallEventResponse:
+        """Project an ORM ``FallEvent`` row to its mobile DTO.
+
+        Shared by ``dismiss`` and ``submit_survey`` so both writes echo
+        a consistent shape (``status`` derivation + survey passthrough).
+        """
         return FallEventResponse(
             id=row.id,
             uuid=str(row.uuid),
@@ -277,6 +383,9 @@ class FallEventService:
             sos_triggered=row.sos_triggered,
             status=derive_status(row),
             features=row.features if isinstance(row.features, dict) else None,
+            survey_answers=(
+                row.survey_answers if isinstance(row.survey_answers, dict) else None
+            ),
         )
 
     # ------------------------------------------------------------------
@@ -323,6 +432,11 @@ class FallEventService:
             sos_triggered=bool(row.get("sos_triggered")),
             status=derive_status(_Stub(row)),  # type: ignore[arg-type]
             features=row.get("features") if isinstance(row.get("features"), dict) else None,
+            survey_answers=(
+                row.get("survey_answers")
+                if isinstance(row.get("survey_answers"), dict)
+                else None
+            ),
         )
 
 

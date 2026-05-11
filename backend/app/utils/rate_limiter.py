@@ -26,12 +26,17 @@ class RateLimiter:
         now = get_current_time()
         cutoff = now - timedelta(minutes=self.window_minutes)
         
-        # Clean old attempts
-        self._attempts[identifier] = [
+        # Clean old attempts and prune empty entries to prevent unbounded growth
+        recent = [
             attempt for attempt in self._attempts[identifier]
             if attempt > cutoff
         ]
-        
+        if recent:
+            self._attempts[identifier] = recent
+        else:
+            self._attempts.pop(identifier, None)
+            return False
+
         # Check if exceeded limit
         return len(self._attempts[identifier]) >= self.max_attempts
     
@@ -44,13 +49,17 @@ class RateLimiter:
         now = get_current_time()
         cutoff = now - timedelta(minutes=self.window_minutes)
         
-        # Clean old attempts
-        self._attempts[identifier] = [
+        # Clean old attempts and prune empty entries
+        recent = [
             attempt for attempt in self._attempts[identifier]
             if attempt > cutoff
         ]
-        
-        current_attempts = len(self._attempts[identifier])
+        if recent:
+            self._attempts[identifier] = recent
+        else:
+            self._attempts.pop(identifier, None)
+
+        current_attempts = len(recent)
         return max(0, self.max_attempts - current_attempts)
     
     def reset(self, identifier: str):

@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' show Timer, unawaited;
 import 'package:flutter/material.dart';
 import 'package:slide_to_act/slide_to_act.dart';
 import 'package:geolocator/geolocator.dart';
@@ -41,7 +41,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
   bool _networkError = false;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  final SosAudioService _audio = SosAudioService();
+  final SosAudioService _audio = SosAudioService(AudioAlertType.manualSos);
 
   @override
   void initState() {
@@ -164,7 +164,7 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
         longitude: position?.longitude,
       );
 
-      _audio.stop();
+      await _audio.stop();
 
       if (mounted) {
         Navigator.pushReplacement(
@@ -189,14 +189,14 @@ class _ManualSOSScreenState extends State<ManualSOSScreen>
   void _cancelSOS() {
     _isCancelled = true;
     _timer?.cancel();
-    _audio.stop();
+    unawaited(_audio.stop());
     Navigator.pop(context);
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _audio.stop();
+    unawaited(_audio.stop());
     _countdownNotifier.dispose();
     _isSendingNotifier.dispose();
     _pulseController.dispose();

@@ -10,10 +10,15 @@ import httpx
 from fastapi import FastAPI
 import uvicorn
 
+from fastapi import HTTPException
+
 from app.api.routes.relationships import router as relationships_router
 from app.core.dependencies import get_current_user
 from app.db.database import get_db
-from app.schemas.relationship import LinkedContactDetailResponse
+from app.schemas.relationship import (
+    LinkedContactDetailResponse,
+    LinkedContactMedicalInfoResponse,
+)
 from app.services.relationship_service import RelationshipService
 
 
@@ -214,6 +219,93 @@ def test_request_relationship_passes_payload(monkeypatch) -> None:
         "primary_relationship_label": "Mẹ",
         "tags": expected_tags,
     }
+
+
+def test_medical_info_route_returns_payload_when_permission_granted(monkeypatch) -> None:
+    """P-4: happy path — service returns the payload, route serialises it
+    via ``LinkedContactMedicalInfoResponse``. We hardcode the expected dict
+    so a future schema field rename is caught here, not silently dropped."""
+
+    route = _route("/relationships/{contact_id}/medical-info", "GET")
+    expected = {
+        "contact_id": 77,
+        "display_name": "Bà Mẹ",
+        "blood_type": "O+",
+        "height_cm": 158,
+        "weight_kg": 52.5,
+        "medications": ["Metformin 500mg", "Losartan 50mg"],
+        "allergies": ["Penicillin"],
+        "medical_conditions": ["hypertension", "diabetes"],
+    }
+
+    captured: dict[str, object] = {}
+
+    def _service(db, current_user, contact_id):
+        captured["user_id"] = current_user.id
+        captured["contact_id"] = contact_id
+        return expected
+
+    monkeypatch.setattr(
+        RelationshipService,
+        "get_linked_contact_medical_info",
+        staticmethod(_service),
+    )
+
+    with _serve_test_app(user_id=42) as client:
+        response = client.get("/mobile/relationships/77/medical-info")
+
+    assert route.response_model is LinkedContactMedicalInfoResponse
+    assert response.status_code == 200
+    assert response.json() == expected
+    assert captured == {"user_id": 42, "contact_id": 77}
+
+
+def test_medical_info_route_returns_403_when_permission_denied(monkeypatch) -> None:
+    """P-4: when the patient has not granted ``can_view_medical_info`` to
+    the requester the service raises 403; the route must propagate that
+    intact (not 500). Frontend relies on the 403 to show the 'permission
+    not granted' empty state."""
+
+    def _service(db, current_user, contact_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Người này chưa cho phép bạn xem hồ sơ y tế.",
+        )
+
+    monkeypatch.setattr(
+        RelationshipService,
+        "get_linked_contact_medical_info",
+        staticmethod(_service),
+    )
+
+    with _serve_test_app(user_id=42) as client:
+        response = client.get("/mobile/relationships/77/medical-info")
+
+    assert response.status_code == 403
+    body = response.json()
+    assert "chưa cho phép" in body["detail"]
+
+
+def test_medical_info_route_returns_404_when_no_relationship(monkeypatch) -> None:
+    """P-4: 404 path — caller passed a contact_id they have no link to."""
+
+    def _service(db, current_user, contact_id):
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy dữ liệu liên hệ này",
+        )
+
+    monkeypatch.setattr(
+        RelationshipService,
+        "get_linked_contact_medical_info",
+        staticmethod(_service),
+    )
+
+    with _serve_test_app(user_id=42) as client:
+        response = client.get("/mobile/relationships/999/medical-info")
+
+    assert response.status_code == 404
+    assert "Không tìm thấy" in response.json()["detail"]
 
 
 def test_delete_relationship_returns_204(monkeypatch) -> None:

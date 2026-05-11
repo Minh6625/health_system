@@ -185,7 +185,7 @@ class DeviceService:
         except ProgrammingError as error:
             db.rollback()
             if DeviceService._is_missing_devices_table(error):
-                raise ValueError("Bang devices chua duoc tao trong database") from error
+                raise ValueError("Hệ thống chưa sẵn sàng, vui lòng thử lại sau") from error
             raise
 
         db.commit()

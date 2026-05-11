@@ -2,8 +2,35 @@ import '../../../core/network/api_client.dart';
 import '../models/access_profile_model.dart';
 import '../models/user_search_model.dart';
 import '../models/family_profile_snapshot.dart';
+import '../models/linked_contact_medical_info_model.dart';
 import '../models/linked_contact_model.dart';
 import 'package:flutter/foundation.dart';
+
+/// P-4: thrown by ``FamilyRepository.getLinkedContactMedicalInfo`` when the
+/// patient has not granted ``can_view_medical_info`` to the current user.
+/// Distinct from a generic exception so the UI can render a "permission
+/// not yet granted" empty state instead of a red error banner.
+class MedicalInfoPermissionDeniedException implements Exception {
+  const MedicalInfoPermissionDeniedException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// P-4: thrown when the requested contact has no accepted relationship.
+/// Different from ``MedicalInfoPermissionDeniedException`` so the UI can
+/// surface a "stale link / contact removed" message rather than the
+/// permission-toggle hint.
+class MedicalInfoNotFoundException implements Exception {
+  const MedicalInfoNotFoundException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 class FamilyRepository {
   FamilyRepository({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
@@ -39,6 +66,39 @@ class FamilyRepository {
     } catch (e) {
       debugPrint('Error getting linked contact detail: $e');
       throw Exception('Không thể tải chi tiết liên hệ.');
+    }
+  }
+
+  /// P-4: fetch a linked contact's read-only medical profile.
+  ///
+  /// The current ``ApiClient`` collapses every non-2xx into a flat
+  /// ``Exception`` whose message is the backend ``detail`` string, so we
+  /// detect 403 vs 404 by matching the Vietnamese phrases from the
+  /// backend's HTTPException details. Brittle if those copies change, but
+  /// keeps the typed-exception surface here without invasive ApiClient
+  /// changes — and the same Vietnamese strings are pinned by the backend
+  /// HTTP-route tests, so a drift would fail there before it reached UI.
+  Future<LinkedContactMedicalInfoModel> getLinkedContactMedicalInfo(
+    String id,
+  ) async {
+    try {
+      final response = await _apiClient.get('/relationships/$id/medical-info');
+      if (response is Map) {
+        return LinkedContactMedicalInfoModel.fromJson(
+          Map<String, dynamic>.from(response),
+        );
+      }
+      throw Exception('Phản hồi không hợp lệ.');
+    } catch (e) {
+      final raw = e.toString();
+      if (raw.contains('chưa cho phép')) {
+        throw MedicalInfoPermissionDeniedException(raw);
+      }
+      if (raw.contains('Không tìm thấy')) {
+        throw MedicalInfoNotFoundException(raw);
+      }
+      debugPrint('Error getting linked contact medical info: $e');
+      throw Exception('Không thể tải hồ sơ y tế của liên hệ.');
     }
   }
 

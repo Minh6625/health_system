@@ -108,5 +108,50 @@ void main() {
       expect(xai.timeline.first.description, 'Legacy mock entry');
       expect(xai.triggerReason, isNull);
     });
+
+    // Bug fix G-7 regression: backend ships UTC ISO strings; previously the
+    // parser kept ``DateTime`` in UTC and the SOS detail card rendered the
+    // wrong wall-clock time on a VN device (UTC+7). Pin the parser to
+    // ``.toLocal()`` so all three timestamp fields land in the device zone.
+    test('normalises UTC trigger_time / last_updated / resolved_at to local',
+        () {
+      final payload = activeFallPayload()
+        ..['trigger_time'] = '2026-04-25T13:51:15.551501Z'
+        ..['location'] = <String, dynamic>{
+          'latitude': 10.5,
+          'longitude': 106.7,
+          'accuracy': 50.0,
+          'address': '123 Street',
+          'last_updated': '2026-04-25T13:51:15.551501Z',
+        }
+        ..['status'] = 'resolved'
+        ..['fall_detection_xai'] = null
+        ..['resolution'] = <String, dynamic>{
+          'resolved_at': '2026-04-25T13:41:06.165556Z',
+          'resolved_by_name': 'Nguyen Caregiver',
+          'resolution_status': 'safe',
+          'notes': null,
+        };
+
+      final model = SOSEventModel.fromJson(payload);
+
+      expect(model.triggerTime.isUtc, isFalse,
+          reason: 'triggerTime must be in local time after fromJson');
+      expect(model.location.lastUpdated.isUtc, isFalse,
+          reason: 'location.lastUpdated must be in local time after fromJson');
+      expect(model.resolution!.resolvedTime.isUtc, isFalse,
+          reason:
+              'resolution.resolvedTime must be in local time after fromJson');
+
+      // The instant-in-time should still equal the UTC moment shipped on
+      // the wire — only the timezone label changes. Compare against a UTC
+      // DateTime with matching components to avoid hard-coding the host's
+      // offset (the test runs the same way on any machine).
+      final expectedTrigger = DateTime.utc(2026, 4, 25, 13, 51, 15, 551, 501);
+      expect(
+        model.triggerTime.toUtc().millisecondsSinceEpoch,
+        expectedTrigger.millisecondsSinceEpoch,
+      );
+    });
   });
 }

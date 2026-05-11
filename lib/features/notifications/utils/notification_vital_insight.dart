@@ -285,6 +285,63 @@ String _prettifyKey(String key) {
   return normalized[0].toUpperCase() + normalized.substring(1);
 }
 
+// F-13 (M-3): keys that are internal DB FKs / debug fields and must
+// never be rendered to the end user. Pre-fix the fall-through branch
+// at the bottom of `buildNotificationRelatedFields` was prettifying
+// `risk_score_id` → "Risk score id" and showing the raw integer FK to
+// the user, which is meaningless and leaked DB schema. Add to this set
+// instead of the well-known label list when a field should disappear.
+const Set<String> _hiddenNotificationDataKeys = <String>{
+  'risk_score_id',
+  'alert_id',
+  'profile_id',
+  'user_id',
+  'event_id',
+  'notification_id',
+  'created_by',
+  'updated_by',
+};
+
+// F-13 (M-3): map enum-like backend strings to Vietnamese labels for
+// the notification detail screen. Tester report showed "medium" /
+// "initial" rendered raw alongside the prettified field name; this
+// gives those values a Vietnamese form so the UI is self-explanatory
+// without forcing the user to learn the API contract.
+String _localizeRiskLevel(String raw) {
+  switch (raw.trim().toLowerCase()) {
+    case 'low':
+      return 'Nhẹ';
+    case 'medium':
+    case 'moderate':
+      return 'Trung bình';
+    case 'high':
+      return 'Cao';
+    case 'critical':
+      return 'Nguy hiểm';
+    default:
+      return raw.isEmpty ? '--' : raw;
+  }
+}
+
+String _localizeEscalationStage(String raw) {
+  switch (raw.trim().toLowerCase()) {
+    case 'initial':
+    case 'pending':
+      return 'Mới phát sinh';
+    case 'escalating':
+    case 'in_progress':
+      return 'Đang leo thang';
+    case 'resolved':
+    case 'closed':
+      return 'Đã xử lý';
+    case 'cancelled':
+    case 'canceled':
+      return 'Đã hủy';
+    default:
+      return raw.isEmpty ? '--' : raw;
+  }
+}
+
 /// Builds the "Chỉ số và thông tin liên quan" rows for the detail screen.
 /// Limits to 8 entries, formats common vitals, falls back to prettified
 /// key/value for everything else.
@@ -326,6 +383,32 @@ List<MapEntry<String, String>> buildNotificationRelatedFields(
   addField('trigger', 'Kích hoạt bởi', (v) => v.toString());
   addField('offline_duration', 'Mất kết nối', (v) => '${v.toString()} phút');
 
+  // F-13 (M-3): risk-alert specific fields that previously fell through
+  // to the snake_case prettifier ("Risk level: medium", "Auto escalate
+  // after seconds: 60") — give them proper labels and Vietnamese enum
+  // values so the screen reads as a localised UI, not a raw DB dump.
+  addField('device_id', 'Thiết bị', (v) => '#${v.toString()}');
+  addField(
+    'risk_level',
+    'Mức nguy cơ',
+    (v) => _localizeRiskLevel(v.toString()),
+  );
+  addField('risk_score', 'Điểm nguy cơ', (v) {
+    final num? parsed = num.tryParse(v.toString());
+    if (parsed == null) return v.toString();
+    return parsed.toStringAsFixed(parsed % 1 == 0 ? 0 : 2);
+  });
+  addField(
+    'escalation_stage',
+    'Giai đoạn',
+    (v) => _localizeEscalationStage(v.toString()),
+  );
+  addField(
+    'auto_escalate_after_seconds',
+    'Tự leo thang sau',
+    (v) => '${v.toString()} giây',
+  );
+
   final sys = data['blood_pressure_sys'];
   final dia = data['blood_pressure_dia'];
   if (sys != null || dia != null) {
@@ -339,6 +422,9 @@ List<MapEntry<String, String>> buildNotificationRelatedFields(
   for (final entry in data.entries) {
     if (fields.length >= 8) break;
     if (usedKeys.contains(entry.key)) continue;
+    // F-13 (M-3): skip internal FKs like `risk_score_id` so the user
+    // does not see meaningless DB row IDs in the detail card.
+    if (_hiddenNotificationDataKeys.contains(entry.key)) continue;
     if (entry.value == null || entry.value is Map || entry.value is List) {
       continue;
     }

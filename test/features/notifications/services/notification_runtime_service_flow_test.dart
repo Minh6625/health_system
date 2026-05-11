@@ -24,6 +24,7 @@ class _FakeNotificationEmergencyAdapter implements NotificationEmergencyAdapter 
   final List<NotificationOpenTarget> openedTargets = <NotificationOpenTarget>[];
   final List<NotificationOpenTarget> redirectedTargets =
       <NotificationOpenTarget>[];
+  final List<int> openedFallEventIds = <int>[];
 
   @override
   Future<void> openNotifications() async {
@@ -55,6 +56,15 @@ class _FakeNotificationEmergencyAdapter implements NotificationEmergencyAdapter 
   @override
   Future<void> redirectCriticalAlertToAuth(NotificationOpenTarget target) async {
     redirectedTargets.add(target);
+  }
+
+  @override
+  Future<void> presentFallAlert({
+    required int fallEventId,
+    String? fallEventUuid,
+    double confidence = 0.0,
+  }) async {
+    openedFallEventIds.add(fallEventId);
   }
 }
 

@@ -9,6 +9,7 @@ class _FakeRepository implements FallEventRepository {
     this.listFn,
     this.getFn,
     this.dismissFn,
+    this.submitSurveyFn,
   });
 
   Future<FallEventList> Function({int limit, int offset, String? patientId})?
@@ -16,9 +17,13 @@ class _FakeRepository implements FallEventRepository {
   Future<FallEvent?> Function(int id, {String? patientId})? getFn;
   Future<FallEvent?> Function(int id, {String? reason, String? patientId})?
       dismissFn;
+  Future<FallEvent?> Function(int id,
+      {required bool? canStand, required bool skipped, String? patientId})?
+      submitSurveyFn;
 
   int listCalls = 0;
   int dismissCalls = 0;
+  int submitSurveyCalls = 0;
 
   @override
   Future<FallEventList> listEvents({
@@ -48,6 +53,21 @@ class _FakeRepository implements FallEventRepository {
     dismissCalls++;
     final fn = dismissFn;
     if (fn != null) return fn(id, reason: reason, patientId: patientId);
+    return Future.value(null);
+  }
+
+  @override
+  Future<FallEvent?> submitSurvey(
+    int id, {
+    required bool? canStand,
+    required bool skipped,
+    String? patientId,
+  }) {
+    submitSurveyCalls++;
+    final fn = submitSurveyFn;
+    if (fn != null) {
+      return fn(id, canStand: canStand, skipped: skipped, patientId: patientId);
+    }
     return Future.value(null);
   }
 }

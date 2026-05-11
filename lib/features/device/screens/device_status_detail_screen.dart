@@ -104,20 +104,14 @@ class _DeviceStatusDetailView extends StatelessWidget {
                   label: 'Cấu hình thiết bị',
                   onPressed: () => _navigateToConfigure(context, device),
                 ),
-                
-                DeviceInfoSection(
-                  title: 'Thông tin kỹ thuật',
-                  children: [
-                    InfoRow(label: 'Firmware', value: device.firmwareVersion ?? 'Chưa có'),
-                    InfoRow(label: 'Serial', value: device.serialNumber ?? 'Chưa có'),
-                    InfoRow(label: 'MAC', value: device.macAddress ?? 'Chưa có'),
-                    InfoRow(
-                      label: 'MQTT', 
-                      value: device.mqttClientId != null ? '${device.mqttClientId!.substring(0, 8)}...' : 'Chưa có',
-                      isLast: true,
-                    ),
-                  ],
-                ),
+
+                // Bug 1 (QA M-12): the technical info card used to render
+                // four rows that all said "Chưa có" for devices paired via
+                // BLE (firmware/MAC/serial/MQTT not yet reported), which
+                // looked like a broken screen. We now build the row list
+                // conditionally and skip the section entirely when the
+                // device has nothing to show.
+                _buildTechnicalInfoSection(device),
                 const SizedBox(height: 48), // Bottom padding
               ],
             ),
@@ -235,5 +229,47 @@ class _DeviceStatusDetailView extends StatelessWidget {
     if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
     if (diff.inHours < 24) return '${diff.inHours} giờ trước';
     return '${diff.inDays} ngày trước';
+  }
+
+  /// Build the "Thông tin kỹ thuật" card only with rows that have a real
+  /// value. When every technical field is null (typical for a freshly
+  /// BLE-paired device that hasn't reported telemetry yet), we hide the
+  /// whole card so the user doesn't see a stack of "Chưa có" placeholders
+  /// that read like a broken screen.
+  Widget _buildTechnicalInfoSection(DeviceModel device) {
+    final entries = <MapEntry<String, String>>[];
+    if (device.firmwareVersion != null &&
+        device.firmwareVersion!.trim().isNotEmpty) {
+      entries.add(MapEntry('Firmware', device.firmwareVersion!));
+    }
+    if (device.serialNumber != null &&
+        device.serialNumber!.trim().isNotEmpty) {
+      entries.add(MapEntry('Serial', device.serialNumber!));
+    }
+    if (device.macAddress != null && device.macAddress!.trim().isNotEmpty) {
+      entries.add(MapEntry('MAC', device.macAddress!));
+    }
+    if (device.mqttClientId != null &&
+        device.mqttClientId!.trim().isNotEmpty) {
+      // Same truncation as before: backend MQTT client IDs are long opaque
+      // strings, the user only needs the prefix to confirm identity.
+      final mqtt = device.mqttClientId!;
+      final preview = mqtt.length > 8 ? '${mqtt.substring(0, 8)}...' : mqtt;
+      entries.add(MapEntry('MQTT', preview));
+    }
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    return DeviceInfoSection(
+      title: 'Thông tin kỹ thuật',
+      children: [
+        for (var i = 0; i < entries.length; i++)
+          InfoRow(
+            label: entries[i].key,
+            value: entries[i].value,
+            isLast: i == entries.length - 1,
+          ),
+      ],
+    );
   }
 }

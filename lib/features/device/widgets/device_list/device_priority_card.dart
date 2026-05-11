@@ -11,6 +11,18 @@ class DevicePriorityCard extends StatelessWidget {
   final bool needsAttention;
   final Function(DeviceModel, String) onActionSelected;
   final VoidCallback onRefreshRequested;
+  // F-16 (M-10): name of the person this device is currently
+  // monitoring. Today the device data model owns a single `user_id`
+  // (the device owner = monitored subject), so the caller passes the
+  // current user's full name. When the M-10 level B/C migration
+  // adds `devices.monitored_for_user_id` for caregiver-purchased
+  // devices, the caller switches to that user's name without any
+  // change to this widget.
+  //
+  // Nullable + empty-string-tolerant: if the auth provider has not
+  // resolved yet (rare race) we just hide the badge rather than
+  // showing "Đang theo dõi: " with no name.
+  final String? monitoredForName;
 
   const DevicePriorityCard({
     super.key,
@@ -18,6 +30,7 @@ class DevicePriorityCard extends StatelessWidget {
     required this.needsAttention,
     required this.onActionSelected,
     required this.onRefreshRequested,
+    this.monitoredForName,
   });
 
   @override
@@ -77,6 +90,38 @@ class DevicePriorityCard extends StatelessWidget {
                               _buildStatusBadge(isOffline),
                             ],
                           ),
+                          // F-16 (M-10): "Đang theo dõi" line so users
+                          // who own multiple devices can tell at a glance
+                          // *who* each device is collecting data for.
+                          // Until the level B/C migration adds
+                          // `monitored_for_user_id`, every device on
+                          // the self dashboard maps to the current user;
+                          // the line still removes the ambiguity tester
+                          // reported ("không có note ... kết nối cho ai").
+                          if (monitoredForName != null &&
+                              monitoredForName!.trim().isNotEmpty) ...[
+                            SizedBox(height: AppSpacing.gapXs + 2),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.person_outline_rounded,
+                                  size: 14,
+                                  color: AppColors.textSecondary,
+                                ),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'Đang theo dõi: ${monitoredForName!.trim()}',
+                                    style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                           SizedBox(height: AppSpacing.gapXs + 2),
                           Text(
                             _buildSubtitle(),

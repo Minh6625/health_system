@@ -9,6 +9,7 @@ from app.schemas.relationship import (
     AccessProfileResponse,
     FamilyProfileSnapshot,
     LinkedContactDetailResponse,
+    LinkedContactMedicalInfoResponse,
     RelationshipAcceptRequest,
     RelationshipRequestCreate,
     RelationshipResponse,
@@ -42,6 +43,24 @@ def get_linked_contact_detail(
     db: Session = Depends(get_db)
 ):
     return RelationshipService.get_linked_contact_detail(db, current_user, contact_id)
+
+
+@router.get(
+    "/relationships/{contact_id}/medical-info",
+    response_model=LinkedContactMedicalInfoResponse,
+    summary="Get a linked contact's self-filled medical profile",
+)
+def get_linked_contact_medical_info(
+    contact_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """P-4: read the patient's medical info when they granted
+    ``can_view_medical_info`` to the current caregiver. Returns 403 if
+    the bit is off, 404 if no relationship exists."""
+    return RelationshipService.get_linked_contact_medical_info(
+        db, current_user, contact_id
+    )
 
 @router.get(
     "/access-profiles",
@@ -95,7 +114,11 @@ def request_relationship(
 ):
     """Send a request to a family member or friend by email/phone"""
     rel = RelationshipService.request_relationship(db, current_user, payload)
-    return RelationshipService.format_relationships(db, current_user.id)[-1]  # Return fully formatted
+    all_rels = RelationshipService.format_relationships(db, current_user.id)
+    for r in all_rels:
+        if r["id"] == rel.id:
+            return r
+    return all_rels[-1]  # fallback
 
 
 @router.post(
@@ -110,12 +133,11 @@ def accept_relationship(
 ):
     """Accept an incoming request from someone wanting to view your data"""
     rel = RelationshipService.accept_relationship(db, current_user, payload.relationship_id)
-    # Find and return fully formatted
     rels = RelationshipService.format_relationships(db, current_user.id)
     for r in rels:
         if r["id"] == rel.id:
             return r
-    raise HTTPException(status_code=404, detail="Error formatting response")
+    raise HTTPException(status_code=404, detail="Relationship not found after accept")
 
 @router.put(
     "/relationships/{relationship_id}",

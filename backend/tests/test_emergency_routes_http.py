@@ -180,10 +180,16 @@ def test_get_sos_alerts_route_uses_status_filter_and_current_user(monkeypatch) -
 def test_get_sos_detail_route_rejects_unauthorized_access(monkeypatch) -> None:
     client = _build_test_client(user_id=7, role="user")
 
+    # Bug fix G-3: the route now passes ``viewer_user_id`` and
+    # ``viewer_is_admin`` as keyword args so the service can redact location
+    # for caregivers without ``can_view_location``. Accept **kwargs to stay
+    # compatible with both the old and new call shapes.
     monkeypatch.setattr(
         EmergencyService,
         "get_sos_detail",
-        staticmethod(lambda db, sos_id: _sample_sos_detail(patient_user_id=42)),
+        staticmethod(
+            lambda db, sos_id, **_: _sample_sos_detail(patient_user_id=42),
+        ),
     )
     monkeypatch.setattr(
         "app.repositories.emergency_repository.EmergencyRepository.check_user_has_access",

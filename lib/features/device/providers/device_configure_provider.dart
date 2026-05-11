@@ -61,6 +61,14 @@ class DeviceConfigureProvider extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
+  // F-7 (M-7): true when the most recent saveChanges() committed the name
+  // PATCH but the settings PUT then failed. The screen reads this flag to
+  // pick a warning-tinted snackbar instead of the misleading red error that
+  // QA reported (the rename DID persist; only the toggles need a retry).
+  // Cleared at the start of every saveChanges() call.
+  bool _hasPartialSuccess = false;
+  bool get hasPartialSuccess => _hasPartialSuccess;
+
   void updateName(String name) {
     if (deviceName != name) {
       deviceName = name;
@@ -91,15 +99,22 @@ class DeviceConfigureProvider extends ChangeNotifier {
   }
 
   void _markDirty() {
-    if (!_isDirty) {
-      _isDirty = true;
-      notifyListeners();
-    }
+    // Bug 2 (QA): the original implementation only called notifyListeners()
+    // on the false→true transition, so every subsequent toggle was silent.
+    // SwitchListTile is a controlled widget driven by `provider.notifyXxx`,
+    // so without a notify the UI didn't rebuild and the switch appeared
+    // "stuck" — exactly the "tắt cảnh báo nhịp tim cao xong bật lại không
+    // được" symptom. Each updateNotifyXxx caller already guards with
+    // `if (current != value)` so there are no spurious notifies; we always
+    // notify here to keep the switches in sync with the provider state.
+    _isDirty = true;
+    notifyListeners();
   }
 
   Future<bool> saveChanges() async {
     _isSaving = true;
     _errorMessage = null;
+    _hasPartialSuccess = false;
     notifyListeners();
 
     // Reject empty names up front so the user gets a clear Vietnamese
@@ -111,6 +126,12 @@ class DeviceConfigureProvider extends ChangeNotifier {
       return false;
     }
 
+    // F-7 (M-7): track per-step success so the catch block can tell a clean
+    // failure ("both calls failed") from a partial success ("name persisted,
+    // only settings PUT failed"). Without this distinction the user got a
+    // red snackbar even though their rename was already committed.
+    bool nameJustCommitted = false;
+
     try {
       // 1) PATCH the device name when the user actually edited it. We do
       //    this first so a server-side validation error (e.g. duplicate /
@@ -121,6 +142,7 @@ class DeviceConfigureProvider extends ChangeNotifier {
           deviceName: deviceName.trim(),
         );
         _nameDirty = false;
+        nameJustCommitted = true;
       }
 
       // 2) PUT the three notify flags using backend keys directly.
@@ -144,7 +166,20 @@ class DeviceConfigureProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _isSaving = false;
-      _errorMessage = 'Lỗi: ${e.toString()}';
+      if (nameJustCommitted) {
+        // F-7 (M-7): partial success — the rename PATCH already committed on
+        // the server, only the settings PUT failed. Surface that honestly so
+        // the screen can show a warning snackbar (not a red "everything
+        // failed" error) and the user only retries the settings step.
+        // _nameDirty was cleared after the PATCH so a retry will skip the
+        // already-committed name change automatically.
+        _hasPartialSuccess = true;
+        _errorMessage =
+            'Đã đổi tên thiết bị, nhưng chưa lưu được cài đặt thông báo: '
+            '${e.toString()}';
+      } else {
+        _errorMessage = 'Lỗi: ${e.toString()}';
+      }
       notifyListeners();
       return false;
     }

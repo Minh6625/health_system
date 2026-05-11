@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -13,6 +13,7 @@ from app.schemas.emergency import (
     TriggerSOSResponse,
 )
 from app.services.emergency_service import EmergencyService
+from app.services.push_notification_service import PushNotificationService
 
 
 router = APIRouter(prefix="/emergency", tags=["Emergency"])
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/emergency", tags=["Emergency"])
 @router.post("/sos/trigger", response_model=TriggerSOSResponse)
 def trigger_sos(
     payload: TriggerSOSRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> TriggerSOSResponse:
@@ -33,6 +35,18 @@ def trigger_sos(
         latitude=payload.latitude,
         longitude=payload.longitude,
         address=payload.address,
+        send_push=False,
+    )
+    background_tasks.add_task(
+        PushNotificationService.send_sos_push_alerts,
+        db,
+        recipient_user_ids=dispatch_info["recipient_user_ids"],
+        title=dispatch_info["title"],
+        body=dispatch_info["body"],
+        sos_id=int(sos_event.id),
+        alert_type=dispatch_info["alert_type"],
+        trigger_type=dispatch_info["trigger_type"],
+        notification_id_by_user=dispatch_info["notification_id_by_user"],
     )
     return TriggerSOSResponse(
         success=True,
@@ -76,14 +90,23 @@ def get_sos_detail(
     Returns:
         Complete SOS event details including patient info, location, XAI data, resolution info
     """
-    sos_detail = EmergencyService.get_sos_detail(db, sos_id)
-    
+    # Bug fix G-3: pass the viewer's identity so the service can redact
+    # ``LocationInfo`` for caregivers whose relationship row has
+    # ``can_view_location=False``. Owners (patient viewing their own SOS) and
+    # admins see the full payload.
+    sos_detail = EmergencyService.get_sos_detail(
+        db,
+        sos_id,
+        viewer_user_id=int(current_user.id),
+        viewer_is_admin=(current_user.role == "admin"),
+    )
+
     if not sos_detail:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy sự kiện SOS"
         )
-    
+
     from app.repositories.emergency_repository import EmergencyRepository
     # Check authorization (must be owner or linked profile)
     has_access = EmergencyRepository.check_user_has_access(db, current_user.id, sos_detail.patient.user_id)
@@ -92,7 +115,7 @@ def get_sos_detail(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bạn không có quyền xem chi tiết SOS này"
         )
-    
+
     return sos_detail
 
 

@@ -116,7 +116,7 @@ class SOSAlertsResponse(BaseModel):
 # ============================================================================
 class TriggerSOSRequest(BaseModel):
     """Request to trigger a new SOS event."""
-    trigger_type: str = "manual"
+    trigger_type: Literal["auto", "manual"] = "manual"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     address: Optional[str] = None

@@ -13,8 +13,8 @@ class AuditLog(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     time: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True, default=get_current_time)
-    user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     resource_type: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     resource_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False)

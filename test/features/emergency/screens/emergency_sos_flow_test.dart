@@ -277,6 +277,71 @@ void main() {
     },
   );
 
+  // F-9 (G-6): pinned regression for the SOS search-trim fix.
+  //
+  // Before this fix `_searchController.text.toLowerCase()` was stored as the
+  // search query verbatim, so an accidental trailing space (very common on
+  // touch keyboards after autocorrect) made the contains() check compare
+  // "an nguyen" against "an nguyen " and silently drop every match. QA
+  // reported caregivers thinking patients had vanished from the list when
+  // the only "bug" was a stray space they couldn't see in the search field.
+  //
+  // The fix trims the controller text before lowercasing. This test pins
+  // that trim by typing the patient name with a trailing space and
+  // asserting the matching card stays on screen.
+  testWidgets(
+    'F-9 (G-6): SOS search trims trailing whitespace so "An Nguyen " '
+    'still matches the patient "An Nguyen"',
+    (tester) async {
+      final active = _event(
+        id: '1',
+        patientName: 'An Nguyen',
+        triggerType: 'manual',
+        status: 'active',
+      );
+      final other = _event(
+        id: '2',
+        patientName: 'Binh Tran',
+        triggerType: 'manual',
+        status: 'active',
+      );
+      final repository = _FakeEmergencyCaregiverRepository(
+        initialAlerts: <SOSEventModel>[active, other],
+      );
+
+      await tester.pumpWidget(_buildApp(repository));
+      await _pumpUntilVisible(tester, find.byKey(const ValueKey('sos-card-1')));
+
+      // Sanity: both cards visible before any search.
+      expect(find.byKey(const ValueKey('sos-card-1')), findsOneWidget);
+      expect(find.byKey(const ValueKey('sos-card-2')), findsOneWidget);
+
+      // Type the target name with a trailing space — the exact shape of
+      // input QA hit on the touch keyboard.
+      await tester.enterText(
+        find.byKey(const ValueKey('sos-search-field')),
+        'An Nguyen ',
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('sos-card-1')),
+        findsOneWidget,
+        reason:
+            'Trailing whitespace must not hide the matching patient. '
+            'Without the .trim() in the search listener this expectation '
+            'fails because contains("an nguyen ") returns false.',
+      );
+      expect(
+        find.byKey(const ValueKey('sos-card-2')),
+        findsNothing,
+        reason:
+            'Filter still has to actually filter — only the matching '
+            'patient should remain after a trimmed-but-real query.',
+      );
+    },
+  );
+
   testWidgets('shows empty state when caregiver has no SOS alerts', (
     tester,
   ) async {

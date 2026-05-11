@@ -106,6 +106,13 @@ class FallEvent {
   /// surface it on a dedicated SHAP screen.
   final Map<String, dynamic>? features;
 
+  /// Module FA-2 (Option 3-Lite) post-dismiss stand-up survey:
+  /// ``{can_stand: bool|null, skipped: bool, answered_at: iso}``.
+  /// NULL when the user hasn't answered yet (or the app version pre-
+  /// dates the survey).  The caregiver app reads this to render "OK
+  /// + standing" / "OK but cannot stand" / "OK + skipped" badges.
+  final Map<String, dynamic>? surveyAnswers;
+
   const FallEvent({
     required this.id,
     required this.uuid,
@@ -123,6 +130,7 @@ class FallEvent {
     this.cancelReason,
     this.sosTriggered = false,
     this.features,
+    this.surveyAnswers,
   });
 
   factory FallEvent.fromJson(Map<String, dynamic> json) {
@@ -145,6 +153,9 @@ class FallEvent {
       features: json['features'] is Map<String, dynamic>
           ? json['features'] as Map<String, dynamic>
           : null,
+      surveyAnswers: json['survey_answers'] is Map<String, dynamic>
+          ? json['survey_answers'] as Map<String, dynamic>
+          : null,
     );
   }
 
@@ -156,6 +167,7 @@ class FallEvent {
     bool? userCancelled,
     String? cancelReason,
     FallEventStatus? status,
+    Map<String, dynamic>? surveyAnswers,
   }) {
     return FallEvent(
       id: id,
@@ -174,6 +186,7 @@ class FallEvent {
       sosTriggered: sosTriggered,
       status: status ?? this.status,
       features: features,
+      surveyAnswers: surveyAnswers ?? this.surveyAnswers,
     );
   }
 

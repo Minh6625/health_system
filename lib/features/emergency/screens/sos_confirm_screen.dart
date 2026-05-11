@@ -3,7 +3,7 @@ import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
 
-enum SosConfirmMode { manual, riskEscalation }
+enum SosConfirmMode { manual, riskEscalation, fallEscalation }
 
 /// Màn hình xác nhận sau khi gửi SOS thành công.
 /// Thay thế SnackBar để user yên tâm rằng đã gửi thành công.
@@ -71,23 +71,45 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
   }
 
   bool get _isRiskEscalation => widget.mode == SosConfirmMode.riskEscalation;
+  bool get _isFallEscalation => widget.mode == SosConfirmMode.fallEscalation;
 
-  String get _titleText =>
-      _isRiskEscalation ? 'Đã chuyển cảnh báo' : 'Đã gửi SOS';
+  String get _titleText {
+    if (_isFallEscalation) return 'Đã gửi cảnh báo té ngã';
+    if (_isRiskEscalation) return 'Đã chuyển cảnh báo';
+    return 'Đã gửi SOS';
+  }
 
-  String get _bodyPrefix =>
-      _isRiskEscalation ? 'Đã chuyển yêu cầu hỗ trợ đến ' : 'Đã thông báo đến ';
+  String get _bodyPrefix {
+    if (_isFallEscalation) return 'Đã thông báo khẩn cấp đến ';
+    if (_isRiskEscalation) return 'Đã chuyển yêu cầu hỗ trợ đến ';
+    return 'Đã thông báo đến ';
+  }
 
-  String get _bodySuffix => _isRiskEscalation
-      ? ' người thân. Hệ thống đang tiếp tục theo dõi và kết nối hỗ trợ.'
-      : ' người thân.\nHọ đang được kết nối để hỗ trợ bạn.';
+  String get _bodySuffix {
+    if (_isFallEscalation) {
+      return ' người thân.\nHọ sẽ sớm liên hệ để kiểm tra bạn.';
+    }
+    if (_isRiskEscalation) {
+      return ' người thân. Hệ thống đang tiếp tục theo dõi và kết nối hỗ trợ.';
+    }
+    return ' người thân.\nHọ đang được kết nối để hỗ trợ bạn.';
+  }
 
-  String get _statusText =>
-      _isRiskEscalation ? 'Đang leo thang hỗ trợ' : 'Đang chờ phản hồi';
+  String get _statusText {
+    if (_isFallEscalation) return 'SOS đã được kích hoạt';
+    if (_isRiskEscalation) return 'Đang leo thang hỗ trợ';
+    return 'Đang chờ phản hồi';
+  }
 
-  String get _tipText => _isRiskEscalation
-      ? 'Giữ bình tĩnh trong khi hệ thống liên hệ người hỗ trợ.'
-      : 'Giữ bình tĩnh và ở yên một chỗ để người thân dễ tìm thấy bạn.';
+  String get _tipText {
+    if (_isFallEscalation) {
+      return 'Hãy cố gắng ở yên. Người thân đang trên đường đến hỗ trợ bạn.';
+    }
+    if (_isRiskEscalation) {
+      return 'Giữ bình tĩnh trong khi hệ thống liên hệ người hỗ trợ.';
+    }
+    return 'Giữ bình tĩnh và ở yên một chỗ để người thân dễ tìm thấy bạn.';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,28 +167,37 @@ class _SosConfirmScreenState extends State<SosConfirmScreen>
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 12),
-                        RichText(
-                          textAlign: TextAlign.center,
-                          text: TextSpan(
-                            style: AppTextStyles.body.copyWith(
-                              color: AppColors.textSecondary,
-                              fontSize: 17,
-                            ),
-                            children: [
-                              TextSpan(text: _bodyPrefix),
-                              TextSpan(
-                                text: '${widget.recipientCount} người thân',
-                                style: AppTextStyles.bodyMedium.copyWith(
-                                  color: _isRiskEscalation
-                                      ? AppColors.warning
-                                      : AppColors.success,
-                                  fontWeight: FontWeight.w700,
+                        _isFallEscalation
+                            ? Text(
+                                'Cảnh báo SOS đã được kích hoạt.\nNgười thân sẽ nhận thông báo khẩn cấp.',
+                                style: AppTextStyles.body.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 17,
+                                ),
+                                textAlign: TextAlign.center,
+                              )
+                            : RichText(
+                                textAlign: TextAlign.center,
+                                text: TextSpan(
+                                  style: AppTextStyles.body.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 17,
+                                  ),
+                                  children: [
+                                    TextSpan(text: _bodyPrefix),
+                                    TextSpan(
+                                      text: '${widget.recipientCount} người thân',
+                                      style: AppTextStyles.bodyMedium.copyWith(
+                                        color: _isRiskEscalation
+                                            ? AppColors.warning
+                                            : AppColors.success,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    TextSpan(text: _bodySuffix),
+                                  ],
                                 ),
                               ),
-                              TextSpan(text: _bodySuffix),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
