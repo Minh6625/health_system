@@ -7,6 +7,7 @@ from fastapi.security.http import HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from typing import Optional
 
+from app.core.config import settings
 from app.db.database import get_db
 from app.models.user_model import User
 from app.repositories.user_repository import UserRepository
@@ -136,25 +137,42 @@ def get_target_profile_id(
 
 _logger = logging.getLogger(__name__)
 
-_INTERNAL_SERVICE_SECRET: str = os.getenv("INTERNAL_SERVICE_SECRET", "")
-if not _INTERNAL_SERVICE_SECRET:
-    _logger.warning(
-        "INTERNAL_SERVICE_SECRET is not set. Internal endpoints are protected "
-        "only by the X-Internal-Service header, which is trivially spoofable. "
-        "Set INTERNAL_SERVICE_SECRET in your environment to enable secret verification."
-    )
-
 
 def require_internal_service(
     x_internal_service: str | None = Header(default=None, alias="X-Internal-Service"),
     x_internal_secret: str | None = Header(default=None, alias="X-Internal-Secret"),
 ) -> None:
+    """Verify internal service headers per ADR-005.
+
+    Production (ENVIRONMENT=production): INTERNAL_SERVICE_SECRET must be set,
+    otherwise startup would have failed via Settings validator.
+    Development: if secret unset, accept with warning (fail-open for dev convenience).
+    """
     if x_internal_service != "iot-simulator":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Endpoint này chỉ dành cho IoT Simulator internal service",
+            detail="Endpoint nay chi danh cho IoT Simulator internal service",
         )
-    if _INTERNAL_SERVICE_SECRET and x_internal_secret != _INTERNAL_SERVICE_SECRET:
+
+    configured_secret = settings.INTERNAL_SERVICE_SECRET
+
+    # Fail-closed in production: secret must be configured.
+    if settings.ENVIRONMENT == "production" and not configured_secret:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Internal service secret not configured in production.",
+        )
+
+    # Dev mode: secret not set -> accept with warning (HS-006 grace).
+    if not configured_secret:
+        _logger.warning(
+            "INTERNAL_SERVICE_SECRET not set — accepting internal request without "
+            "secret verification (dev mode). Set INTERNAL_SERVICE_SECRET for production."
+        )
+        return
+
+    # Secret configured: verify header.
+    if x_internal_secret != configured_secret:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid internal service credentials",

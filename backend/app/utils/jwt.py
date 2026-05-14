@@ -21,8 +21,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     if expires_delta:
         expire = get_current_time() + expires_delta
     else:
-        # Default: 30 days (43200 minutes)
-        expire = get_current_time() + timedelta(days=30)
+        expire = get_current_time() + timedelta(days=settings.ACCESS_TOKEN_EXPIRE_DAYS)
     
     to_encode.update({
         "exp": expire,

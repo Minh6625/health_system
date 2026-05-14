@@ -19,6 +19,7 @@ from typing import Any
 
 import httpx
 
+from app.core.config import settings
 from app.observability.timing import StageTimer
 from app.services.circuit_breaker import CircuitBreaker
 
@@ -95,10 +96,15 @@ class ModelApiClient:
         if self._client is None:
             with self._client_lock:
                 if self._client is None:
+                    headers = {"X-Internal-Service": "health-system-backend"}
+                    # HS-021: add X-Internal-Secret per ADR-005.
+                    secret = settings.INTERNAL_SERVICE_SECRET
+                    if secret:
+                        headers["X-Internal-Secret"] = secret
                     self._client = httpx.Client(
                         base_url=self._base_url,
                         timeout=self._timeout,
-                        headers={"X-Internal-Service": "health-system-backend"},
+                        headers=headers,
                     )
         return self._client
 
