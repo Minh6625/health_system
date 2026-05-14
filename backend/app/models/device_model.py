@@ -24,7 +24,14 @@ class Device(Base):
     uuid: Mapped[str] = mapped_column(UUID, unique=True, server_default=text("gen_random_uuid()"))
     
     # Ownership
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    # [HS-001 ADR-010] user_id is nullable + ON DELETE SET NULL.
+    # Supports admin provisioning (user_id=None until assigned) and preserves
+    # device row + telemetry history when user is deleted.
+    user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     
     # Device Info
     device_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)

@@ -109,21 +109,20 @@ class DeviceScanPairResponse(BaseModel):
 
 
 class DeviceSettingsRequest(BaseModel):
-    """Cập nhật cấu hình thiết bị - for DEVICE_Configure screen"""
-    heart_rate_offset: int | None = Field(default=None, ge=-50, le=50)
-    spo2_calibration: float | None = Field(default=None, ge=0.8, le=1.2)
-    temperature_offset: float | None = Field(default=None, ge=-5.0, le=5.0)
+    """Cập nhật cấu hình thiết bị - for DEVICE_Configure screen.
+
+    [HS-003 ADR-012] Calibration offsets dropped — no consumer in mobile BE,
+    IoT sim, or HealthGuard backend. Schema retains notification toggles +
+    wear_side preference only.
+    """
     notify_high_hr: bool | None = None
     notify_low_spo2: bool | None = None
     notify_high_bp: bool | None = None
     wear_side: str | None = Field(default=None, pattern="^(left|right)$")  # left/right wrist
-    
+
     class Config:
         json_schema_extra = {
             "example": {
-                "heart_rate_offset": 0,
-                "spo2_calibration": 1.0,
-                "temperature_offset": 0.0,
                 "notify_high_hr": True,
                 "notify_low_spo2": True,
                 "notify_high_bp": True,
