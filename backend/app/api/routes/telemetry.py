@@ -170,14 +170,27 @@ def _resolve_alert_user_id(
 
 
 def _map_alert_severity(severity: str) -> str:
+    """Map IoT sim outbound severity to canonical DB vocab per ADR-015.
+
+    Layer 2 (IoT outbound) -> Layer 4 (DB canonical):
+      normal  -> low
+      warning -> high
+      critical -> critical
+      high    -> high
+      (other) -> low
+    """
     normalized = (severity or "").strip().lower()
+    if normalized == "normal":
+        return "low"
     if normalized == "warning":
         return "high"
     if normalized == "critical":
         return "critical"
     if normalized == "high":
         return "high"
-    return "normal"
+    if normalized == "medium":
+        return "medium"
+    return "low"
 
 
 def _map_alert_type(event_type: str) -> str:
@@ -547,7 +560,7 @@ def ingest_alert(
     return IngestResponse(ingested=ingested, errors=errors)
 
 
-@router.post("/sleep", response_model=IngestResponse)
+@router.post("/sleep", response_model=IngestResponse, dependencies=[Depends(require_internal_service)])
 def ingest_sleep_session(
     payload: SleepIngestRequest,
     db: Session = Depends(get_db),
@@ -622,7 +635,7 @@ def ingest_sleep_session(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/imu-window", response_model=ImuWindowResponse)
+@router.post("/imu-window", response_model=ImuWindowResponse, dependencies=[Depends(require_internal_service)])
 def ingest_imu_window(
     payload: ImuWindowRequest,
     db: Session = Depends(get_db),
@@ -704,7 +717,7 @@ def ingest_imu_window(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/sleep-risk", response_model=SleepRiskResponse)
+@router.post("/sleep-risk", response_model=SleepRiskResponse, dependencies=[Depends(require_internal_service)])
 def ingest_sleep_risk(
     payload: SleepRiskRequest,
     db: Session = Depends(get_db),

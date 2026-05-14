@@ -62,7 +62,7 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     __table_args__ = (
-        CheckConstraint("severity IN ('normal', 'high', 'critical')", name="check_alert_severity"),
+        CheckConstraint("severity IN ('low', 'medium', 'high', 'critical')", name="check_alert_severity"),
         Index("ix_alerts_device_alert_type_created", "device_id", "alert_type", "created_at"),
     )
 
