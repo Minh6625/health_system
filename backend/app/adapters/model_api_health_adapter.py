@@ -73,13 +73,26 @@ class ModelApiHealthAdapter:
         record without falling back to its ``ValueError("Missing required
         keys")`` path.
 
-        This is a verbatim port of the pre-Phase-3b
-        ``risk_alert_service._build_model_api_record``; the medical defaults
-        (75 bpm / 16 rpm / 36.6°C / 98% / 120/80 mmHg / 165 cm / 65 kg /
-        50 ms HRV) MUST not drift, otherwise model-api receives biased inputs.
+        XR-003 step 2: tracks which fields were default-filled via
+        ``is_synthetic_default`` + ``defaults_applied`` list. When any
+        primary vital (heart_rate, spo2, body_temp) is missing, flag is set.
         """
-        sys_bp = float(payload.get("sys_bp") or 120.0)
-        dia_bp = float(payload.get("dia_bp") or 80.0)
+        defaults_applied: list[str] = []
+
+        def _get_or_default(key: str, payload_key: str, default: float) -> float:
+            val = payload.get(payload_key)
+            if val is None or val == "":
+                defaults_applied.append(key)
+                return default
+            return float(val)
+
+        heart_rate = _get_or_default("heart_rate", "heart_rate", 75.0)
+        resp_rate = _get_or_default("respiratory_rate", "resp_rate", 16.0)
+        body_temp = _get_or_default("body_temperature", "body_temp", 36.6)
+        spo2 = _get_or_default("spo2", "spo2", 98.0)
+        sys_bp = _get_or_default("systolic_blood_pressure", "sys_bp", 120.0)
+        dia_bp = _get_or_default("diastolic_blood_pressure", "dia_bp", 80.0)
+
         height_cm = float(payload.get("height_cm") or 165.0)
         height_m = height_cm / 100.0 if height_cm > 3.5 else height_cm
         if height_m <= 0:
@@ -89,11 +102,13 @@ class ModelApiHealthAdapter:
         gender_norm = str(payload.get("gender") or "").strip().lower()
         gender_int = 1 if gender_norm in {"m", "male", "man", "nam", "1", "true"} else 0
 
+        is_synthetic = len(defaults_applied) > 0
+
         return {
-            "heart_rate": float(payload.get("heart_rate") or 75.0),
-            "respiratory_rate": float(payload.get("resp_rate") or 16.0),
-            "body_temperature": float(payload.get("body_temp") or 36.6),
-            "spo2": float(payload.get("spo2") or 98.0),
+            "heart_rate": heart_rate,
+            "respiratory_rate": resp_rate,
+            "body_temperature": body_temp,
+            "spo2": spo2,
             "systolic_blood_pressure": sys_bp,
             "diastolic_blood_pressure": dia_bp,
             "age": int(round(float(payload.get("age") or 35.0))),
@@ -104,6 +119,8 @@ class ModelApiHealthAdapter:
             "derived_pulse_pressure": round(sys_bp - dia_bp, 4),
             "derived_bmi": round(weight_kg / (height_m * height_m), 4),
             "derived_map": round((sys_bp + 2.0 * dia_bp) / 3.0, 4),
+            "is_synthetic_default": is_synthetic,
+            "defaults_applied": defaults_applied,
         }
 
     # ------------------------------------------------------------------

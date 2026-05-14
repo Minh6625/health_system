@@ -38,6 +38,7 @@ class RiskCalculationResult:
     risk_level: str
     model: str
     calculated_at: datetime
+    is_tentative: bool = False
 
 
 def _derive_age(date_of_birth: date | None) -> float:
@@ -146,8 +147,13 @@ def _fetch_latest_vitals(db: Session, device_id: int) -> dict[str, Any] | None:
     if row is None:
         return None
     row_dict = dict(row)
-    # Averaging an empty table yields NULL for all columns → treat as no data
-    if row_dict.get("heart_rate") is None and row_dict.get("spo2") is None:
+    # HS-024 / XR-003: reject record khi cả HR + SpO2 + body_temp NULL
+    # (input quality gate — không đủ data để inference có ý nghĩa).
+    if (
+        row_dict.get("heart_rate") is None
+        and row_dict.get("spo2") is None
+        and row_dict.get("temperature") is None
+    ):
         return None
     return row_dict
 
@@ -407,6 +413,9 @@ def calculate_device_risk(
         risk_level=inference.risk_level,
         model=inference.backend_label,
         calculated_at=risk_score_row.calculated_at,
+        # XR-003 / HS-024: tag tentative when confidence < 0.5
+        # (synthetic defaults or degraded model-api response).
+        is_tentative=inference.confidence_value < 0.5,
     )
 
     if dispatch_alerts:
