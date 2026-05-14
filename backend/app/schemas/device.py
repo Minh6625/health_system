@@ -142,14 +142,6 @@ class DeviceSettingsRequest(BaseModel):
     notify_high_bp: bool | None = None
     wear_side: str | None = Field(default=None, pattern="^(left|right)$")  # left/right wrist
 
-    heart_rate_offset: int | None = Field(default=None, ge=-50, le=50)
-    spo2_calibration: float | None = Field(default=None, ge=0.8, le=1.2)
-    temperature_offset: float | None = Field(default=None, ge=-5.0, le=5.0)
-    notify_high_hr: bool | None = None
-    notify_low_spo2: bool | None = None
-    notify_high_bp: bool | None = None
-    wear_side: str | None = Field(default=None, pattern="^(left|right)$")  # left/right wrist
-
 
 class DeviceSettingsResponse(BaseModel):
     """Response after updating settings"""
