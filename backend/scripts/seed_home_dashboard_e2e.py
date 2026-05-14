@@ -1,6 +1,19 @@
+"""
+DEV ONLY — Seed script for Home Dashboard E2E testing.
+
+Run with: python -m scripts.seed_home_dashboard_e2e
+
+Required env vars (do not commit values):
+    SEED_E2E_PATIENT_EMAIL / SEED_E2E_PATIENT_PASSWORD
+    SEED_E2E_CAREGIVER_EMAIL / SEED_E2E_CAREGIVER_PASSWORD
+    SEED_E2E_EMPTY_SLEEP_EMAIL / SEED_E2E_EMPTY_SLEEP_PASSWORD
+
+Production guard: refuses to run when ENV=production.
+"""
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -9,6 +22,24 @@ from sqlalchemy import create_engine, text
 
 from app.core.config import settings
 from app.utils.password import hash_password
+
+
+def _require_dev_env() -> None:
+    env = os.getenv("ENV", "development").lower()
+    if env == "production":
+        raise RuntimeError(
+            "Refusing to run seed script in production (ENV=production). "
+            "This script is DEV ONLY."
+        )
+
+
+def _require_env(name: str) -> str:
+    value = os.getenv(name)
+    if not value:
+        raise RuntimeError(
+            f"Missing env var {name}. Set it in .env.dev (gitignored) before running this DEV ONLY script."
+        )
+    return value
 
 
 @dataclass(frozen=True)
@@ -27,90 +58,95 @@ class SeedUser:
     wake_count: int
 
 
-PATIENT = SeedUser(
-    email="e2e.dashboard.patient@example.com",
-    password="PatientE2E!123",
-    full_name="Tran Patient E2E",
-    role="user",
-    device_name="E2E Patient Watch",
-    serial_number="e2e-dashboard-patient-watch",
-    risk_series=(
-        (6, 58, "medium"),
-        (4, 52, "medium"),
-        (2, 47, "medium"),
-        (0, 43, "medium"),
-    ),
-    vitals={
-        "heart_rate": 104,
-        "spo2": Decimal("94.0"),
-        "temperature": Decimal("37.9"),
-        "blood_pressure_sys": 142,
-        "blood_pressure_dia": 93,
-        "hrv": 31,
-        "respiratory_rate": 21,
-        "signal_quality": 1,
-        "motion_artifact": False,
-    },
-    sleep_score=78,
-    sleep_minutes=392,
-    awake_minutes=28,
-    wake_count=1,
-)
+def _build_patient() -> SeedUser:
+    return SeedUser(
+        email=_require_env("SEED_E2E_PATIENT_EMAIL"),
+        password=_require_env("SEED_E2E_PATIENT_PASSWORD"),
+        full_name="Tran Patient E2E",
+        role="user",
+        device_name="E2E Patient Watch",
+        serial_number="e2e-dashboard-patient-watch",
+        risk_series=(
+            (6, 58, "medium"),
+            (4, 52, "medium"),
+            (2, 47, "medium"),
+            (0, 43, "medium"),
+        ),
+        vitals={
+            "heart_rate": 104,
+            "spo2": Decimal("94.0"),
+            "temperature": Decimal("37.9"),
+            "blood_pressure_sys": 142,
+            "blood_pressure_dia": 93,
+            "hrv": 31,
+            "respiratory_rate": 21,
+            "signal_quality": 1,
+            "motion_artifact": False,
+        },
+        sleep_score=78,
+        sleep_minutes=392,
+        awake_minutes=28,
+        wake_count=1,
+    )
 
-CAREGIVER = SeedUser(
-    email="e2e.dashboard.caregiver@example.com",
-    password="CaregiverE2E!123",
-    full_name="Nguyen Caregiver E2E",
-    role="user",
-    device_name="E2E Caregiver Watch",
-    serial_number="e2e-dashboard-caregiver-watch",
-    risk_series=(
-        (6, 26, "low"),
-        (4, 22, "low"),
-        (2, 19, "low"),
-        (0, 17, "low"),
-    ),
-    vitals={
-        "heart_rate": 72,
-        "spo2": Decimal("98.0"),
-        "temperature": Decimal("36.7"),
-        "blood_pressure_sys": 118,
-        "blood_pressure_dia": 76,
-        "hrv": 54,
-        "respiratory_rate": 16,
-        "signal_quality": 1,
-        "motion_artifact": False,
-    },
-    sleep_score=90,
-    sleep_minutes=438,
-    awake_minutes=18,
-    wake_count=1,
-)
 
-EMPTY_SLEEP = SeedUser(
-    email="e2e.sleep.empty@example.com",
-    password="SleepEmptyE2E!123",
-    full_name="Sleep Empty E2E",
-    role="user",
-    device_name="unused-empty-sleep-watch",
-    serial_number="unused-empty-sleep-watch",
-    risk_series=(),
-    vitals={
-        "heart_rate": 72,
-        "spo2": Decimal("98.0"),
-        "temperature": Decimal("36.7"),
-        "blood_pressure_sys": 118,
-        "blood_pressure_dia": 76,
-        "hrv": 54,
-        "respiratory_rate": 16,
-        "signal_quality": 1,
-        "motion_artifact": False,
-    },
-    sleep_score=0,
-    sleep_minutes=0,
-    awake_minutes=0,
-    wake_count=0,
-)
+def _build_caregiver() -> SeedUser:
+    return SeedUser(
+        email=_require_env("SEED_E2E_CAREGIVER_EMAIL"),
+        password=_require_env("SEED_E2E_CAREGIVER_PASSWORD"),
+        full_name="Nguyen Caregiver E2E",
+        role="user",
+        device_name="E2E Caregiver Watch",
+        serial_number="e2e-dashboard-caregiver-watch",
+        risk_series=(
+            (6, 26, "low"),
+            (4, 22, "low"),
+            (2, 19, "low"),
+            (0, 17, "low"),
+        ),
+        vitals={
+            "heart_rate": 72,
+            "spo2": Decimal("98.0"),
+            "temperature": Decimal("36.7"),
+            "blood_pressure_sys": 118,
+            "blood_pressure_dia": 76,
+            "hrv": 54,
+            "respiratory_rate": 16,
+            "signal_quality": 1,
+            "motion_artifact": False,
+        },
+        sleep_score=90,
+        sleep_minutes=438,
+        awake_minutes=18,
+        wake_count=1,
+    )
+
+
+def _build_empty_sleep() -> SeedUser:
+    return SeedUser(
+        email=_require_env("SEED_E2E_EMPTY_SLEEP_EMAIL"),
+        password=_require_env("SEED_E2E_EMPTY_SLEEP_PASSWORD"),
+        full_name="Sleep Empty E2E",
+        role="user",
+        device_name="unused-empty-sleep-watch",
+        serial_number="unused-empty-sleep-watch",
+        risk_series=(),
+        vitals={
+            "heart_rate": 72,
+            "spo2": Decimal("98.0"),
+            "temperature": Decimal("36.7"),
+            "blood_pressure_sys": 118,
+            "blood_pressure_dia": 76,
+            "hrv": 54,
+            "respiratory_rate": 16,
+            "signal_quality": 1,
+            "motion_artifact": False,
+        },
+        sleep_score=0,
+        sleep_minutes=0,
+        awake_minutes=0,
+        wake_count=0,
+    )
 
 
 def _now_utc() -> datetime:
@@ -164,9 +200,10 @@ def _feature_payload(user: SeedUser, score: int) -> dict[str, object]:
     }
 
 
-def _sleep_phases(user: SeedUser) -> dict[str, int]:
-    deep = 96 if user is PATIENT else 118
-    rem = 74 if user is PATIENT else 92
+def _sleep_phases(user: SeedUser, patient: SeedUser) -> dict[str, int]:
+    is_patient = user.email == patient.email
+    deep = 96 if is_patient else 118
+    rem = 74 if is_patient else 92
     light = max(user.sleep_minutes - deep - rem, 180)
     return {
         "deep": deep,
@@ -333,7 +370,9 @@ def _seed_latest_vitals(connection, device_id: int, user: SeedUser) -> None:
     )
 
 
-def _seed_sleep_session(connection, user_id: int, device_id: int, user: SeedUser) -> None:
+def _seed_sleep_session(
+    connection, user_id: int, device_id: int, user: SeedUser, patient: SeedUser
+) -> None:
     end_time = _now_utc() - timedelta(hours=1)
     start_time = end_time - timedelta(minutes=user.sleep_minutes + user.awake_minutes)
     connection.execute(
@@ -367,7 +406,7 @@ def _seed_sleep_session(connection, user_id: int, device_id: int, user: SeedUser
             "start_time": start_time,
             "end_time": end_time,
             "sleep_score": user.sleep_score,
-            "phases": json.dumps(_sleep_phases(user)),
+            "phases": json.dumps(_sleep_phases(user, patient)),
             "wake_count": user.wake_count,
             "sleep_date": date.today(),
         },
@@ -523,47 +562,41 @@ def _seed_relationships(connection, patient_id: int, caregiver_id: int) -> None:
 
 
 def main() -> None:
+    _require_dev_env()
+    patient = _build_patient()
+    caregiver = _build_caregiver()
+    empty_sleep = _build_empty_sleep()
+
     engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
     try:
         with engine.begin() as connection:
-            patient_id = _upsert_user(connection, PATIENT)
-            caregiver_id = _upsert_user(connection, CAREGIVER)
-            empty_sleep_id = _upsert_user(connection, EMPTY_SLEEP)
+            patient_id = _upsert_user(connection, patient)
+            caregiver_id = _upsert_user(connection, caregiver)
+            empty_sleep_id = _upsert_user(connection, empty_sleep)
 
             _reset_user_data(connection, patient_id)
             _reset_user_data(connection, caregiver_id)
             _reset_user_data(connection, empty_sleep_id)
 
-            patient_device_id = _create_device(connection, patient_id, PATIENT)
-            caregiver_device_id = _create_device(connection, caregiver_id, CAREGIVER)
+            patient_device_id = _create_device(connection, patient_id, patient)
+            caregiver_device_id = _create_device(connection, caregiver_id, caregiver)
 
-            _seed_latest_vitals(connection, patient_device_id, PATIENT)
-            _seed_latest_vitals(connection, caregiver_device_id, CAREGIVER)
+            _seed_latest_vitals(connection, patient_device_id, patient)
+            _seed_latest_vitals(connection, caregiver_device_id, caregiver)
 
-            _seed_sleep_session(connection, patient_id, patient_device_id, PATIENT)
-            _seed_sleep_session(connection, caregiver_id, caregiver_device_id, CAREGIVER)
+            _seed_sleep_session(connection, patient_id, patient_device_id, patient, patient)
+            _seed_sleep_session(connection, caregiver_id, caregiver_device_id, caregiver, patient)
 
-            _seed_risk_reports(connection, patient_id, patient_device_id, PATIENT)
-            _seed_risk_reports(connection, caregiver_id, caregiver_device_id, CAREGIVER)
+            _seed_risk_reports(connection, patient_id, patient_device_id, patient)
+            _seed_risk_reports(connection, caregiver_id, caregiver_device_id, caregiver)
 
             _seed_relationships(connection, patient_id, caregiver_id)
 
+        # Print only IDs + emails. Passwords are env-driven; do NOT echo them.
         summary = {
-            "patient": {
-                "email": PATIENT.email,
-                "password": PATIENT.password,
-                "user_id": patient_id,
-            },
-            "caregiver": {
-                "email": CAREGIVER.email,
-                "password": CAREGIVER.password,
-                "user_id": caregiver_id,
-            },
-            "empty_sleep": {
-                "email": EMPTY_SLEEP.email,
-                "password": EMPTY_SLEEP.password,
-                "user_id": empty_sleep_id,
-            },
+            "patient": {"email": patient.email, "user_id": patient_id},
+            "caregiver": {"email": caregiver.email, "user_id": caregiver_id},
+            "empty_sleep": {"email": empty_sleep.email, "user_id": empty_sleep_id},
         }
         print(json.dumps(summary, ensure_ascii=True, indent=2))
     finally:
