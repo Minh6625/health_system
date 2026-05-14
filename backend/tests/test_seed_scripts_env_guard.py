@@ -6,6 +6,7 @@ Verifies:
 
 These tests do NOT touch the DB; they unit-test the guard helpers directly.
 """
+
 from __future__ import annotations
 
 import importlib

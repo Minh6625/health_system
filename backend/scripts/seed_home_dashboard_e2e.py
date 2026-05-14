@@ -10,6 +10,7 @@ Required env vars (do not commit values):
 
 Production guard: refuses to run when ENV=production.
 """
+
 from __future__ import annotations
 
 import json

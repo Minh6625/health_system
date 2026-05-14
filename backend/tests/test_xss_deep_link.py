@@ -9,6 +9,7 @@ Verifies post-fix:
 2. Quote-breakout attempts are escaped.
 3. Standard happy-path values still render correctly.
 """
+
 from __future__ import annotations
 
 from app.api.routes.auth import deep_link_redirect
