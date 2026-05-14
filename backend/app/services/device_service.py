@@ -73,16 +73,27 @@ class DeviceService:
         mqtt_client_id: str | None,
         db: Session,
     ) -> None:
+        """Reject duplicate device identity per BR-040-01 (HS-002).
+
+        UC040 pair-create flow per ADR-011. Cross-user duplicate is blocked
+        at app layer (defense-in-depth) and at DB layer via partial UNIQUE
+        indexes (devices_mac_active_uniq, devices_serial_active_uniq,
+        devices_mqtt_active_uniq) - see PM_REVIEW migration 20260514.
+
+        Note: ``user_id`` parameter retained for future ownership audit log,
+        but NOT used as filter - checking duplicates globally (cross-user).
+        Soft-deleted rows (deleted_at IS NOT NULL) are excluded so re-pair
+        after unpair stays allowed.
+        """
         if not serial_number and not mac_address and not mqtt_client_id:
             return
 
         row = db.execute(
             text(
                 """
-                SELECT id
+                SELECT id, user_id
                 FROM devices
-                WHERE user_id = :user_id
-                  AND deleted_at IS NULL
+                WHERE deleted_at IS NULL
                   AND (
                     (:serial_number IS NOT NULL AND serial_number = :serial_number)
                     OR (:mac_address IS NOT NULL AND mac_address = :mac_address)
@@ -92,7 +103,6 @@ class DeviceService:
                 """
             ),
             {
-                "user_id": user_id,
                 "serial_number": serial_number,
                 "mac_address": mac_address,
                 "mqtt_client_id": mqtt_client_id,
@@ -100,7 +110,13 @@ class DeviceService:
         ).mappings().first()
 
         if row is not None:
-            raise ValueError("Thiet bi da ton tai (trung serial/mac/mqtt)")
+            existing_user_id = row.get("user_id")
+            if existing_user_id == user_id:
+                raise ValueError("Thiet bi da ton tai (trung serial/mac/mqtt)")
+            raise ValueError(
+                "Thiet bi nay da duoc ghep noi voi tai khoan khac. "
+                "Vui long lien he ho tro de chuyen quyen so huu."
+            )
 
     @staticmethod
     def create_device(
@@ -509,10 +525,9 @@ class DeviceService:
             raise PermissionError("Không có quyền truy cập thiết bị này")
 
         # Build calibration data JSON
+        # [HS-003 ADR-012] Calibration offset keys (heart_rate_offset,
+        # spo2_calibration, temperature_offset) dropped — no consumer.
         calibration_data = {
-            "heart_rate_offset": settings.heart_rate_offset or 0,
-            "spo2_calibration": settings.spo2_calibration or 1.0,
-            "temperature_offset": settings.temperature_offset or 0.0,
             "notify_high_hr": settings.notify_high_hr if settings.notify_high_hr is not None else True,
             "notify_low_spo2": settings.notify_low_spo2 if settings.notify_low_spo2 is not None else True,
             "notify_high_bp": settings.notify_high_bp if settings.notify_high_bp is not None else True,

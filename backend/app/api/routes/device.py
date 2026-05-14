@@ -77,9 +77,17 @@ def create_device(
             db=db,
         )
     except ValueError as error:
+        # [HS-002] Cross-user duplicate -> 409 Conflict (per BR-040-01).
+        # Same-user duplicate or other validation errors -> 400 Bad Request.
+        message = str(error)
+        if "tai khoan khac" in message:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=message,
+            ) from error
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
+            detail=message,
         ) from error
 
 
@@ -154,9 +162,17 @@ def scan_and_pair_device(
             device=device,
         )
     except ValueError as e:
+        # [HS-002] Cross-user duplicate -> 409 Conflict (per BR-040-01).
+        # Same-user duplicate or other validation errors -> 400 Bad Request.
+        message = str(e)
+        if "tai khoan khac" in message:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=message,
+            ) from e
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
+            detail=message,
         ) from e
 
 
