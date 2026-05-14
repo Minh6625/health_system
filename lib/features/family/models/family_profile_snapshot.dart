@@ -79,7 +79,7 @@ class FamilyProfileSnapshot {
           : DateTime.now(),
       specialNote: json['special_note'] as String? ?? '',
       sleepDurationMinutes: json['sleep_duration_minutes'] as int? ?? 0,
-      sleepQuality: json['sleep_quality'] as String? ?? 'Trung bình',
+      sleepQuality: json['sleep_quality'] as String? ?? 'Tốt',
       healthScore7Days: json['health_score_7_days'] as int?,
       healthScoreLevel: json['health_score_level'] as String? ?? 'Trung bình',
     );
