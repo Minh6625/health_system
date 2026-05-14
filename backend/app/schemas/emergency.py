@@ -1,6 +1,10 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
+
+
+# [HS-015] Every Request schema in this module rejects unknown fields so
+# typos surface as 422 instead of being silently dropped.
 
 
 # ============================================================================
@@ -29,7 +33,7 @@ class PatientInfo(BaseModel):
     full_name: str
     avatar_url: Optional[str] = None
     phone: Optional[str] = None
-    date_of_birth: Optional[str] = None
+    date_of_birth: Optional[date] = None  # [HS-017] typed (rejects "abc" / "2026-13-45")
     
     class Config:
         from_attributes = True
@@ -116,6 +120,8 @@ class SOSAlertsResponse(BaseModel):
 # ============================================================================
 class TriggerSOSRequest(BaseModel):
     """Request to trigger a new SOS event."""
+    model_config = ConfigDict(extra="forbid")
+
     trigger_type: Literal["auto", "manual"] = "manual"
     latitude: Optional[float] = None
     longitude: Optional[float] = None
@@ -124,6 +130,7 @@ class TriggerSOSRequest(BaseModel):
 
 class RiskAlertResponseRequest(BaseModel):
     """Request to respond to an initial risk alert."""
+    model_config = ConfigDict(extra="forbid")
 
     risk_score_id: Optional[int] = None
     action: Literal["safe", "help_requested", "timeout_escalated"]
@@ -147,6 +154,8 @@ class RiskAlertResponseResponse(BaseModel):
 
 class ResolveSOSRequest(BaseModel):
     """Request to resolve SOS event by caregiver."""
+    model_config = ConfigDict(extra="forbid")
+
     resolution_status: str = Field(..., pattern="^(safe|assisted|cancelled)$")
     notes: Optional[str] = Field(None, max_length=500)
 

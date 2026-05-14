@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AccelData(BaseModel):
@@ -70,6 +70,9 @@ class ImuWindowRequest(BaseModel):
     mobile sensor still reaches the upstream where the authoritative
     threshold lives.
     """
+
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
 
     db_device_id: int = Field(..., description="`devices.id` of the source watch.")
     sampling_rate: int = Field(default=50, ge=1, le=200)
@@ -203,6 +206,9 @@ class FallEventDismissRequest(BaseModel):
     field; whichever the user picked lands here verbatim.
     """
 
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     reason: str | None = Field(
         default=None,
         max_length=255,
@@ -235,6 +241,9 @@ class FallSurveySubmitRequest(BaseModel):
       the same check-in noti ("patient seems OK but did not answer
       stand-up question").
     """
+
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
 
     can_stand: bool | None = Field(
         default=None,

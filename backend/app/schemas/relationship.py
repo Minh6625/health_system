@@ -1,7 +1,7 @@
 from typing import Any, List, Optional
 from datetime import datetime
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 class AccessProfileResponse(BaseModel):
     id: int
@@ -26,6 +26,9 @@ class LinkedContactDetailResponse(BaseModel):
     isIncomingRequest: bool = False
 
 class RelationshipRequestCreate(BaseModel):
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     target_user_id: Optional[int] = None
@@ -34,9 +37,15 @@ class RelationshipRequestCreate(BaseModel):
     tags: Optional[list] = None
 
 class RelationshipAcceptRequest(BaseModel):
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     relationship_id: int
 
 class RelationshipUpdate(BaseModel):
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     can_view_vitals: Optional[bool] = None
     can_receive_alerts: Optional[bool] = None
     can_view_location: Optional[bool] = None

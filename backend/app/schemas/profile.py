@@ -1,7 +1,7 @@
 from datetime import date, datetime
 import re
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.utils.age_validator import validate_age
 
@@ -49,6 +49,9 @@ class ProfileResponse(BaseModel):
 
 
 class ProfileUpdateRequest(BaseModel):
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     full_name: str = Field(min_length=2, max_length=100)
     phone: str | None = Field(default=None, max_length=15)
     date_of_birth: date | None = None
@@ -136,4 +139,7 @@ class ProfileUpdateRequest(BaseModel):
 
 
 class DeleteAccountRequest(BaseModel):
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     password: str = Field(min_length=1)

@@ -1,10 +1,16 @@
 from datetime import datetime
 import re
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+# [HS-015] Every Request schema in this module rejects unknown fields so
+# typos surface as 422 instead of being silently dropped.
 
 
 class DeviceCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     device_name: str = Field(min_length=1, max_length=100)
     device_type: str = Field(default="smartwatch")
     model: str | None = Field(default=None, max_length=100)
@@ -36,6 +42,8 @@ class DeviceCreateRequest(BaseModel):
 
 
 class DeviceUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     device_name: str | None = Field(default=None, min_length=1, max_length=100)
     firmware_version: str | None = Field(default=None, max_length=20)
     is_active: bool | None = None
@@ -78,6 +86,8 @@ class DeviceListResponse(BaseModel):
 
 class DeviceScanPairRequest(BaseModel):
     """BLE scan & pair request - for DEVICE_Connect screen"""
+    model_config = ConfigDict(extra="forbid")
+
     mac_address: str = Field(min_length=17, max_length=17)  # AA:BB:CC:DD:EE:FF
     device_name: str = Field(min_length=1, max_length=100)
     device_type: str = Field(default="smartwatch")
@@ -115,20 +125,30 @@ class DeviceSettingsRequest(BaseModel):
     IoT sim, or HealthGuard backend. Schema retains notification toggles +
     wear_side preference only.
     """
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "notify_high_hr": True,
+                "notify_low_spo2": True,
+                "notify_high_bp": True,
+                "wear_side": "left",
+            }
+        },
+    )
+
     notify_high_hr: bool | None = None
     notify_low_spo2: bool | None = None
     notify_high_bp: bool | None = None
     wear_side: str | None = Field(default=None, pattern="^(left|right)$")  # left/right wrist
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "notify_high_hr": True,
-                "notify_low_spo2": True,
-                "notify_high_bp": True,
-                "wear_side": "left"
-            }
-        }
+    heart_rate_offset: int | None = Field(default=None, ge=-50, le=50)
+    spo2_calibration: float | None = Field(default=None, ge=0.8, le=1.2)
+    temperature_offset: float | None = Field(default=None, ge=-5.0, le=5.0)
+    notify_high_hr: bool | None = None
+    notify_low_spo2: bool | None = None
+    notify_high_bp: bool | None = None
+    wear_side: str | None = Field(default=None, pattern="^(left|right)$")  # left/right wrist
 
 
 class DeviceSettingsResponse(BaseModel):

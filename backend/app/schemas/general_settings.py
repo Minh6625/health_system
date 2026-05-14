@@ -1,6 +1,6 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GeneralSettingsResponse(BaseModel):
@@ -13,6 +13,9 @@ class GeneralSettingsResponse(BaseModel):
 
 
 class GeneralSettingsUpdateRequest(BaseModel):
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     language: Optional[str] = Field(default=None, min_length=2, max_length=10)
     theme: Optional[str] = Field(default=None, pattern="^(light|dark|system)$")
     timezone: Optional[str] = Field(default=None, min_length=3, max_length=100)
