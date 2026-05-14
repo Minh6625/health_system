@@ -319,16 +319,36 @@ def deep_link_redirect(action: str, code: str, email: str):
     """
     Redirect web links (from emails) to the mobile app deep link via HTML/JS.
     Directly using HTTP 302 redirects to custom schemes is often blocked by Chrome/Android.
+
+    Security: HS-018 — escape user-controlled query params (`action`, `code`, `email`) before
+    interpolating into HTML/JS context. URL-encode for href attributes; HTML-escape for text.
     """
-    from app.core.config import settings
+    from html import escape as html_escape
+    from urllib.parse import quote as url_quote
+
     from fastapi.responses import HTMLResponse
-    
+
+    from app.core.config import settings
+
+    # URL-encode for embedding in href / window.location.href contexts.
+    safe_action_url = url_quote(action, safe="")
+    safe_code_url = url_quote(code, safe="")
+    safe_email_url = url_quote(email, safe="")
+
     # iOS/Standard custom scheme
-    ios_url = f"{settings.MOBILE_DEEP_LINK_SCHEME}://{action}?code={code}&email={email}"
-    
+    ios_url = f"{settings.MOBILE_DEEP_LINK_SCHEME}://{safe_action_url}?code={safe_code_url}&email={safe_email_url}"
+
     # Android Chrome specific Intent URI (Bypasses security blocks)
-    android_intent_url = f"intent://{action}?code={code}&email={email}#Intent;scheme={settings.MOBILE_DEEP_LINK_SCHEME};package=com.example.health_system;end;"
-    
+    android_intent_url = (
+        f"intent://{safe_action_url}?code={safe_code_url}&email={safe_email_url}"
+        f"#Intent;scheme={settings.MOBILE_DEEP_LINK_SCHEME};package=com.example.health_system;end;"
+    )
+
+    # HTML-escape for embedding inside the JS string literals (defense in depth — already
+    # URL-encoded but escape any quotes/angle-brackets that would break the script tag).
+    safe_ios_url_html = html_escape(ios_url, quote=True)
+    safe_android_intent_url_html = html_escape(android_intent_url, quote=True)
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -352,11 +372,11 @@ def deep_link_redirect(action: str, code: str, email: str):
         <script>
             // Detect platform to set the correct app launch URL
             var isAndroid = /Android/i.test(navigator.userAgent);
-            var targetUrl = isAndroid ? "{android_intent_url}" : "{ios_url}";
-            
+            var targetUrl = isAndroid ? "{safe_android_intent_url_html}" : "{safe_ios_url_html}";
+
             // Set the fallback button link
             document.getElementById('open-btn').href = targetUrl;
-            
+
             // Try to open the app automatically
             window.onload = function() {{
                 setTimeout(function() {{
