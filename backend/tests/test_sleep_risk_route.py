@@ -28,6 +28,12 @@ from app.api.routes.telemetry import router as telemetry_router
 from app.db.database import get_db
 
 
+# Internal-service header required by ``require_internal_service`` dep
+# (ADR-005). Without this the route returns 403 before reaching the
+# handler, so every POST in this module must carry it.
+_INTERNAL_HEADERS = {"X-Internal-Service": "iot-simulator"}
+
+
 # ---------------------------------------------------------------------------
 # Test client + DB stub
 # ---------------------------------------------------------------------------
@@ -173,6 +179,7 @@ class TestSleepRiskHappyPath:
                     "db_user_id": 42,
                     "record": _full_sleep_record(),
                 },
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 200, response.text
@@ -225,6 +232,7 @@ class TestSleepRiskHappyPath:
                     "db_user_id": 42,
                     "record": _full_sleep_record(),
                 },
+                headers=_INTERNAL_HEADERS,
             )
 
         body = response.json()
@@ -261,6 +269,7 @@ class TestSleepRiskModelUnavailable:
                     "db_user_id": 42,
                     "record": _full_sleep_record(),
                 },
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 200
@@ -301,6 +310,7 @@ class TestSleepRiskSchemaValidation:
                     "db_user_id": 42,
                     "record": record,
                 },
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 422
@@ -320,6 +330,7 @@ class TestSleepRiskSchemaValidation:
                     # db_user_id intentionally omitted
                     "record": _full_sleep_record(),
                 },
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 422

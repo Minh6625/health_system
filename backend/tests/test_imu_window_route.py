@@ -24,6 +24,12 @@ from app.api.routes.telemetry import router as telemetry_router
 from app.db.database import get_db
 
 
+# Internal-service header required by ``require_internal_service`` dep
+# (ADR-005). Without this the route returns 403 before reaching the
+# handler, so every POST in this module must carry it.
+_INTERNAL_HEADERS = {"X-Internal-Service": "iot-simulator"}
+
+
 # ---------------------------------------------------------------------------
 # Test client + DB stub
 # ---------------------------------------------------------------------------
@@ -137,6 +143,7 @@ class TestImuWindowHappyPath:
             response = client.post(
                 "/mobile/telemetry/imu-window",
                 json=_imu_window_payload(),
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 200, response.text
@@ -181,6 +188,7 @@ class TestImuWindowHappyPath:
             response = client.post(
                 "/mobile/telemetry/imu-window",
                 json=_imu_window_payload(sample_count=30),
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 200
@@ -222,6 +230,7 @@ class TestImuWindowModelUnavailable:
             response = client.post(
                 "/mobile/telemetry/imu-window",
                 json=_imu_window_payload(),
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 200
@@ -260,6 +269,7 @@ class TestImuWindowSchemaValidation:
             response = client.post(
                 "/mobile/telemetry/imu-window",
                 json=_imu_window_payload(sample_count=5),
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 422
@@ -277,6 +287,7 @@ class TestImuWindowSchemaValidation:
             response = client.post(
                 "/mobile/telemetry/imu-window",
                 json=payload,
+                headers=_INTERNAL_HEADERS,
             )
 
         assert response.status_code == 422
