@@ -13,7 +13,7 @@ in either direction.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SleepRecord(BaseModel):
@@ -78,6 +78,12 @@ class SleepRiskRequest(BaseModel):
     for FK resolution. The inner ``record`` is forwarded verbatim to
     ``predict_sleep``.
     """
+
+    # [HS-015] Reject unknown fields at the wrapper layer so client typos
+    # surface as 422. The nested ``record`` retains Pydantic default
+    # behaviour because it ports a 40+ field upstream model and the
+    # forwarder needs the field set to evolve in lockstep with model-api.
+    model_config = ConfigDict(extra="forbid")
 
     db_device_id: int = Field(..., description="`devices.id` of the source watch.")
     db_user_id: int = Field(..., description="`users.id` who owns the device.")

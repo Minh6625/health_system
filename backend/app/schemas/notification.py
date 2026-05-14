@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class NotificationItem(BaseModel):
@@ -35,12 +35,18 @@ class NotificationReadResponse(BaseModel):
 
 
 class PushTokenUpsertRequest(BaseModel):
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     token: str = Field(min_length=20, max_length=1024)
     platform: str = Field(default="android", min_length=2, max_length=20)
     device_id: Optional[str] = Field(default=None, max_length=128)
 
 
 class PushTokenUnregisterRequest(BaseModel):
+    # [HS-015] Reject unknown fields so client typos surface as 422.
+    model_config = ConfigDict(extra="forbid")
+
     token: str = Field(min_length=20, max_length=1024)
 
 
