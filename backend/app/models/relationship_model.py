@@ -22,8 +22,12 @@ class UserRelationship(Base):
     tags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Permissions
-    can_view_vitals: Mapped[bool] = mapped_column(Boolean, default=False)
-    can_receive_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
+    # [HS-012 ADR-017] Default permissions flipped True for caregiver-side
+    # access. Caregiver newly linked via UC040 receives vitals + alerts by
+    # default; patient must explicitly toggle off if they want stricter
+    # privacy. Aligns canonical SQL DEFAULT true on these columns.
+    can_view_vitals: Mapped[bool] = mapped_column(Boolean, default=True)
+    can_receive_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     can_view_location: Mapped[bool] = mapped_column(Boolean, default=False)
     # P-4: caregiver can read patient's self-filled medical profile
     # (blood type, height, weight, medications, allergies, medical conditions).
