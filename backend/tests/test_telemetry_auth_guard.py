@@ -15,8 +15,11 @@ from fastapi.testclient import TestClient
 def client():
     """TestClient with internal secret configured so guard is active."""
     with patch(
-        "app.core.dependencies._INTERNAL_SERVICE_SECRET",
+        "app.core.config.settings.INTERNAL_SERVICE_SECRET",
         "test-internal-secret",
+    ), patch(
+        "app.core.config.settings.ENVIRONMENT",
+        "production",
     ):
         from app.main import app
 
