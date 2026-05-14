@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import Index, String, Boolean, DateTime, Integer, ForeignKey, Numeric, Text, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import text
 
@@ -63,6 +63,15 @@ class Alert(Base):
 
     __table_args__ = (
         CheckConstraint("severity IN ('low', 'medium', 'high', 'critical')", name="check_alert_severity"),
+        # [HS-010] Canonical alert_type vocabulary (12 values) per init_full_setup.sql.
+        CheckConstraint(
+            "alert_type IN ("
+            "'vital_abnormal', 'fall_detected', 'sos_triggered', 'risk_high', "
+            "'risk_critical', 'device_offline', 'low_battery', 'medication_reminder', "
+            "'system', 'sleep_anomaly', 'manual_check_in', 'caregiver_message'"
+            ")",
+            name="check_alert_type",
+        ),
         Index("ix_alerts_device_alert_type_created", "device_id", "alert_type", "created_at"),
     )
 
@@ -91,6 +100,19 @@ class Alert(Base):
     title: Mapped[str] = mapped_column(String(255))
     message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     details: Mapped[Optional[dict]] = mapped_column("data", JSONB, nullable=True)
+
+    # [HS-010] 7 canonical fields aligned with init_full_setup.sql alerts table.
+    sos_event_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("sos_events.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_via: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text), nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Metadata
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_current_time)
