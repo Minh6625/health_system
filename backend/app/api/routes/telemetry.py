@@ -3,10 +3,11 @@ from __future__ import annotations
 import json as _json
 import logging
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Header
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -74,16 +75,23 @@ def _fall_confidence_threshold() -> float:
 
 
 class VitalIngestVitals(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    # ADR-018 part 4 (Phase 7 S5): strict at the boundary. ``extra="forbid"``
+    # blocks producers from smuggling unknown fields that the DB cannot
+    # store; clinical ranges per
+    # ``PM_REVIEW/REDESIGN_IOT_SIM_2026/03_data_contracts/vitals_ingest.md``
+    # §1.3. All fields stay nullable — the per-item INSUFFICIENT_VITALS
+    # gate (see ``ingest_vitals``) handles the "at least one critical
+    # vital present" business rule.
+    model_config = ConfigDict(extra="forbid")
 
-    heart_rate: float | None = None
-    spo2: float | None = None
-    temperature: float | None = None
-    hrv: float | None = None
-    respiratory_rate: float | None = None
-    blood_pressure_sys: float | None = None
-    blood_pressure_dia: float | None = None
-    signal_quality: float | None = None
+    heart_rate: float | None = Field(default=None, ge=20, le=250)
+    spo2: float | None = Field(default=None, ge=50, le=100)
+    temperature: float | None = Field(default=None, ge=30, le=45)
+    hrv: float | None = Field(default=None, ge=0, le=300)
+    respiratory_rate: float | None = Field(default=None, ge=5, le=60)
+    blood_pressure_sys: float | None = Field(default=None, ge=60, le=260)
+    blood_pressure_dia: float | None = Field(default=None, ge=30, le=180)
+    signal_quality: float | None = Field(default=None, ge=0.0, le=1.0)
     motion_artifact: bool | None = None
 
 
@@ -94,12 +102,109 @@ class VitalIngestItem(BaseModel):
 
 
 class VitalIngestRequest(BaseModel):
-    messages: list[VitalIngestItem]
+    # ADR-018 part 4 (Phase 7 S5): cap batch size at 50 per
+    # ``vitals_ingest.md`` §1.3 so a buggy producer can't push a million
+    # records through a single request and starve the worker.
+    messages: list[VitalIngestItem] = Field(..., min_length=1, max_length=50)
 
 
 class IngestResponse(BaseModel):
+    """Legacy response model — kept for the alert + sleep endpoints.
+
+    ``ingest_vitals`` returns :class:`VitalIngestResponse` instead so the
+    structured per-item error contract + auto-trigger summary do not
+    leak into ``/telemetry/alert`` and ``/telemetry/sleep``.
+    """
+
     ingested: int
     errors: list[str] = Field(default_factory=list)
+
+
+class IngestError(BaseModel):
+    """Per-item rejection record for the vitals batch endpoint.
+
+    Pinned by ``vitals_ingest.md`` §2.1: producers iterate the
+    ``errors`` array and retry per-item with the corrected payload
+    instead of re-pushing the whole batch.
+    """
+
+    index: int
+    device_id: int
+    emitted_at: datetime
+    error_code: str
+    message: str
+
+
+class VitalIngestResponse(BaseModel):
+    """ADR-018 part 4 response shape for ``/telemetry/ingest``.
+
+    ``ingested`` + ``rejected`` always sum to ``len(messages)``.
+    ``errors`` is per-item and only populated for the rejected slice.
+    ``risk_evaluated_devices`` is the unique set of ``device_id``
+    values the post-ingest auto-trigger fanned out to, so producers can
+    correlate which devices the mobile app will receive a fresh risk
+    push for.
+    """
+
+    ingested: int = 0
+    rejected: int = 0
+    errors: list[IngestError] = Field(default_factory=list)
+    risk_evaluated_devices: list[int] = Field(default_factory=list)
+
+
+# ADR-018 part 4 (Phase 7 S5): in-memory idempotency cache for the
+# ``/telemetry/ingest`` endpoint. Producers (IoT sim, mobile bridge)
+# attach ``Idempotency-Key`` to every batch; a retry within
+# :data:`_IDEMPOTENCY_TTL_SECONDS` returns the original response so a
+# flaky network retry never double-counts vitals.
+#
+# Trade-off accepted: per-process dict means a multi-replica deploy
+# could still double-write across replicas. The single-replica dev
+# topology (one uvicorn worker) is the only target right now; upgrading
+# to Redis is tracked as a follow-up under ADR-020 part 2.
+_IDEMPOTENCY_TTL_SECONDS: int = 5 * 60
+_IDEMPOTENCY_CACHE: dict[str, tuple[float, "VitalIngestResponse"]] = {}
+
+
+def _idempotency_lookup(key: str | None) -> "VitalIngestResponse | None":
+    """Return the cached response for ``key`` if still within the TTL.
+
+    Returns ``None`` when the key is absent, missing from the cache, or
+    expired. Side-effect: expired entries are pruned on access so the
+    dict cannot grow without bound under steady producer traffic.
+
+    Defensive ``isinstance`` check — when ``ingest_vitals`` is called
+    directly (e.g. from unit tests) FastAPI's ``Header(default=None,
+    alias=...)`` parameter declaration leaks through as the actual
+    argument value instead of ``None``. Treat any non-string value as
+    "no key supplied" so direct invocations stay deterministic.
+    """
+    if not isinstance(key, str) or not key:
+        return None
+    now = time.monotonic()
+    expired = [
+        k for k, (ts, _) in _IDEMPOTENCY_CACHE.items()
+        if now - ts > _IDEMPOTENCY_TTL_SECONDS
+    ]
+    for k in expired:
+        _IDEMPOTENCY_CACHE.pop(k, None)
+    entry = _IDEMPOTENCY_CACHE.get(key)
+    return entry[1] if entry else None
+
+
+def _idempotency_store(key: str | None, response: "VitalIngestResponse") -> None:
+    if not isinstance(key, str) or not key:
+        return
+    _IDEMPOTENCY_CACHE[key] = (time.monotonic(), response)
+
+
+def _idempotency_clear_for_tests() -> None:
+    """Test-only — reset the cache between parametrised cases.
+
+    Not exposed via the public API; tests import it directly off the
+    module so each scenario starts with a known-empty cache.
+    """
+    _IDEMPOTENCY_CACHE.clear()
 
 
 class AlertIngestRequest(BaseModel):
@@ -222,11 +327,23 @@ def _build_alert_title(event_type: str, severity: str) -> str:
     return normalized.replace("_", " ").strip().title() or "Telemetry alert"
 
 
-@router.post("/ingest", response_model=IngestResponse, dependencies=[Depends(require_internal_service)])
+@router.post(
+    "/ingest",
+    response_model=VitalIngestResponse,
+    dependencies=[Depends(require_internal_service)],
+)
 def ingest_vitals(
     payload: VitalIngestRequest,
     db: Session = Depends(get_db),
-) -> IngestResponse:
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+) -> VitalIngestResponse:
+    # ADR-018 part 4 (Phase 7 S5): idempotency replay short-circuit —
+    # producers retry on a transient network error and we MUST return
+    # the original response shape so they do not double-count.
+    cached = _idempotency_lookup(idempotency_key)
+    if cached is not None:
+        return cached
+
     insert_sql = text(
         """
         INSERT INTO vitals (
@@ -259,40 +376,92 @@ def ingest_vitals(
     )
 
     ingested = 0
-    errors: list[str] = []
+    rejected = 0
+    errors: list[IngestError] = []
+    # Track which devices actually got a fresh row this batch so the
+    # post-commit auto-trigger only fans out for them (rejected items
+    # must NOT pull the model-api into a synthetic-only inference).
+    inserted_device_ids: list[int] = []
 
     for index, message in enumerate(payload.messages):
-        vitals = message.vitals.model_dump()
-        if message.vitals.model_extra:
-            vitals.update(message.vitals.model_extra)
+        vitals = message.vitals
+
+        # ADR-018 part 4 / HS-024 fix at the boundary: refuse vitals
+        # records where BOTH critical fields are NULL. Soft fields
+        # (BP, HRV, temp...) may still be NULL — the downstream
+        # ``_build_inference_payload`` handles default-or-fail for
+        # those separately.
+        if vitals.heart_rate is None and vitals.spo2 is None:
+            rejected += 1
+            errors.append(
+                IngestError(
+                    index=index,
+                    device_id=message.db_device_id,
+                    emitted_at=message.emitted_at,
+                    error_code="INSUFFICIENT_VITALS",
+                    message=(
+                        "cần ít nhất 1 trong heart_rate hoặc spo2 để "
+                        "INSERT vitals; record bị từ chối ở boundary."
+                    ),
+                )
+            )
+            continue
+
         params = {
             "time": message.emitted_at,
             "device_id": message.db_device_id,
-            "heart_rate": _pick_float(vitals, "heart_rate"),
-            "spo2": _pick_float(vitals, "spo2"),
-            "temperature": _pick_float(vitals, "temperature"),
-            "hrv": _pick_float(vitals, "hrv"),
-            "respiratory_rate": _pick_float(vitals, "respiratory_rate"),
-            "blood_pressure_sys": _pick_int(vitals, "blood_pressure_sys", "sys_bp"),
-            "blood_pressure_dia": _pick_int(vitals, "blood_pressure_dia", "dia_bp"),
-            "signal_quality": _pick_float(vitals, "signal_quality"),
-            "motion_artifact": _pick_bool(vitals, "motion_artifact"),
+            "heart_rate": vitals.heart_rate,
+            "spo2": vitals.spo2,
+            "temperature": vitals.temperature,
+            "hrv": vitals.hrv,
+            "respiratory_rate": vitals.respiratory_rate,
+            "blood_pressure_sys": (
+                int(round(vitals.blood_pressure_sys))
+                if vitals.blood_pressure_sys is not None
+                else None
+            ),
+            "blood_pressure_dia": (
+                int(round(vitals.blood_pressure_dia))
+                if vitals.blood_pressure_dia is not None
+                else None
+            ),
+            "signal_quality": vitals.signal_quality,
+            "motion_artifact": vitals.motion_artifact,
         }
 
         try:
             with db.begin_nested():
                 result = db.execute(insert_sql, params)
-            ingested += max(result.rowcount or 0, 0)
+            inserted_count = max(result.rowcount or 0, 0)
+            ingested += inserted_count
+            if inserted_count > 0:
+                inserted_device_ids.append(message.db_device_id)
         except Exception as exc:
+            rejected += 1
             errors.append(
-                f"messages[{index}] device_id={message.db_device_id}: {exc}"
+                IngestError(
+                    index=index,
+                    device_id=message.db_device_id,
+                    emitted_at=message.emitted_at,
+                    error_code="INSERT_FAILED",
+                    message=str(exc),
+                )
             )
 
+    risk_evaluated_devices: list[int] = []
     try:
         db.commit()
 
         if ingested > 0:
-            pushed_device_ids = list({msg.db_device_id for msg in payload.messages})
+            # Preserve first-seen order so the response is deterministic
+            # for producer-side assertions in integration tests.
+            unique_devices: list[int] = []
+            seen: set[int] = set()
+            for device_id in inserted_device_ids:
+                if device_id not in seen:
+                    seen.add(device_id)
+                    unique_devices.append(device_id)
+
             try:
                 db.execute(
                     text(
@@ -303,14 +472,22 @@ def ingest_vitals(
                           AND deleted_at IS NULL
                         """
                     ),
-                    {"device_ids": pushed_device_ids},
+                    {"device_ids": unique_devices},
                 )
                 db.commit()
             except Exception as sync_exc:
                 db.rollback()
-                errors.append(f"last_sync_update_failed: {sync_exc}")
+                errors.append(
+                    IngestError(
+                        index=-1,
+                        device_id=0,
+                        emitted_at=datetime.now(timezone.utc),
+                        error_code="LAST_SYNC_UPDATE_FAILED",
+                        message=str(sync_exc),
+                    )
+                )
 
-            for device_id in pushed_device_ids:
+            for device_id in unique_devices:
                 try:
                     resolved_user_id = _resolve_alert_user_id(
                         db,
@@ -331,20 +508,42 @@ def ingest_vitals(
                         allow_cached=True,
                         dispatch_alerts=True,
                     )
+                    risk_evaluated_devices.append(int(device_id))
                 except Exception as exc:
                     logger.exception(
                         "Telemetry risk evaluation failed after ingest for device %s",
                         device_id,
                     )
                     errors.append(
-                        f"risk_eval_failed device_id={device_id}: {exc}"
+                        IngestError(
+                            index=-1,
+                            device_id=int(device_id),
+                            emitted_at=datetime.now(timezone.utc),
+                            error_code="RISK_EVAL_FAILED",
+                            message=str(exc),
+                        )
                     )
     except Exception as exc:
         db.rollback()
         ingested = 0
-        errors.append(f"commit_failed: {exc}")
+        errors.append(
+            IngestError(
+                index=-1,
+                device_id=0,
+                emitted_at=datetime.now(timezone.utc),
+                error_code="COMMIT_FAILED",
+                message=str(exc),
+            )
+        )
 
-    return IngestResponse(ingested=ingested, errors=errors)
+    response = VitalIngestResponse(
+        ingested=ingested,
+        rejected=rejected,
+        errors=errors,
+        risk_evaluated_devices=risk_evaluated_devices,
+    )
+    _idempotency_store(idempotency_key, response)
+    return response
 
 
 @router.post("/alert", response_model=IngestResponse, dependencies=[Depends(require_internal_service)])
