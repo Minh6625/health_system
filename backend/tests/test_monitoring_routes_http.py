@@ -26,7 +26,7 @@ from app.services.monitoring_service import MonitoringService
 
 def _build_test_client() -> TestClient:
     app = FastAPI()
-    app.include_router(monitoring_router, prefix="/mobile")
+    app.include_router(monitoring_router, prefix="/api/v1/mobile")
 
     def _override_target_profile_id(
         x_target_profile_id: int | None = Header(
@@ -227,20 +227,20 @@ def test_mobile_monitoring_routes_use_canonical_shape_and_target_profile(
     linked_headers = {"X-Target-Profile-Id": "42"}
 
     self_responses = [
-        client.get("/mobile/metrics/vital-signs/latest", headers=self_headers),
-        client.get("/mobile/metrics/sleep/latest", headers=self_headers),
-        client.get("/mobile/metrics/health-report", headers=self_headers),
-        client.get("/mobile/analysis/risk-reports?limit=1", headers=self_headers),
-        client.get("/mobile/analysis/risk-reports/9", headers=self_headers),
-        client.get("/mobile/analysis/risk-history?range=7d&page=1&limit=5", headers=self_headers),
+        client.get("/api/v1/mobile/metrics/vital-signs/latest", headers=self_headers),
+        client.get("/api/v1/mobile/metrics/sleep/latest", headers=self_headers),
+        client.get("/api/v1/mobile/metrics/health-report", headers=self_headers),
+        client.get("/api/v1/mobile/analysis/risk-reports?limit=1", headers=self_headers),
+        client.get("/api/v1/mobile/analysis/risk-reports/9", headers=self_headers),
+        client.get("/api/v1/mobile/analysis/risk-history?range=7d&page=1&limit=5", headers=self_headers),
     ]
     linked_responses = [
-        client.get("/mobile/metrics/vital-signs/latest", headers=linked_headers),
-        client.get("/mobile/metrics/sleep/latest", headers=linked_headers),
-        client.get("/mobile/metrics/health-report", headers=linked_headers),
-        client.get("/mobile/analysis/risk-reports?limit=1", headers=linked_headers),
-        client.get("/mobile/analysis/risk-reports/9", headers=linked_headers),
-        client.get("/mobile/analysis/risk-history?range=7d&page=1&limit=5", headers=linked_headers),
+        client.get("/api/v1/mobile/metrics/vital-signs/latest", headers=linked_headers),
+        client.get("/api/v1/mobile/metrics/sleep/latest", headers=linked_headers),
+        client.get("/api/v1/mobile/metrics/health-report", headers=linked_headers),
+        client.get("/api/v1/mobile/analysis/risk-reports?limit=1", headers=linked_headers),
+        client.get("/api/v1/mobile/analysis/risk-reports/9", headers=linked_headers),
+        client.get("/api/v1/mobile/analysis/risk-history?range=7d&page=1&limit=5", headers=linked_headers),
     ]
 
     for response in [*self_responses, *linked_responses]:
@@ -286,7 +286,7 @@ def test_mobile_monitoring_routes_reject_unauthorized_linked_profile() -> None:
     client = _build_test_client()
 
     response = client.get(
-        "/mobile/analysis/risk-history",
+        "/api/v1/mobile/analysis/risk-history",
         headers={"X-Target-Profile-Id": "999"},
     )
 
@@ -297,11 +297,11 @@ def test_main_app_registers_single_mobile_risk_reports_route() -> None:
     matching_routes = [
         (route.path, tuple(sorted(route.methods)))
         for route in main_app.routes
-        if getattr(route, "path", None) == "/mobile/analysis/risk-reports"
+        if getattr(route, "path", None) == "/api/v1/mobile/analysis/risk-reports"
     ]
 
     assert matching_routes == [
-        ("/mobile/analysis/risk-reports", ("GET",)),
+        ("/api/v1/mobile/analysis/risk-reports", ("GET",)),
     ]
 
 
@@ -364,7 +364,7 @@ def test_vitals_timeseries_route_passes_range_through_and_preserves_nulls(
 
     # Default range — confirms the route mounts at the documented path
     # and that `range_key` defaults to "24h" when the client omits it.
-    default_response = client.get("/mobile/metrics/vitals/timeseries")
+    default_response = client.get("/api/v1/mobile/metrics/vitals/timeseries")
     assert default_response.status_code == 200
     default_payload = default_response.json()
     assert captured["patient_id"] == 7
@@ -381,7 +381,7 @@ def test_vitals_timeseries_route_passes_range_through_and_preserves_nulls(
     # Explicit `range` param flows through to the service so the future
     # 7d / 30d tabs can be wired without further route changes.
     seven_day_response = client.get(
-        "/mobile/metrics/vitals/timeseries?range=7d"
+        "/api/v1/mobile/metrics/vitals/timeseries?range=7d"
     )
     assert seven_day_response.status_code == 200
     assert captured["range_key"] == "7d"
@@ -405,12 +405,12 @@ def test_vitals_timeseries_route_respects_target_profile_header(
     )
 
     # Self profile (no header).
-    self_resp = client.get("/mobile/metrics/vitals/timeseries")
+    self_resp = client.get("/api/v1/mobile/metrics/vitals/timeseries")
     assert self_resp.status_code == 200
 
     # Linked profile (allowed).
     linked_resp = client.get(
-        "/mobile/metrics/vitals/timeseries",
+        "/api/v1/mobile/metrics/vitals/timeseries",
         headers={"X-Target-Profile-Id": "42"},
     )
     assert linked_resp.status_code == 200
@@ -420,7 +420,7 @@ def test_vitals_timeseries_route_respects_target_profile_header(
     # non-linked patient's vitals time-series. Drift here would be a
     # security regression.
     forbidden_resp = client.get(
-        "/mobile/metrics/vitals/timeseries",
+        "/api/v1/mobile/metrics/vitals/timeseries",
         headers={"X-Target-Profile-Id": "999"},
     )
     assert forbidden_resp.status_code == 403

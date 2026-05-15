@@ -1,6 +1,6 @@
 """End-to-end smoke for caregiver fan-out on risk push (P1 #6).
 
-Triggers /mobile/telemetry/ingest with critical vitals, then verifies that the
+Triggers /api/v1/mobile/telemetry/ingest with critical vitals, then verifies that the
 new ``_resolve_risk_alert_recipients`` path created risk_critical Alert rows
 for BOTH the patient and the caregiver who has ``can_receive_alerts=True``.
 
@@ -53,7 +53,7 @@ def _ingest_critical_vitals() -> None:
     }
     print("== ingest critical vitals ==")
     response = httpx.post(
-        f"{BACKEND_URL}/mobile/telemetry/ingest", json=payload, timeout=15.0
+        f"{BACKEND_URL}/api/v1/mobile/telemetry/ingest", json=payload, timeout=15.0
     )
     print("status:", response.status_code)
     print("body:  ", response.json())

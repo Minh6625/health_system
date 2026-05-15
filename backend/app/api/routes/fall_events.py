@@ -4,9 +4,9 @@ Phase 4B-full slice 2c (see ``backend/docs/risk-contract-baseline.md``
 §7j). Three routes that the Flutter ``lib/features/fall/`` module
 consumes:
 
-* ``GET    /mobile/fall-events`` — paginated list, newest first.
-* ``GET    /mobile/fall-events/{id}`` — one event detail.
-* ``POST   /mobile/fall-events/{id}/dismiss`` — mark as user-cancelled.
+* ``GET    /api/v1/mobile/fall-events`` — paginated list, newest first.
+* ``GET    /api/v1/mobile/fall-events/{id}`` — one event detail.
+* ``POST   /api/v1/mobile/fall-events/{id}/dismiss`` — mark as user-cancelled.
 
 All three are scoped through ``X-Target-Profile-Id`` (relationships
 already resolved by :func:`get_target_profile_id`). The service layer

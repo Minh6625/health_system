@@ -60,7 +60,7 @@ class SensorSample(BaseModel):
 
 
 class ImuWindowRequest(BaseModel):
-    """Body for ``POST /mobile/telemetry/imu-window``.
+    """Body for ``POST /api/v1/mobile/telemetry/imu-window``.
 
     The ``data`` array MUST contain at least 20 samples; the model-api
     config ``fall_min_sequence_samples`` may demand more, in which case
@@ -89,7 +89,7 @@ class ImuWindowRequest(BaseModel):
 
 
 class FallEventResponse(BaseModel):
-    """One row from the mobile-facing ``GET /mobile/fall-events*`` surface.
+    """One row from the mobile-facing ``GET /api/v1/mobile/fall-events*`` surface.
 
     Phase 4B-full slice 2c (see ``backend/docs/risk-contract-baseline.md``
     §7j). Mirrors the columns the Flutter ``fall_alert_screen`` and
@@ -199,7 +199,7 @@ class FallEventListResponse(BaseModel):
 
 
 class FallEventDismissRequest(BaseModel):
-    """Body for ``POST /mobile/fall-events/{id}/dismiss``.
+    """Body for ``POST /api/v1/mobile/fall-events/{id}/dismiss``.
 
     A single optional reason string. The mobile UI usually offers
     two-three preset chips ("Tôi ổn", "Báo nhầm", ...) plus a free-text
@@ -217,7 +217,7 @@ class FallEventDismissRequest(BaseModel):
 
 
 class FallEventDismissResponse(BaseModel):
-    """Success body for ``POST /mobile/fall-events/{id}/dismiss``.
+    """Success body for ``POST /api/v1/mobile/fall-events/{id}/dismiss``.
 
     Echoes back the updated event so the Flutter client doesn't need a
     second GET to refresh its local state.
@@ -227,7 +227,7 @@ class FallEventDismissResponse(BaseModel):
 
 
 class FallSurveySubmitRequest(BaseModel):
-    """Body for ``POST /mobile/fall-events/{id}/survey`` (Module FA-2).
+    """Body for ``POST /api/v1/mobile/fall-events/{id}/survey`` (Module FA-2).
 
     Option 3-Lite stand-up survey shown after the user dismissed the
     initial fall alert with "Tôi ổn".  Three possible outcomes:
@@ -259,7 +259,7 @@ class FallSurveySubmitRequest(BaseModel):
 
 
 class FallSurveySubmitResponse(BaseModel):
-    """Success body for ``POST /mobile/fall-events/{id}/survey``.
+    """Success body for ``POST /api/v1/mobile/fall-events/{id}/survey``.
 
     Echoes the persisted survey so the Flutter client can show the
     confirmation chip without a follow-up GET.  Mirrors the
@@ -273,7 +273,7 @@ class ImuWindowResponse(BaseModel):
     """Compact summary returned to the simulator / mobile.
 
     Tuned to be just enough for the caller to decide whether to escalate
-    via ``POST /mobile/telemetry/alert`` (with the returned
+    via ``POST /api/v1/mobile/telemetry/alert`` (with the returned
     ``fall_event_id``) or simply log the window for later review.
     """
 

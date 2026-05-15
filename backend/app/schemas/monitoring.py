@@ -18,7 +18,7 @@ class VitalSignsResponse(BaseModel):
 # `vital_detail_screen.dart` previously promised a "Biến động 24h qua"
 # chart but `VitalSignsProvider.chartData` always returned `const []`
 # because no endpoint existed. These schemas back the new
-# `GET /mobile/metrics/vitals/timeseries` endpoint that downsamples raw
+# `GET /api/v1/mobile/metrics/vitals/timeseries` endpoint that downsamples raw
 # `vitals` rows into ~96 buckets (15 min × 24 h) — small enough for a
 # fluid mobile chart, large enough to show real diurnal variation. Each
 # bucket carries every vital channel in a single row so the screen can
@@ -228,7 +228,7 @@ class RiskReportDetailResponse(BaseModel):
 class RiskReportClinicianResponse(RiskReportDetailResponse):
     """Phase 5 clinician-only extension of :class:`RiskReportDetailResponse`.
 
-    Returned from ``GET /mobile/analysis/risk-reports/{id}`` only when the
+    Returned from ``GET /api/v1/mobile/analysis/risk-reports/{id}`` only when the
     caller passes ``?audience=clinician`` AND ``user.role`` is in
     :data:`~app.core.audience.CLINICIAN_ROLES`. Inherits every field of
     the patient response unchanged so mobile codegen can model this as a

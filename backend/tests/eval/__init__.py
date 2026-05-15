@@ -17,5 +17,5 @@ Two run modes:
   ``tests/eval/reports/``.
 
 The Phase 4B-full plan slice 2a calls for these gates **before** any
-additional caller is wired into ``POST /mobile/telemetry/imu-window``.
+additional caller is wired into ``POST /api/v1/mobile/telemetry/imu-window``.
 """

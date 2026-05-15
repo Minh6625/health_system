@@ -47,7 +47,7 @@ class FallEvent(Base):
     features: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
 
     # Option 3-Lite stand-up survey (Module FA-2).  Populated by
-    # ``POST /mobile/fall-events/{id}/survey``.  NULL when the user did
+    # ``POST /api/v1/mobile/fall-events/{id}/survey``.  NULL when the user did
     # not reach step 2 (older app build, panic dismiss, or alert
     # auto-escalated to SOS without a confirm path).  Shape:
     # ``{"can_stand": bool|null, "skipped": bool, "answered_at": iso}``.

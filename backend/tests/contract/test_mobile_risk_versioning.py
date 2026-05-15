@@ -192,17 +192,17 @@ def risk_client(monkeypatch) -> TestClient:
 
 
 _EXPECTED_RESPONSE_MODELS: dict[str, type] = {
-    "/mobile/analysis/risk-reports": list[RiskReportResponse],  # type: ignore[dict-item]
+    "/api/v1/mobile/analysis/risk-reports": list[RiskReportResponse],  # type: ignore[dict-item]
     # Phase 5 turned the detail route's response_model into a Union of
     # patient + clinician DTOs. FastAPI preserves the Union on the
     # runtime ``route.response_model`` attribute AND emits a faithful
     # ``anyOf`` in OpenAPI (the latter is asserted below in
     # ``TestMobileRiskOpenApiSnapshot.test_detail_path_emits_anyof_for_audience``).
-    "/mobile/analysis/risk-reports/{report_id}": (
+    "/api/v1/mobile/analysis/risk-reports/{report_id}": (
         RiskReportDetailResponse | RiskReportClinicianResponse
     ),
-    "/mobile/analysis/risk-history": RiskHistoryResponse,
-    "/mobile/metrics/health-report": HealthReportResponse,
+    "/api/v1/mobile/analysis/risk-history": RiskHistoryResponse,
+    "/api/v1/mobile/metrics/health-report": HealthReportResponse,
 }
 
 
@@ -250,10 +250,10 @@ class TestRiskContractVersionHeaderOnRiskSurface:
     @pytest.mark.parametrize(
         "path",
         [
-            "/mobile/analysis/risk-reports",
-            "/mobile/analysis/risk-reports/42",
-            "/mobile/analysis/risk-history",
-            "/mobile/metrics/health-report",
+            "/api/v1/mobile/analysis/risk-reports",
+            "/api/v1/mobile/analysis/risk-reports/42",
+            "/api/v1/mobile/analysis/risk-history",
+            "/api/v1/mobile/metrics/health-report",
         ],
     )
     def test_header_is_set_on_risk_route_responses(
@@ -267,7 +267,7 @@ class TestRiskContractVersionHeaderOnRiskSurface:
         self, risk_client: TestClient
     ) -> None:
         # Guard against ad-hoc literals creeping into the middleware.
-        response = risk_client.get("/mobile/analysis/risk-reports")
+        response = risk_client.get("/api/v1/mobile/analysis/risk-reports")
         assert response.headers[RISK_CONTRACT_VERSION_HEADER] == RISK_CONTRACT_VERSION
         assert RISK_CONTRACT_VERSION  # must be non-empty
 
@@ -283,10 +283,10 @@ class TestRiskContractVersionHeaderScope:
     @pytest.mark.parametrize(
         "path",
         [
-            "/mobile/analysis/risk-reports",
-            "/mobile/analysis/risk-reports/42",
-            "/mobile/analysis/risk-history",
-            "/mobile/metrics/health-report",
+            "/api/v1/mobile/analysis/risk-reports",
+            "/api/v1/mobile/analysis/risk-reports/42",
+            "/api/v1/mobile/analysis/risk-history",
+            "/api/v1/mobile/metrics/health-report",
             "/api/v1/mobile/analysis/risk-reports",
             "/api/v1/mobile/metrics/health-report",
         ],
@@ -297,10 +297,10 @@ class TestRiskContractVersionHeaderScope:
     @pytest.mark.parametrize(
         "path",
         [
-            "/mobile/auth/login",
-            "/mobile/notifications",
-            "/mobile/vitals/latest",
-            "/mobile/analysis/sleep-history",  # sleep is NOT in the risk surface (Phase 4A territory)
+            "/api/v1/mobile/auth/login",
+            "/api/v1/mobile/notifications",
+            "/api/v1/mobile/vitals/latest",
+            "/api/v1/mobile/analysis/sleep-history",  # sleep is NOT in the risk surface (Phase 4A territory)
             "/api/v1/mobile/auth/refresh",
             "/",
             "/mobile-docs",
@@ -343,10 +343,10 @@ def _collect_refs(schema: dict[str, Any]) -> list[str]:
 
 _EXPECTED_OPENAPI_PATHS = frozenset(
     {
-        "/mobile/analysis/risk-reports",
-        "/mobile/analysis/risk-reports/{report_id}",
-        "/mobile/analysis/risk-history",
-        "/mobile/metrics/health-report",
+        "/api/v1/mobile/analysis/risk-reports",
+        "/api/v1/mobile/analysis/risk-reports/{report_id}",
+        "/api/v1/mobile/analysis/risk-history",
+        "/api/v1/mobile/metrics/health-report",
     }
 )
 
@@ -398,7 +398,7 @@ class TestMobileRiskOpenApiSnapshot:
         depend on it.
         """
         spec = main_app.openapi()
-        schema = spec["paths"]["/mobile/analysis/risk-reports/{report_id}"][
+        schema = spec["paths"]["/api/v1/mobile/analysis/risk-reports/{report_id}"][
             "get"
         ]["responses"]["200"]["content"]["application/json"]["schema"]
         refs = set(_collect_refs(schema))

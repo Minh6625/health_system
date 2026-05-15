@@ -103,20 +103,20 @@ def test_risk_safe_response_enforces_auth_and_persists_ack(
 
     with httpx.Client(base_url=backend_base_url, timeout=20.0) as client:
         unauthorized = client.post(
-            f"/mobile/risk/alerts/{alert_id}/respond",
+            f"/api/v1/mobile/risk/alerts/{alert_id}/respond",
             json={"action": "safe", "source": "overlay"},
         )
         assert unauthorized.status_code in {401, 403}
 
         forbidden = client.post(
-            f"/mobile/risk/alerts/{alert_id}/respond",
+            f"/api/v1/mobile/risk/alerts/{alert_id}/respond",
             headers=_auth_headers(user_id=caregiver_id),
             json={"action": "safe", "source": "overlay"},
         )
         assert forbidden.status_code == 403, forbidden.text
 
         safe_response = client.post(
-            f"/mobile/risk/alerts/{alert_id}/respond",
+            f"/api/v1/mobile/risk/alerts/{alert_id}/respond",
             headers=_auth_headers(user_id=patient_id),
             json={
                 "risk_score_id": 4101,
@@ -130,7 +130,7 @@ def test_risk_safe_response_enforces_auth_and_persists_ack(
         assert safe_body["sos_event_id"] is None
 
         duplicate = client.post(
-            f"/mobile/risk/alerts/{alert_id}/respond",
+            f"/api/v1/mobile/risk/alerts/{alert_id}/respond",
             headers=_auth_headers(user_id=patient_id),
             json={
                 "risk_score_id": 4101,
@@ -180,7 +180,7 @@ def test_risk_escalation_creates_vital_critical_sos_for_caregiver(
 
     with httpx.Client(base_url=backend_base_url, timeout=20.0) as client:
         help_response = client.post(
-            f"/mobile/risk/alerts/{help_alert_id}/respond",
+            f"/api/v1/mobile/risk/alerts/{help_alert_id}/respond",
             headers=_auth_headers(user_id=patient_id),
             json={
                 "risk_score_id": 5101,
@@ -196,7 +196,7 @@ def test_risk_escalation_creates_vital_critical_sos_for_caregiver(
         help_sos_id = int(help_body["sos_event_id"])
 
         caregiver_active_list = client.get(
-            "/mobile/emergency/caregiver/sos-alerts",
+            "/api/v1/mobile/emergency/caregiver/sos-alerts",
             headers=_auth_headers(user_id=caregiver_id),
             params={"status": "active"},
         )
@@ -208,14 +208,14 @@ def test_risk_escalation_creates_vital_critical_sos_for_caregiver(
         )
 
         help_detail = client.get(
-            f"/mobile/emergency/sos/{help_sos_id}",
+            f"/api/v1/mobile/emergency/sos/{help_sos_id}",
             headers=_auth_headers(user_id=caregiver_id),
         )
         assert help_detail.status_code == 200, help_detail.text
         assert help_detail.json()["trigger_type"] == "vital_critical"
 
         duplicate = client.post(
-            f"/mobile/risk/alerts/{help_alert_id}/respond",
+            f"/api/v1/mobile/risk/alerts/{help_alert_id}/respond",
             headers=_auth_headers(user_id=patient_id),
             json={
                 "risk_score_id": 5101,
@@ -228,7 +228,7 @@ def test_risk_escalation_creates_vital_critical_sos_for_caregiver(
         assert int(duplicate.json()["sos_event_id"]) == help_sos_id
 
         timeout_response = client.post(
-            f"/mobile/risk/alerts/{timeout_alert_id}/respond",
+            f"/api/v1/mobile/risk/alerts/{timeout_alert_id}/respond",
             headers=_auth_headers(user_id=patient_id),
             json={
                 "risk_score_id": 5102,
@@ -244,7 +244,7 @@ def test_risk_escalation_creates_vital_critical_sos_for_caregiver(
         timeout_sos_id = int(timeout_body["sos_event_id"])
 
         timeout_detail = client.get(
-            f"/mobile/emergency/sos/{timeout_sos_id}",
+            f"/api/v1/mobile/emergency/sos/{timeout_sos_id}",
             headers=_auth_headers(user_id=caregiver_id),
         )
         assert timeout_detail.status_code == 200, timeout_detail.text

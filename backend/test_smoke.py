@@ -14,7 +14,7 @@ data = json.dumps({
     "metadata": {"variant": "fall_1", "confidence": 0.99}
 }).encode()
 
-for path in ["/mobile/telemetry/alert", "/api/v1/mobile/telemetry/alert"]:
+for path in ["/api/v1/mobile/telemetry/alert", "/api/v1/mobile/telemetry/alert"]:
     url = f"http://localhost:8000{path}"
     try:
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")

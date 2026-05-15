@@ -1,4 +1,4 @@
-"""HTTP tests for ``POST /mobile/telemetry/imu-window`` (Phase 4B-thin).
+"""HTTP tests for ``POST /api/v1/mobile/telemetry/imu-window`` (Phase 4B-thin).
 
 Three scenarios pin the route's contract:
 
@@ -41,7 +41,7 @@ def _build_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     stubbed to capture the kwargs that would have been written.
     """
     app = FastAPI()
-    app.include_router(telemetry_router, prefix="/mobile")
+    app.include_router(telemetry_router, prefix="/api/v1/mobile")
 
     captured_persist: dict[str, Any] = {"called": False, "kwargs": {}}
 
@@ -141,7 +141,7 @@ class TestImuWindowHappyPath:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/imu-window",
+                "/api/v1/mobile/telemetry/imu-window",
                 json=_imu_window_payload(),
                 headers=_INTERNAL_HEADERS,
             )
@@ -186,7 +186,7 @@ class TestImuWindowHappyPath:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/imu-window",
+                "/api/v1/mobile/telemetry/imu-window",
                 json=_imu_window_payload(sample_count=30),
                 headers=_INTERNAL_HEADERS,
             )
@@ -228,7 +228,7 @@ class TestImuWindowModelUnavailable:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/imu-window",
+                "/api/v1/mobile/telemetry/imu-window",
                 json=_imu_window_payload(),
                 headers=_INTERNAL_HEADERS,
             )
@@ -267,7 +267,7 @@ class TestImuWindowSchemaValidation:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/imu-window",
+                "/api/v1/mobile/telemetry/imu-window",
                 json=_imu_window_payload(sample_count=5),
                 headers=_INTERNAL_HEADERS,
             )
@@ -285,7 +285,7 @@ class TestImuWindowSchemaValidation:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/imu-window",
+                "/api/v1/mobile/telemetry/imu-window",
                 json=payload,
                 headers=_INTERNAL_HEADERS,
             )

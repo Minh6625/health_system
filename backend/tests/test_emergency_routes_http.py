@@ -23,8 +23,8 @@ from app.services.emergency_service import EmergencyService
 
 def _build_test_client(*, user_id: int = 7, role: str = "user") -> TestClient:
     app = FastAPI()
-    app.include_router(emergency_router, prefix="/mobile")
-    app.include_router(risk_router, prefix="/mobile")
+    app.include_router(emergency_router, prefix="/api/v1/mobile")
+    app.include_router(risk_router, prefix="/api/v1/mobile")
 
     def _override_current_user():
         return SimpleNamespace(id=user_id, role=role)
@@ -108,7 +108,7 @@ def test_trigger_sos_route_returns_sos_metadata_and_passes_named_payload(
     )
 
     response = client.post(
-        "/mobile/emergency/sos/trigger",
+        "/api/v1/mobile/emergency/sos/trigger",
         json={
             "trigger_type": "manual",
             "latitude": 10.762622,
@@ -170,7 +170,7 @@ def test_get_sos_alerts_route_uses_status_filter_and_current_user(monkeypatch) -
         staticmethod(_get_alerts),
     )
 
-    response = client.get("/mobile/emergency/caregiver/sos-alerts?status=resolved")
+    response = client.get("/api/v1/mobile/emergency/caregiver/sos-alerts?status=resolved")
 
     assert response.status_code == 200
     assert calls == [(33, "resolved")]
@@ -196,7 +196,7 @@ def test_get_sos_detail_route_rejects_unauthorized_access(monkeypatch) -> None:
         lambda db, viewer_id, target_user_id: False,
     )
 
-    response = client.get("/mobile/emergency/sos/91")
+    response = client.get("/api/v1/mobile/emergency/sos/91")
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Bạn không có quyền xem chi tiết SOS này"
@@ -229,7 +229,7 @@ def test_resolve_sos_route_passes_resolution_status_and_notes(monkeypatch) -> No
     )
 
     response = client.post(
-        "/mobile/emergency/sos/91/resolve",
+        "/api/v1/mobile/emergency/sos/91/resolve",
         json={
             "resolution_status": "assisted",
             "notes": "Caregiver arrived",
@@ -264,7 +264,7 @@ def test_risk_response_route_surfaces_recipient_count_for_escalation(
     )
 
     response = client.post(
-        "/mobile/risk/alerts/501/respond",
+        "/api/v1/mobile/risk/alerts/501/respond",
         json={
             "action": "help_requested",
             "source": "overlay",
