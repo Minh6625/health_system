@@ -8,6 +8,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy import func, text
 from sqlalchemy.exc import ProgrammingError
@@ -15,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user, get_optional_current_user
 from app.db.database import get_db
+from app.exceptions import InsufficientVitalsError
 from app.models.user_model import User
 from app.services.risk_inference_service import describe_feature_vector, infer_risk
 from app.models.risk_score_model import RiskScore
@@ -381,6 +383,25 @@ def recalculate_risk(
             allow_cached=False,
             dispatch_alerts=True,
         )
+    except InsufficientVitalsError as exc:
+        # ADR-018 / HS-024: critical vital fields are NULL — fail-closed so
+        # the mobile app can render an honest "thiết bị cần đeo thêm" empty
+        # state instead of a fake risk score.
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "INSUFFICIENT_VITALS",
+                    "message": (
+                        "Không đủ dữ liệu sinh hiệu để đánh giá rủi ro. "
+                        "Vui lòng đeo thiết bị thêm vài phút rồi thử lại."
+                    ),
+                    "details": [
+                        {"field": field} for field in exc.missing_fields
+                    ],
+                }
+            },
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -415,6 +436,23 @@ def calculate_risk(
             user_id=int(context["user_id"]),
             allow_cached=True,
             dispatch_alerts=True,
+        )
+    except InsufficientVitalsError as exc:
+        # ADR-018 / HS-024: same fail-closed path as ``recalculate_risk``.
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "INSUFFICIENT_VITALS",
+                    "message": (
+                        "Không đủ dữ liệu sinh hiệu để đánh giá rủi ro. "
+                        "Vui lòng đeo thiết bị thêm vài phút rồi thử lại."
+                    ),
+                    "details": [
+                        {"field": field} for field in exc.missing_fields
+                    ],
+                }
+            },
         )
     except ValueError as exc:
         raise HTTPException(

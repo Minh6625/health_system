@@ -83,6 +83,9 @@ class TestBuildModelApiRecord:
         assert record["height_m"] == pytest.approx(1.65)
 
     def test_missing_optional_fields_use_clinical_defaults(self) -> None:
+        # ADR-018: adapter remains a defensive layer (defaults clinical
+        # placeholders) but every defaulted field is tracked. HRV aligned
+        # to 40.0 to match the service layer; previously drifted to 50.0.
         record = _build_model_api_record({})
         assert record["heart_rate"] == 75.0
         assert record["respiratory_rate"] == 16.0
@@ -94,7 +97,7 @@ class TestBuildModelApiRecord:
         assert record["gender"] == 0
         assert record["weight_kg"] == 65.0
         assert record["height_m"] == pytest.approx(1.65)
-        assert record["derived_hrv"] == 50.0
+        assert record["derived_hrv"] == 40.0
 
     def test_invalid_height_falls_back_to_one_six_five(self) -> None:
         payload = {"height_cm": -10, "weight_kg": 60}
