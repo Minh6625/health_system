@@ -179,6 +179,29 @@ class ModelApiHealthAdapter:
             probability = 0.0
         confidence_value = max(0.0, min(1.0, probability))
 
+        # ADR-018: extract data-quality contract fields from the model-api
+        # prediction block. ``effective_confidence`` is the degraded value
+        # the consumer should display; raw ``confidence_value`` is kept for
+        # back-compat. ``is_synthetic_default`` + ``data_quality_warning``
+        # surface the input-quality story to the mobile UI.
+        prediction_block = response.get("prediction") or {}
+        try:
+            effective_confidence_raw = prediction_block.get("effective_confidence")
+            effective_confidence: float | None = (
+                max(0.0, min(1.0, float(effective_confidence_raw)))
+                if effective_confidence_raw is not None
+                else None
+            )
+        except (TypeError, ValueError):
+            effective_confidence = None
+        is_synthetic_default = bool(prediction_block.get("is_synthetic_default") or False)
+        data_quality_warning_raw = prediction_block.get("data_quality_warning")
+        data_quality_warning: str | None = (
+            str(data_quality_warning_raw).strip()
+            if isinstance(data_quality_warning_raw, str) and data_quality_warning_raw.strip()
+            else None
+        )
+
         risk_score = normalize_risk_score(
             level=risk_level,
             confidence=confidence_value,

@@ -74,3 +74,19 @@ class NormalizedExplanation:
     #: rule_based / ONNX fallback path — there is no upstream request to
     #: correlate with there.
     model_request_id: str | None = None
+
+    # --- ADR-018 data quality contract --------------------------------
+    #: ``True`` when the inference was built from a payload containing one
+    #: or more default-filled soft fields (HRV, BP, weight, height) — the
+    #: model-api uses this flag to halve the confidence and emit a
+    #: ``data_quality_warning``. ``False`` on a fully real-vitals path.
+    is_synthetic_default: bool = False
+    #: Model-api's ``effective_confidence`` (== confidence x 0.5 when
+    #: ``is_synthetic_default`` is true, == confidence otherwise). ``None``
+    #: on the local fallback path which does not produce the quality
+    #: contract.
+    effective_confidence: float | None = None
+    #: Human-readable warning message produced by the model-api when
+    #: soft defaults were applied. ``None`` on clean records and on the
+    #: local fallback path.
+    data_quality_warning: str | None = None

@@ -127,6 +127,20 @@ class RiskPersistenceAdapter:
             defaults_applied=defaults_applied,
         )
 
+        # ADR-018 (Phase 7 S4): promote data-quality contract fields from
+        # the features JSONB blob to first-class columns. ``is_synthetic_default``
+        # is the OR of the inference flag and the ``defaults_applied`` list so
+        # the column reflects reality on the local rule-based fallback path
+        # too (where ``from_local_inference`` does not set the inference flag
+        # but the payload builder may still report defaulted soft fields).
+        is_synthetic_default = bool(inference.is_synthetic_default) or bool(
+            defaults_applied
+        )
+        # ``defaults_applied`` column stays NULL on clean records so admin
+        # queries can use ``WHERE defaults_applied IS NOT NULL`` to find
+        # synthetic-default rows. Persist as a list when non-empty.
+        defaults_applied_column = list(defaults_applied) if defaults_applied else None
+
         try:
             risk_score_row = RiskScore(
                 user_id=int(user_id),
@@ -138,6 +152,10 @@ class RiskPersistenceAdapter:
                 features=features_json,
                 model_version=inference.model_version_label,
                 algorithm=inference.backend_label,
+                is_synthetic_default=is_synthetic_default,
+                defaults_applied=defaults_applied_column,
+                effective_confidence=inference.effective_confidence,
+                data_quality_warning=inference.data_quality_warning,
             )
             db.add(risk_score_row)
             db.flush()
