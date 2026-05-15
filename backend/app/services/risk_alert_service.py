@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters import ModelApiHealthAdapter, RiskPersistenceAdapter
 from app.core.alert_constants import get_escalation_rule
+from app.exceptions import InsufficientVitalsError
 from app.models.risk_score_model import RiskScore
 from app.observability.timing import StageTimer
 from app.repositories.emergency_repository import EmergencyRepository
@@ -158,10 +159,33 @@ def _fetch_latest_vitals(db: Session, device_id: int) -> dict[str, Any] | None:
     return row_dict
 
 
+# ADR-018: critical vital fields MUST NOT be defaulted. NULL → fail-closed
+# (raise ``InsufficientVitalsError``) so the mobile app shows an honest
+# empty state instead of a fake risk score built from clinical placeholders.
+_CRITICAL_VITAL_FIELDS: tuple[str, ...] = (
+    "heart_rate",
+    "spo2",
+    "respiratory_rate",
+    "temperature",
+)
+
+
 def _build_inference_payload(
     vitals_row: dict[str, Any],
     context: dict[str, Any],
 ) -> tuple[dict[str, Any], list[str]]:
+    """Build the model-input payload + a list of soft fields that were defaulted.
+
+    Fail-closed (ADR-018) when any critical vital field is missing — raises
+    :class:`InsufficientVitalsError`. Soft fields (BP, HRV, weight, height)
+    may still be defaulted with their names appended to ``defaults_applied``.
+    """
+    missing_critical = [
+        field for field in _CRITICAL_VITAL_FIELDS if vitals_row.get(field) is None
+    ]
+    if missing_critical:
+        raise InsufficientVitalsError(missing_critical)
+
     defaults_applied: list[str] = []
 
     sys_bp = vitals_row.get("blood_pressure_sys")
@@ -190,10 +214,13 @@ def _build_inference_payload(
         defaults_applied.append("height_cm")
 
     inference_payload = {
-        "heart_rate": float(vitals_row.get("heart_rate") or 75.0),
-        "resp_rate": float(vitals_row.get("respiratory_rate") or 16.0),
-        "body_temp": float(vitals_row.get("temperature") or 36.6),
-        "spo2": float(vitals_row.get("spo2") or 98.0),
+        # Critical vitals — guaranteed non-null by the gate above, but cast
+        # to float defensively so a numeric-typed NULL surrogate (e.g.
+        # ``Decimal('0')`` from a buggy SQL aggregate) still flows through.
+        "heart_rate": float(vitals_row["heart_rate"]),
+        "resp_rate": float(vitals_row["respiratory_rate"]),
+        "body_temp": float(vitals_row["temperature"]),
+        "spo2": float(vitals_row["spo2"]),
         "sys_bp": float(sys_bp),
         "dia_bp": float(dia_bp),
         "age": _derive_age(context.get("date_of_birth")),

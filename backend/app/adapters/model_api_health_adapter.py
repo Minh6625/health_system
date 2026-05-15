@@ -93,12 +93,34 @@ class ModelApiHealthAdapter:
         sys_bp = _get_or_default("systolic_blood_pressure", "sys_bp", 120.0)
         dia_bp = _get_or_default("diastolic_blood_pressure", "dia_bp", 80.0)
 
-        height_cm = float(payload.get("height_cm") or 165.0)
+        # ADR-018: soft fields — track defaults so the model-api response
+        # surfaces a complete ``defaults_applied`` list. HRV default aligned
+        # to 40.0 to match :func:`risk_alert_service._build_inference_payload`
+        # (drift between the two layers was a HS-024 symptom).
+        height_cm_raw = payload.get("height_cm")
+        if height_cm_raw is None or height_cm_raw == "":
+            defaults_applied.append("height_cm")
+            height_cm = 165.0
+        else:
+            height_cm = float(height_cm_raw)
         height_m = height_cm / 100.0 if height_cm > 3.5 else height_cm
         if height_m <= 0:
             height_m = 1.65
-        weight_kg = float(payload.get("weight_kg") or 65.0)
-        hrv = float(payload.get("hrv") or 50.0)
+
+        weight_kg_raw = payload.get("weight_kg")
+        if weight_kg_raw is None or weight_kg_raw == "":
+            defaults_applied.append("weight_kg")
+            weight_kg = 65.0
+        else:
+            weight_kg = float(weight_kg_raw)
+
+        hrv_raw = payload.get("hrv")
+        if hrv_raw is None or hrv_raw == "":
+            defaults_applied.append("hrv")
+            hrv = 40.0
+        else:
+            hrv = float(hrv_raw)
+
         gender_norm = str(payload.get("gender") or "").strip().lower()
         gender_int = 1 if gender_norm in {"m", "male", "man", "nam", "1", "true"} else 0
 
