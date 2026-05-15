@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 
-from sqlalchemy import Index, String, DateTime, Integer, ForeignKey, Numeric, CheckConstraint
+from sqlalchemy import Boolean, Index, String, DateTime, Integer, ForeignKey, Numeric, CheckConstraint, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -51,6 +51,18 @@ class RiskScore(Base):
     # Model metadata
     model_version: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     algorithm: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+
+    # ADR-018 data quality contract (Phase 7 S4) — promoted from features
+    # JSONB blob to first-class columns so the admin dashboard, retraining
+    # pipelines and audit reports can query them without parsing JSON.
+    is_synthetic_default: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false",
+    )
+    defaults_applied: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+    effective_confidence: Mapped[Optional[float]] = mapped_column(
+        Numeric(5, 4), nullable=True,
+    )
+    data_quality_warning: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Timestamps
     created_at: Mapped[Optional[datetime]] = mapped_column(
