@@ -1,4 +1,4 @@
-"""HTTP tests for ``POST /mobile/telemetry/sleep-risk`` (Phase 4A-thin).
+"""HTTP tests for ``POST /api/v1/mobile/telemetry/sleep-risk`` (Phase 4A-thin).
 
 Mirrors the IMU window route tests (Phase 4B-thin) one-for-one:
 
@@ -41,7 +41,7 @@ _INTERNAL_HEADERS = {"X-Internal-Service": "iot-simulator"}
 
 def _build_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     app = FastAPI()
-    app.include_router(telemetry_router, prefix="/mobile")
+    app.include_router(telemetry_router, prefix="/api/v1/mobile")
 
     captured_persist: dict[str, Any] = {"called": False, "kwargs": {}}
 
@@ -173,7 +173,7 @@ class TestSleepRiskHappyPath:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/sleep-risk",
+                "/api/v1/mobile/telemetry/sleep-risk",
                 json={
                     "db_device_id": 7,
                     "db_user_id": 42,
@@ -226,7 +226,7 @@ class TestSleepRiskHappyPath:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/sleep-risk",
+                "/api/v1/mobile/telemetry/sleep-risk",
                 json={
                     "db_device_id": 7,
                     "db_user_id": 42,
@@ -263,7 +263,7 @@ class TestSleepRiskModelUnavailable:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/sleep-risk",
+                "/api/v1/mobile/telemetry/sleep-risk",
                 json={
                     "db_device_id": 7,
                     "db_user_id": 42,
@@ -304,7 +304,7 @@ class TestSleepRiskSchemaValidation:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/sleep-risk",
+                "/api/v1/mobile/telemetry/sleep-risk",
                 json={
                     "db_device_id": 7,
                     "db_user_id": 42,
@@ -324,7 +324,7 @@ class TestSleepRiskSchemaValidation:
 
         with TestClient(app) as client:
             response = client.post(
-                "/mobile/telemetry/sleep-risk",
+                "/api/v1/mobile/telemetry/sleep-risk",
                 json={
                     "db_device_id": 7,
                     # db_user_id intentionally omitted

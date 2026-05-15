@@ -71,7 +71,7 @@ def _build_test_client(
     profile ids raise 403 just like the real ``get_target_profile_id``.
     """
     app = FastAPI()
-    app.include_router(fall_events_router, prefix="/mobile")
+    app.include_router(fall_events_router, prefix="/api/v1/mobile")
 
     overrides = target_profile_overrides or {}
 
@@ -118,7 +118,7 @@ class TestListFallEvents:
         monkeypatch.setattr(FallEventService, "list_for_user", _fake_list)
         client = _build_test_client()
 
-        response = client.get("/mobile/fall-events")
+        response = client.get("/api/v1/mobile/fall-events")
 
         assert response.status_code == 200, response.text
         body = response.json()
@@ -141,7 +141,7 @@ class TestListFallEvents:
         monkeypatch.setattr(FallEventService, "list_for_user", _fake_list)
         client = _build_test_client()
 
-        response = client.get("/mobile/fall-events?limit=5&offset=15")
+        response = client.get("/api/v1/mobile/fall-events?limit=5&offset=15")
         assert response.status_code == 200
         assert captured == {"limit": 5, "offset": 15}
 
@@ -157,7 +157,7 @@ class TestListFallEvents:
         monkeypatch.setattr(FallEventService, "list_for_user", _fake_list)
         client = _build_test_client()
 
-        response = client.get("/mobile/fall-events?limit=500")
+        response = client.get("/api/v1/mobile/fall-events?limit=500")
         assert response.status_code == 422
         assert called["hit"] is False
 
@@ -176,7 +176,7 @@ class TestListFallEvents:
         client = _build_test_client(target_profile_overrides={99: 99})
 
         response = client.get(
-            "/mobile/fall-events",
+            "/api/v1/mobile/fall-events",
             headers={"X-Target-Profile-Id": "99"},
         )
         assert response.status_code == 200, response.text
@@ -186,7 +186,7 @@ class TestListFallEvents:
         # No override -> the stub raises 403 just like the real auth flow.
         client = _build_test_client()
         response = client.get(
-            "/mobile/fall-events",
+            "/api/v1/mobile/fall-events",
             headers={"X-Target-Profile-Id": "999"},
         )
         assert response.status_code == 403
@@ -205,7 +205,7 @@ class TestGetFallEventDetail:
         monkeypatch.setattr(FallEventService, "get_for_user", _fake_get)
         client = _build_test_client()
 
-        response = client.get("/mobile/fall-events/17")
+        response = client.get("/api/v1/mobile/fall-events/17")
         assert response.status_code == 200
         body = response.json()
         assert body["id"] == 17
@@ -220,7 +220,7 @@ class TestGetFallEventDetail:
         monkeypatch.setattr(FallEventService, "get_for_user", _fake_get)
         client = _build_test_client()
 
-        response = client.get("/mobile/fall-events/9999")
+        response = client.get("/api/v1/mobile/fall-events/9999")
         assert response.status_code == 404
         assert response.json()["detail"] == "Không tìm thấy sự kiện ngã"
 
@@ -236,7 +236,7 @@ class TestGetFallEventDetail:
         client = _build_test_client(target_profile_overrides={42: 42})
 
         response = client.get(
-            "/mobile/fall-events/100",
+            "/api/v1/mobile/fall-events/100",
             headers={"X-Target-Profile-Id": "42"},
         )
         assert response.status_code == 200
@@ -268,7 +268,7 @@ class TestDismissFallEvent:
         client = _build_test_client()
 
         response = client.post(
-            "/mobile/fall-events/17/dismiss",
+            "/api/v1/mobile/fall-events/17/dismiss",
             json={"reason": "Tôi ổn"},
         )
         assert response.status_code == 200, response.text
@@ -292,7 +292,7 @@ class TestDismissFallEvent:
         monkeypatch.setattr(FallEventService, "dismiss", _fake_dismiss)
         client = _build_test_client()
 
-        response = client.post("/mobile/fall-events/17/dismiss")
+        response = client.post("/api/v1/mobile/fall-events/17/dismiss")
         assert response.status_code == 200
         # No body -> reason should be None.
         assert captured == {"reason": None}
@@ -304,7 +304,7 @@ class TestDismissFallEvent:
         monkeypatch.setattr(FallEventService, "dismiss", _fake_dismiss)
         client = _build_test_client()
 
-        response = client.post("/mobile/fall-events/9999/dismiss")
+        response = client.post("/api/v1/mobile/fall-events/9999/dismiss")
         assert response.status_code == 404
 
     def test_reason_too_long_is_validation_error(self, monkeypatch) -> None:
@@ -319,7 +319,7 @@ class TestDismissFallEvent:
         client = _build_test_client()
 
         response = client.post(
-            "/mobile/fall-events/17/dismiss",
+            "/api/v1/mobile/fall-events/17/dismiss",
             json={"reason": "x" * 300},
         )
         assert response.status_code == 422

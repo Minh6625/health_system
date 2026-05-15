@@ -2,9 +2,9 @@
 
 Pins the JSON keys exposed to the Flutter app by:
 
-- ``GET  /mobile/analysis/risk-reports``        (``RiskReportResponse[]``)
-- ``GET  /mobile/analysis/risk-reports/{id}``   (``RiskReportDetailResponse``)
-- ``GET  /mobile/analysis/risk-history``        (``RiskHistoryResponse``)
+- ``GET  /api/v1/mobile/analysis/risk-reports``        (``RiskReportResponse[]``)
+- ``GET  /api/v1/mobile/analysis/risk-reports/{id}``   (``RiskReportDetailResponse``)
+- ``GET  /api/v1/mobile/analysis/risk-history``        (``RiskHistoryResponse``)
 
 The point of this test is **not** to validate logic — that lives in
 ``test_monitoring_service_contract.py`` and ``test_shap_explanation_contract.py``.

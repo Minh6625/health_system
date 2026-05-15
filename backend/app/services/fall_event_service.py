@@ -2,8 +2,8 @@
 
 Phase 4B-full slice 2c. The Flutter ``fall_alert_screen`` and
 ``fall_history_screen`` call into this service via three routes
-(``GET /mobile/fall-events``, ``GET /mobile/fall-events/{id}``,
-``POST /mobile/fall-events/{id}/dismiss``).
+(``GET /api/v1/mobile/fall-events``, ``GET /api/v1/mobile/fall-events/{id}``,
+``POST /api/v1/mobile/fall-events/{id}/dismiss``).
 
 The service owns three concerns:
 

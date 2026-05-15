@@ -64,19 +64,18 @@ RISK_CONTRACT_VERSION: Final[str] = "0.5.0"
 #: only; auth, vitals ingestion and notification routes are not part of
 #: it and bumping them would be a category error.
 #:
-#: Note that ``/health-report`` is mounted under ``/mobile/metrics/``
+#: Note that ``/health-report`` is mounted under ``/api/v1/mobile/metrics/``
 #: (it is a snapshot of the latest vitals + the latest risk score),
 #: while ``/risk-reports``, ``/risk-reports/{id}`` and ``/risk-history``
-#: live under ``/mobile/analysis/``.
+#: live under ``/api/v1/mobile/analysis/``.
+#:
+#: ADR-021 post-execution: only the canonical ``/api/v1/mobile/...`` prefix
+#: is served (the FastAPI ``root_path`` magic has been removed so both
+#: production and TestClient see the same path).
 RISK_CONTRACT_ROUTE_PREFIXES: Final[tuple[str, ...]] = (
     "/api/v1/mobile/analysis/risk-reports",
     "/api/v1/mobile/analysis/risk-history",
     "/api/v1/mobile/metrics/health-report",
-    # Without ``root_path`` (e.g. when FastAPI is mounted directly during
-    # tests): the bare ``/mobile/...`` prefix.
-    "/mobile/analysis/risk-reports",
-    "/mobile/analysis/risk-history",
-    "/mobile/metrics/health-report",
 )
 
 

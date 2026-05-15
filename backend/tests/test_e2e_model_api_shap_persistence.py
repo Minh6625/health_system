@@ -66,7 +66,7 @@ def _model_api_alive() -> bool:
 
 def _backend_alive() -> bool:
     try:
-        response = httpx.get(f"{BACKEND_URL}/mobile/health", timeout=2.0)
+        response = httpx.get(f"{BACKEND_URL}/api/v1/mobile/health", timeout=2.0)
     except Exception:
         return False
     return response.status_code == 200
@@ -93,7 +93,7 @@ def _ingest_critical_vitals() -> dict:
         ]
     }
     response = httpx.post(
-        f"{BACKEND_URL}/mobile/telemetry/ingest", json=payload, timeout=15.0
+        f"{BACKEND_URL}/api/v1/mobile/telemetry/ingest", json=payload, timeout=15.0
     )
     response.raise_for_status()
     return response.json()

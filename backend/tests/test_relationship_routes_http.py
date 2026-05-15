@@ -24,7 +24,7 @@ from app.services.relationship_service import RelationshipService
 
 def _build_test_app(*, user_id: int = 7) -> FastAPI:
     app = FastAPI()
-    app.include_router(relationships_router, prefix="/mobile")
+    app.include_router(relationships_router, prefix="/api/v1/mobile")
 
     def _override_current_user():
         return SimpleNamespace(
@@ -120,7 +120,7 @@ def test_detail_route_declares_typed_response_model(monkeypatch) -> None:
     )
 
     with _serve_test_app(user_id=42) as client:
-        response = client.get("/mobile/relationships/77/detail")
+        response = client.get("/api/v1/mobile/relationships/77/detail")
 
     assert route.response_model is LinkedContactDetailResponse
     assert response.status_code == 200
@@ -141,7 +141,7 @@ def test_get_access_profiles_passes_current_user(monkeypatch) -> None:
     )
 
     with _serve_test_app(user_id=42) as client:
-        response = client.get("/mobile/access-profiles")
+        response = client.get("/api/v1/mobile/access-profiles")
 
     assert response.status_code == 200
     assert response.json() == []
@@ -196,7 +196,7 @@ def test_request_relationship_passes_payload(monkeypatch) -> None:
 
     with _serve_test_app(user_id=18) as client:
         response = client.post(
-            "/mobile/relationships/request",
+            "/api/v1/mobile/relationships/request",
             json={
                 "target_user_id": 7,
                 "relationship_type": "family",
@@ -252,7 +252,7 @@ def test_medical_info_route_returns_payload_when_permission_granted(monkeypatch)
     )
 
     with _serve_test_app(user_id=42) as client:
-        response = client.get("/mobile/relationships/77/medical-info")
+        response = client.get("/api/v1/mobile/relationships/77/medical-info")
 
     assert route.response_model is LinkedContactMedicalInfoResponse
     assert response.status_code == 200
@@ -279,7 +279,7 @@ def test_medical_info_route_returns_403_when_permission_denied(monkeypatch) -> N
     )
 
     with _serve_test_app(user_id=42) as client:
-        response = client.get("/mobile/relationships/77/medical-info")
+        response = client.get("/api/v1/mobile/relationships/77/medical-info")
 
     assert response.status_code == 403
     body = response.json()
@@ -302,7 +302,7 @@ def test_medical_info_route_returns_404_when_no_relationship(monkeypatch) -> Non
     )
 
     with _serve_test_app(user_id=42) as client:
-        response = client.get("/mobile/relationships/999/medical-info")
+        response = client.get("/api/v1/mobile/relationships/999/medical-info")
 
     assert response.status_code == 404
     assert "Không tìm thấy" in response.json()["detail"]
@@ -323,7 +323,7 @@ def test_delete_relationship_returns_204(monkeypatch) -> None:
     )
 
     with _serve_test_app(user_id=9) as client:
-        response = client.delete("/mobile/relationships/77")
+        response = client.delete("/api/v1/mobile/relationships/77")
 
     assert route.status_code == 204
     assert response.status_code == 204

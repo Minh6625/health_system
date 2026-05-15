@@ -650,7 +650,7 @@ def ingest_imu_window(
     3. On a successful prediction, ``FallPersistenceAdapter.persist``
        writes one ``fall_events`` row and the response carries the new
        ``fall_event_id`` so the caller can later POST
-       ``/mobile/telemetry/alert`` with that id for SOS escalation.
+       ``/api/v1/mobile/telemetry/alert`` with that id for SOS escalation.
     4. On breaker-open / network failure / 5xx (anything that makes
        ``predict_fall`` return ``None``), **no row is written**. Falsely
        claiming "no fall" is dangerous (false-negative on a real fall)

@@ -25,13 +25,9 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(
     title="Health Guard - Mobile Backend",
     version="0.1.0",
-    root_path="/api/v1",
     docs_url="/mobile-docs",
     redoc_url="/mobile-redoc",
     openapi_url="/mobile-openapi.json",
-    servers=[
-        {"url": "/api/v1", "description": "API v1"},
-    ]
 )
 
 app.add_middleware(

@@ -756,7 +756,7 @@ class MonitoringService:
     ) -> VitalsTimeseriesResponse:
         """Return downsampled vitals time-series for the chart UI.
 
-        F-12 (M-6) — backs the new ``GET /mobile/metrics/vitals/timeseries``
+        F-12 (M-6) — backs the new ``GET /api/v1/mobile/metrics/vitals/timeseries``
         endpoint. The mobile ``vital_detail_screen.dart`` previously
         rendered an "EmptyChartPlaceholder" because
         :attr:`VitalSignsProvider.chartData` was hardcoded to ``const []``.

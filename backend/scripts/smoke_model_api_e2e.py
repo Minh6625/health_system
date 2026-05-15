@@ -1,7 +1,7 @@
 """End-to-end smoke for the new model-api + SHAP persistence path.
 
 Workflow:
-  1. POST /mobile/telemetry/ingest for the seeded patient device (id=51).
+  1. POST /api/v1/mobile/telemetry/ingest for the seeded patient device (id=51).
   2. Backend pipeline -> calculate_device_risk -> ModelApiClient.predict_health_risk
      -> healthguard-model-api (LightGBM + SHAP) at :8001.
   3. Query the latest risk_scores + risk_explanations rows to assert that the
@@ -57,7 +57,7 @@ def _ingest_vitals() -> None:
     }
     print("== ingest vitals ==")
     response = httpx.post(
-        f"{BACKEND_URL}/mobile/telemetry/ingest", json=payload, timeout=15.0
+        f"{BACKEND_URL}/api/v1/mobile/telemetry/ingest", json=payload, timeout=15.0
     )
     print("status:", response.status_code)
     print("body:  ", response.json())

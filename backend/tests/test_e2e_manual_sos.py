@@ -324,13 +324,13 @@ def test_manual_sos_round_trip_persists_lists_details_and_resolves(
 
     with httpx.Client(base_url=backend_base_url, timeout=20.0) as client:
         unauthorized = client.post(
-            "/mobile/emergency/sos/trigger",
+            "/api/v1/mobile/emergency/sos/trigger",
             json={"trigger_type": "manual"},
         )
         assert unauthorized.status_code in {401, 403}
 
         trigger_response = client.post(
-            "/mobile/emergency/sos/trigger",
+            "/api/v1/mobile/emergency/sos/trigger",
             headers=_auth_headers(user_id=patient_id),
             json={
                 "trigger_type": "manual",
@@ -382,7 +382,7 @@ def test_manual_sos_round_trip_persists_lists_details_and_resolves(
             assert "SOS" in caregiver_alert["title"]
 
         list_response = client.get(
-            "/mobile/emergency/caregiver/sos-alerts",
+            "/api/v1/mobile/emergency/caregiver/sos-alerts",
             headers=_auth_headers(user_id=caregiver_id),
             params={"status": "active"},
         )
@@ -395,7 +395,7 @@ def test_manual_sos_round_trip_persists_lists_details_and_resolves(
         assert matched_list_item["status"] == "active"
 
         detail_response = client.get(
-            f"/mobile/emergency/sos/{sos_id}",
+            f"/api/v1/mobile/emergency/sos/{sos_id}",
             headers=_auth_headers(user_id=caregiver_id),
         )
         assert detail_response.status_code == 200, detail_response.text
@@ -404,7 +404,7 @@ def test_manual_sos_round_trip_persists_lists_details_and_resolves(
         assert detail_body["status"] == "active"
 
         resolve_response = client.post(
-            f"/mobile/emergency/sos/{sos_id}/resolve",
+            f"/api/v1/mobile/emergency/sos/{sos_id}/resolve",
             headers=_auth_headers(user_id=caregiver_id),
             json={
                 "resolution_status": "safe",
@@ -415,7 +415,7 @@ def test_manual_sos_round_trip_persists_lists_details_and_resolves(
         assert resolve_response.json()["success"] is True
 
         resolved_detail = client.get(
-            f"/mobile/emergency/sos/{sos_id}",
+            f"/api/v1/mobile/emergency/sos/{sos_id}",
             headers=_auth_headers(user_id=caregiver_id),
         )
         assert resolved_detail.status_code == 200, resolved_detail.text
@@ -425,7 +425,7 @@ def test_manual_sos_round_trip_persists_lists_details_and_resolves(
         assert resolved_body["resolution"]["notes"] == "Manual SOS E2E resolved"
 
         resolved_list = client.get(
-            "/mobile/emergency/caregiver/sos-alerts",
+            "/api/v1/mobile/emergency/caregiver/sos-alerts",
             headers=_auth_headers(user_id=caregiver_id),
             params={"status": "resolved"},
         )

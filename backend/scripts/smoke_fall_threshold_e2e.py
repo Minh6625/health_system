@@ -1,7 +1,7 @@
 """End-to-end smoke for the new fall confidence-threshold gate (P0 #1).
 
 Workflow:
-  1. POST /mobile/telemetry/alert with event_type=fall_detected at high
+  1. POST /api/v1/mobile/telemetry/alert with event_type=fall_detected at high
      confidence (0.92) -> backend creates FallEvent + escalates to SOS.
   2. POST same endpoint with low confidence (0.40) -> backend creates
      FallEvent + soft Alert (alert_type=fall_detection, severity=high) but
@@ -50,7 +50,7 @@ def _post_fall(*, confidence: float, label: str) -> dict:
     }
     print(f"\n== POST /telemetry/alert (confidence={confidence}) ==")
     response = httpx.post(
-        f"{BACKEND_URL}/mobile/telemetry/alert", json=payload, timeout=15.0
+        f"{BACKEND_URL}/api/v1/mobile/telemetry/alert", json=payload, timeout=15.0
     )
     print("status:", response.status_code)
     body = response.json()

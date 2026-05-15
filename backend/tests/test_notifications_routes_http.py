@@ -15,7 +15,7 @@ from app.services.notification_service import NotificationService
 
 def _build_test_client(*, user_id: int = 7) -> TestClient:
     app = FastAPI()
-    app.include_router(notifications_router, prefix="/mobile")
+    app.include_router(notifications_router, prefix="/api/v1/mobile")
 
     def _override_current_user():
         return SimpleNamespace(id=user_id, role="user", is_active=True)
@@ -72,7 +72,7 @@ def test_get_notifications_passes_query_params_and_current_user(
         staticmethod(_list_notifications),
     )
 
-    response = client.get("/mobile/notifications?limit=10&offset=20&unread_only=true")
+    response = client.get("/api/v1/mobile/notifications?limit=10&offset=20&unread_only=true")
 
     assert response.status_code == 200
     assert response.json()["unread_count"] == 1
@@ -92,7 +92,7 @@ def test_get_notification_detail_returns_404_when_missing(monkeypatch) -> None:
         staticmethod(lambda db, user_id, notification_id: None),
     )
 
-    response = client.get("/mobile/notifications/91")
+    response = client.get("/api/v1/mobile/notifications/91")
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Notification not found"
@@ -119,7 +119,7 @@ def test_get_notification_detail_returns_notification_payload(
         staticmethod(_get_notification_detail),
     )
 
-    response = client.get("/mobile/notifications/91")
+    response = client.get("/api/v1/mobile/notifications/91")
 
     assert response.status_code == 200
     assert response.json()["id"] == 91
@@ -150,7 +150,7 @@ def test_mark_notification_as_read_returns_read_at(monkeypatch) -> None:
         staticmethod(_mark_notification_as_read),
     )
 
-    response = client.put("/mobile/notifications/91/read", json={})
+    response = client.put("/api/v1/mobile/notifications/91/read", json={})
 
     assert response.status_code == 200
     assert response.json()["notification_id"] == 91
@@ -190,7 +190,7 @@ def test_upsert_push_token_uses_current_user(monkeypatch) -> None:
     )
 
     response = client.post(
-        "/mobile/notifications/push-token",
+        "/api/v1/mobile/notifications/push-token",
         json={
             "token": "a" * 32,
             "platform": "android",
@@ -205,7 +205,7 @@ def test_upsert_push_token_uses_current_user(monkeypatch) -> None:
 
 def test_unregister_push_token_does_not_require_current_user(monkeypatch) -> None:
     app = FastAPI()
-    app.include_router(notifications_router, prefix="/mobile")
+    app.include_router(notifications_router, prefix="/api/v1/mobile")
 
     def _override_db():
         yield object()
@@ -224,7 +224,7 @@ def test_unregister_push_token_does_not_require_current_user(monkeypatch) -> Non
     )
 
     response = client.post(
-        "/mobile/notifications/push-token/unregister",
+        "/api/v1/mobile/notifications/push-token/unregister",
         json={"token": "b" * 32},
     )
 

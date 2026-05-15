@@ -37,7 +37,7 @@ def authed_headers():
 class TestSleepEndpointAuth:
     def test_sleep_rejects_no_header(self, client):
         resp = client.post(
-            "/mobile/telemetry/sleep",
+            "/api/v1/mobile/telemetry/sleep",
             json={"db_device_id": 1, "user_id": 1, "date": "2026-05-14"},
         )
         # Should be 401 or 403 (depends on require_internal_service impl)
@@ -45,7 +45,7 @@ class TestSleepEndpointAuth:
 
     def test_sleep_rejects_wrong_header(self, client):
         resp = client.post(
-            "/mobile/telemetry/sleep",
+            "/api/v1/mobile/telemetry/sleep",
             json={"db_device_id": 1, "user_id": 1, "date": "2026-05-14"},
             headers={"X-Internal-Service": "wrong-service"},
         )
@@ -55,7 +55,7 @@ class TestSleepEndpointAuth:
 class TestImuWindowEndpointAuth:
     def test_imu_window_rejects_no_header(self, client):
         resp = client.post(
-            "/mobile/telemetry/imu-window",
+            "/api/v1/mobile/telemetry/imu-window",
             json={"device_id": "dev1", "data": []},
         )
         assert resp.status_code in (401, 403)
@@ -64,7 +64,7 @@ class TestImuWindowEndpointAuth:
 class TestSleepRiskEndpointAuth:
     def test_sleep_risk_rejects_no_header(self, client):
         resp = client.post(
-            "/mobile/telemetry/sleep-risk",
+            "/api/v1/mobile/telemetry/sleep-risk",
             json={"device_id": "dev1", "records": []},
         )
         assert resp.status_code in (401, 403)

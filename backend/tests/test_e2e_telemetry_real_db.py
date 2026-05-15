@@ -290,7 +290,7 @@ def _seed_sleep_session(
     }
 
     with httpx.Client(timeout=10.0) as client:
-        return client.post(f"{backend_base_url}/mobile/telemetry/sleep", json=payload)
+        return client.post(f"{backend_base_url}/api/v1/mobile/telemetry/sleep", json=payload)
 
 
 def test_vital_ingest_persists_to_postgres(
@@ -321,7 +321,7 @@ def test_vital_ingest_persists_to_postgres(
     }
 
     with httpx.Client(timeout=10.0) as client:
-        response = client.post(f"{backend_base_url}/mobile/telemetry/ingest", json=payload)
+        response = client.post(f"{backend_base_url}/api/v1/mobile/telemetry/ingest", json=payload)
 
     assert response.status_code == 200, response.text
     assert response.json() == {"ingested": 1, "errors": []}
@@ -440,9 +440,9 @@ def test_sleep_metrics_latest_and_history_require_auth_and_return_canonical_fiel
 
     headers = _auth_headers(user_id=temp_device["user_id"])
     with httpx.Client(timeout=10.0, headers=headers) as client:
-        latest_response = client.get(f"{backend_base_url}/mobile/metrics/sleep/latest")
+        latest_response = client.get(f"{backend_base_url}/api/v1/mobile/metrics/sleep/latest")
         history_response = client.get(
-            f"{backend_base_url}/mobile/metrics/sleep/history",
+            f"{backend_base_url}/api/v1/mobile/metrics/sleep/history",
             params={"from_date": today.isoformat(), "to_date": today.isoformat()},
         )
 
@@ -485,7 +485,7 @@ def test_sleep_metrics_linked_profile_requires_relationship(
         target_profile_id=temp_device["user_id"],
     )
     with httpx.Client(timeout=10.0, headers=headers) as client:
-        forbidden_response = client.get(f"{backend_base_url}/mobile/metrics/sleep/latest")
+        forbidden_response = client.get(f"{backend_base_url}/api/v1/mobile/metrics/sleep/latest")
 
     assert forbidden_response.status_code == 403, forbidden_response.text
 
@@ -520,9 +520,9 @@ def test_sleep_metrics_linked_profile_requires_relationship(
         )
 
     with httpx.Client(timeout=10.0, headers=headers) as client:
-        latest_response = client.get(f"{backend_base_url}/mobile/metrics/sleep/latest")
+        latest_response = client.get(f"{backend_base_url}/api/v1/mobile/metrics/sleep/latest")
         history_response = client.get(
-            f"{backend_base_url}/mobile/metrics/sleep/history",
+            f"{backend_base_url}/api/v1/mobile/metrics/sleep/history",
             params={"from_date": today.isoformat(), "to_date": today.isoformat()},
         )
 

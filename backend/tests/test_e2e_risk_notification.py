@@ -2,7 +2,7 @@ r"""
 E2E tests for the risk notification pipeline (Threshold 2).
 
 Verifies the full flow:
-  POST /mobile/risk/calculate  ->  RiskScore saved  ->  Alert rows created
+  POST /api/v1/mobile/risk/calculate  ->  RiskScore saved  ->  Alert rows created
 
 Prerequisites:
   - Live Postgres with health_system schema (users, devices, vitals, alerts, risk_scores)
@@ -114,7 +114,7 @@ def backend_base_url() -> Iterator[str]:
     # Wait for the server to be ready
     for _ in range(40):
         try:
-            resp = httpx.get(f"{base_url}/mobile/health", timeout=1.0)
+            resp = httpx.get(f"{base_url}/api/v1/mobile/health", timeout=1.0)
             if resp.status_code == 200:
                 break
         except (httpx.ConnectError, httpx.ReadTimeout, httpx.ConnectTimeout):
@@ -176,9 +176,9 @@ class TestRiskNotificationE2E:
         backend_base_url: str,
         test_device_info: dict,
     ) -> None:
-        """POST /mobile/risk/calculate returns a valid risk score response."""
+        """POST /api/v1/mobile/risk/calculate returns a valid risk score response."""
         resp = httpx.post(
-            f"{backend_base_url}/mobile/risk/calculate",
+            f"{backend_base_url}/api/v1/mobile/risk/calculate",
             json={"device_id": test_device_info["device_id"]},
             headers={"X-Internal-Service": "iot-simulator"},
             timeout=15.0,
@@ -197,7 +197,7 @@ class TestRiskNotificationE2E:
         test_device_info: dict,
         engine: Engine,
     ) -> None:
-        """After /mobile/risk/calculate, the risk_scores table has a new row."""
+        """After /api/v1/mobile/risk/calculate, the risk_scores table has a new row."""
         # Record count before
         with engine.connect() as conn:
             before_count = conn.execute(
@@ -209,7 +209,7 @@ class TestRiskNotificationE2E:
 
         # Trigger risk calculation
         resp = httpx.post(
-            f"{backend_base_url}/mobile/risk/calculate",
+            f"{backend_base_url}/api/v1/mobile/risk/calculate",
             json={"device_id": test_device_info["device_id"]},
             headers={"X-Internal-Service": "iot-simulator"},
             timeout=15.0,
@@ -255,7 +255,7 @@ class TestRiskNotificationE2E:
 
         # Trigger risk calculation
         resp = httpx.post(
-            f"{backend_base_url}/mobile/risk/calculate",
+            f"{backend_base_url}/api/v1/mobile/risk/calculate",
             json={"device_id": device_id},
             headers={"X-Internal-Service": "iot-simulator"},
             timeout=15.0,
@@ -331,7 +331,7 @@ class TestRiskNotificationE2E:
 
         # First call
         resp1 = httpx.post(
-            f"{backend_base_url}/mobile/risk/calculate",
+            f"{backend_base_url}/api/v1/mobile/risk/calculate",
             json={"device_id": device_id},
             headers={"X-Internal-Service": "iot-simulator"},
             timeout=15.0,
@@ -362,7 +362,7 @@ class TestRiskNotificationE2E:
 
         # Second call immediately (should hit cooldown for ALERT, not for risk calc)
         resp2 = httpx.post(
-            f"{backend_base_url}/mobile/risk/calculate",
+            f"{backend_base_url}/api/v1/mobile/risk/calculate",
             json={"device_id": device_id},
             headers={"X-Internal-Service": "iot-simulator"},
             timeout=15.0,
@@ -394,7 +394,7 @@ class TestRiskNotificationE2E:
     ) -> None:
         """Without auth or X-Internal-Service header, the request is rejected."""
         resp = httpx.post(
-            f"{backend_base_url}/mobile/risk/calculate",
+            f"{backend_base_url}/api/v1/mobile/risk/calculate",
             json={"device_id": test_device_info["device_id"]},
             timeout=10.0,
         )

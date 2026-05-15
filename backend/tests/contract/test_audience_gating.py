@@ -1,6 +1,6 @@
 """Phase 5 contract tests — audience profile + clinician role gate.
 
-Pins three guarantees on ``GET /mobile/analysis/risk-reports/{id}``:
+Pins three guarantees on ``GET /api/v1/mobile/analysis/risk-reports/{id}``:
 
 1. **Default is patient.** A request with no ``audience=`` query param
    returns the existing :class:`RiskReportDetailResponse` shape, with

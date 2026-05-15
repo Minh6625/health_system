@@ -14,7 +14,7 @@ from app.api.routes.risk import router as risk_router
 from app.api.routes.settings import router as settings_router
 from app.api.routes.telemetry import router as telemetry_router
 
-api_router = APIRouter(prefix="/mobile")
+api_router = APIRouter(prefix="/api/v1/mobile")
 api_router.include_router(health_router)
 api_router.include_router(auth_router)
 api_router.include_router(emergency_router)

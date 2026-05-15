@@ -71,7 +71,7 @@ class SleepRecord(BaseModel):
 
 
 class SleepRiskRequest(BaseModel):
-    """Body for ``POST /mobile/telemetry/sleep-risk``.
+    """Body for ``POST /api/v1/mobile/telemetry/sleep-risk``.
 
     Adds the backend-only fields (``db_device_id``, ``db_user_id``) that
     the model-api doesn't need but that the persistence layer requires

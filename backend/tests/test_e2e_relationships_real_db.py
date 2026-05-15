@@ -711,7 +711,7 @@ def test_request_accept_update_delete_round_trip(
     async def _exercise() -> None:
         async with _build_async_client() as client:
             search_response = await client.get(
-                "/mobile/relationships/search",
+                "/api/v1/mobile/relationships/search",
                 headers=_auth_headers(user_id=caregiver_id),
                 params={"query": searchable_email},
             )
@@ -719,7 +719,7 @@ def test_request_accept_update_delete_round_trip(
             assert search_response.json()[0]["connection_status"] == "none"
 
             request_response = await client.post(
-                "/mobile/relationships/request",
+                "/api/v1/mobile/relationships/request",
                 headers=_auth_headers(user_id=caregiver_id),
                 json={
                     "target_user_id": searchable_user_id,
@@ -732,7 +732,7 @@ def test_request_accept_update_delete_round_trip(
             relationship_id = int(request_response.json()["id"])
 
             duplicate_response = await client.post(
-                "/mobile/relationships/request",
+                "/api/v1/mobile/relationships/request",
                 headers=_auth_headers(user_id=caregiver_id),
                 json={
                     "target_user_id": searchable_user_id,
@@ -742,14 +742,14 @@ def test_request_accept_update_delete_round_trip(
             assert duplicate_response.status_code == 400
 
             self_response = await client.post(
-                "/mobile/relationships/request",
+                "/api/v1/mobile/relationships/request",
                 headers=_auth_headers(user_id=caregiver_id),
                 json={"target_user_id": caregiver_id},
             )
             assert self_response.status_code == 400
 
             accept_response = await client.post(
-                "/mobile/relationships/accept",
+                "/api/v1/mobile/relationships/accept",
                 headers=_auth_headers(user_id=searchable_user_id),
                 json={"relationship_id": relationship_id},
             )
@@ -757,7 +757,7 @@ def test_request_accept_update_delete_round_trip(
             assert accept_response.json()["status"] == "accepted"
 
             update_response = await client.put(
-                f"/mobile/relationships/{relationship_id}",
+                f"/api/v1/mobile/relationships/{relationship_id}",
                 headers=_auth_headers(user_id=searchable_user_id),
                 json={
                     "can_view_vitals": True,
@@ -772,13 +772,13 @@ def test_request_accept_update_delete_round_trip(
             assert update_response.json()["can_view_location"] is True
 
             delete_response = await client.delete(
-                f"/mobile/relationships/{relationship_id}",
+                f"/api/v1/mobile/relationships/{relationship_id}",
                 headers=_auth_headers(user_id=searchable_user_id),
             )
             assert delete_response.status_code == 204
 
             search_after_delete = await client.get(
-                "/mobile/relationships/search",
+                "/api/v1/mobile/relationships/search",
                 headers=_auth_headers(user_id=caregiver_id),
                 params={"query": searchable_email},
             )
@@ -801,7 +801,7 @@ def test_access_profiles_and_dashboard_use_real_data(
     async def _exercise() -> None:
         async with _build_async_client() as client:
             access_response = await client.get(
-                "/mobile/access-profiles",
+                "/api/v1/mobile/access-profiles",
                 headers=_auth_headers(user_id=caregiver_id),
             )
             assert access_response.status_code == 200
@@ -815,7 +815,7 @@ def test_access_profiles_and_dashboard_use_real_data(
             }
 
             dashboard_response = await client.get(
-                "/mobile/relationships/dashboard",
+                "/api/v1/mobile/relationships/dashboard",
                 headers=_auth_headers(user_id=caregiver_id),
             )
             assert dashboard_response.status_code == 200
@@ -866,7 +866,7 @@ def test_linked_contact_detail_returns_live_payload(
     async def _exercise() -> None:
         async with _build_async_client() as client:
             detail_response = await client.get(
-                f"/mobile/relationships/{patient_id}/detail",
+                f"/api/v1/mobile/relationships/{patient_id}/detail",
                 headers=_auth_headers(user_id=caregiver_id),
             )
 

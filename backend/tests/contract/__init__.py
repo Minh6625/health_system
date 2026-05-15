@@ -1,6 +1,6 @@
 """Contract snapshot tests for the mobile-facing risk DTOs.
 
-These tests pin the JSON keys exposed by ``/mobile/analysis/*`` and the
+These tests pin the JSON keys exposed by ``/api/v1/mobile/analysis/*`` and the
 nested types (``TopFactorResponse``, ``FactorBreakdownResponse``,
 ``AiExplanationResponse``, ``SnapshotMetricsResponse``) so that any
 field rename / drop is caught at PR time.

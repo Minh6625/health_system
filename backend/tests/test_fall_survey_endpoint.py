@@ -1,6 +1,6 @@
 """HTTP-level tests for the Module FA-2 fall survey endpoint.
 
-``POST /mobile/fall-events/{id}/survey`` accepts the post-dismiss
+``POST /api/v1/mobile/fall-events/{id}/survey`` accepts the post-dismiss
 "can stand?" answer from the Flutter ``FallStandUpSurveyScreen``.
 Tests stub ``FallEventService.submit_survey`` so this file focuses on
 routing + payload shape contracts; the service-level DB / push behaviour
@@ -59,7 +59,7 @@ def _stub_event(
 
 def _build_test_client(*, target_profile_id: int = 7) -> TestClient:
     app = FastAPI()
-    app.include_router(fall_events_router, prefix="/mobile")
+    app.include_router(fall_events_router, prefix="/api/v1/mobile")
 
     def _override_target(
         x_target_profile_id: int | None = Header(None, alias="X-Target-Profile-Id"),
@@ -85,7 +85,7 @@ def _build_test_client(*, target_profile_id: int = 7) -> TestClient:
 
 
 class TestSubmitFallSurveyRoute:
-    """Module FA-2 ``POST /mobile/fall-events/{id}/survey`` contract."""
+    """Module FA-2 ``POST /api/v1/mobile/fall-events/{id}/survey`` contract."""
 
     def test_can_stand_true_returns_event_with_survey_attached(
         self, monkeypatch
@@ -114,7 +114,7 @@ class TestSubmitFallSurveyRoute:
         client = _build_test_client()
 
         response = client.post(
-            "/mobile/fall-events/17/survey",
+            "/api/v1/mobile/fall-events/17/survey",
             json={"can_stand": True, "skipped": False},
         )
 
@@ -156,7 +156,7 @@ class TestSubmitFallSurveyRoute:
         client = _build_test_client()
 
         response = client.post(
-            "/mobile/fall-events/17/survey",
+            "/api/v1/mobile/fall-events/17/survey",
             json={"can_stand": False, "skipped": False},
         )
 
@@ -182,7 +182,7 @@ class TestSubmitFallSurveyRoute:
         client = _build_test_client()
 
         response = client.post(
-            "/mobile/fall-events/17/survey",
+            "/api/v1/mobile/fall-events/17/survey",
             json={"can_stand": None, "skipped": True},
         )
 
@@ -198,7 +198,7 @@ class TestSubmitFallSurveyRoute:
         client = _build_test_client()
 
         response = client.post(
-            "/mobile/fall-events/9999/survey",
+            "/api/v1/mobile/fall-events/9999/survey",
             json={"can_stand": True, "skipped": False},
         )
 
@@ -220,7 +220,7 @@ class TestSubmitFallSurveyRoute:
         monkeypatch.setattr(FallEventService, "submit_survey", _fake_submit)
         client = _build_test_client()
 
-        response = client.post("/mobile/fall-events/17/survey", json={})
+        response = client.post("/api/v1/mobile/fall-events/17/survey", json={})
 
         assert response.status_code == 200, response.text
         assert captured == {"can_stand": None, "skipped": False}
@@ -242,7 +242,7 @@ class TestSubmitFallSurveyRoute:
         client = _build_test_client()
 
         response = client.post(
-            "/mobile/fall-events/17/survey",
+            "/api/v1/mobile/fall-events/17/survey",
             json={"can_stand": ["maybe"], "skipped": False},
         )
 
@@ -262,7 +262,7 @@ class TestSubmitFallSurveyRoute:
         client = _build_test_client()
 
         response = client.post(
-            "/mobile/fall-events/17/survey",
+            "/api/v1/mobile/fall-events/17/survey",
             json={"can_stand": True, "skipped": False},
             headers={"X-Target-Profile-Id": "7"},
         )
@@ -273,7 +273,7 @@ class TestSubmitFallSurveyRoute:
     def test_target_profile_for_unowned_user_is_403(self) -> None:
         client = _build_test_client()
         response = client.post(
-            "/mobile/fall-events/17/survey",
+            "/api/v1/mobile/fall-events/17/survey",
             json={"can_stand": True, "skipped": False},
             headers={"X-Target-Profile-Id": "999"},
         )

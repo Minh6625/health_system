@@ -415,9 +415,9 @@ def test_analysis_risk_routes_return_empty_canonical_payloads_when_patient_has_n
     headers = _auth_headers(user_id=temp_patient["user_id"])
 
     with httpx.Client(timeout=10.0, headers=headers) as client:
-        latest_response = client.get(f"{backend_base_url}/mobile/analysis/risk-reports", params={"limit": 1})
+        latest_response = client.get(f"{backend_base_url}/api/v1/mobile/analysis/risk-reports", params={"limit": 1})
         history_response = client.get(
-            f"{backend_base_url}/mobile/analysis/risk-history",
+            f"{backend_base_url}/api/v1/mobile/analysis/risk-history",
             params={"range": "7d", "page": 1, "limit": 20},
         )
 
@@ -491,18 +491,18 @@ def test_analysis_risk_routes_support_self_latest_detail_history_stale_and_pagin
 
     headers = _auth_headers(user_id=patient_id)
     with httpx.Client(timeout=10.0, headers=headers) as client:
-        latest_response = client.get(f"{backend_base_url}/mobile/analysis/risk-reports", params={"limit": 1})
-        detail_response = client.get(f"{backend_base_url}/mobile/analysis/risk-reports/{latest_report_id}")
+        latest_response = client.get(f"{backend_base_url}/api/v1/mobile/analysis/risk-reports", params={"limit": 1})
+        detail_response = client.get(f"{backend_base_url}/api/v1/mobile/analysis/risk-reports/{latest_report_id}")
         history_page_1 = client.get(
-            f"{backend_base_url}/mobile/analysis/risk-history",
+            f"{backend_base_url}/api/v1/mobile/analysis/risk-history",
             params={"range": "30d", "page": 1, "limit": 1},
         )
         history_page_2 = client.get(
-            f"{backend_base_url}/mobile/analysis/risk-history",
+            f"{backend_base_url}/api/v1/mobile/analysis/risk-history",
             params={"range": "30d", "page": 2, "limit": 1},
         )
         history_page_3 = client.get(
-            f"{backend_base_url}/mobile/analysis/risk-history",
+            f"{backend_base_url}/api/v1/mobile/analysis/risk-history",
             params={"range": "30d", "page": 3, "limit": 1},
         )
 
@@ -575,7 +575,7 @@ def test_analysis_risk_routes_require_relationship_for_linked_profile_then_share
         target_profile_id=patient_id,
     )
     with httpx.Client(timeout=10.0, headers=linked_headers) as client:
-        forbidden_response = client.get(f"{backend_base_url}/mobile/analysis/risk-reports", params={"limit": 1})
+        forbidden_response = client.get(f"{backend_base_url}/api/v1/mobile/analysis/risk-reports", params={"limit": 1})
 
     assert forbidden_response.status_code == 403, forbidden_response.text
 
@@ -612,10 +612,10 @@ def test_analysis_risk_routes_require_relationship_for_linked_profile_then_share
         )
 
     with httpx.Client(timeout=10.0, headers=linked_headers) as client:
-        latest_response = client.get(f"{backend_base_url}/mobile/analysis/risk-reports", params={"limit": 1})
-        detail_response = client.get(f"{backend_base_url}/mobile/analysis/risk-reports/{latest_report_id}")
+        latest_response = client.get(f"{backend_base_url}/api/v1/mobile/analysis/risk-reports", params={"limit": 1})
+        detail_response = client.get(f"{backend_base_url}/api/v1/mobile/analysis/risk-reports/{latest_report_id}")
         history_response = client.get(
-            f"{backend_base_url}/mobile/analysis/risk-history",
+            f"{backend_base_url}/api/v1/mobile/analysis/risk-history",
             params={"range": "7d", "page": 1, "limit": 20},
         )
 

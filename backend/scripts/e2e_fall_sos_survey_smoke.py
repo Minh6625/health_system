@@ -2,11 +2,11 @@
 
 Walks through the full operator-injected fall path end-to-end:
 
-  1. ``simulator.inject_event(confirmed)`` → BE webhook ``/mobile/telemetry/alert``
+  1. ``simulator.inject_event(confirmed)`` → BE webhook ``/api/v1/mobile/telemetry/alert``
   2. BE creates ``fall_events`` row with ``confidence ≥ 0.7``
   3. BE escalates via ``EmergencyService.trigger_sos`` → ``sos_events`` row
   4. BE calls ``send_fall_critical_alert`` → log line + FCM send attempt
-  5. We POST ``/mobile/fall-events/{id}/survey`` with ``can_stand=false``
+  5. We POST ``/api/v1/mobile/fall-events/{id}/survey`` with ``can_stand=false``
   6. BE persists ``survey_answers`` JSONB + calls
      ``send_fall_followup_concern`` → another FCM log line
 
