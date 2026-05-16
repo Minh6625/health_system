@@ -17,6 +17,7 @@ when the persisted rows are fetched back through ``MonitoringService``.
 """
 
 from app.adapters.fall_persistence_adapter import FallPersistenceAdapter
+from app.adapters.imu_window_persistence_adapter import ImuPersistenceAdapter
 from app.adapters.model_api_health_adapter import ModelApiHealthAdapter
 from app.adapters.normalized_explanation import NormalizedExplanation
 from app.adapters.risk_persistence_adapter import RiskPersistenceAdapter
@@ -24,6 +25,7 @@ from app.adapters.sleep_risk_adapter import SleepRiskAdapter
 
 __all__ = [
     "FallPersistenceAdapter",
+    "ImuPersistenceAdapter",
     "ModelApiHealthAdapter",
     "NormalizedExplanation",
     "RiskPersistenceAdapter",

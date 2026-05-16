@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.adapters import (
     FallPersistenceAdapter,
+    ImuPersistenceAdapter,
     RiskPersistenceAdapter,
     SleepRiskAdapter,
 )
@@ -899,6 +900,39 @@ def ingest_imu_window(
     if raw_request_id is not None:
         candidate = str(raw_request_id).strip()
         model_request_id = candidate[:36] if candidate else None
+
+    # ADR-022 Phase 7 S8: persist the raw IMU window for replay + retrain.
+    # We write the window AFTER the fall row so we can populate
+    # ``imu_windows.fall_event_id`` in a single INSERT instead of two
+    # statements, then back-link the surrogate id + time onto
+    # ``fall_events.imu_window_id`` / ``imu_window_time``. The composite
+    # FK on ``fall_events`` is enforced by the migration — both columns
+    # MUST be written together. A persistence failure on this step is
+    # surfaced as 500 by :class:`ImuPersistenceAdapter` and the fall row
+    # remains in place: missing raw evidence is not a reason to drop the
+    # event itself.
+    imu_window = ImuPersistenceAdapter.persist(
+        db,
+        db_device_id=payload.db_device_id,
+        payload=payload,
+        fall_event_id=fall_event.id,
+        model_request_id=model_request_id,
+    )
+    try:
+        fall_event.imu_window_id = imu_window.id
+        fall_event.imu_window_time = imu_window.time
+        db.commit()
+        db.refresh(fall_event)
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Failed to back-link fall_event %s to imu_window %s",
+            fall_event.id,
+            imu_window.id,
+        )
+        # The window is already on disk; leaving the back-link null is
+        # acceptable (the link table can be reconstructed by joining on
+        # device_id + time window). Continue with the success response.
 
     return ImuWindowResponse(
         status="ok",
