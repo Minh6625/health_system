@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Index, String, Boolean, DateTime, Integer, ForeignKey, Numeric, Text, CheckConstraint
+from sqlalchemy import BigInteger, Index, String, Boolean, DateTime, Integer, ForeignKey, Numeric, Text, CheckConstraint
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import text
@@ -52,6 +52,20 @@ class FallEvent(Base):
     # auto-escalated to SOS without a confirm path).  Shape:
     # ``{"can_stand": bool|null, "skipped": bool, "answered_at": iso}``.
     survey_answers: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # ADR-022 Phase 7 S8: composite link back to the raw ``imu_windows``
+    # row this event was derived from. Both columns are nullable so
+    # pre-S8 rows and events without a raw window (e.g. simulator-only
+    # injected events) stay valid. The matching FK
+    # ``fk_fall_events_imu_window (imu_window_id, imu_window_time)
+    # REFERENCES imu_windows (id, time)`` is added by the migration —
+    # SQLAlchemy can't express a composite FK against a hypertable PK
+    # cleanly, so we model the columns here and let the DB enforce it.
+    imu_window_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    imu_window_time: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
     # Metadata
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=get_current_time)

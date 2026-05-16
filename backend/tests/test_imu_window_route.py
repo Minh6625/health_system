@@ -37,18 +37,34 @@ _INTERNAL_HEADERS = {"X-Internal-Service": "iot-simulator"}
 
 def _build_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     """Mount the telemetry router with a stub DB so the route is hit
-    without a real Postgres connection. The persistence adapter is also
-    stubbed to capture the kwargs that would have been written.
+    without a real Postgres connection. Both persistence adapters
+    (``FallPersistenceAdapter`` + ``ImuPersistenceAdapter``) are stubbed
+    to capture the kwargs that would have been written, so the tests
+    can assert the route's side effects without touching Postgres or
+    TimescaleDB.
     """
+    from datetime import datetime, timezone
+
     app = FastAPI()
     app.include_router(telemetry_router, prefix="/api/v1/mobile")
 
     captured_persist: dict[str, Any] = {"called": False, "kwargs": {}}
+    captured_imu_persist: dict[str, Any] = {"called": False, "kwargs": {}}
 
     class _StubFallEvent:
         def __init__(self, **kwargs: Any) -> None:
             self.id = 7777
             self.uuid = "stub-uuid"
+            # ADR-022 Phase 7 S8 back-link columns. Initialised to None
+            # so the test can detect when the route writes the
+            # composite link onto the fall row.
+            self.imu_window_id: int | None = None
+            self.imu_window_time: datetime | None = None
+
+    class _StubImuWindow:
+        def __init__(self) -> None:
+            self.id = 5555
+            self.time = datetime(2026, 5, 16, 1, 23, 45, tzinfo=timezone.utc)
 
     def _fake_persist(db, *, db_device_id: int, prediction: dict[str, Any]):
         captured_persist["called"] = True
@@ -56,17 +72,62 @@ def _build_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
             "db_device_id": db_device_id,
             "prediction": prediction,
         }
-        return _StubFallEvent()
+        fall_event = _StubFallEvent()
+        # ADR-022 Phase 7 S8: keep the stub fall event reachable so the
+        # back-link assertion can verify ``imu_window_id`` / ``time``
+        # were written after :class:`ImuPersistenceAdapter.persist`.
+        app.state.fall_event = fall_event
+        return fall_event
+
+    def _fake_imu_persist(
+        db,
+        *,
+        db_device_id: int,
+        payload: Any,
+        fall_event_id: int | None = None,
+        model_request_id: str | None = None,
+        scenario_context: dict[str, Any] | None = None,
+    ):
+        captured_imu_persist["called"] = True
+        captured_imu_persist["kwargs"] = {
+            "db_device_id": db_device_id,
+            "fall_event_id": fall_event_id,
+            "model_request_id": model_request_id,
+            "scenario_context": scenario_context,
+            "sample_count": len(payload.data),
+        }
+        return _StubImuWindow()
+
+    # ADR-022 Phase 7 S8: db.commit / db.refresh are no-ops here so the
+    # back-link write does not blow up the stub session. The test
+    # observes the field assignment directly on the captured fall row.
+    class _StubSession:
+        def add(self, _row: Any) -> None:  # pragma: no cover - trivial
+            return None
+
+        def commit(self) -> None:  # pragma: no cover - trivial
+            return None
+
+        def refresh(self, _row: Any) -> None:  # pragma: no cover - trivial
+            return None
+
+        def rollback(self) -> None:  # pragma: no cover - trivial
+            return None
 
     monkeypatch.setattr(
         "app.api.routes.telemetry.FallPersistenceAdapter.persist",
         staticmethod(_fake_persist),
     )
+    monkeypatch.setattr(
+        "app.api.routes.telemetry.ImuPersistenceAdapter.persist",
+        staticmethod(_fake_imu_persist),
+    )
 
     app.state.captured_persist = captured_persist  # noqa: SLF001 - test seam
+    app.state.captured_imu_persist = captured_imu_persist  # noqa: SLF001 - test seam
 
     def _override_db():
-        yield object()
+        yield _StubSession()
 
     app.dependency_overrides[get_db] = _override_db
     return app
@@ -162,6 +223,83 @@ class TestImuWindowHappyPath:
         assert captured["called"] is True
         assert captured["kwargs"]["db_device_id"] == 42
         assert captured["kwargs"]["prediction"]["predicted_fall"] is True
+
+    def test_persists_imu_window_after_fall_event(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """ADR-022 Phase 7 S8: the raw window is written to ``imu_windows``
+        after the fall row is created, with ``fall_event_id`` populated
+        from the freshly-persisted fall id.
+        """
+        app = _build_app(monkeypatch)
+
+        class _StubClient:
+            def predict_fall(self, payload: dict[str, Any]):
+                return _ok_prediction()
+
+        monkeypatch.setattr(
+            "app.api.routes.telemetry.get_model_api_client",
+            lambda: _StubClient(),
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/mobile/telemetry/imu-window",
+                json=_imu_window_payload(sample_count=30),
+                headers=_INTERNAL_HEADERS,
+            )
+
+        assert response.status_code == 200, response.text
+
+        imu_capture = app.state.captured_imu_persist
+        assert imu_capture["called"] is True
+        # Same device id passes through.
+        assert imu_capture["kwargs"]["db_device_id"] == 42
+        # ``fall_event_id`` comes from the freshly-persisted fall row.
+        assert imu_capture["kwargs"]["fall_event_id"] == 7777
+        # ``model_request_id`` propagated from the model-api meta block
+        # so admin replay can correlate prediction <-> raw window.
+        assert (
+            imu_capture["kwargs"]["model_request_id"]
+            == "fa11-9b3d-2a9c-4d27-9e1a-1234abcd"
+        )
+        # All 30 samples handed to the adapter — no slicing.
+        assert imu_capture["kwargs"]["sample_count"] == 30
+
+    def test_back_links_fall_event_to_imu_window(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """ADR-022 Phase 7 S8: after the IMU window is persisted, the
+        composite link ``(imu_window_id, imu_window_time)`` is written
+        onto the fall row so the FK ``fk_fall_events_imu_window`` (set
+        up by the migration) is satisfied.
+        """
+        app = _build_app(monkeypatch)
+
+        class _StubClient:
+            def predict_fall(self, payload: dict[str, Any]):
+                return _ok_prediction()
+
+        monkeypatch.setattr(
+            "app.api.routes.telemetry.get_model_api_client",
+            lambda: _StubClient(),
+        )
+
+        with TestClient(app) as client:
+            response = client.post(
+                "/api/v1/mobile/telemetry/imu-window",
+                json=_imu_window_payload(),
+                headers=_INTERNAL_HEADERS,
+            )
+
+        assert response.status_code == 200, response.text
+
+        fall_event = app.state.fall_event
+        assert fall_event.imu_window_id == 5555
+        assert fall_event.imu_window_time is not None
+        assert fall_event.imu_window_time.year == 2026
 
     def test_forwards_data_to_model_api_in_native_shape(
         self,

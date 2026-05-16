@@ -7,6 +7,7 @@ from app.models.device_model import Device
 from app.models.notification_read_model import NotificationRead
 from app.models.push_token_model import UserPushToken
 from app.models.sos_event_model import FallEvent, SOSEvent
+from app.models.imu_window_model import ImuWindow
 from app.models.audit_log_model import AuditLog
 from app.models.risk_score_model import RiskScore
 from app.models.risk_explanation_model import RiskExplanation
@@ -19,6 +20,7 @@ __all__ = [
     "UserPushToken",
     "FallEvent",
     "SOSEvent",
+    "ImuWindow",
     "AuditLog",
     "RiskScore",
     "RiskExplanation",
