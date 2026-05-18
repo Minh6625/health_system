@@ -28,6 +28,14 @@ from app.utils.datetime_helper import get_current_time
 
 logger = logging.getLogger(__name__)
 
+# P2-6 (2026-05-18): named constant for the model-confidence cut-off used
+# by the ``is_tentative`` flag. Distinct axis from
+# ``health_thresholds.warning_at`` (which classifies the *prediction*) —
+# this expresses "did the model produce a confident answer?" so a 0.4
+# probability with confidence_value=0.45 is NOT downgraded to tentative
+# just because it sits below ``warning_at=0.35``.
+_MODEL_CONFIDENCE_TENTATIVE_AT: float = 0.5
+
 RISK_COOLDOWN_SECONDS = int(os.getenv("RISK_COOLDOWN_SECONDS", "60"))
 RISK_ALERT_AUTO_ESCALATE_AFTER_SECONDS = 60
 
@@ -442,7 +450,12 @@ def calculate_device_risk(
         calculated_at=risk_score_row.calculated_at,
         # XR-003 / HS-024: tag tentative when confidence < 0.5
         # (synthetic defaults or degraded model-api response).
-        is_tentative=inference.confidence_value < 0.5,
+        # P2-6 (2026-05-18): the 0.5 cut is a separate axis from
+        # ``health_thresholds.warning_at`` (=0.35) — it expresses "did
+        # the model produce a confident answer?" not "is the answer
+        # warning-grade?". Pulling it out as a named constant so the
+        # next reader doesn't have to guess where 0.5 came from.
+        is_tentative=inference.confidence_value < _MODEL_CONFIDENCE_TENTATIVE_AT,
     )
 
     if dispatch_alerts:

@@ -935,28 +935,36 @@ def ingest_imu_window(
     # surfaced as 500 by :class:`ImuPersistenceAdapter` and the fall row
     # remains in place: missing raw evidence is not a reason to drop the
     # event itself.
-    imu_window = ImuPersistenceAdapter.persist(
-        db,
-        db_device_id=payload.db_device_id,
-        payload=payload,
-        fall_event_id=fall_event.id,
-        model_request_id=model_request_id,
-    )
+    # P2-7 (2026-05-18): wrap the ImuWindow persistence + back-link in a
+    # single nested transaction so a failure leaves no orphan rows. The
+    # FallEvent row was committed earlier by FallPersistenceAdapter; if
+    # the ImuWindow INSERT or back-link UPDATE fail, we roll back ONLY
+    # those two operations and surface the issue without dropping the
+    # fall row itself (the original detection still has audit value).
+    imu_window = None
     try:
-        fall_event.imu_window_id = imu_window.id
-        fall_event.imu_window_time = imu_window.time
+        with db.begin_nested():
+            imu_window = ImuPersistenceAdapter.persist(
+                db,
+                db_device_id=payload.db_device_id,
+                payload=payload,
+                fall_event_id=fall_event.id,
+                model_request_id=model_request_id,
+            )
+            fall_event.imu_window_id = imu_window.id
+            fall_event.imu_window_time = imu_window.time
         db.commit()
         db.refresh(fall_event)
     except Exception:
         db.rollback()
         logger.exception(
-            "Failed to back-link fall_event %s to imu_window %s",
+            "Failed to persist imu_window or back-link fall_event %s — fall row "
+            "kept (audit value); raw evidence not stored",
             fall_event.id,
-            imu_window.id,
         )
-        # The window is already on disk; leaving the back-link null is
-        # acceptable (the link table can be reconstructed by joining on
-        # device_id + time window). Continue with the success response.
+        # The window persistence + back-link are atomic so we don't have
+        # to worry about a partial state. The fall_events row stays
+        # intact; raw IMU window is missing for this event.
 
     # S13 fall FCM fanout — dispatch only when model says predicted_fall=True.
     if predicted_fall:
