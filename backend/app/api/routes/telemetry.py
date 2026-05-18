@@ -861,6 +861,7 @@ def ingest_sleep_session(
 @router.post("/imu-window", response_model=ImuWindowResponse, dependencies=[Depends(require_internal_service)])
 def ingest_imu_window(
     payload: ImuWindowRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ) -> ImuWindowResponse:
     """Ingest a raw IMU window, run model-api fall inference, persist on success.
@@ -956,6 +957,43 @@ def ingest_imu_window(
         # The window is already on disk; leaving the back-link null is
         # acceptable (the link table can be reconstructed by joining on
         # device_id + time window). Continue with the success response.
+
+    # S13 fall FCM fanout — dispatch only when model says predicted_fall=True.
+    if predicted_fall:
+        _device = db.query(Device).filter(Device.id == payload.db_device_id).first()
+        if _device is not None and _device.user_id is not None:
+            _patient_id = int(_device.user_id)
+            try:
+                _caregiver_ids = [
+                    int(row.caregiver_id)
+                    for row in db.query(UserRelationship.caregiver_id).filter(
+                        UserRelationship.patient_id == _patient_id,
+                        UserRelationship.status == "accepted",
+                        UserRelationship.can_receive_alerts.is_(True),
+                        UserRelationship.deleted_at.is_(None),
+                    ).all()
+                ]
+            except Exception:
+                logger.warning("Failed to query caregivers for /imu-window fall fanout", exc_info=True)
+                _caregiver_ids = []
+            background_tasks.add_task(
+                PushNotificationService.send_fall_critical_alert,
+                db,
+                recipient_user_ids=[_patient_id] + _caregiver_ids,
+                patient_user_id=_patient_id,
+                fall_event_id=fall_event.id,
+                fall_event_uuid=str(fall_event.uuid),
+                title="Phát hiện té ngã",
+                body=(
+                    "Hệ thống phát hiện bạn có thể đã té ngã. "
+                    "Nhấn 'Tôi ổn' nếu bạn vẫn ổn."
+                ),
+                confidence=fall_probability,
+            )
+            logger.info(
+                "Fall FCM fanout queued from /imu-window: patient=%s caregivers=%s fall_event_id=%s",
+                _patient_id, _caregiver_ids, fall_event.id,
+            )
 
     return ImuWindowResponse(
         status="ok",
