@@ -9,7 +9,7 @@ class AuthRepository {
     try {
       final result = await _apiClient.post(
         '/auth/login',
-        body: user.toJson(),
+        body: {'email': user.email, 'password': user.password},
         requiresAuth: false,
       );
       return AuthResponse.fromJson(result);
