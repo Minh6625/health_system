@@ -63,6 +63,7 @@ dependencies:
   yomu: ^1.0.0
   supabase_flutter: ^2.8.0
   audioplayers: ^6.1.0
+  shared_preferences: ^2.3.0
 
   flutter_native_splash: any
 dev_dependencies:

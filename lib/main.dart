@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:healthguard/core/services/threshold_service.dart';
 import 'package:healthguard/features/notifications/services/notification_runtime_service.dart';
 
 void main() async {
@@ -46,6 +47,16 @@ void main() async {
       }
     } catch (e) {
       debugPrint("==== SUPABASE INIT ERROR (IGNORING) ==== $e");
+    }
+
+    // P1-5: load cached clinical thresholds + kick off background refresh.
+    // Awaits the SharedPreferences read (fast) so the first frame shows
+    // last-known cuts; the BE fetch runs unawaited.
+    try {
+      await ThresholdService.instance.initialize();
+      debugPrint("==== THRESHOLD SERVICE INITIALIZED ====");
+    } catch (e) {
+      debugPrint("==== THRESHOLD SERVICE ERROR (IGNORING) ==== $e");
     }
 
     runApp(const HealthSystemApp());
