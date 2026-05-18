@@ -161,6 +161,17 @@ class RiskAnalysisRepository {
           ? (json['confidence'] as num).toDouble()
           : 0,
       isStale: json['is_stale'] as bool? ?? true,
+      // Phase 7 S11: data quality contract fields (ADR-018 read path).
+      isSyntheticDefault: json['is_synthetic_default'] as bool? ?? false,
+      defaultsApplied: (json['defaults_applied'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      effectiveConfidence: json['effective_confidence'] is num
+          ? (json['effective_confidence'] as num).toDouble()
+          : null,
+      dataQualityWarning: (json['data_quality_warning'] as String?)?.trim().isNotEmpty == true
+          ? (json['data_quality_warning'] as String).trim()
+          : null,
     );
   }
 
@@ -241,6 +252,17 @@ class RiskAnalysisRepository {
       shapDetails: _parseShapDetails(json['shap_details']),
       modelRequestId: (json['model_request_id'] as String?)?.trim().isNotEmpty == true
           ? (json['model_request_id'] as String).trim()
+          : null,
+      // Phase 7 S11: data quality contract fields.
+      isSyntheticDefault: json['is_synthetic_default'] as bool? ?? false,
+      defaultsApplied: (json['defaults_applied'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      effectiveConfidence: json['effective_confidence'] is num
+          ? (json['effective_confidence'] as num).toDouble()
+          : null,
+      dataQualityWarning: (json['data_quality_warning'] as String?)?.trim().isNotEmpty == true
+          ? (json['data_quality_warning'] as String).trim()
           : null,
     );
   }

@@ -134,6 +134,15 @@ class _RiskReportDetailScreenState extends State<RiskReportDetailScreen> {
                   ),
                   const SizedBox(height: AppSpacing.gapLg),
                 ],
+                if (detail.isSyntheticDefault) ...[
+                  InlineStatusBanner.warning(
+                    key: const ValueKey('synthetic_default_banner_detail'),
+                    message: detail.dataQualityWarning?.isNotEmpty == true
+                        ? detail.dataQualityWarning!
+                        : 'Một số chỉ số (HRV, huyết áp, cân nặng, chiều cao) chưa được đo — mô hình đã sử dụng giá trị mặc định. Kết quả có thể kém chính xác hơn.',
+                  ),
+                  const SizedBox(height: AppSpacing.gapLg),
+                ],
                 if (provider.isRefreshing) ...[
                   const LinearProgressIndicator(minHeight: 2),
                   const SizedBox(height: AppSpacing.gapLg),

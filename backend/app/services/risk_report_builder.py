@@ -79,6 +79,10 @@ def build_risk_report(
         recommendation_preview=normalized.recommendations[:2],
         confidence=normalized.confidence,
         is_stale=normalized.is_stale,
+        is_synthetic_default=normalized.is_synthetic_default,
+        defaults_applied=normalized.defaults_applied,
+        effective_confidence=normalized.effective_confidence,
+        data_quality_warning=normalized.data_quality_warning,
     )
 
 
@@ -136,6 +140,10 @@ def build_risk_report_detail(
         confidence=normalized.confidence,
         is_stale=normalized.is_stale,
         ai_explanation=ai_explanation,
+        is_synthetic_default=normalized.is_synthetic_default,
+        defaults_applied=normalized.defaults_applied,
+        effective_confidence=normalized.effective_confidence,
+        data_quality_warning=normalized.data_quality_warning,
     )
 
 

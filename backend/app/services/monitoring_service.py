@@ -220,6 +220,34 @@ class MonitoringService:
         if raw_request_id is not None:
             candidate = str(raw_request_id).strip()
             model_request_id = candidate[:36] if candidate else None
+
+        # Phase 7 S11: data-quality contract fields (S4 columns). Promoted
+        # from the read path now so the mobile warning banner has a
+        # contract to consume. Older rows (pre-S4 backfill) carry NULL,
+        # which we surface as `is_synthetic_default=False` + the rest as
+        # `None`. Intermediate queries that don't SELECT these columns
+        # (e.g. `_get_history_summary`) also fall back to the same defaults.
+        is_synthetic_default = bool(row.get("is_synthetic_default") or False)
+        defaults_applied_raw = row.get("defaults_applied")
+        if isinstance(defaults_applied_raw, list):
+            defaults_applied = [
+                str(item) for item in defaults_applied_raw if str(item).strip()
+            ]
+        else:
+            defaults_applied = None
+        effective_confidence_raw = row.get("effective_confidence")
+        effective_confidence: float | None = None
+        if effective_confidence_raw is not None:
+            try:
+                effective_confidence = round(float(effective_confidence_raw), 4)
+            except (TypeError, ValueError):
+                effective_confidence = None
+        data_quality_warning_raw = row.get("data_quality_warning")
+        data_quality_warning: str | None = None
+        if data_quality_warning_raw is not None:
+            candidate_warning = str(data_quality_warning_raw).strip()
+            data_quality_warning = candidate_warning if candidate_warning else None
+
         return NormalizedRiskRow(
             # Some intermediate query paths (e.g. ``_get_history_summary``)
             # only need timestamp + risk_score and pass rows that omit
@@ -250,6 +278,10 @@ class MonitoringService:
             algorithm=str(algorithm) if algorithm is not None else None,
             shap_details=shap_details,
             model_request_id=model_request_id,
+            is_synthetic_default=is_synthetic_default,
+            defaults_applied=defaults_applied,
+            effective_confidence=effective_confidence,
+            data_quality_warning=data_quality_warning,
         )
 
     @staticmethod
@@ -1029,6 +1061,10 @@ class MonitoringService:
                         rs.calculated_at,
                         rs.features,
                         rs.algorithm,
+                        rs.is_synthetic_default,
+                        rs.defaults_applied,
+                        rs.effective_confidence,
+                        rs.data_quality_warning,
                         re.explanation_text,
                         re.feature_importance,
                         re.recommendations,
@@ -1108,6 +1144,10 @@ class MonitoringService:
                         rs.features,
                         rs.model_version,
                         rs.algorithm,
+                        rs.is_synthetic_default,
+                        rs.defaults_applied,
+                        rs.effective_confidence,
+                        rs.data_quality_warning,
                         re.id AS risk_explanation_id,
                         re.explanation_text,
                         re.feature_importance,
@@ -1186,6 +1226,10 @@ class MonitoringService:
                         rs.features,
                         rs.model_version,
                         rs.algorithm,
+                        rs.is_synthetic_default,
+                        rs.defaults_applied,
+                        rs.effective_confidence,
+                        rs.data_quality_warning,
                         re.id AS risk_explanation_id,
                         re.explanation_text,
                         re.feature_importance,
