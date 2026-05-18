@@ -13,6 +13,7 @@ from app.api.routes.relationships import router as relationships_router
 from app.api.routes.risk import router as risk_router
 from app.api.routes.settings import router as settings_router
 from app.api.routes.telemetry import router as telemetry_router
+from app.api.routes.thresholds import router as thresholds_router
 
 api_router = APIRouter(prefix="/api/v1/mobile")
 api_router.include_router(health_router)
@@ -24,6 +25,7 @@ api_router.include_router(risk_router)
 api_router.include_router(telemetry_router)
 api_router.include_router(notifications_router)
 api_router.include_router(settings_router)
+api_router.include_router(thresholds_router)
 api_router.include_router(device_router)
 api_router.include_router(admin_router)
 api_router.include_router(profile_router)
