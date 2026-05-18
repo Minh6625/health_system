@@ -40,7 +40,7 @@ class Settings(BaseSettings):
 
     # --- CORS (HS-005) ---
     CORS_ALLOWED_ORIGINS: list[str] = Field(
-        default=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080"]
+        default=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://localhost:7777"]
     )
 
     # --- Email ---
