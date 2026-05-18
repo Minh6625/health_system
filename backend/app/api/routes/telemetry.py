@@ -58,7 +58,12 @@ def _is_in_post_fall_window(db: Session, device_id: int) -> bool:
 # / device must meet this threshold before the backend escalates to a full SOS event.
 # Below threshold the FallEvent is still persisted for audit, plus a soft Alert row is
 # created so caregivers can review without triggering the real-emergency takeover.
-_DEFAULT_FALL_CONFIDENCE_THRESHOLD = 0.7
+#
+# P1-6 (2026-05-18): lowered from 0.7 to 0.5 so the BE gate aligns with the
+# model-api ``fall_thresholds.fall_true_at`` (= 0.5). Previously the band
+# 0.5-0.7 produced a model-side "warning" verdict but was silently dropped
+# at the BE — now it routes through the soft-alert path instead.
+_DEFAULT_FALL_CONFIDENCE_THRESHOLD = 0.5
 
 
 def _fall_confidence_threshold() -> float:
@@ -74,6 +79,20 @@ def _fall_confidence_threshold() -> float:
     if value > 1.0:
         return 1.0
     return value
+
+
+# P1-7: severity bands derived from model-api ``fall_thresholds``. The BE
+# previously hard-coded ``severity="high"`` for every fall above 0.7 which
+# discarded the model's own warning vs critical distinction. Keep the
+# bands in sync with ``healthguard-model-api/app/config.py::FallThresholds``
+# (warning_at=0.6, critical_at=0.85).
+def _fall_severity_for_confidence(confidence: float) -> str:
+    """Map a fall confidence (0..1) to a canonical Alert severity."""
+    if confidence >= 0.85:
+        return "critical"
+    if confidence >= 0.6:
+        return "high"
+    return "medium"
 
 
 class VitalIngestVitals(BaseModel):
@@ -576,21 +595,64 @@ def ingest_alert(
 
         if payload.event_type == "fall_detected":
             confidence_value = _pick_float(metadata, "confidence") or 0.0
-            fall_event = FallEvent(
-                device_id=payload.db_device_id,
-                detected_at=payload.timestamp,
-                confidence=confidence_value,
-                model_version=_pick_value(metadata, "model_version"),
-                latitude=_pick_float(metadata, "latitude"),
-                longitude=_pick_float(metadata, "longitude"),
-                location_accuracy=_pick_float(metadata, "location_accuracy", "accuracy"),
-                address=_pick_value(metadata, "address"),
-                features=metadata or None,
-            )
-            db.add(fall_event)
-            db.flush()
+            # P0-4: dedup with the row already created by /telemetry/imu-window.
+            # The simulator forwards ``metadata.fall_event_id`` after countdown
+            # so we must NOT INSERT a second FallEvent for the same window.
+            existing_fall_event_id = _pick_int(metadata, "fall_event_id")
+            fall_event: FallEvent | None = None
+            if existing_fall_event_id is not None:
+                fall_event = (
+                    db.query(FallEvent)
+                    .filter(
+                        FallEvent.id == existing_fall_event_id,
+                        FallEvent.device_id == payload.db_device_id,
+                    )
+                    .first()
+                )
+                if fall_event is None:
+                    logger.warning(
+                        "Fall alert references unknown fall_event_id=%s for device=%s — falling back to INSERT",
+                        existing_fall_event_id,
+                        payload.db_device_id,
+                    )
+
+            if fall_event is None:
+                fall_event = FallEvent(
+                    device_id=payload.db_device_id,
+                    detected_at=payload.timestamp,
+                    confidence=confidence_value,
+                    model_version=_pick_value(metadata, "model_version"),
+                    latitude=_pick_float(metadata, "latitude"),
+                    longitude=_pick_float(metadata, "longitude"),
+                    location_accuracy=_pick_float(metadata, "location_accuracy", "accuracy"),
+                    address=_pick_value(metadata, "address"),
+                    features=metadata or None,
+                )
+                db.add(fall_event)
+                db.flush()
+                ingested += 1
+            else:
+                # Refresh GPS / address / confidence captured during countdown
+                # without overwriting the original detection timestamp.
+                if confidence_value:
+                    fall_event.confidence = confidence_value
+                lat = _pick_float(metadata, "latitude")
+                lon = _pick_float(metadata, "longitude")
+                if lat is not None:
+                    fall_event.latitude = lat
+                if lon is not None:
+                    fall_event.longitude = lon
+                accuracy = _pick_float(metadata, "location_accuracy", "accuracy")
+                if accuracy is not None:
+                    fall_event.location_accuracy = accuracy
+                addr = _pick_value(metadata, "address")
+                if addr is not None:
+                    fall_event.address = addr
+                if metadata:
+                    fall_event.features = {**(fall_event.features or {}), **metadata}
+                db.flush()
+
             fall_event_id = fall_event.id
-            ingested += 1
 
             threshold = _fall_confidence_threshold()
             if confidence_value < threshold:
@@ -615,7 +677,7 @@ def ingest_alert(
                     user_id=resolved_user_id,
                     fall_event_id=fall_event_id,
                     alert_type="fall_detection",
-                    severity="high",
+                    severity=_fall_severity_for_confidence(confidence_value),
                     title="Phát hiện khả năng té ngã (chờ xác minh)",
                     message=(
                         "Phát hiện chuyển động giống té ngã "
@@ -910,12 +972,21 @@ def ingest_imu_window(
     )
 
     fall_probability = FallPersistenceAdapter._extract_probability(prediction)
-    band = str(
+    # P1-10: pin priority to (prediction.prediction_band > risk_level >
+    # predicted_fall_label) and normalise the legacy "fall" label to
+    # "critical" so downstream UIs do not see "unknown" when the model
+    # returned a positive prediction.
+    band_raw = (
         (prediction.get("prediction") or {}).get("prediction_band")
-        or prediction.get("predicted_fall_label")
         or prediction.get("risk_level")
+        or prediction.get("predicted_fall_label")
         or "unknown"
     )
+    band = str(band_raw).strip().lower() or "unknown"
+    if band == "fall":
+        band = "critical"
+    elif band == "no_fall":
+        band = "normal"
     requires_attention = bool(prediction.get("requires_attention", False))
     predicted_fall = bool(prediction.get("predicted_fall", False))
     meta = prediction.get("meta") if isinstance(prediction.get("meta"), dict) else {}
