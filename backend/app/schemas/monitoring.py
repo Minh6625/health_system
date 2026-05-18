@@ -167,6 +167,20 @@ class RiskReportResponse(BaseModel):
     confidence: float = 0.0
     is_stale: bool = True
 
+    # ADR-018 data quality contract (Phase 7 S11 read path). Persisted by
+    # S4 (migration 20260516) but the read path was previously silent;
+    # mobile binaries that pre-date S11 ignore these (extra fields), and
+    # post-S11 binaries render the warning banner when
+    # ``is_synthetic_default`` is true. ``defaults_applied`` is the
+    # ordered list of soft vital fields the model-api had to fill with
+    # population defaults; ``effective_confidence`` is the degraded
+    # confidence the UI should display when the banner is shown;
+    # ``data_quality_warning`` is the verbatim Vietnamese banner copy.
+    is_synthetic_default: bool = False
+    defaults_applied: list[str] | None = None
+    effective_confidence: float | None = None
+    data_quality_warning: str | None = None
+
 
 class RiskReportDetailResponse(BaseModel):
     """Mobile risk-report detail payload.
@@ -223,6 +237,12 @@ class RiskReportDetailResponse(BaseModel):
     confidence: float = 0.0
     is_stale: bool = True
     ai_explanation: AiExplanationResponse | None = None
+
+    # ADR-018 data quality contract (Phase 7 S11 read path — same as list).
+    is_synthetic_default: bool = False
+    defaults_applied: list[str] | None = None
+    effective_confidence: float | None = None
+    data_quality_warning: str | None = None
 
 
 class RiskReportClinicianResponse(RiskReportDetailResponse):

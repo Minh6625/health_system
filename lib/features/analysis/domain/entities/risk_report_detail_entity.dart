@@ -165,6 +165,14 @@ class RiskReportDetailEntity {
   /// request to correlate with.
   final String? modelRequestId;
 
+  // ADR-018 data quality contract (Phase 7 S11). Same semantics as
+  // [RiskReportEntity] — present here too so the detail screen can
+  // render the banner without needing the list entity.
+  final bool isSyntheticDefault;
+  final List<String>? defaultsApplied;
+  final double? effectiveConfidence;
+  final String? dataQualityWarning;
+
   RiskReportDetailEntity({
     required this.reportId,
     required this.profileId,
@@ -187,6 +195,10 @@ class RiskReportDetailEntity {
     this.aiExplanation = AiExplanation.empty,
     this.shapDetails,
     this.modelRequestId,
+    this.isSyntheticDefault = false,
+    this.defaultsApplied,
+    this.effectiveConfidence,
+    this.dataQualityWarning,
   });
 
   /// True when the response carried clinician-only SHAP details that

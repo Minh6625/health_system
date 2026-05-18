@@ -44,6 +44,14 @@ class RiskReportEntity {
   final double confidence;
   final bool isStale;
 
+  // ADR-018 data quality contract (Phase 7 S11). Populated when the BE
+  // inference used population defaults for one or more soft vitals (HRV,
+  // BP, weight, height). When true the UI renders the warning banner.
+  final bool isSyntheticDefault;
+  final List<String>? defaultsApplied;
+  final double? effectiveConfidence;
+  final String? dataQualityWarning;
+
   RiskReportEntity({
     required this.reportId,
     required this.profileId,
@@ -58,6 +66,10 @@ class RiskReportEntity {
     required this.recommendationPreview,
     required this.confidence,
     required this.isStale,
+    this.isSyntheticDefault = false,
+    this.defaultsApplied,
+    this.effectiveConfidence,
+    this.dataQualityWarning,
   });
 
   /// User-facing health score (0–100, higher is better). Computed as the

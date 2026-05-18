@@ -82,3 +82,28 @@ class NormalizedRiskRow:
     #: in Phase 2. Phase 5 lights it up on the read path so the clinician
     #: response can carry it for end-to-end log correlation.
     model_request_id: str | None = None
+
+    # --- ADR-018 data quality contract (Phase 7 S11 read path) ---------
+    # Persisted by S4 migration (20260516) but the read path was not
+    # updated in lockstep — the columns existed on the row but never
+    # made it onto the response. S11 closes that gap so the mobile
+    # warning banner has data to consume.
+    #
+    # ``is_synthetic_default`` is the OR of the model-api inference flag
+    # and a non-empty ``defaults_applied`` list (mirrors the persistence
+    # rule in :class:`RiskPersistenceAdapter`). ``True`` ⇒ at least one
+    # soft vital (HRV / BP / weight / height) was default-filled and
+    # the mobile UI should show the data-quality warning banner.
+    is_synthetic_default: bool = False
+    #: Sorted list of vital field names that were default-filled. ``None``
+    #: on clean records (column is NULL in DB).
+    defaults_applied: list[str] | None = None
+    #: Degraded confidence used by the UI (== ``confidence`` x 0.5 when
+    #: ``is_synthetic_default`` is True, == ``confidence`` otherwise).
+    #: ``None`` on the local fallback path which does not produce the
+    #: quality contract.
+    effective_confidence: float | None = None
+    #: Human-readable warning message (Vietnamese on the mobile path).
+    #: ``None`` on clean records and on the local fallback path. Mobile
+    #: UI uses this verbatim as the banner copy.
+    data_quality_warning: str | None = None
