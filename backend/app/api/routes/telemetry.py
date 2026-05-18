@@ -228,6 +228,12 @@ class SleepIngestRequest(BaseModel):
     phases: dict[str, int]
     start_time: datetime
     end_time: datetime
+    # P1-2 (2026-05-18): producers (simulator + mobile) now forward the
+    # true wake-event count from their own state machines instead of
+    # letting the BE derive ``wake_count`` from ``phases["awake"] // 30``
+    # which fabricated 1 event per 30 awake-minutes regardless of how
+    # many discrete wake transitions actually happened.
+    wake_count: int | None = None
 
 
 def _pick_value(payload: dict[str, Any], *keys: str) -> Any:
@@ -842,7 +848,14 @@ def ingest_sleep_session(
                 "end_time": payload.end_time,
                 "sleep_score": min(100, max(0, payload.score)),
                 "phases": _json.dumps(payload.phases),
-                "wake_count": payload.phases.get("awake", 30) // 30,
+                # P1-2: prefer the producer-supplied wake_count; fall back
+                # to the legacy heuristic only when the field is missing
+                # so older clients still write something rather than NULL.
+                "wake_count": (
+                    int(payload.wake_count)
+                    if payload.wake_count is not None
+                    else payload.phases.get("awake", 30) // 30
+                ),
                 "sleep_date": payload.date,
             },
         )
@@ -1038,6 +1051,37 @@ def ingest_sleep_risk(
     """
     # Inner record is already in the model-api shape — just dump it.
     record_dict = SleepRiskAdapter.to_record(payload.record.model_dump())
+
+    # P1-8 (2026-05-18): validate device-user ownership before persisting
+    # a risk_scores row. Previously the route trusted the caller's
+    # ``db_device_id`` + ``db_user_id`` pair under the cover of
+    # ``require_internal_service``, but a leaked secret / compromised
+    # internal client could push sleep risk rows for any user. Mirror
+    # the ownership check that ``/telemetry/alert`` already does via
+    # ``_resolve_alert_user_id``.
+    owner_row = (
+        db.query(Device.user_id)
+        .filter(
+            Device.id == payload.db_device_id,
+            Device.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if owner_row is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Device {payload.db_device_id} not found.",
+        )
+    actual_user_id = int(owner_row[0]) if owner_row[0] is not None else None
+    if actual_user_id is None or actual_user_id != int(payload.db_user_id):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "device-user ownership mismatch: device "
+                f"{payload.db_device_id} is not assigned to user "
+                f"{payload.db_user_id}"
+            ),
+        )
 
     prediction = get_model_api_client().predict_sleep(record_dict)
     if prediction is None:

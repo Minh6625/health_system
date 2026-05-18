@@ -30,6 +30,7 @@ the ``check_risk_level`` constraint.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from app.adapters.normalized_explanation import NormalizedExplanation
@@ -183,6 +184,12 @@ class SleepRiskAdapter:
         the inversion to ``risk_score = 100 - 0 = 100`` deliberately
         flags "we got nothing useful from the model" as critical risk
         rather than silently treating it as healthy sleep.
+
+        P1-3 (2026-05-18): NaN/inf bypass guard. ``max(0, min(100,
+        NaN))`` returns NaN because every NaN comparison is False,
+        which would propagate into ``risk_score = 100 - NaN = NaN``
+        and corrupt the persisted DB row. Treat any non-finite value
+        as the same "nothing useful" signal that nulls produce.
         """
         raw = response.get("predicted_sleep_score")
         if raw is None:
@@ -192,6 +199,8 @@ class SleepRiskAdapter:
         try:
             value = float(raw) if raw is not None else 0.0
         except (TypeError, ValueError):
+            value = 0.0
+        if math.isnan(value) or math.isinf(value):
             value = 0.0
         return max(0.0, min(100.0, value))
 
@@ -203,12 +212,16 @@ class SleepRiskAdapter:
         prediction_score doubles as both the inverted risk and the
         confidence proxy. We divide by 100 so it lands in [0, 1] like
         the health adapter.
+
+        P1-3: NaN/inf guard mirrors :meth:`_extract_sleep_score`.
         """
         prediction = response.get("prediction") or {}
         raw = prediction.get("prediction_score") if isinstance(prediction, dict) else None
         try:
             value = float(raw) / 100.0 if raw is not None else 0.0
         except (TypeError, ValueError):
+            value = 0.0
+        if math.isnan(value) or math.isinf(value):
             value = 0.0
         return max(0.0, min(1.0, value))
 
