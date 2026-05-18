@@ -154,6 +154,11 @@ NotificationEvent? mapNotificationEventFromPushData(
         'fall_event_id': fallEventId,
       if (isFall && data['fall_event_uuid'] != null)
         'fall_event_uuid': data['fall_event_uuid'].toString(),
+      // ADR-023 Phase 7 S13: caregiver fanout flag. String "true"/"false"
+      // because FCM data payloads are Map<String,String>. Absent = patient.
+      if (isFall)
+        'is_recipient_patient':
+            data['is_recipient_patient']?.toString() ?? 'true',
       if (isRisk) 'risk_level': riskLevel ?? 'medium',
       if (isRisk && notificationId != null) 'notification_id': notificationId,
       if (isRisk && data['risk_score_id'] != null)

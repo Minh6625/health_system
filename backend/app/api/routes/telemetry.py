@@ -21,6 +21,7 @@ from app.adapters import (
 from app.core.dependencies import require_internal_service
 from app.db.database import get_db
 from app.models.device_model import Device
+from app.models.relationship_model import UserRelationship
 from app.models.sos_event_model import Alert, FallEvent
 from app.schemas.fall_telemetry import ImuWindowRequest, ImuWindowResponse
 from app.schemas.sleep_telemetry import SleepRiskRequest, SleepRiskResponse
@@ -667,20 +668,38 @@ def ingest_alert(
                         payload.db_device_id,
                     )
 
-                # Module FA-2 patient-facing push.  ``trigger_sos`` only
-                # pushes SOS notifications to *caregivers*; the patient
-                # device receives nothing through that path.  We fire a
-                # dedicated ``fall_critical`` data-only push to the
-                # patient so their phone shows the full-screen FallAlert
-                # takeover with sound + vibration + 30s countdown.  If
-                # FCM creds are absent or the patient has no active
-                # push token the helper logs + returns silently — never
-                # raises — so a missing push does not block the SOS
-                # escalation we already committed above.
+                # ADR-023 Phase 7 S13: fan-out fall critical push to the
+                # patient + their caregivers.  Patient gets the full-screen
+                # FallAlertScreen takeover; caregivers get a banner-only
+                # notification (mobile differentiates via is_recipient_patient
+                # flag).  Caregiver SOS push still fires through trigger_sos
+                # above — this is a separate, fall-specific push so the
+                # family banner copy is distinct ("member may have fallen")
+                # from the generic SOS copy.
+                _patient_id = int(resolved_user_id)
+                try:
+                    _caregiver_ids = [
+                        int(row.caregiver_id)
+                        for row in db.query(UserRelationship.caregiver_id).filter(
+                            UserRelationship.patient_id == _patient_id,
+                            UserRelationship.status == "accepted",
+                            UserRelationship.can_receive_alerts.is_(True),
+                            UserRelationship.deleted_at.is_(None),
+                        ).all()
+                    ]
+                except Exception:
+                    logger.warning(
+                        "Failed to query caregivers for fall fanout patient=%s (non-fatal)",
+                        _patient_id,
+                        exc_info=True,
+                    )
+                    _caregiver_ids = []
+                _all_recipients = [_patient_id] + _caregiver_ids
                 background_tasks.add_task(
                     PushNotificationService.send_fall_critical_alert,
                     db,
-                    recipient_user_ids=[int(resolved_user_id)],
+                    recipient_user_ids=_all_recipients,
+                    patient_user_id=_patient_id,
                     fall_event_id=int(fall_event_id),
                     fall_event_uuid=str(fall_event.uuid),
                     title="Phát hiện té ngã",
@@ -689,6 +708,10 @@ def ingest_alert(
                         "Nhấn 'Tôi ổn' nếu bạn vẫn ổn."
                     ),
                     confidence=float(confidence_value),
+                )
+                logger.info(
+                    "Fall fanout queued: patient=%s caregivers=%s fall_event_id=%s",
+                    _patient_id, _caregiver_ids, fall_event_id,
                 )
 
                 ingested += 1

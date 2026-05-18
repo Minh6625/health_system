@@ -251,6 +251,14 @@ Future<void> _showBackgroundSosNotification(RemoteMessage message) async {
 
   final alertType = (message.data['alert_type'] as String? ?? '').toLowerCase();
   final isFall = isFallAlertType(alertType);
+
+  // ADR-023 Phase 7 S13: caregiver fall path — banner only (no fullscreen
+  // takeover). Caregiver needs to know a family member may have fallen but
+  // must not receive the 30 s countdown / SOS ring meant for the patient.
+  final isCaregiver =
+      isFall &&
+      (message.data['is_recipient_patient'] as String? ?? 'true') == 'false';
+
   final channelId =
       isFall ? _backgroundFallChannelId : _backgroundSosChannelId;
   final channelName =
@@ -261,28 +269,54 @@ Future<void> _showBackgroundSosNotification(RemoteMessage message) async {
   final sound = isFall ? _fallAlertSound : _emergencyAlertSound;
 
   final notificationId = _deriveSosNotificationId(sosId);
-  final details = NotificationDetails(
-    android: AndroidNotificationDetails(
-      channelId,
-      channelName,
-      channelDescription: channelDesc,
-      importance: Importance.max,
-      priority: Priority.max,
-      category: AndroidNotificationCategory.alarm,
-      fullScreenIntent: true,
-      playSound: true,
-      sound: sound,
-      enableVibration: true,
-      vibrationPattern: Int64List.fromList([0, 900, 400, 900, 400, 1400]),
-      visibility: NotificationVisibility.public,
-      autoCancel: true,
-    ),
-  );
+
+  final details = isCaregiver
+      ? NotificationDetails(
+          android: AndroidNotificationDetails(
+            _backgroundFallChannelId,
+            _backgroundFallChannelName,
+            channelDescription: 'Cảnh báo phát hiện té ngã',
+            importance: Importance.high,
+            priority: Priority.high,
+            category: AndroidNotificationCategory.message,
+            fullScreenIntent: false,
+            playSound: true,
+            sound: _fallAlertSound,
+            enableVibration: true,
+            vibrationPattern: Int64List.fromList([0, 500, 200, 500]),
+            visibility: NotificationVisibility.public,
+            autoCancel: true,
+          ),
+        )
+      : NotificationDetails(
+          android: AndroidNotificationDetails(
+            channelId,
+            channelName,
+            channelDescription: channelDesc,
+            importance: Importance.max,
+            priority: Priority.max,
+            category: AndroidNotificationCategory.alarm,
+            fullScreenIntent: true,
+            playSound: true,
+            sound: sound,
+            enableVibration: true,
+            vibrationPattern: Int64List.fromList([0, 900, 400, 900, 400, 1400]),
+            visibility: NotificationVisibility.public,
+            autoCancel: true,
+          ),
+        );
+
+  final title = isCaregiver
+      ? (payload['title']?.toString() ?? 'Cảnh báo té ngã')
+      : payload['title']?.toString();
+  final body = isCaregiver
+      ? 'Người thân của bạn có thể đã bị té ngã. Hãy kiểm tra ngay!'
+      : payload['body']?.toString();
 
   await _backgroundNotifications.show(
     notificationId,
-    payload['title']?.toString(),
-    payload['body']?.toString(),
+    title,
+    body,
     details,
     payload: jsonEncode(payload),
   );
@@ -1002,6 +1036,14 @@ class NotificationRuntimeService {
     // alertType marker we set in parseNotificationOpenTarget.
     final alertType = target.alertType?.trim().toLowerCase() ?? '';
     if (alertType == 'fall_detected' || alertType == 'fall_detection') {
+      // ADR-023 Phase 7 S13: caregiver taps the banner → open notifications
+      // list instead of FallAlertScreen + 30s countdown SOS ring.
+      final isCaregiverTap =
+          (data['is_recipient_patient'] as String? ?? 'true') == 'false';
+      if (isCaregiverTap) {
+        await _emergencyAdapter.openNotifications();
+        return;
+      }
       final fallEventIdRaw =
           (data['fall_event_id'] ?? data['fallEventId'] ?? target.sosId)
               ?.toString();
@@ -1201,6 +1243,20 @@ class NotificationRuntimeService {
             alertType: alertType,
           )
         : null;
+
+    // ADR-023 Phase 7 S13: caregiver fall path — show banner instead of
+    // fullscreen. Patient fall flag absent or "true" continues the existing
+    // fullscreen FallAlertScreen path.
+    final isFallAlert = isFallAlertType(alertType);
+    final isCaregiver =
+        isFallAlert &&
+        _toMap(item['data'])['is_recipient_patient']?.toString() == 'false';
+    if (isCaregiver) {
+      await _emergencyAdapter.presentMissedAlert(item, subjectId: subjectId);
+      _rememberPresentedAlert(dedupeKey);
+      _lastPresentedNotificationId = notificationId;
+      return;
+    }
 
     if (preferFullscreen) {
       final shouldShowFullscreenRisk = !isRisk || riskLevel == 'critical';

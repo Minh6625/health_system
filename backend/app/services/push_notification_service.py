@@ -418,6 +418,7 @@ class PushNotificationService:
         body: str,
         confidence: float,
         notification_id_by_user: dict[int, int] | None = None,
+        patient_user_id: int | None = None,
     ) -> None:
         """Fan out a fall-detected push to the user + their caregivers.
 
@@ -490,6 +491,15 @@ class PushNotificationService:
 
         for row in rows:
             notification_id = notif_map.get(int(row.user_id))
+            # ADR-023 Phase 7 S13: per-recipient flag so the mobile handler
+            # can differentiate the patient (fullscreen FallAlertScreen) from
+            # caregivers (banner-only "family member fell" notification).
+            # When ``patient_user_id`` is ``None`` (legacy call-site or
+            # patient-only fan-out) every recipient is treated as patient.
+            is_patient = (
+                patient_user_id is None
+                or int(row.user_id) == int(patient_user_id)
+            )
             data = {
                 # Discriminator that the mobile fall_event_handler keys on.
                 "type": "fall_alert",
@@ -507,6 +517,9 @@ class PushNotificationService:
                 "title": title,
                 "body": body,
                 "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                # S13: caregiver-facing flag. String "true"/"false" because
+                # FCM data payloads must be Map<String, String>.
+                "is_recipient_patient": "true" if is_patient else "false",
             }
 
             # Always-takeover for fall alerts: a missed fall = potential
