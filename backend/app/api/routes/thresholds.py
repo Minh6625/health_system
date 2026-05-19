@@ -1,9 +1,8 @@
 """Threshold endpoint — single-source-of-truth for mobile + simulator UI.
 
-Phase 0.1 of the IoT pipeline fix plan: project clinical thresholds from
-``backend/app/data/rules_config.json`` into a stable JSON contract so
-mobile (Flutter ``ThresholdService``) and the IoT sim-web dashboard can
-fetch one document instead of duplicating constants in three places.
+Phase 0.1 of the IoT pipeline fix plan. Reads
+``system_settings.clinical_rules_thresholds`` so admin website edits
+propagate without redeploy.
 
 The endpoint is anonymous — no auth required — because thresholds are
 non-sensitive clinical reference values used to colour vital cards. A
@@ -13,8 +12,10 @@ means; gating that behind login adds friction without security value.
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
+from app.db.database import get_db
 from app.schemas.general_settings import (
     BodyTempThresholds,
     DiaBpThresholds,
@@ -31,6 +32,8 @@ from app.schemas.general_settings import (
 )
 from app.services.threshold_loader import (
     SNAPSHOT_VERSION,
+    get_fall_confidence_threshold,
+    get_model_thresholds,
     get_rules_version,
     get_vital_thresholds,
 )
@@ -43,16 +46,18 @@ router = APIRouter(prefix="/settings", tags=["mobile-thresholds"])
     response_model=ThresholdConfigResponse,
     summary="Clinical thresholds (single source of truth)",
 )
-def get_thresholds() -> ThresholdConfigResponse:
-    """Return the projected vitals + model + fall thresholds.
+def get_thresholds(db: Session = Depends(get_db)) -> ThresholdConfigResponse:
+    """Return the clinical vitals + model + fall thresholds.
 
-    Cached server-side via ``threshold_loader._CACHE`` (mtime-keyed) so
-    repeated polling from many clients is cheap. Mobile clients should
-    fetch once per app launch and persist locally; the contract is
-    stable but the values may shift between releases (bump
-    ``snapshot_version`` to invalidate client caches).
+    Source: ``system_settings.clinical_rules_thresholds`` row. Cached
+    server-side via ``threshold_loader._CACHE`` (TTL 300s) so repeated
+    polling from many clients stays cheap. Mobile clients should fetch
+    once per app launch and persist locally; the contract is stable but
+    values may shift between releases (admin updates the row through
+    the admin website).
     """
-    vitals_dict = get_vital_thresholds()
+    vitals_dict = get_vital_thresholds(db)
+    model_dict = get_model_thresholds(db)
     vitals = VitalsThresholds(
         heart_rate=HeartRateThresholds(**vitals_dict["heart_rate"]),
         spo2=Spo2Thresholds(**vitals_dict["spo2"]),
@@ -62,17 +67,13 @@ def get_thresholds() -> ThresholdConfigResponse:
         dia_bp=DiaBpThresholds(**vitals_dict["dia_bp"]),
     )
     return ThresholdConfigResponse(
-        version=get_rules_version(),
+        version=get_rules_version(db),
         snapshot_version=SNAPSHOT_VERSION,
         vitals=vitals,
-        # Aligns with PR-3 P1-6: lowered to 0.5 (model-api fall_true_at)
-        # so the BE secondary-validation gate matches what the model
-        # already considers "fall positive". Variant fall_brief (0.65)
-        # now produces a soft alert instead of being silently dropped.
-        fall_confidence_threshold=0.5,
+        fall_confidence_threshold=get_fall_confidence_threshold(db),
         model_thresholds=ModelThresholds(
-            health=ModelHealthThresholds(),
-            fall=ModelFallThresholds(),
-            sleep=ModelSleepThresholds(),
+            health=ModelHealthThresholds(**model_dict["health"]),
+            fall=ModelFallThresholds(**model_dict["fall"]),
+            sleep=ModelSleepThresholds(**model_dict["sleep"]),
         ),
     )
