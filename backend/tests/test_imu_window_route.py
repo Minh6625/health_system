@@ -8,8 +8,10 @@ Three scenarios pin the route's contract:
 2. **Model unavailable** — ``predict_fall`` returns ``None`` (breaker
    open / transport fail / 5xx); **no row is written**, the response
    carries ``status="model_unavailable"`` and a NULL ``fall_event_id``.
-3. **Schema validation** — payloads with fewer than 20 samples are
-   rejected at the FastAPI layer with HTTP 422.
+3. **Schema validation** — payloads with fewer than 50 samples are
+   rejected at the FastAPI layer with HTTP 422 (P1-1: tightened from
+   the legacy 20-sample floor so the BE matches the model-api's
+   ``fall_min_sequence_samples=50``).
 """
 
 from __future__ import annotations
@@ -133,8 +135,12 @@ def _build_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     return app
 
 
-def _imu_window_payload(*, sample_count: int = 25) -> dict[str, Any]:
-    """Build a minimal valid IMU window with ``sample_count`` rows."""
+def _imu_window_payload(*, sample_count: int = 50) -> dict[str, Any]:
+    """Build a minimal valid IMU window with ``sample_count`` rows.
+
+    Default raised from 25 to 50 (P1-1) to match the new BE schema
+    minimum that mirrors the model-api's ``fall_min_sequence_samples``.
+    """
     samples = [
         {
             "timestamp": i * 20,
@@ -155,7 +161,7 @@ def _imu_window_payload(*, sample_count: int = 25) -> dict[str, Any]:
 def _ok_prediction() -> dict[str, Any]:
     return {
         "device_id": "42",
-        "sample_count": 25,
+        "sample_count": 50,
         "predicted_fall_probability": 0.87,
         "predicted_fall": True,
         "predicted_fall_label": "fall",
