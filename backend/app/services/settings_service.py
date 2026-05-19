@@ -18,18 +18,19 @@ logger = logging.getLogger(__name__)
 _CACHE_TTL_SEC = 300.0
 
 
-def _default_daytime() -> dict[str, Any]:
-    """Daytime fallback projected from rules_config.json (Phase 0 SoT).
+def _default_daytime(db: Session) -> dict[str, Any]:
+    """Daytime fallback projected from DB-backed clinical_rules_thresholds.
 
-    Resolved at call time so a hot-reloaded snapshot is picked up
-    without restarting uvicorn (mtime-keyed cache inside the loader).
+    Reads the same row that ``GET /settings/thresholds`` serves so admin
+    edits propagate to the risk pipeline within the loader cache TTL
+    (300s) without restarting uvicorn.
     """
-    return to_legacy_daytime_dict()
+    return to_legacy_daytime_dict(db)
 
 
-def _default_sleep() -> dict[str, Any]:
-    """Sleep-context fallback (rules_config + sleep-only OSA gates)."""
-    return to_legacy_sleep_dict()
+def _default_sleep(db: Session) -> dict[str, Any]:
+    """Sleep-context fallback (DB-backed clinical thresholds + OSA gates)."""
+    return to_legacy_sleep_dict(db)
 
 _THRESHOLD_KEY_ALIASES: dict[str, str] = {
     "hr_min": "hr_critical_min",
@@ -66,13 +67,13 @@ class SettingsService:
 
     @classmethod
     def get_vitals_sleep_thresholds(cls, db: Session) -> dict[str, Any]:
-        defaults = _default_sleep()
+        defaults = _default_sleep(db)
         result = cls.get_setting("vitals_sleep_thresholds", db, defaults)
         return cls._normalize_thresholds(result, defaults)
 
     @classmethod
     def get_vitals_daytime_thresholds(cls, db: Session) -> dict[str, Any]:
-        defaults = _default_daytime()
+        defaults = _default_daytime(db)
         result = cls.get_setting("vitals_default_thresholds", db, defaults)
         return cls._normalize_thresholds(result, defaults)
 
