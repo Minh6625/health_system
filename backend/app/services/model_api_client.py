@@ -62,7 +62,24 @@ class ModelApiClient:
                 timeout_value = float(os.getenv("HEALTHGUARD_MODEL_API_TIMEOUT_SECONDS", _DEFAULT_TIMEOUT_SECONDS))
             except (TypeError, ValueError):
                 timeout_value = _DEFAULT_TIMEOUT_SECONDS
-        self._timeout = httpx.Timeout(timeout_value)
+        # P1-9 (2026-05-18): split connect / read / write / pool timeouts
+        # so a slow model-api cold start does not trip the breaker on
+        # the very first request.
+        # - connect=2s : DNS + TCP handshake should always be sub-second on
+        #   localhost; longer means the upstream is genuinely down.
+        # - read=timeout_value : the user-facing knob — model inference
+        #   (LightGBM + SHAP) for a 50-sample window typically lands
+        #   500-1500 ms but cold-start can spike past 5s.
+        # - write=2s : payloads are small; long write times signal a
+        #   broken connection rather than slow inference.
+        # - pool=2s : we keep a single client; pool acquire should be
+        #   instant.
+        self._timeout = httpx.Timeout(
+            timeout_value,
+            connect=2.0,
+            write=2.0,
+            pool=2.0,
+        )
         self._client: httpx.Client | None = None
         # Three independent breakers — health, fall and sleep endpoints
         # all degrade independently. A failing sleep model must not
