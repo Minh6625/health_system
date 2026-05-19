@@ -8,42 +8,28 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from app.services.threshold_loader import (
+    to_legacy_daytime_dict,
+    to_legacy_sleep_dict,
+)
+
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SEC = 300.0
 
-_DEFAULT_DAYTIME: dict[str, Any] = {
-    "hr_critical_min": 50,
-    "hr_critical_max": 120,
-    "hr_warning_min": 55,
-    "hr_warning_max": 110,
-    "spo2_critical": 90,
-    "spo2_warning": 94,
-    "rr_critical_min": 10,
-    "rr_critical_max": 25,
-    "bp_sys_critical": 180,
-    "bp_dia_critical": 120,
-    "bp_sys_warning": 140,
-    "bp_dia_warning": 90,
-}
 
-_DEFAULT_SLEEP: dict[str, Any] = {
-    "hr_critical_min": 38,
-    "hr_critical_max": 100,
-    "hr_warning_min": 42,
-    "hr_warning_max": 90,
-    "spo2_critical": 85,
-    "spo2_warning": 90,
-    "rr_critical_min": 6,
-    "rr_critical_max": 25,
-    "bp_sys_critical": 180,
-    "bp_dia_critical": 120,
-    "bp_sys_warning": 160,
-    "bp_dia_warning": 100,
-    "osa_alert_spo2_threshold": 88,
-    "nocturnal_tachy_hr": 120,
-    "apnea_rr_threshold": 6,
-}
+def _default_daytime() -> dict[str, Any]:
+    """Daytime fallback projected from rules_config.json (Phase 0 SoT).
+
+    Resolved at call time so a hot-reloaded snapshot is picked up
+    without restarting uvicorn (mtime-keyed cache inside the loader).
+    """
+    return to_legacy_daytime_dict()
+
+
+def _default_sleep() -> dict[str, Any]:
+    """Sleep-context fallback (rules_config + sleep-only OSA gates)."""
+    return to_legacy_sleep_dict()
 
 _THRESHOLD_KEY_ALIASES: dict[str, str] = {
     "hr_min": "hr_critical_min",
@@ -80,13 +66,15 @@ class SettingsService:
 
     @classmethod
     def get_vitals_sleep_thresholds(cls, db: Session) -> dict[str, Any]:
-        result = cls.get_setting("vitals_sleep_thresholds", db, _DEFAULT_SLEEP)
-        return cls._normalize_thresholds(result, _DEFAULT_SLEEP)
+        defaults = _default_sleep()
+        result = cls.get_setting("vitals_sleep_thresholds", db, defaults)
+        return cls._normalize_thresholds(result, defaults)
 
     @classmethod
     def get_vitals_daytime_thresholds(cls, db: Session) -> dict[str, Any]:
-        result = cls.get_setting("vitals_default_thresholds", db, _DEFAULT_DAYTIME)
-        return cls._normalize_thresholds(result, _DEFAULT_DAYTIME)
+        defaults = _default_daytime()
+        result = cls.get_setting("vitals_default_thresholds", db, defaults)
+        return cls._normalize_thresholds(result, defaults)
 
     @classmethod
     def upsert_setting(
