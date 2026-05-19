@@ -7,8 +7,13 @@
 /// 4. warning-high     (normalHigh .. criticalHigh]
 /// 5. critical-high    (criticalHigh .. axisMax]
 ///
-/// All thresholds are mirrored from `vital_signs.dart` classifiers so the
-/// gauge always agrees with the colored status pill.
+/// All thresholds derive from `ThresholdService.instance.config` (P1-5),
+/// which is fed by the BE `/settings/thresholds` endpoint and falls back
+/// to the rules_config v2.0.0 snapshot when offline. The classifiers in
+/// `vital_signs.dart` read from the same source so the gauge always
+/// agrees with the colored status pill.
+import 'package:healthguard/core/services/threshold_service.dart';
+
 class VitalSafeRange {
   const VitalSafeRange({
     required this.axisMin,
@@ -32,62 +37,56 @@ class VitalSafeRange {
 /// Returns the canonical safe range for a given vital type. For blood
 /// pressure this returns the **systolic** range (the dominant indicator);
 /// the diastolic value is shown alongside but not gauged separately.
-VitalSafeRange? vitalSafeRangeFor(String vitalType) {
+VitalSafeRange? vitalSafeRangeFor(String vitalType, {ThresholdConfig? config}) {
+  final t = config ?? ThresholdService.instance.config;
   switch (vitalType) {
     case 'hr':
-      // <50 critical, 50-59 warn, 60-100 normal, 101-120 warn, >120 critical.
-      return const VitalSafeRange(
+      return VitalSafeRange(
         axisMin: 30,
-        criticalLow: 50,
-        normalLow: 60,
-        normalHigh: 100,
-        criticalHigh: 120,
+        criticalLow: t.heartRate.urgentLow,
+        normalLow: t.heartRate.sendLow,
+        normalHigh: t.heartRate.watchHigh,
+        criticalHigh: t.heartRate.sendHigh,
         axisMax: 160,
         unitLabel: 'bpm',
       );
     case 'spo2':
-      // <92 critical, 92-94 warn, ≥95 normal. No upper warning.
-      return const VitalSafeRange(
+      return VitalSafeRange(
         axisMin: 80,
-        criticalLow: 92,
-        normalLow: 95,
+        criticalLow: t.spo2.urgentLow,
+        normalLow: t.spo2.watchLow,
         normalHigh: 100,
         criticalHigh: 100,
         axisMax: 100,
         unitLabel: '%',
       );
     case 'temp':
-      // <35.5 critical, 35.5-36.0 warn, 36.1-37.2 normal,
-      // 37.3-37.7 warn, ≥37.8 critical.
-      return const VitalSafeRange(
+      return VitalSafeRange(
         axisMin: 34.0,
-        criticalLow: 35.5,
-        normalLow: 36.1,
-        normalHigh: 37.2,
-        criticalHigh: 37.8,
+        criticalLow: t.bodyTemp.urgentLow,
+        normalLow: t.bodyTemp.sendLow,
+        normalHigh: t.bodyTemp.watchHigh,
+        criticalHigh: t.bodyTemp.sendHigh,
         axisMax: 40.0,
         unitLabel: '°C',
       );
     case 'bp':
-      // Systolic: <70 critical, 70-89 warn, 90-120 normal,
-      // 121-139 warn, ≥140 critical.
-      return const VitalSafeRange(
+      return VitalSafeRange(
         axisMin: 50,
-        criticalLow: 70,
-        normalLow: 90,
-        normalHigh: 120,
-        criticalHigh: 140,
+        criticalLow: t.sysBp.urgentLow,
+        normalLow: t.sysBp.sendLow,
+        normalHigh: t.sysBp.watchHigh,
+        criticalHigh: t.sysBp.sendHigh,
         axisMax: 200,
         unitLabel: 'mmHg',
       );
     case 'rr':
-      // <12 critical, 12-13 warn, 14-20 normal, 21-25 warn, >25 critical.
-      return const VitalSafeRange(
+      return VitalSafeRange(
         axisMin: 5,
-        criticalLow: 12,
+        criticalLow: t.respRate.urgentLow,
         normalLow: 14,
-        normalHigh: 20,
-        criticalHigh: 25,
+        normalHigh: t.respRate.watchHigh,
+        criticalHigh: t.respRate.sendHigh,
         axisMax: 35,
         unitLabel: 'lần/phút',
       );

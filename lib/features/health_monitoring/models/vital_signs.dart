@@ -1,69 +1,104 @@
+import 'package:healthguard/core/services/threshold_service.dart';
+
 enum VitalStatus { normal, warning, critical, unknown }
 
-VitalStatus classifyHeartRateStatus(double? heartRate) {
+/// P1-5 (2026-05-18): the classify* helpers now accept an optional
+/// [ThresholdConfig] argument. When omitted they read from
+/// `ThresholdService.instance.config`, which initialises to the
+/// rules_config v2.0.0 defaults and is updated when
+/// `GET /api/v1/mobile/settings/thresholds` returns. Callers therefore
+/// keep the same signature — colour zones move with the BE without a
+/// rebuild.
+
+VitalStatus classifyHeartRateStatus(double? heartRate, {ThresholdConfig? config}) {
   if (heartRate == null) {
     return VitalStatus.unknown;
   }
-  if (heartRate < 50 || heartRate > 120) {
+  final t = (config ?? ThresholdService.instance.config).heartRate;
+  if (heartRate <= t.urgentLow || heartRate >= t.urgentHigh) {
     return VitalStatus.critical;
   }
-  if ((heartRate >= 50 && heartRate < 60) ||
-      (heartRate > 100 && heartRate <= 120)) {
+  if (heartRate <= t.sendLow || heartRate >= t.sendHigh) {
+    return VitalStatus.warning;
+  }
+  if (heartRate >= t.watchHigh) {
     return VitalStatus.warning;
   }
   return VitalStatus.normal;
 }
 
-VitalStatus classifySpo2Status(double? spo2) {
+VitalStatus classifySpo2Status(double? spo2, {ThresholdConfig? config}) {
   if (spo2 == null) {
     return VitalStatus.unknown;
   }
-  if (spo2 < 92) {
+  final t = (config ?? ThresholdService.instance.config).spo2;
+  if (spo2 < t.urgentLow) {
     return VitalStatus.critical;
   }
-  if (spo2 < 95) {
+  if (spo2 <= t.sendLow) {
+    return VitalStatus.warning;
+  }
+  if (spo2 <= t.watchLow) {
     return VitalStatus.warning;
   }
   return VitalStatus.normal;
 }
 
-VitalStatus classifyTemperatureStatus(double? temperature) {
+VitalStatus classifyTemperatureStatus(
+  double? temperature, {
+  ThresholdConfig? config,
+}) {
   if (temperature == null) {
     return VitalStatus.unknown;
   }
-  if (temperature >= 37.8 || temperature < 35.5) {
+  final t = (config ?? ThresholdService.instance.config).bodyTemp;
+  if (temperature <= t.urgentLow || temperature >= t.urgentHigh) {
     return VitalStatus.critical;
   }
-  if ((temperature >= 37.3 && temperature < 37.8) ||
-      (temperature >= 35.5 && temperature < 36.1)) {
+  if (temperature <= t.sendLow || temperature >= t.sendHigh) {
+    return VitalStatus.warning;
+  }
+  if (temperature >= t.watchHigh) {
     return VitalStatus.warning;
   }
   return VitalStatus.normal;
 }
 
-VitalStatus classifyBloodPressureSystolicStatus(double? systolic) {
+VitalStatus classifyBloodPressureSystolicStatus(
+  double? systolic, {
+  ThresholdConfig? config,
+}) {
   if (systolic == null) {
     return VitalStatus.unknown;
   }
-  if (systolic >= 140 || systolic < 70) {
+  final t = (config ?? ThresholdService.instance.config).sysBp;
+  if (systolic <= t.urgentLow || systolic >= t.urgentHigh) {
     return VitalStatus.critical;
   }
-  if ((systolic >= 121 && systolic < 140) ||
-      (systolic >= 70 && systolic < 90)) {
+  if (systolic <= t.sendLow || systolic >= t.sendHigh) {
+    return VitalStatus.warning;
+  }
+  if (systolic >= t.watchHigh) {
     return VitalStatus.warning;
   }
   return VitalStatus.normal;
 }
 
-VitalStatus classifyBloodPressureDiastolicStatus(double? diastolic) {
+VitalStatus classifyBloodPressureDiastolicStatus(
+  double? diastolic, {
+  ThresholdConfig? config,
+}) {
   if (diastolic == null) {
     return VitalStatus.unknown;
   }
-  if (diastolic >= 90 || diastolic < 50) {
+  final t = (config ?? ThresholdService.instance.config).diaBp;
+  if (diastolic >= t.urgentHigh) {
     return VitalStatus.critical;
   }
-  if ((diastolic >= 81 && diastolic < 90) ||
-      (diastolic >= 50 && diastolic < 60)) {
+  if (diastolic >= t.sendHigh) {
+    return VitalStatus.warning;
+  }
+  if (diastolic >= t.watchHigh) {
     return VitalStatus.warning;
   }
   return VitalStatus.normal;
@@ -72,9 +107,10 @@ VitalStatus classifyBloodPressureDiastolicStatus(double? diastolic) {
 VitalStatus classifyBloodPressureStatus({
   required double? systolic,
   required double? diastolic,
+  ThresholdConfig? config,
 }) {
-  final systolicStatus = classifyBloodPressureSystolicStatus(systolic);
-  final diastolicStatus = classifyBloodPressureDiastolicStatus(diastolic);
+  final systolicStatus = classifyBloodPressureSystolicStatus(systolic, config: config);
+  final diastolicStatus = classifyBloodPressureDiastolicStatus(diastolic, config: config);
   if (systolicStatus == VitalStatus.critical ||
       diastolicStatus == VitalStatus.critical) {
     return VitalStatus.critical;
@@ -90,15 +126,21 @@ VitalStatus classifyBloodPressureStatus({
   return VitalStatus.normal;
 }
 
-VitalStatus classifyRespiratoryRateStatus(double? respiratoryRate) {
+VitalStatus classifyRespiratoryRateStatus(
+  double? respiratoryRate, {
+  ThresholdConfig? config,
+}) {
   if (respiratoryRate == null) {
     return VitalStatus.unknown;
   }
-  if (respiratoryRate < 12 || respiratoryRate > 25) {
+  final t = (config ?? ThresholdService.instance.config).respRate;
+  if (respiratoryRate <= t.urgentLow || respiratoryRate >= t.urgentHigh) {
     return VitalStatus.critical;
   }
-  if ((respiratoryRate >= 12 && respiratoryRate < 14) ||
-      (respiratoryRate > 20 && respiratoryRate <= 25)) {
+  if (respiratoryRate >= t.sendHigh) {
+    return VitalStatus.warning;
+  }
+  if (respiratoryRate >= t.watchHigh) {
     return VitalStatus.warning;
   }
   return VitalStatus.normal;
