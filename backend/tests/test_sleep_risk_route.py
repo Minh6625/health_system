@@ -64,8 +64,37 @@ def _build_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
 
     app.state.captured_persist = captured_persist  # noqa: SLF001 - test seam
 
+    # P1-8: ingest_sleep_risk now validates device-user ownership with
+    # ``db.query(Device.user_id).filter(...).first()``. Provide a stub
+    # session that returns the owning user_id for the test payload's
+    # db_device_id (= 42 by default in the route tests below).
+    class _StubFilter:
+        def __init__(self, owner_user_id: int | None) -> None:
+            self._owner = owner_user_id
+
+        def first(self):
+            if self._owner is None:
+                return None
+            return (self._owner,)
+
+    class _StubQuery:
+        def __init__(self, owner_user_id: int | None) -> None:
+            self._owner = owner_user_id
+
+        def filter(self, *_args, **_kwargs):
+            return _StubFilter(self._owner)
+
+    class _StubSession:
+        # Default: device 7 belongs to user 42 (matches the
+        # SleepRiskRequest body the tests post). Tests that need a
+        # different owner override ``app.state.owner_user_id``.
+        def query(self, *_args, **_kwargs):
+            return _StubQuery(getattr(app.state, "owner_user_id", 42))
+
+    app.state.owner_user_id = 42
+
     def _override_db():
-        yield object()
+        yield _StubSession()
 
     app.dependency_overrides[get_db] = _override_db
     return app
