@@ -79,11 +79,14 @@ class ImuWindowRequest(BaseModel):
     window_size: int = Field(default=50, ge=1)
     data: list[SensorSample] = Field(
         ...,
-        min_length=20,
+        min_length=50,
+        max_length=500,
         description=(
             "IMU window: one SensorSample per timestep. Must contain at "
-            "least 20 entries; the model-api may require more (e.g. 50 at "
-            "default 50 Hz)."
+            "least 50 entries to match the model-api's "
+            "``fall_min_sequence_samples`` setting. The previous lower "
+            "bound of 20 caused silent ``model_unavailable`` responses "
+            "because the upstream rejected anything below 50."
         ),
     )
 
