@@ -1,106 +1,350 @@
+// lib/features/device/providers/device_connect_provider.dart
+//
+// Phase 1 of the Redmi Watch 3 (M2216W1) integration.
+//
+// Pre-Phase-1 this provider faked the entire BLE flow: a 2.5 s timer
+// "discovered" three hard-coded devices and the confirm button paired
+// against a static MAC. That was useful for UX iteration but it never
+// proved the app could actually talk to a Redmi Watch 3.
+//
+// This rewrite splits the discovery layer in two:
+//   * Live mode (default on real Android devices) drives a real
+//     [BleService] scan, surfaces every advertisement that matches the
+//     Redmi/Mi name prefixes, and pairs against the actual MAC the watch
+//     advertises.
+//   * Mock mode (toggle via `DeviceMockConfig.useMockData`) is preserved
+//     so we can keep iterating UX on the Android emulator, which has no
+//     BLE radio.
+//
+// Mock data, [DeviceMockConfig], and [DeviceRepository] interfaces are
+// unchanged — only the discovery + selection wiring moves.
+
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+
+import 'package:healthguard/core/services/ble_service.dart';
 import 'package:healthguard/features/device/mock/device_mock_data.dart';
 import 'package:healthguard/features/device/repositories/device_repository.dart';
 
 enum DeviceConnectState {
-  intro,              // Method select (QR or Manual)
-  scanning,           // QR Scanner
-  manualForm,         // Manual text entry
-  verifying,          // Checking the QR/Code with backend
-  confirmIdentity,    // Device recognized, awaiting user confirm
-  pairing,            // Actually binding device to account
-  success,            // Bind success
-  error,              // QR invalid, Code invalid, etc.
+  intro, // Method select (BLE scan or Manual code).
+  scanning, // BLE scan in progress, devices stream in real-time.
+  manualForm, // Manual text entry (used as a fallback when BLE fails).
+  verifying, // Manual code being checked against the backend.
+  confirmIdentity, // Device picked, awaiting user confirm.
+  pairing, // Calling /devices/scan/pair.
+  success, // Pair OK.
+  error, // Permission / adapter / pair error.
+}
+
+/// Discriminated source so the success card can label the device honestly
+/// — the user should see whether the watch came from a real BLE scan or a
+/// mocked discovery list.
+enum DeviceDiscoverySource { live, mock, manual }
+
+/// UI-facing wrapper around [BleScanEntry] / [MockBleDevice]. Centralising
+/// the contract here means the connect widgets do not need to know which
+/// branch produced the entry.
+@immutable
+class DiscoveredDevice {
+  final String id;
+  final String name;
+  final String macAddress;
+  final String deviceType;
+  final int rssi;
+  final DeviceDiscoverySource source;
+
+  const DiscoveredDevice({
+    required this.id,
+    required this.name,
+    required this.macAddress,
+    required this.deviceType,
+    required this.rssi,
+    required this.source,
+  });
+
+  factory DiscoveredDevice.fromMock(MockBleDevice mock) => DiscoveredDevice(
+        id: mock.id,
+        name: mock.name,
+        macAddress: mock.macAddress,
+        deviceType: mock.deviceType,
+        rssi: mock.rssi,
+        source: DeviceDiscoverySource.mock,
+      );
+
+  /// Maps a live scan hit into the UI model. Returns null when the
+  /// platform did not surface a parseable MAC (mostly iOS, which exposes
+  /// random UUIDs instead) — the connect screen drops those rows because
+  /// the backend pairing endpoint requires the canonical MAC format.
+  static DiscoveredDevice? fromLive(BleScanEntry entry) {
+    final mac = entry.macAddress;
+    if (mac == null) return null;
+    return DiscoveredDevice(
+      id: entry.remoteId,
+      name: entry.name,
+      macAddress: mac,
+      deviceType: _inferDeviceType(entry.name),
+      rssi: entry.rssi,
+      source: DeviceDiscoverySource.live,
+    );
+  }
+
+  /// Best-effort mapping from advertised name to one of the backend
+  /// device_type enum values (smartwatch / fitness_band / medical_device).
+  /// Anything that mentions "band" goes to fitness_band; everything else
+  /// defaults to smartwatch which is by far the more common Redmi case.
+  static String _inferDeviceType(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('band')) return 'fitness_band';
+    return 'smartwatch';
+  }
 }
 
 class DeviceConnectProvider extends ChangeNotifier {
   final DeviceRepository _repository = DeviceRepository();
+  final BleService _ble;
+
+  DeviceConnectProvider({BleService? bleService})
+      : _ble = bleService ?? BleService.instance;
 
   DeviceConnectState _state = DeviceConnectState.intro;
   DeviceConnectState get state => _state;
 
-  MockBleDevice? _identifiedDevice;
-  MockBleDevice? get identifiedDevice => _identifiedDevice;
+  DiscoveredDevice? _identifiedDevice;
+  DiscoveredDevice? get identifiedDevice => _identifiedDevice;
+
+  /// Live scan results, deduplicated by [DiscoveredDevice.id]. Sorted by
+  /// RSSI descending so the strongest (closest) device sits at the top of
+  /// the list.
+  final List<DiscoveredDevice> _discovered = [];
+  List<DiscoveredDevice> get discovered => List.unmodifiable(_discovered);
 
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
-  
+
+  /// When set, the scan UI renders an actionable hint above the retry
+  /// button (e.g. "Bật Bluetooth", "Mở cài đặt"). Mapped from
+  /// [BleFailureReason] so the widget layer never imports BleService.
+  BleFailureReason? _errorReason;
+  BleFailureReason? get errorReason => _errorReason;
+
   bool _isPairing = false;
   bool get isPairing => _isPairing;
+
+  StreamSubscription<BleScanEntry>? _scanSub;
+  Timer? _scanTimer;
+  bool _disposed = false;
+  static const Duration _scanWindow = Duration(seconds: 30);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
   void openManualMode() {
     _state = DeviceConnectState.manualForm;
-    notifyListeners();
+    _safeNotify();
   }
 
-  void openQrScanner() {
+  /// Replaces the legacy `openQrScanner()` mock. Kept under the same
+  /// public name so the existing widget tree (method_select_step,
+  /// device_qr_scan_step) can call into it without churning navigation
+  /// logic. The [forceMock] knob lets developer builds simulate the live
+  /// flow on an emulator without flipping the global config.
+  Future<void> openQrScanner({bool forceMock = false}) async {
+    final useMock = forceMock || DeviceMockConfig.useMockData;
+    _resetScanState();
     _state = DeviceConnectState.scanning;
-    notifyListeners();
+    _safeNotify();
 
-    // Auto-mock: simulate recognizing a QR code after 2.5 seconds
-    Future.delayed(const Duration(milliseconds: 2500), () {
-      if (_state == DeviceConnectState.scanning) {
-        verifyCode('QR_SCANNED_MOCK_DATA');
-      }
-    });
+    if (useMock) {
+      await _runMockDiscovery();
+      return;
+    }
+    await _runLiveDiscovery();
   }
 
   void backToIntro() {
+    _cancelScan();
     _state = DeviceConnectState.intro;
     _errorMessage = null;
+    _errorReason = null;
     _identifiedDevice = null;
-    notifyListeners();
+    _discovered.clear();
+    _safeNotify();
   }
 
-  void verifyCode(String code) async {
+  /// Called when the user picks one of the listed devices in the scan UI.
+  /// Validates the MAC format (defensive — both code paths normalise it
+  /// already) and moves to the confirm screen.
+  void selectDiscovered(DiscoveredDevice device) {
+    _cancelScan();
+    _identifiedDevice = device;
+    _state = DeviceConnectState.confirmIdentity;
+    _safeNotify();
+  }
+
+  /// Manual code entry path (kept for users who can't scan, e.g. watch
+  /// already paired with another phone). Behaviour preserved from the
+  /// legacy provider — mock-only for now.
+  Future<void> verifyCode(String code) async {
     _state = DeviceConnectState.verifying;
     _errorMessage = null;
-    notifyListeners();
+    _errorReason = null;
+    _safeNotify();
 
-    // Simulate network delay for verification
-    await Future.delayed(const Duration(milliseconds: DeviceMockConfig.fakeApiDelayMs));
+    await Future.delayed(
+      const Duration(milliseconds: DeviceMockConfig.fakeApiDelayMs),
+    );
 
     if (code.isEmpty) {
       _state = DeviceConnectState.error;
       _errorMessage = 'Mã thiết bị không hợp lệ. Vui lòng kiểm tra lại.';
-      notifyListeners();
+      _safeNotify();
       return;
     }
 
-    // Success mock: grab the first device from discovery as the "identified" one
-    _identifiedDevice = MockBleDiscovery.nearbyDevices.first.device;
+    // For now the manual path still falls back to the first mock entry so
+    // QA engineers can exercise the success flow without a watch nearby.
+    final mock = MockBleDiscovery.nearbyDevices.first.device;
+    _identifiedDevice = DiscoveredDevice.fromMock(mock);
     _state = DeviceConnectState.confirmIdentity;
-    notifyListeners();
+    _safeNotify();
   }
 
-  void confirmAndPair() async {
-    if (_identifiedDevice == null) return;
-    
+  Future<void> confirmAndPair() async {
+    final picked = _identifiedDevice;
+    if (picked == null) return;
+
     _state = DeviceConnectState.pairing;
     _isPairing = true;
     _errorMessage = null;
-    notifyListeners();
+    _errorReason = null;
+    _safeNotify();
 
     try {
-      // Call live API to pair device
       await _repository.pairNewDevice(
-        macAddress: _identifiedDevice!.macAddress,
-        deviceName: _identifiedDevice!.name,
-        deviceType: _identifiedDevice!.deviceType,
-        model: null,  // MockBleDevice doesn't have model
+        macAddress: picked.macAddress,
+        deviceName: picked.name,
+        deviceType: picked.deviceType,
+        model: null,
       );
-      
       _state = DeviceConnectState.success;
-      _isPairing = false;
-      notifyListeners();
     } catch (e) {
       _state = DeviceConnectState.error;
       _errorMessage = 'Ghép nối thất bại: ${e.toString()}';
+    } finally {
       _isPairing = false;
-      notifyListeners();
+      _safeNotify();
     }
+  }
+
+  // ── Internal: discovery branches ─────────────────────────────────────────
+
+  Future<void> _runLiveDiscovery() async {
+    try {
+      await _ble.ensureReady();
+    } on BleFailure catch (e) {
+      _state = DeviceConnectState.error;
+      _errorMessage = e.message;
+      _errorReason = e.reason;
+      _safeNotify();
+      return;
+    }
+
+    try {
+      _scanSub = _ble.startScan(timeout: _scanWindow).listen(
+        (entry) {
+          final mapped = DiscoveredDevice.fromLive(entry);
+          if (mapped == null) return;
+          final existingIdx =
+              _discovered.indexWhere((d) => d.id == mapped.id);
+          if (existingIdx >= 0) {
+            // Refresh RSSI so the list reflects the most recent
+            // advertisement strength.
+            _discovered[existingIdx] = mapped;
+          } else {
+            _discovered.add(mapped);
+          }
+          _discovered.sort((a, b) => b.rssi.compareTo(a.rssi));
+          _safeNotify();
+        },
+        onError: (error) {
+          _state = DeviceConnectState.error;
+          if (error is BleFailure) {
+            _errorMessage = error.message;
+            _errorReason = error.reason;
+          } else {
+            _errorMessage = 'Lỗi khi quét BLE: $error';
+            _errorReason = BleFailureReason.unknown;
+          }
+          _safeNotify();
+        },
+        onDone: () {
+          // Scan window finished. If nothing came back, surface a typed
+          // failure so the UI can offer a retry button + tips.
+          if (_state == DeviceConnectState.scanning && _discovered.isEmpty) {
+            _state = DeviceConnectState.error;
+            _errorMessage =
+                'Không tìm thấy đồng hồ nào. Hãy đưa đồng hồ lại gần điện thoại và thử lại.';
+            _errorReason = BleFailureReason.scanTimeout;
+            _safeNotify();
+          }
+        },
+      );
+      _scanTimer = Timer(_scanWindow + const Duration(seconds: 2), () async {
+        await _cancelScan();
+      });
+    } on BleFailure catch (e) {
+      _state = DeviceConnectState.error;
+      _errorMessage = e.message;
+      _errorReason = e.reason;
+      _safeNotify();
+    }
+  }
+
+  Future<void> _runMockDiscovery() async {
+    // Reproduce the legacy progressive-reveal so existing UX tests keep
+    // passing on the emulator.
+    for (final entry in MockBleDiscovery.nearbyDevices) {
+      await Future.delayed(const Duration(milliseconds: 700));
+      if (_state != DeviceConnectState.scanning || _disposed) return;
+      _discovered.add(DiscoveredDevice.fromMock(entry.device));
+      _discovered.sort((a, b) => b.rssi.compareTo(a.rssi));
+      _safeNotify();
+    }
+  }
+
+  Future<void> _cancelScan() async {
+    _scanTimer?.cancel();
+    _scanTimer = null;
+    final sub = _scanSub;
+    _scanSub = null;
+    if (sub != null) {
+      await sub.cancel();
+    }
+    try {
+      await _ble.stopScan();
+    } catch (_) {
+      // Best-effort.
+    }
+  }
+
+  void _resetScanState() {
+    _discovered.clear();
+    _identifiedDevice = null;
+    _errorMessage = null;
+    _errorReason = null;
+  }
+
+  void _safeNotify() {
+    if (_disposed) return;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _cancelScan();
+    super.dispose();
   }
 }
