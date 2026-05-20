@@ -208,7 +208,15 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
     // the user to see *why* — not just an unexplained dash. Without this
     // banner QA reported users mistaking a dead watch for a healthy one
     // because the previous reading was still painted on screen.
-    final isStale = provider.isStale;
+    //
+    // Phase 2 (Health Connect): rephrase the sub-message based on
+    // [DataFreshness] so a normal HC delay (5-15 min) reads as "đang
+    // chờ đồng bộ" instead of the alarmist "mất kết nối", which would
+    // otherwise fire every cycle just because Mi Fitness hasn't pushed
+    // yet. Only the >15 min bucket keeps the disconnect copy.
+    final freshness = provider.dataFreshness;
+    final isStale = provider.isStale || freshness == DataFreshness.stale;
+    final isDelayed = freshness == DataFreshness.delayed;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
@@ -290,10 +298,30 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                 ),
                 SizedBox(width: AppSpacing.gapXs),
                 Text(
-                  'Thiết bị mất kết nối',
+                  'Đã hơn 15 phút chưa cập nhật',
                   style: AppTextStyles.caption.copyWith(
                     color: AppColors.warning,
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ] else if (isDelayed) ...[
+            SizedBox(height: AppSpacing.gapSm),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.sync_rounded,
+                  size: 16,
+                  color: AppColors.textSecondary,
+                ),
+                SizedBox(width: AppSpacing.gapXs),
+                Text(
+                  'Đang chờ đồng bộ từ đồng hồ',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],

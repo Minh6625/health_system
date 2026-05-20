@@ -14,6 +14,12 @@ class VitalCard extends StatelessWidget {
   final VitalStatus status;
   final VoidCallback? onTap;
 
+  /// Optional sub-message rendered under the unit. Used by the Phase 2
+  /// dashboard to disambiguate why a value is "—" — e.g. "Đang đợi đồng
+  /// bộ", "Watch chưa cấp quyền", "Đã hơn 15 phút chưa cập nhật". Keep
+  /// short (≤ 40 chars) so it fits the 2-line cap.
+  final String? subtitle;
+
   const VitalCard({
     super.key,
     required this.title,
@@ -22,6 +28,7 @@ class VitalCard extends StatelessWidget {
     required this.icon,
     required this.status,
     this.onTap,
+    this.subtitle,
   });
 
   Color _getBackgroundColor() {
@@ -167,6 +174,21 @@ class VitalCard extends StatelessWidget {
                 ),
               ],
             ),
+            // Phase 2: optional sub-message that explains a missing value
+            // (e.g. "Đang đợi đồng bộ"). Renders only when supplied so
+            // existing call sites without a subtitle keep their layout.
+            if (subtitle != null && subtitle!.isNotEmpty) ...[
+              SizedBox(height: AppSpacing.gapXs),
+              Text(
+                subtitle!,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
           ],
         ),
       ),
