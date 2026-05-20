@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.audience import AudienceEnum, require_clinician_audience
-from app.core.dependencies import get_target_profile_id
+from app.core.dependencies import get_current_user, get_target_profile_id
 from app.db.database import get_db
+from app.models.user_model import User
 from app.schemas.monitoring import (
     SleepSessionResponse,
     SleepHistoryResponse,
@@ -14,6 +15,9 @@ from app.schemas.monitoring import (
     RiskReportClinicianResponse,
     RiskReportDetailResponse,
     RiskHistoryResponse,
+    MobileVitalsBatch,
+    MobileVitalsIngestResponse,
+    MobileVitalsIngestRejection,
 )
 from app.services.monitoring_service import MonitoringService
 
@@ -217,6 +221,43 @@ def get_risk_history(
         page=page,
         limit=limit,
         risk_type=risk_type,
+    )
+
+
+@metrics_router.post(
+    "/vitals/ingest",
+    response_model=MobileVitalsIngestResponse,
+)
+def ingest_mobile_vitals(
+    payload: MobileVitalsBatch,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MobileVitalsIngestResponse:
+    """Phase 2: Mobile clients (Flutter app reading from Health Connect)
+    push batches of vitals harvested from the user's watch via Mi Fitness.
+
+    Auth boundary: standard JWT user (NOT the internal-service token used
+    by the IoT simulator) — the device must belong to the calling user.
+    Insertion path is shared with `/telemetry/ingest` so risk pipeline
+    output is symmetric across simulator and real-watch sources.
+    """
+    try:
+        result = MonitoringService.ingest_mobile_batch(
+            patient_id=current_user.id,
+            device_id=payload.device_id,
+            samples=payload.samples,
+            db=db,
+        )
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    return MobileVitalsIngestResponse(
+        accepted=result["accepted"],
+        rejected=result["rejected"],
+        rejections=[
+            MobileVitalsIngestRejection(**r) for r in result["rejections"]
+        ],
+        risk_evaluated_devices=result["risk_evaluated_devices"],
     )
 
 
