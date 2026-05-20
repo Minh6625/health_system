@@ -49,6 +49,21 @@
     <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
     <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
 
+    <!--
+      Health Connect package visibility (Android 11+ package visibility).
+      Without this <queries> entry, the `health` plugin cannot see
+      `com.google.android.apps.healthdata` on Android 11+ and reports
+      "Health Connect chua duoc cai dat" even when it is. The
+      ACTION_SHOW_PERMISSIONS_RATIONALE intent is required by the
+      package's permission flow on Android 14+.
+    -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
+    </queries>
+
     <application
         android:label="Health Guard"
         android:name="${applicationName}"
