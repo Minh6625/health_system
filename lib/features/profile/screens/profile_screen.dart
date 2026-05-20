@@ -206,6 +206,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _DeviceTile(isFirst: true, isLast: false),
                 const ProfileMenuDivider(),
                 ProfileMenuTile(
+                  icon: Icons.health_and_safety_rounded,
+                  iconColor: AppColors.success,
+                  title: 'Đồng bộ Health Connect',
+                  subtitle: 'Lấy dữ liệu thật từ Mi Fitness ↔ Health Connect',
+                  onTap: () => Navigator.pushNamed(
+                      context, AppRouter.healthConnectSettings),
+                ),
+                const ProfileMenuDivider(),
+                ProfileMenuTile(
                   icon: Icons.family_restroom_rounded,
                   iconColor: AppColors.info,
                   title: 'Quản lý gia đình',
