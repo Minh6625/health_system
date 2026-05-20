@@ -267,6 +267,8 @@ class EmergencyService:
         address: Optional[str] = None,
         notes: Optional[str] = None,
         background_tasks: Optional[Any] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
     ) -> dict[str, Any]:
         """Handle a terminal response for an initial risk alert."""
         alert = EmergencyRepository.get_alert_by_id(db, notification_id)
@@ -340,6 +342,21 @@ class EmergencyService:
         try:
             if normalized_action == "safe":
                 db.commit()
+                safe_log_action(
+                    db,
+                    action="risk_alert.acknowledged",
+                    status="success",
+                    user_id=int(current_user_id),
+                    resource_type="alert",
+                    resource_id=int(notification_id),
+                    ip_address=ip_address,
+                    user_agent=user_agent,
+                    details={
+                        "source": source,
+                        "response_action": normalized_action,
+                        "risk_score_id": risk_score_id,
+                    },
+                )
                 return {
                     "success": True,
                     "status": "acknowledged",
@@ -361,6 +378,41 @@ class EmergencyService:
             )
             response_row.sos_event_id = int(sos_event.id)
             db.commit()
+
+            # Audit: log BOTH the risk-alert escalation and the resulting
+            # SOS creation so the timeline reads correctly even when the
+            # SOS was triggered by an alert response (rather than the
+            # direct ``POST /emergency/sos/trigger`` route).
+            _audit_details = {
+                "source": source,
+                "response_action": normalized_action,
+                "trigger_type": trigger_type,
+                "risk_score_id": risk_score_id,
+                "recipient_count": len(dispatch_info["recipient_user_ids"]),
+                "has_location": latitude is not None,
+            }
+            safe_log_action(
+                db,
+                action="risk_alert.escalated",
+                status="success",
+                user_id=int(current_user_id),
+                resource_type="alert",
+                resource_id=int(notification_id),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={**_audit_details, "sos_event_id": int(sos_event.id)},
+            )
+            safe_log_action(
+                db,
+                action="sos.triggered",
+                status="success",
+                user_id=int(current_user_id),
+                resource_type="sos_event",
+                resource_id=int(sos_event.id),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={**_audit_details, "origin": "risk_alert"},
+            )
 
             _push_kwargs = dict(
                 recipient_user_ids=dispatch_info["recipient_user_ids"],
@@ -396,8 +448,23 @@ class EmergencyService:
                 "acknowledged_at": existing_response.responded_at,
                 "sos_event_id": existing_response.sos_event_id,
             }
-        except Exception:
+        except Exception as exc:
             db.rollback()
+            safe_log_action(
+                db,
+                action="risk_alert.respond",
+                status="failure",
+                user_id=int(current_user_id),
+                resource_type="alert",
+                resource_id=int(notification_id),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={
+                    "source": source,
+                    "response_action": normalized_action,
+                    "error_type": type(exc).__name__,
+                },
+            )
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Không thể xử lý phản hồi cảnh báo rủi ro",

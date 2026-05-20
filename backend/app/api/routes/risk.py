@@ -319,6 +319,7 @@ def _dispatch_risk_alerts(
 def respond_to_risk_alert(
     notification_id: int,
     payload: RiskAlertResponseRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -336,6 +337,8 @@ def respond_to_risk_alert(
         address=payload.address,
         notes=payload.notes,
         background_tasks=background_tasks,
+        ip_address=get_client_ip(request),
+        user_agent=get_user_agent(request),
     )
     return RiskAlertResponseResponse(**result)
 
