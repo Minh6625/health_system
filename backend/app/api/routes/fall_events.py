@@ -17,11 +17,12 @@ would leak existence).
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_target_profile_id
+from app.core.dependencies import get_target_profile_id, get_current_user
 from app.db.database import get_db
+from app.models.user_model import User
 from app.schemas.fall_telemetry import (
     FallEventDismissRequest,
     FallEventDismissResponse,
@@ -31,6 +32,7 @@ from app.schemas.fall_telemetry import (
     FallSurveySubmitResponse,
 )
 from app.services.fall_event_service import FallEventService
+from app.utils.audit_helper import get_client_ip, get_user_agent, safe_log_action
 
 router = APIRouter(prefix="/fall-events", tags=["mobile-fall-events"])
 
@@ -114,8 +116,10 @@ def get_fall_event(
 )
 def dismiss_fall_event(
     fall_event_id: int,
+    request: Request,
     payload: FallEventDismissRequest | None = None,
     target_profile_id: int = Depends(get_target_profile_id),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> FallEventDismissResponse:
     """Mark a fall event as ``user_cancelled`` and update
@@ -136,10 +140,27 @@ def dismiss_fall_event(
         db=db,
     )
     if result is None:
+        # 404 enumeration-resistant — skip audit.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy sự kiện ngã",
         )
+    safe_log_action(
+        db,
+        action="fall_event.dismissed",
+        status="success",
+        user_id=int(current_user.id),
+        resource_type="fall_event",
+        resource_id=int(fall_event_id),
+        ip_address=get_client_ip(request),
+        user_agent=get_user_agent(request),
+        details={
+            "target_profile_id": int(target_profile_id),
+            "via_target_header": int(target_profile_id) != int(current_user.id),
+            "has_reason": bool(reason),
+            "reason": reason,
+        },
+    )
     return FallEventDismissResponse(fall_event=result)
 
 
@@ -156,7 +177,9 @@ def dismiss_fall_event(
 def submit_fall_survey(
     fall_event_id: int,
     payload: FallSurveySubmitRequest,
+    request: Request,
     target_profile_id: int = Depends(get_target_profile_id),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> FallSurveySubmitResponse:
     """Persist the FallStandUpSurveyScreen answer (Option 3-Lite).
@@ -183,8 +206,25 @@ def submit_fall_survey(
         db=db,
     )
     if result is None:
+        # 404 enumeration-resistant — skip audit.
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy sự kiện ngã",
         )
+    safe_log_action(
+        db,
+        action="fall_event.survey_submitted",
+        status="success",
+        user_id=int(current_user.id),
+        resource_type="fall_event",
+        resource_id=int(fall_event_id),
+        ip_address=get_client_ip(request),
+        user_agent=get_user_agent(request),
+        details={
+            "target_profile_id": int(target_profile_id),
+            "via_target_header": int(target_profile_id) != int(current_user.id),
+            "can_stand": payload.can_stand,
+            "skipped": bool(payload.skipped),
+        },
+    )
     return FallSurveySubmitResponse(fall_event=result)

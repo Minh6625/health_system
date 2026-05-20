@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -8,6 +9,45 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!--
+      BLE permissions for Phase 1 (real Redmi Watch 3 scan/connect).
+
+      Android 12+ (API 31): BLUETOOTH_SCAN + BLUETOOTH_CONNECT are runtime
+      permissions. We declare `neverForLocation` on SCAN so the OS does not
+      force us to request ACCESS_FINE_LOCATION on Android 12+ purely for BLE.
+      ACCESS_FINE_LOCATION is still kept above (already used elsewhere) and
+      is required on Android 11 and below for BLE scanning.
+
+      Android <= 11 (API 30): legacy BLUETOOTH + BLUETOOTH_ADMIN are still
+      needed and we cap them with maxSdkVersion="30" so they are not granted
+      unnecessarily on modern devices.
+    -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        tools:targetApi="s" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADMIN"
+        android:maxSdkVersion="30" />
+
+    <!--
+      Phase 2 (Health Connect): read-only access to Mi Fitness's
+      Redmi Watch 3 readings. Each permission is a runtime grant on
+      Android 14+; on older devices the Health Connect APK supplies
+      the permission flow via its own activity.
+    -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
 
     <application
         android:label="Health Guard"

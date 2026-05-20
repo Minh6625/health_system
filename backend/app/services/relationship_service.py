@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -169,6 +169,37 @@ class RelationshipService:
                 ))
                 
         return profiles
+
+    @staticmethod
+    def get_relationship_snapshot(
+        db: Session, relationship_id: int
+    ) -> Optional[dict]:
+        """Return a JSON-friendly snapshot of a relationship's permission
+        bits, used by audit log writers BEFORE update/delete so the audit
+        row carries ``permissions_before`` (the post-mutation state is
+        derived from the request payload or another fresh fetch).
+
+        Returns ``None`` when the relationship does not exist; callers
+        translate that into the standard 404 path and skip auditing.
+        """
+        rel = RelationshipRepository.get_by_id(db, relationship_id)
+        if rel is None:
+            return None
+        return {
+            "id": int(rel.id),
+            "patient_id": int(rel.patient_id) if rel.patient_id is not None else None,
+            "caregiver_id": int(rel.caregiver_id)
+            if rel.caregiver_id is not None
+            else None,
+            "status": rel.status,
+            "relationship_type": getattr(rel, "relationship_type", None),
+            "can_view_vitals": bool(getattr(rel, "can_view_vitals", False)),
+            "can_view_location": bool(getattr(rel, "can_view_location", False)),
+            "can_view_medical_info": bool(
+                getattr(rel, "can_view_medical_info", False)
+            ),
+            "can_receive_alerts": bool(getattr(rel, "can_receive_alerts", False)),
+        }
 
     @staticmethod
     def request_relationship(db: Session, current_user: User, payload: RelationshipRequestCreate) -> UserRelationship:

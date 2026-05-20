@@ -12,6 +12,7 @@ import 'package:healthguard/features/auth/providers/auth_provider.dart';
 import 'package:healthguard/features/auth/repositories/auth_repository.dart';
 import 'package:healthguard/features/auth/screens/auth_pages_screen.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
+import 'package:healthguard/features/device/providers/health_sync_provider.dart';
 import 'package:healthguard/features/emergency/providers/emergency_caregiver_provider.dart';
 import 'package:healthguard/features/emergency/repositories/emergency_caregiver_repository.dart';
 import 'package:healthguard/features/fall/providers/fall_event_provider.dart';
@@ -215,6 +216,12 @@ class _HealthSystemAppState extends State<HealthSystemApp> {
           create: (_) => SleepProvider(now: widget.sleepNow),
         ),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
+        // Phase 2 (Health Connect): provider that polls Mi Fitness'
+        // Health Connect output and pushes batches to the backend mobile
+        // ingest endpoint. Lazy by default — start() is called from the
+        // dashboard once the user has paired a watch and granted HC
+        // permissions, so the provider is cheap to register globally.
+        ChangeNotifierProvider(create: (_) => HealthSyncProvider()),
         ChangeNotifierProvider(create: (_) => HomeDashboardProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
         ChangeNotifierProvider(create: (_) => FamilyDashboardProvider()),

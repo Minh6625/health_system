@@ -109,6 +109,26 @@ class _ClinicianToggleTile extends StatelessWidget {
             ),
           ),
         ),
+        // Phase 2 (Health Connect): entry point that drives the Mi
+        // Fitness <-> Health Connect bridge. Available to every user, not
+        // gated on the clinician toggle, because data sync is the core
+        // mechanism for getting real Redmi Watch 3 readings into the app.
+        const Divider(height: 32),
+        ListTile(
+          leading: Icon(
+            Icons.health_and_safety_rounded,
+            color: theme.colorScheme.primary,
+          ),
+          title: const Text('Đồng bộ Health Connect'),
+          subtitle: const Text(
+            'Kết nối Mi Fitness ↔ Health Connect để lấy dữ liệu thật từ '
+            'đồng hồ Redmi Watch.',
+          ),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => Navigator.of(context).pushNamed(
+            '/health-connect-settings',
+          ),
+        ),
       ],
     );
   }

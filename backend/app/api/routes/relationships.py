@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from typing import List
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.schemas.relationship import (
     UserSearchResponse,
 )
 from app.services.relationship_service import RelationshipService
+from app.utils.audit_helper import get_client_ip, get_user_agent, safe_log_action
 
 router = APIRouter(tags=["mobile-relationships"])
 
@@ -109,11 +110,53 @@ def get_relationships(
 )
 def request_relationship(
     payload: RelationshipRequestCreate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Send a request to a family member or friend by email/phone"""
-    rel = RelationshipService.request_relationship(db, current_user, payload)
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+    try:
+        rel = RelationshipService.request_relationship(db, current_user, payload)
+    except HTTPException as exc:
+        # 404 (target not found) is enumeration-resistant — skip audit.
+        # All other 4xx (self-link, account inactive, duplicate) ARE worth
+        # auditing because they reveal social-engineering attempts.
+        if exc.status_code != status.HTTP_404_NOT_FOUND:
+            safe_log_action(
+                db,
+                action="relationship.requested",
+                status="failure",
+                user_id=int(current_user.id),
+                resource_type="relationship",
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={
+                    "reason": str(exc.detail),
+                    "http_status": exc.status_code,
+                    "target_user_id": payload.target_user_id,
+                    "has_email": bool(payload.email),
+                    "has_phone": bool(payload.phone),
+                },
+            )
+        raise
+    safe_log_action(
+        db,
+        action="relationship.requested",
+        status="success",
+        user_id=int(current_user.id),
+        resource_type="relationship",
+        resource_id=int(rel.id),
+        ip_address=ip_address,
+        user_agent=user_agent,
+        details={
+            "target_user_id": int(rel.patient_id)
+            if rel.caregiver_id == current_user.id
+            else int(rel.caregiver_id),
+            "relationship_type": getattr(rel, "relationship_type", None),
+        },
+    )
     all_rels = RelationshipService.format_relationships(db, current_user.id)
     for r in all_rels:
         if r["id"] == rel.id:
@@ -128,11 +171,44 @@ def request_relationship(
 )
 def accept_relationship(
     payload: RelationshipAcceptRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Accept an incoming request from someone wanting to view your data"""
-    rel = RelationshipService.accept_relationship(db, current_user, payload.relationship_id)
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+    try:
+        rel = RelationshipService.accept_relationship(db, current_user, payload.relationship_id)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_403_FORBIDDEN:
+            safe_log_action(
+                db,
+                action="relationship.accepted",
+                status="failure",
+                user_id=int(current_user.id),
+                resource_type="relationship",
+                resource_id=int(payload.relationship_id),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={"reason": "forbidden"},
+            )
+        raise
+    safe_log_action(
+        db,
+        action="relationship.accepted",
+        status="success",
+        user_id=int(current_user.id),
+        resource_type="relationship",
+        resource_id=int(rel.id),
+        ip_address=ip_address,
+        user_agent=user_agent,
+        details={
+            "patient_id": int(rel.patient_id),
+            "caregiver_id": int(rel.caregiver_id),
+            "relationship_type": getattr(rel, "relationship_type", None),
+        },
+    )
     rels = RelationshipService.format_relationships(db, current_user.id)
     for r in rels:
         if r["id"] == rel.id:
@@ -147,11 +223,52 @@ def accept_relationship(
 def update_relationship(
     relationship_id: int,
     payload: RelationshipUpdate,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Update permissions like can_view_vitals, or tags/relationship_type"""
-    rel = RelationshipService.update_relationship(db, current_user, relationship_id, payload)
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+    # Snapshot BEFORE the mutation so audit captures the old permission
+    # bits. ``None`` means no row exists; the service will raise 404 and
+    # we skip the audit log (enumeration-resistant).
+    snapshot_before = RelationshipService.get_relationship_snapshot(db, relationship_id)
+    try:
+        rel = RelationshipService.update_relationship(db, current_user, relationship_id, payload)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_403_FORBIDDEN:
+            safe_log_action(
+                db,
+                action="relationship.updated",
+                status="failure",
+                user_id=int(current_user.id),
+                resource_type="relationship",
+                resource_id=int(relationship_id),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={
+                    "reason": "forbidden",
+                    "permissions_before": snapshot_before,
+                },
+            )
+        raise
+    snapshot_after = RelationshipService.get_relationship_snapshot(db, relationship_id)
+    safe_log_action(
+        db,
+        action="relationship.updated",
+        status="success",
+        user_id=int(current_user.id),
+        resource_type="relationship",
+        resource_id=int(rel.id),
+        ip_address=ip_address,
+        user_agent=user_agent,
+        details={
+            "permissions_before": snapshot_before,
+            "permissions_after": snapshot_after,
+            "fields_changed": list(payload.dict(exclude_unset=True).keys()),
+        },
+    )
     rels = RelationshipService.format_relationships(db, current_user.id)
     for r in rels:
         if r["id"] == rel.id:
@@ -165,8 +282,43 @@ def update_relationship(
 )
 def delete_relationship(
     relationship_id: int,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Cancel a pending request, or revoke access to an accepted relationship"""
-    RelationshipService.delete_relationship(db, current_user, relationship_id)
+    ip_address = get_client_ip(request)
+    user_agent = get_user_agent(request)
+    snapshot_before = RelationshipService.get_relationship_snapshot(db, relationship_id)
+    try:
+        RelationshipService.delete_relationship(db, current_user, relationship_id)
+    except HTTPException as exc:
+        if exc.status_code == status.HTTP_403_FORBIDDEN:
+            safe_log_action(
+                db,
+                action="relationship.deleted",
+                status="failure",
+                user_id=int(current_user.id),
+                resource_type="relationship",
+                resource_id=int(relationship_id),
+                ip_address=ip_address,
+                user_agent=user_agent,
+                details={
+                    "reason": "forbidden",
+                    "permissions_before": snapshot_before,
+                },
+            )
+        raise
+    safe_log_action(
+        db,
+        action="relationship.deleted",
+        status="success",
+        user_id=int(current_user.id),
+        resource_type="relationship",
+        resource_id=int(relationship_id),
+        ip_address=ip_address,
+        user_agent=user_agent,
+        details={
+            "permissions_before": snapshot_before,
+        },
+    )

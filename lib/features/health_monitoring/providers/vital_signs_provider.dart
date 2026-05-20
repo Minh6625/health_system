@@ -8,6 +8,24 @@ import '../repositories/monitoring_repository.dart';
 
 enum VitalsUIState { initial, loading, success, error, empty }
 
+/// Freshness bucket for the latest vitals snapshot. Drives the
+/// delay-aware copy on `vital_card` and `vital_detail_screen` so the user
+/// can tell whether a missing reading means "syncing in a minute" or "the
+/// watch went dark hours ago".
+///
+/// Phase 2 (Health Connect): Mi Fitness writes to Health Connect every
+/// 5-15 minutes, so a "fresh" reading here is anything within the last
+/// 5 minutes; 5-15 min is a normal `delayed` window we still treat as
+/// healthy; over 15 min is `stale`. `noData` means the provider has no
+/// reading at all yet (initial empty state, e.g. permissions just
+/// granted and HC has not produced anything yet).
+enum DataFreshness { live, delayed, stale, noData }
+
+/// Thresholds — kept here (not in provider state) so unit tests can pin
+/// the boundary without rebuilding the whole provider.
+const Duration kFreshnessLiveCutoff = Duration(minutes: 5);
+const Duration kFreshnessStaleCutoff = Duration(minutes: 15);
+
 class VitalSignsProvider extends ChangeNotifier {
   final MonitoringRepository _repo;
   final Duration _pollInterval;
@@ -26,6 +44,19 @@ class VitalSignsProvider extends ChangeNotifier {
   // already ships `is_stale=true` after VITALS_STALE_AFTER (5 min) of no
   // ingest — the frontend was simply ignoring the field.
   bool get isStale => _vitals?.isStale ?? false;
+
+  /// Phase 2 (Health Connect): bucketise the latest snapshot into
+  /// live / delayed / stale / noData so the UI can render delay-aware
+  /// copy. Health Connect realistically delivers data every 5-15 min, so
+  /// "delayed" is a normal healthy window — not an error.
+  DataFreshness get dataFreshness {
+    final v = _vitals;
+    if (v == null) return DataFreshness.noData;
+    final age = DateTime.now().difference(v.timestamp);
+    if (age <= kFreshnessLiveCutoff) return DataFreshness.live;
+    if (age <= kFreshnessStaleCutoff) return DataFreshness.delayed;
+    return DataFreshness.stale;
+  }
 
   String? _error;
   String? get error => _error;

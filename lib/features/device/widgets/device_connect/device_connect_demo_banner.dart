@@ -7,18 +7,15 @@ import '../../../../shared/presentation/theme/app_text_styles.dart';
 
 /// Honest disclosure surfaced on every screen of the device-connect flow.
 ///
-/// `DeviceConnectProvider` does **not** drive a real BLE/QR scanner today:
-/// `openQrScanner()` waits 2.5s and picks the first entry of
-/// `MockBleDiscovery.nearbyDevices` (`VSmart Watch A1` with the hard-coded
-/// MAC `AA:BB:CC:11:22:33`); `verifyCode()` ignores the user-typed code and
-/// returns the same mock device.
+/// Phase 1 Option A scope: this screen runs a real BLE scan, picks up the
+/// device's actual MAC and DIS metadata, and records it against the user
+/// account. It does NOT bond at the OS level because Redmi/Xiaomi watches
+/// only exchange meaningful data with Mi Fitness — forcing a bond would
+/// either fail or leave a dead pairing in the OS settings.
 ///
-/// In Phase 5b this banner only warned the user; we still wrote the fake
-/// device to the real backend via `POST /devices/scan/pair` if they tapped
-/// confirm. Phase 5c-A locks the final confirm action so we no longer
-/// pollute production data — `DeviceIdentityConfirmCard` keeps the button
-/// disabled until the real BLE/manual code endpoints land. The banner copy
-/// reflects that lock so what the UI says matches what the code does.
+/// The banner makes that boundary explicit so the user understands why
+/// they still need Mi Fitness for vital-sign sync, and why the simulator
+/// is the demo data source until the Xiaomi protobuf path is implemented.
 class DeviceConnectDemoBanner extends StatelessWidget {
   const DeviceConnectDemoBanner({super.key});
 
@@ -47,10 +44,10 @@ class DeviceConnectDemoBanner extends StatelessWidget {
           SizedBox(width: AppSpacing.gapSm),
           Expanded(
             child: Text(
-              'Quét QR/BLE đang ở chế độ demo: bạn có thể xem trước các '
-              'bước, nhưng nút "Kết nối máy này" tạm khoá để không lưu '
-              'thiết bị mẫu vào tài khoản. Tính năng quét thật sẽ có ở '
-              'bản tiếp theo.',
+              'Quét BLE thật: app sẽ ghi nhận MAC + thông tin chuẩn của '
+              'đồng hồ. Để đồng bộ dữ liệu sức khoẻ từ Redmi/Xiaomi, '
+              'hoàn tất ghép nối qua Mi Fitness và dùng Simulator để demo '
+              'pipeline.',
               style: AppTextStyles.caption.copyWith(
                 color: AppColors.textSecondary,
                 height: 1.4,

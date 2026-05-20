@@ -768,7 +768,144 @@ class MonitoringService:
                 raise ValueError("Vital signs table not initialized")
             raise
 
-    # F-12 (M-6): supported (window_hours, bucket_minutes) per range key.
+    # ── Phase 2: Health Connect mobile ingest ──────────────────────────
+    # Mobile clients harvest readings from Health Connect (Mi Fitness ↔
+    # Redmi Watch 3 bridge) and POST them to /metrics/vitals/ingest. This
+    # method validates ownership, INSERTs into the vitals hypertable using
+    # the same ON CONFLICT DO NOTHING pattern as the simulator/internal
+    # /telemetry/ingest path, and triggers the AI risk pipeline so the
+    # mobile UI surfaces a fresh risk score after a real watch sample
+    # arrives — keeping mobile and simulator outputs symmetric.
+    @staticmethod
+    def ingest_mobile_batch(
+        patient_id: int,
+        device_id: int,
+        samples: list[Any],
+        db: Session,
+    ) -> dict[str, Any]:
+        from app.models.device_model import Device
+        from app.services.risk_alert_service import calculate_device_risk
+
+        # Ownership: device must belong to the calling user. We fail fast
+        # with PermissionError so the route layer can map it to 403.
+        device = (
+            db.query(Device)
+            .filter(Device.id == device_id, Device.deleted_at.is_(None))
+            .first()
+        )
+        if device is None:
+            raise PermissionError("Thiet bi khong ton tai hoac da bi xoa")
+        if device.user_id is not None and device.user_id != patient_id:
+            raise PermissionError("Thiet bi khong thuoc ve nguoi dung hien tai")
+
+        now_utc = datetime.now(UTC)
+        future_cutoff = now_utc + timedelta(minutes=1)
+        past_cutoff = now_utc - timedelta(hours=24)
+
+        accepted = 0
+        rejections: list[dict[str, Any]] = []
+        params_to_insert: list[dict[str, Any]] = []
+
+        for idx, sample in enumerate(samples):
+            ts = sample.timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=UTC)
+            if ts > future_cutoff:
+                rejections.append({
+                    "index": idx,
+                    "timestamp": sample.timestamp,
+                    "reason": "timestamp_in_future",
+                })
+                continue
+            if ts < past_cutoff:
+                rejections.append({
+                    "index": idx,
+                    "timestamp": sample.timestamp,
+                    "reason": "timestamp_too_old",
+                })
+                continue
+            if sample.heart_rate is None and sample.spo2 is None:
+                # ADR-018 part 4: refuse vitals where every clinically
+                # meaningful field is null — same boundary contract as
+                # /telemetry/ingest.
+                rejections.append({
+                    "index": idx,
+                    "timestamp": sample.timestamp,
+                    "reason": "no_clinical_signal",
+                })
+                continue
+
+            params_to_insert.append({
+                "time": ts,
+                "device_id": device_id,
+                "heart_rate": int(round(sample.heart_rate))
+                    if sample.heart_rate is not None else None,
+                "spo2": sample.spo2,
+                "temperature": sample.temperature,
+                "hrv": None,
+                "respiratory_rate": (
+                    int(round(sample.respiratory_rate))
+                    if sample.respiratory_rate is not None else None
+                ),
+                "blood_pressure_sys": sample.blood_pressure_sys,
+                "blood_pressure_dia": sample.blood_pressure_dia,
+                "signal_quality": None,
+                "motion_artifact": False,
+            })
+
+        if params_to_insert:
+            insert_sql = text(
+                """
+                INSERT INTO vitals (
+                    time, device_id, heart_rate, spo2, temperature, hrv,
+                    respiratory_rate, blood_pressure_sys, blood_pressure_dia,
+                    signal_quality, motion_artifact
+                ) VALUES (
+                    :time, :device_id, :heart_rate, :spo2, :temperature, :hrv,
+                    :respiratory_rate, :blood_pressure_sys, :blood_pressure_dia,
+                    :signal_quality, :motion_artifact
+                )
+                ON CONFLICT (device_id, time) DO NOTHING
+                """
+            )
+            for params in params_to_insert:
+                result = db.execute(insert_sql, params)
+                if result.rowcount and result.rowcount > 0:
+                    accepted += 1
+
+            # Update device freshness so the mobile dashboard's
+            # last-sync indicator matches reality.
+            db.execute(
+                text(
+                    "UPDATE devices SET last_sync_at = :now, last_seen_at = :now "
+                    "WHERE id = :device_id"
+                ),
+                {"now": now_utc, "device_id": device_id},
+            )
+            db.commit()
+
+        risk_evaluated: list[int] = []
+        if accepted > 0:
+            try:
+                calculate_device_risk(
+                    db,
+                    device_id=device_id,
+                    user_id=patient_id,
+                )
+                risk_evaluated.append(device_id)
+            except Exception as exc:  # noqa: BLE001 — risk failure must not block ingest
+                logger.warning(
+                    "ingest_mobile_batch: risk calculation failed for device %s: %s",
+                    device_id,
+                    exc,
+                )
+
+        return {
+            "accepted": accepted,
+            "rejected": len(rejections),
+            "rejections": rejections,
+            "risk_evaluated_devices": risk_evaluated,
+        }
     # Only "24h" is wired into the mobile UI today; "7d" / "30d" are
     # reserved for future ticket scope and currently coerced to 24h. The
     # bucket sizes are tuned so each chart renders ~50–170 points: large

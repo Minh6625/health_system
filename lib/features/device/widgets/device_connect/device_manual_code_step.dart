@@ -39,12 +39,14 @@ class _DeviceManualCodeStepState extends State<DeviceManualCodeStep> {
           const DeviceConnectDemoBanner(),
           SizedBox(height: AppSpacing.sectionGapMd),
           Text(
-            'Nhập mã thiết bị',
+            'Nhập MAC đồng hồ',
             style: AppTextStyles.sectionTitle.copyWith(fontSize: 24),
           ),
           SizedBox(height: AppSpacing.gapMd),
           Text(
-            'Mã gồm 6-8 ký tự trên vỏ hộp hoặc trong phần cài đặt của đồng hồ.',
+            'Dùng khi BLE không thấy đồng hồ (đã pair với Mi Fitness). '
+            'Mở Cài đặt Android > Bluetooth > thiết bị đã ghép, copy địa '
+            'chỉ MAC dạng AA:BB:CC:DD:EE:FF.',
             style: AppTextStyles.body.copyWith(
               height: 1.5,
               color: AppColors.textSecondary,
@@ -54,11 +56,11 @@ class _DeviceManualCodeStepState extends State<DeviceManualCodeStep> {
           TextField(
             controller: _controller,
             enabled: !isVerifying,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 2),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1, fontFamily: 'monospace'),
             textAlign: TextAlign.center,
             decoration: InputDecoration(
-              hintText: 'VD: A1B2C3',
-              hintStyle: TextStyle(color: AppColors.strokeSoft, letterSpacing: 0),
+              hintText: 'AA:BB:CC:DD:EE:FF',
+              hintStyle: TextStyle(color: AppColors.strokeSoft, letterSpacing: 0, fontFamily: 'monospace'),
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(

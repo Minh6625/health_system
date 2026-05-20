@@ -74,15 +74,19 @@ class DeviceIdentityConfirmCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 40),
-                // Phase 5c-A: the pair button is locked because confirmAndPair
-                // would otherwise call POST /devices/scan/pair with the
-                // hard-coded mock MAC. We keep the visual affordance so the
-                // demo flow is still navigable, but onPressed is null until a
-                // real BLE/manual-code endpoint is wired in.
+                // Phase 1 (Option A — Discovery + Identify only):
+                // Redmi/Xiaomi watches require Mi Fitness to complete the
+                // proprietary auth handshake. We therefore record the MAC
+                // + best-effort GATT metadata (DIS/Battery) without
+                // forcing an OS bond. Data sync is delegated to the
+                // simulator pipeline until the Xiaomi protobuf path is
+                // implemented in a future phase.
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: null,
+                    onPressed: provider.isPairing
+                        ? null
+                        : provider.confirmAndPair,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.brandPrimary,
                       foregroundColor: Colors.white,
@@ -94,17 +98,22 @@ class DeviceIdentityConfirmCard extends StatelessWidget {
                       ),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Kết nối máy này (đang phát triển)',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    child: Text(
+                      provider.isPairing
+                          ? 'Đang ghi nhận...'
+                          : 'Ghi nhận thiết bị này',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
                 SizedBox(height: AppSpacing.gapSm),
                 Text(
-                  'Để bảo vệ dữ liệu, hệ thống không lưu thiết bị mẫu vào '
-                  'tài khoản. Tính năng kết nối thật sẽ mở khi BLE thực '
-                  'sẵn sàng.',
+                  'Ghi nhận MAC vào tài khoản để hệ thống nhận diện đồng hồ. '
+                  'Để đồng bộ dữ liệu sức khoẻ (nhịp tim, bước chân...), '
+                  'hãy hoàn tất ghép nối qua app Mi Fitness của Xiaomi.',
                   style: AppTextStyles.caption.copyWith(
                     color: AppColors.textSecondary,
                     height: 1.4,

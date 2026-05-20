@@ -32,7 +32,11 @@ android {
         applicationId = "com.example.health_system"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Phase 2 (Health Connect): bumped to 26 because the `health`
+        // package's manifest requires it. Android 8.0+ (Oreo) is the
+        // floor anyway for Health Connect on the device side, so users
+        // who need this feature already meet the requirement.
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
