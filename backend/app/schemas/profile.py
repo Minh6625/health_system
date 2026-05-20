@@ -44,8 +44,24 @@ class ProfileResponse(BaseModel):
     medications: list[str] = []
     allergies: list[str] = []
     medical_conditions: list[str] = []
+    # Phase 3: primary device pointer (nullable when user has not chosen one).
+    primary_device_id: int | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class SetPrimaryDeviceRequest(BaseModel):
+    """Phase 3: PATCH /profile/primary-device body. ``device_id=null``
+    clears the primary pointer so the dashboard falls back to the
+    legacy latest-of-all behaviour."""
+
+    model_config = ConfigDict(extra="forbid")
+    device_id: int | None
+
+
+class SetPrimaryDeviceResponse(BaseModel):
+    success: bool
+    primary_device_id: int | None
 
 
 class ProfileUpdateRequest(BaseModel):

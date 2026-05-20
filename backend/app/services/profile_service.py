@@ -36,6 +36,7 @@ class ProfileService:
             medications=user.medications or [],
             allergies=user.allergies or [],
             medical_conditions=user.medical_conditions or [],
+            primary_device_id=user.primary_device_id,
             created_at=user.created_at,
             updated_at=user.updated_at,
         )
@@ -105,3 +106,45 @@ class ProfileService:
             user_agent=user_agent,
             details={"reason": "user_requested"},
         )
+
+    @staticmethod
+    def set_primary_device(
+        user: User,
+        device_id: int | None,
+        db: Session,
+    ) -> int | None:
+        """Phase 3: pin a device as the user's primary data source.
+
+        Passing ``device_id=None`` clears the pointer. Validates that the
+        device exists and belongs to the calling user before persisting.
+        """
+        from app.models.device_model import Device
+
+        if device_id is None:
+            user.primary_device_id = None
+            user.updated_at = get_current_time()
+            db.commit()
+            db.refresh(user)
+            return None
+
+        device = (
+            db.query(Device)
+            .filter(Device.id == device_id, Device.deleted_at.is_(None))
+            .first()
+        )
+        if device is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Thiết bị không tồn tại",
+            )
+        if device.user_id is not None and device.user_id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Thiết bị không thuộc về bạn",
+            )
+
+        user.primary_device_id = device_id
+        user.updated_at = get_current_time()
+        db.commit()
+        db.refresh(user)
+        return device_id

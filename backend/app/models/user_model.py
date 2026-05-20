@@ -1,7 +1,7 @@
 import uuid as _uuid
 from datetime import datetime, date
 
-from sqlalchemy import String, Boolean, DateTime, Date, Float, Integer, SmallInteger, text
+from sqlalchemy import String, Boolean, DateTime, Date, Float, ForeignKey, Integer, SmallInteger, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -80,4 +80,17 @@ class User(Base):
     # NULL after reset is used. Expires in 15 minutes.
     reset_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
     reset_code_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # --- Phase 3: Primary device pointer ---
+    # The single device whose readings drive the dashboard / latest-vitals
+    # tile for this user. Multi-device ownership stays first-class
+    # (vitals.device_id is unchanged), but UI surfaces filter on this
+    # pointer so users always see one canonical "current source" instead
+    # of the racy latest-of-all behaviour. ON DELETE SET NULL keeps the
+    # user row alive when the picked device is unbound.
+    primary_device_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("devices.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
