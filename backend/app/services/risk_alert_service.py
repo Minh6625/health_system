@@ -39,6 +39,14 @@ _MODEL_CONFIDENCE_TENTATIVE_AT: float = 0.5
 RISK_COOLDOWN_SECONDS = int(os.getenv("RISK_COOLDOWN_SECONDS", "60"))
 RISK_ALERT_AUTO_ESCALATE_AFTER_SECONDS = 60
 
+# Phase 8 B3 (2026-05-20): magic constant cho pg_try_advisory_xact_lock.
+# Cap (key1, key2) = (RISK_DISPATCH_LOCK_NAMESPACE, device_id) bao dam chi
+# 1 transaction tai 1 thoi diem chay dispatch_risk_alerts cho cung device.
+# Khu race khi /telemetry/ingest va /telemetry/alert chay song song:
+# truoc fix, ca 2 deu SELECT cooldown thay miss -> ca 2 INSERT Alert + push
+# -> user nhan FCM duplicate. Lock release tu dong khi COMMIT/ROLLBACK.
+RISK_DISPATCH_LOCK_NAMESPACE = 0x52534B  # "RSK"
+
 
 @dataclass(frozen=True)
 class RiskCalculationResult:
@@ -301,6 +309,52 @@ def dispatch_risk_alerts(
             rule.alert_type,
             risk_level,
             os.getenv("RISK_ALERT_COOLDOWN_SECONDS", "300"),
+        )
+        return False
+
+    # Phase 8 B3 (2026-05-20): advisory lock theo device_id de khu race
+    # khi /telemetry/ingest va /telemetry/alert dispatch song song.
+    # ``pg_try_advisory_xact_lock`` non-blocking: neu path khac da giu lock,
+    # path nay skip de tranh duplicate alert + duplicate FCM. Lock auto
+    # release khi transaction COMMIT/ROLLBACK.
+    try:
+        lock_acquired = bool(
+            db.execute(
+                text(
+                    "SELECT pg_try_advisory_xact_lock(:ns, :device_id)"
+                ),
+                {
+                    "ns": RISK_DISPATCH_LOCK_NAMESPACE,
+                    "device_id": int(device_id),
+                },
+            ).scalar()
+        )
+    except Exception:
+        # Backend khong phai Postgres (vd test sqlite) -> bo qua lock,
+        # cooldown family-level van la lop bao ve chinh.
+        logger.debug(
+            "Advisory lock unsupported on this backend; relying on cooldown gate."
+        )
+        lock_acquired = True
+
+    if not lock_acquired:
+        logger.info(
+            "Risk dispatch race avoided: device=%s, another path is dispatching now",
+            device_id,
+        )
+        return False
+
+    # Re-check cooldown sau khi lay lock - path khac vua commit Alert moi
+    # truoc khi minh lay duoc lock.
+    if not post_fall and NotificationService.is_risk_alert_in_cooldown(
+        db,
+        device_id=device_id,
+        alert_type=rule.alert_type,
+    ):
+        logger.warning(
+            "Risk alert suppressed by cooldown after lock: device=%s type=%s",
+            device_id,
+            rule.alert_type,
         )
         return False
 
