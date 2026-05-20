@@ -68,7 +68,7 @@ class _SectionBody extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.fromLTRB(
         AppSpacing.gapLg,
-        0,
+        AppSpacing.gapLg,
         AppSpacing.gapLg,
         0,
       ),
@@ -359,25 +359,38 @@ class _AlertListState extends State<_AlertList> {
     final icon = _expanded
         ? Icons.expand_less_rounded
         : Icons.expand_more_rounded;
+    // Pill-shaped button with brand-tinted fill — visually anchors the
+    // bottom of the list and reads as an action, unlike a flat text link
+    // which looked like an accidental row in the previous iteration.
     return Padding(
-      padding: const EdgeInsets.only(top: 4, bottom: 4),
-      child: SizedBox(
-        width: double.infinity,
-        child: TextButton.icon(
-          onPressed: () => setState(() => _expanded = !_expanded),
-          icon: Icon(icon, size: 18, color: AppColors.brandPrimary),
-          label: Text(
-            label,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.brandPrimary,
-            ),
-          ),
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+      padding: const EdgeInsets.only(top: 8, bottom: 4),
+      child: Center(
+        child: Material(
+          color: AppColors.brandPrimary.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(AppRadii.radiusXl),
+          child: InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(AppRadii.radiusXl),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 10,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 18, color: AppColors.brandPrimary),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.brandPrimary,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
