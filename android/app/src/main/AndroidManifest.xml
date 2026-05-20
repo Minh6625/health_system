@@ -124,7 +124,35 @@
                 <data android:scheme="healthguard" android:host="verify-email" />
                 <data android:scheme="healthguard" android:host="reset-password" />
             </intent-filter>
+
+            <!--
+              Phase 2 (Health Connect): the `health` plugin's permission
+              flow targets this intent filter so Health Connect can show
+              its permissions rationale UI. Without it, requesting
+              authorisation silently no-ops because Health Connect can't
+              find the rationale activity for our package.
+            -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
+
+        <!--
+          Phase 2 (Health Connect): permission usage screen anchor. Health
+          Connect deep-links here when the user taps "View permission
+          usage". Routing to MainActivity is fine for now — the privacy
+          policy can live inside a Flutter route once we ship it.
+        -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
