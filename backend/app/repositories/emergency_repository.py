@@ -1,9 +1,10 @@
 from typing import List, Optional, Tuple
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, or_, func, exists, case
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.alert_constants import CAREGIVER_FEED_ALERT_TYPES
 from app.models.device_model import Device
 from app.models.risk_alert_response_model import RiskAlertResponse
 from app.models.sos_event_model import Alert, SOSEvent, FallEvent
@@ -416,3 +417,60 @@ class EmergencyRepository:
                 can_view_location
             )
         return visibility
+
+    @staticmethod
+    def get_recent_alerts_for_patient(
+        db: Session,
+        *,
+        patient_user_id: int,
+        days: int = 7,
+        limit: int = 10,
+        alert_types: Optional[frozenset[str]] = None,
+    ) -> List[Alert]:
+        """Fetch alerts about ``patient_user_id`` for the caregiver feed.
+
+        The caller is responsible for permission gating (relationship +
+        ``can_receive_alerts``) — this repo method assumes access has already
+        been authorized so it can be reused by future read surfaces.
+
+        Filters:
+          * ``alert_type`` restricted to :data:`CAREGIVER_FEED_ALERT_TYPES`
+            (or the explicit ``alert_types`` override) to drop device-status
+            and conversational noise.
+          * ``created_at`` within the last ``days`` days.
+          * ``user_id`` OR ``device_id`` belonging to the patient — alerts
+            written by the simulator carry only ``device_id`` while alerts
+            authored by the risk service carry ``user_id``. We union both
+            via a sub-select on ``devices`` so neither path is missed.
+
+        Returns alerts ordered ``created_at DESC``, capped at ``limit``.
+        """
+        whitelist = alert_types if alert_types is not None else CAREGIVER_FEED_ALERT_TYPES
+        if not whitelist:
+            return []
+
+        since = datetime.now(timezone.utc) - timedelta(days=max(1, days))
+
+        # Devices owned by the patient — covers simulator-authored alerts that
+        # only set ``device_id``. Soft-deleted devices are still included
+        # because historical alerts referencing them remain valid.
+        patient_device_ids = (
+            db.query(Device.id)
+            .filter(Device.user_id == patient_user_id)
+            .subquery()
+        )
+
+        return (
+            db.query(Alert)
+            .filter(
+                Alert.alert_type.in_(whitelist),
+                Alert.created_at >= since,
+                or_(
+                    Alert.user_id == patient_user_id,
+                    Alert.device_id.in_(db.query(patient_device_ids.c.id)),
+                ),
+            )
+            .order_by(Alert.created_at.desc(), Alert.id.desc())
+            .limit(max(1, limit))
+            .all()
+        )
