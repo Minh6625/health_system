@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.repositories.emergency_repository import EmergencyRepository
 from app.models.sos_event_model import Alert, SOSEvent
 from app.services.push_notification_service import PushNotificationService
+from app.utils.audit_helper import safe_log_action
 from app.schemas.emergency import (
     SOSAlertsResponse,
     SOSEventListItem,

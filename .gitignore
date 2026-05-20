@@ -110,3 +110,6 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Local-only smoke scripts (audit log testing, etc.)
+backend/scripts_local/
+

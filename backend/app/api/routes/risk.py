@@ -7,7 +7,7 @@ from decimal import Decimal
 from datetime import UTC, date, datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Query, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 from sqlalchemy import func, text
@@ -24,6 +24,7 @@ from app.models.risk_explanation_model import RiskExplanation
 from app.utils.datetime_helper import get_current_time
 from app.core.alert_constants import get_escalation_rule
 from app.schemas.emergency import RiskAlertResponseRequest, RiskAlertResponseResponse
+from app.utils.audit_helper import get_client_ip, get_user_agent
 from app.services.emergency_service import EmergencyService
 from app.services.notification_service import NotificationService
 from app.services.push_notification_service import PushNotificationService
