@@ -23,6 +23,10 @@ class DevicePriorityCard extends StatelessWidget {
   // resolved yet (rare race) we just hide the badge rather than
   // showing "Đang theo dõi: " with no name.
   final String? monitoredForName;
+  // Phase 3: id of the user's pinned primary device. When this matches
+  // [device.id] the card paints a "Thiết bị chính" badge so users can
+  // tell at a glance which source the dashboard is filtering on.
+  final int? primaryDeviceId;
 
   const DevicePriorityCard({
     super.key,
@@ -31,7 +35,10 @@ class DevicePriorityCard extends StatelessWidget {
     required this.onActionSelected,
     required this.onRefreshRequested,
     this.monitoredForName,
+    this.primaryDeviceId,
   });
+
+  bool get _isPrimary => primaryDeviceId != null && primaryDeviceId == device.id;
 
   @override
   Widget build(BuildContext context) {
@@ -87,6 +94,10 @@ class DevicePriorityCard extends StatelessWidget {
                                 ),
                               ),
                               SizedBox(width: AppSpacing.gapSm),
+                              if (_isPrimary) ...[
+                                _buildPrimaryBadge(),
+                                SizedBox(width: AppSpacing.gapXs),
+                              ],
                               _buildStatusBadge(isOffline),
                             ],
                           ),
@@ -137,6 +148,16 @@ class DevicePriorityCard extends StatelessWidget {
                       onSelected: (value) => onActionSelected(device, value),
                       padding: EdgeInsets.zero,
                       itemBuilder: (context) => [
+                        if (!_isPrimary)
+                          const PopupMenuItem(
+                            value: 'set_primary',
+                            child: Text('Đặt làm thiết bị chính'),
+                          )
+                        else
+                          const PopupMenuItem(
+                            value: 'clear_primary',
+                            child: Text('Bỏ thiết bị chính'),
+                          ),
                         const PopupMenuItem(value: 'rename', child: Text('Đổi tên')),
                         PopupMenuItem(
                           value: 'toggle',
@@ -237,6 +258,34 @@ class DevicePriorityCard extends StatelessWidget {
           fontSize: 13,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+
+  /// Phase 3: badge marking the user's pinned primary device. Sits next
+  /// to the online/offline pill so a glance at the card answers
+  /// "which device is the dashboard reading from?".
+  Widget _buildPrimaryBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.brandPrimary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.star_rounded, size: 12, color: AppColors.brandPrimary),
+          const SizedBox(width: 3),
+          Text(
+            'Chính',
+            style: TextStyle(
+              color: AppColors.brandPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }

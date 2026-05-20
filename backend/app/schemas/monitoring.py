@@ -59,13 +59,17 @@ class MobileVitalsBatch(BaseModel):
 
     The 1000-sample cap matches the IoT simulator contract in
     ``vitals_ingest.md`` §1.3 so a buggy producer can't push a million
-    rows in a single call.
+    rows in a single call. ``min_length=0`` is intentional: when Health
+    Connect has no new samples since the last poll, the mobile client
+    still POSTs an empty batch so the backend can refresh
+    ``devices.last_seen_at`` and the dashboard's online badge stays
+    accurate even between Mi Fitness sync cycles.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     device_id: int = Field(ge=1)
-    samples: list[MobileVitalSample] = Field(min_length=1, max_length=1000)
+    samples: list[MobileVitalSample] = Field(min_length=0, max_length=1000)
 
 
 class MobileVitalsIngestRejection(BaseModel):

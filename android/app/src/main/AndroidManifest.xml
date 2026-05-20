@@ -49,6 +49,21 @@
     <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
     <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
 
+    <!--
+      Health Connect package visibility (Android 11+ package visibility).
+      Without this <queries> entry, the `health` plugin cannot see
+      `com.google.android.apps.healthdata` on Android 11+ and reports
+      "Health Connect chua duoc cai dat" even when it is. The
+      ACTION_SHOW_PERMISSIONS_RATIONALE intent is required by the
+      package's permission flow on Android 14+.
+    -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
+    </queries>
+
     <application
         android:label="Health Guard"
         android:name="${applicationName}"
@@ -109,7 +124,35 @@
                 <data android:scheme="healthguard" android:host="verify-email" />
                 <data android:scheme="healthguard" android:host="reset-password" />
             </intent-filter>
+
+            <!--
+              Phase 2 (Health Connect): the `health` plugin's permission
+              flow targets this intent filter so Health Connect can show
+              its permissions rationale UI. Without it, requesting
+              authorisation silently no-ops because Health Connect can't
+              find the rationale activity for our package.
+            -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
         </activity>
+
+        <!--
+          Phase 2 (Health Connect): permission usage screen anchor. Health
+          Connect deep-links here when the user taps "View permission
+          usage". Routing to MainActivity is fine for now — the privacy
+          policy can live inside a Flutter route once we ship it.
+        -->
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".MainActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

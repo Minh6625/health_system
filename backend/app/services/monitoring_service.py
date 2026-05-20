@@ -726,27 +726,61 @@ class MonitoringService:
     @staticmethod
     def get_latest_vital_signs(patient_id: int, db: Session) -> VitalSignsResponse:
         try:
-            row = db.execute(
-                text(
-                    """
-                    SELECT
-                        v.time,
-                        v.heart_rate,
-                        v.spo2,
-                        v.temperature,
-                        v.respiratory_rate,
-                        v.blood_pressure_sys,
-                        v.blood_pressure_dia,
-                        v.signal_quality
-                    FROM vitals v
-                    INNER JOIN devices d ON v.device_id = d.id
-                    WHERE d.user_id = :user_id
-                    ORDER BY v.time DESC
-                    LIMIT 1
-                    """
-                ),
-                {"user_id": patient_id},
-            ).mappings().first()
+            # Phase 3: prefer the user's pinned primary_device_id when set
+            # so the dashboard shows readings from one canonical source
+            # instead of racing the latest-of-all across paired devices.
+            # Falls back to the legacy join when no primary is chosen.
+            primary_row = db.execute(
+                text("SELECT primary_device_id FROM users WHERE id = :uid"),
+                {"uid": patient_id},
+            ).first()
+            primary_id = primary_row[0] if primary_row else None
+
+            if primary_id is not None:
+                row = db.execute(
+                    text(
+                        """
+                        SELECT
+                            v.time,
+                            v.heart_rate,
+                            v.spo2,
+                            v.temperature,
+                            v.respiratory_rate,
+                            v.blood_pressure_sys,
+                            v.blood_pressure_dia,
+                            v.signal_quality
+                        FROM vitals v
+                        INNER JOIN devices d ON v.device_id = d.id
+                        WHERE d.user_id = :user_id
+                          AND v.device_id = :device_id
+                        ORDER BY v.time DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"user_id": patient_id, "device_id": primary_id},
+                ).mappings().first()
+            else:
+                row = db.execute(
+                    text(
+                        """
+                        SELECT
+                            v.time,
+                            v.heart_rate,
+                            v.spo2,
+                            v.temperature,
+                            v.respiratory_rate,
+                            v.blood_pressure_sys,
+                            v.blood_pressure_dia,
+                            v.signal_quality
+                        FROM vitals v
+                        INNER JOIN devices d ON v.device_id = d.id
+                        WHERE d.user_id = :user_id
+                        ORDER BY v.time DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"user_id": patient_id},
+                ).mappings().first()
 
             if row is None:
                 raise ValueError("No vital signs data found for this user")
@@ -873,16 +907,21 @@ class MonitoringService:
                 if result.rowcount and result.rowcount > 0:
                     accepted += 1
 
-            # Update device freshness so the mobile dashboard's
-            # last-sync indicator matches reality.
-            db.execute(
-                text(
-                    "UPDATE devices SET last_sync_at = :now, last_seen_at = :now "
-                    "WHERE id = :device_id"
-                ),
-                {"now": now_utc, "device_id": device_id},
-            )
-            db.commit()
+        # Phase 2 fix: bump device freshness on EVERY successful sync
+        # call, not just when new vitals were inserted. Health Connect
+        # sometimes returns 0 new samples (Mi Fitness has not pushed yet
+        # since the last poll) — that does not mean the device is dead,
+        # so we still update last_seen_at so the dashboard can flip the
+        # online badge instead of looking dead 60s after the user
+        # explicitly tapped "Đồng bộ ngay".
+        db.execute(
+            text(
+                "UPDATE devices SET last_sync_at = :now, last_seen_at = :now "
+                "WHERE id = :device_id"
+            ),
+            {"now": now_utc, "device_id": device_id},
+        )
+        db.commit()
 
         risk_evaluated: list[int] = []
         if accepted > 0:

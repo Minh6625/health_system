@@ -58,49 +58,61 @@ class HealthConnectRepository {
     DateTime? now,
   }) async {
     final readings = await _service.readSince(since: since, now: now);
-    if (readings.isEmpty) {
-      return const HealthConnectIngestResult(
-        accepted: 0,
-        rejected: 0,
-        sentSamples: 0,
-        riskEvaluatedDevices: [],
-      );
-    }
-
     final samples = _groupReadings(readings);
-    if (samples.isEmpty) {
-      return const HealthConnectIngestResult(
-        accepted: 0,
-        rejected: 0,
-        sentSamples: 0,
-        riskEvaluatedDevices: [],
-      );
-    }
 
-    // Cap each request at 1000 samples to match the backend
-    // MobileVitalsBatch.max_length contract. Larger windows are split
-    // into multiple posts and counts aggregated.
-    const batchSize = 1000;
+    // Phase 2 fix: even when there are zero new samples, still POST an
+    // empty batch so the backend can bump devices.last_seen_at — the
+    // dashboard's online badge depends on it. Mi Fitness's sync cadence
+    // (5-15 min) means most polls return 0 new HC rows; that does not
+    // mean the watch is dead.
+    final body = {
+      'device_id': deviceId,
+      'samples': samples.map((s) => s.toJson()).toList(),
+    };
+    final response = await _apiClient.post(
+      '/metrics/vitals/ingest',
+      body: body,
+      requiresAuth: true,
+    );
     var accepted = 0;
     var rejected = 0;
     final riskDevices = <int>{};
+    if (response is Map<String, dynamic>) {
+      accepted = (response['accepted'] as num?)?.toInt() ?? 0;
+      rejected = (response['rejected'] as num?)?.toInt() ?? 0;
+      final risk = response['risk_evaluated_devices'] as List?;
+      if (risk != null) {
+        riskDevices.addAll(risk.whereType<num>().map((v) => v.toInt()));
+      }
+    }
+    if (samples.length <= 1000) {
+      return HealthConnectIngestResult(
+        accepted: accepted,
+        rejected: rejected,
+        sentSamples: samples.length,
+        riskEvaluatedDevices: riskDevices.toList(),
+      );
+    }
 
-    for (var start = 0; start < samples.length; start += batchSize) {
+    // Larger windows: split into 1000-sample chunks. The first chunk
+    // already went out above so we resume from index 1000.
+    const batchSize = 1000;
+    for (var start = batchSize; start < samples.length; start += batchSize) {
       final end = (start + batchSize).clamp(0, samples.length);
       final chunk = samples.sublist(start, end);
-      final body = {
+      final extraBody = {
         'device_id': deviceId,
         'samples': chunk.map((s) => s.toJson()).toList(),
       };
-      final response = await _apiClient.post(
+      final extraResponse = await _apiClient.post(
         '/metrics/vitals/ingest',
-        body: body,
+        body: extraBody,
         requiresAuth: true,
       );
-      if (response is Map<String, dynamic>) {
-        accepted += (response['accepted'] as num?)?.toInt() ?? 0;
-        rejected += (response['rejected'] as num?)?.toInt() ?? 0;
-        final risk = response['risk_evaluated_devices'] as List?;
+      if (extraResponse is Map<String, dynamic>) {
+        accepted += (extraResponse['accepted'] as num?)?.toInt() ?? 0;
+        rejected += (extraResponse['rejected'] as num?)?.toInt() ?? 0;
+        final risk = extraResponse['risk_evaluated_devices'] as List?;
         if (risk != null) {
           riskDevices.addAll(
             risk.whereType<num>().map((v) => v.toInt()),

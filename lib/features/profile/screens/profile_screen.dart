@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/auth/providers/auth_provider.dart';
+import 'package:healthguard/features/device/models/device_model.dart';
 import 'package:healthguard/features/profile/models/user_profile_model.dart';
 import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/features/device/providers/device_provider.dart';
@@ -206,6 +207,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _DeviceTile(isFirst: true, isLast: false),
                 const ProfileMenuDivider(),
                 ProfileMenuTile(
+                  icon: Icons.health_and_safety_rounded,
+                  iconColor: AppColors.success,
+                  title: 'Đồng bộ Health Connect',
+                  subtitle: 'Lấy dữ liệu thật từ Mi Fitness ↔ Health Connect',
+                  onTap: () => Navigator.pushNamed(
+                      context, AppRouter.healthConnectSettings),
+                ),
+                const ProfileMenuDivider(),
+                ProfileMenuTile(
                   icon: Icons.family_restroom_rounded,
                   iconColor: AppColors.info,
                   title: 'Quản lý gia đình',
@@ -373,19 +383,57 @@ class _DeviceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final deviceProvider = context.watch<DeviceProvider>();
-    final hasDevice = deviceProvider.devices.isNotEmpty;
-    final deviceName = hasDevice
-        ? (deviceProvider.devices.first.deviceName ?? 'Thiết bị của tôi')
+    final profileProvider = context.watch<ProfileProvider>();
+    // Phase 3: prefer the user's pinned primary device. Falls back to the
+    // first paired device only when nothing is pinned, so the tile
+    // never shows a stale "first" device after the user switches.
+    final primaryId = profileProvider.profile?.primaryDeviceId;
+    final devices = deviceProvider.devices;
+    final hasDevice = devices.isNotEmpty;
+
+    DeviceModel? primary;
+    if (primaryId != null) {
+      for (final d in devices) {
+        if (d.id == primaryId) {
+          primary = d;
+          break;
+        }
+      }
+    }
+    primary ??= hasDevice ? devices.first : null;
+
+    final title = primary != null
+        ? (primary.deviceName?.trim().isNotEmpty == true
+            ? primary.deviceName!
+            : 'Thiết bị #${primary.id}')
         : 'Chưa có thiết bị';
+    final subtitle = primary != null
+        ? (primaryId == primary.id
+            ? 'Thiết bị chính · ${_typeLabel(primary.deviceType)}'
+            : 'Đã ghép nối · ${_typeLabel(primary.deviceType)}')
+        : 'Tap để thêm đồng hồ';
 
     return ProfileMenuTile(
       icon: Icons.watch_rounded,
       iconColor: hasDevice ? AppColors.success : AppColors.brandPrimary,
-      title: 'Thiết bị kết nối',
-      subtitle: deviceName,
+      title: title,
+      subtitle: subtitle,
       isFirst: isFirst,
       isLast: isLast,
       onTap: () => Navigator.pushNamed(context, AppRouter.device),
     );
+  }
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case 'smartwatch':
+        return 'Đồng hồ thông minh';
+      case 'fitness_band':
+        return 'Vòng đeo sức khỏe';
+      case 'medical_device':
+        return 'Thiết bị y tế';
+      default:
+        return type;
+    }
   }
 }

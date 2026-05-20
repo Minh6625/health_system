@@ -22,6 +22,12 @@ class HomeDashboardViewModel {
   // Connection
   final DeviceConnectionUiState deviceConnectionState;
   final int? batteryPercent;
+  /// Phase 3: name of the user's pinned primary device (or the only
+  /// paired device when no primary is set). Drives the connection
+  /// status strip on the dashboard so users see "Redmi Watch 3" instead
+  /// of the generic "Đồng hồ đang kết nối". Null when the user has
+  /// not paired any device yet.
+  final String? deviceName;
 
   // Banners
   final bool isOffline;
@@ -59,6 +65,7 @@ class HomeDashboardViewModel {
     this.showCallHelpCta = false,
     required this.deviceConnectionState,
     this.batteryPercent,
+    this.deviceName,
     this.isOffline = false,
     this.hasWarningBanner = false,
     this.hasError = false,
