@@ -12,6 +12,7 @@ import 'package:healthguard/features/device/widgets/device_list/device_onboardin
 import 'package:healthguard/features/device/widgets/device_list/attention_zone_card.dart';
 import 'package:healthguard/features/device/widgets/device_list/filter_toolbar.dart';
 import 'package:healthguard/features/device/widgets/device_list/add_device_primary_action.dart';
+import 'package:healthguard/features/profile/providers/profile_provider.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_spacing.dart';
 import 'package:healthguard/shared/presentation/theme/app_text_styles.dart';
@@ -181,6 +182,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
                               .watch<AuthProvider>()
                               .currentUser
                               ?.fullName;
+                          final primaryId = context
+                              .watch<ProfileProvider>()
+                              .profile
+                              ?.primaryDeviceId;
                           return provider.devices.map(
                             (device) => DevicePriorityCard(
                               device: device,
@@ -196,6 +201,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                                 }
                               },
                               monitoredForName: monitoredForName,
+                              primaryDeviceId: primaryId,
                             ),
                           );
                         })(),
@@ -224,6 +230,37 @@ class _DeviceScreenState extends State<DeviceScreen> {
       case 'delete':
         await _deleteDevice(device);
         break;
+      case 'set_primary':
+        await _setPrimary(device, device.id);
+        break;
+      case 'clear_primary':
+        await _setPrimary(device, null);
+        break;
+    }
+  }
+
+  Future<void> _setPrimary(DeviceModel device, int? newPrimaryId) async {
+    final profileProvider = context.read<ProfileProvider>();
+    final ok = await profileProvider.setPrimaryDevice(newPrimaryId);
+    if (!mounted) return;
+    if (ok) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            newPrimaryId == null
+                ? 'Đã bỏ thiết bị chính'
+                : 'Đã đặt ${device.displayName} làm thiết bị chính',
+          ),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            profileProvider.errorMessage ?? 'Không thể cập nhật thiết bị chính',
+          ),
+        ),
+      );
     }
   }
 
