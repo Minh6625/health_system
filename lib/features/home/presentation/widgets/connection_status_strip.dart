@@ -10,6 +10,7 @@ class ConnectionStatusStrip extends StatelessWidget {
   final DeviceConnectionUiState deviceConnectionState;
   final int? batteryPercent;
   final String lastUpdatedLabel;
+  final String? deviceName;
   final VoidCallback onTapDevice;
 
   const ConnectionStatusStrip({
@@ -17,6 +18,7 @@ class ConnectionStatusStrip extends StatelessWidget {
     required this.deviceConnectionState,
     this.batteryPercent,
     required this.lastUpdatedLabel,
+    this.deviceName,
     required this.onTapDevice,
   });
 
@@ -30,12 +32,20 @@ class ConnectionStatusStrip extends StatelessWidget {
       case DeviceConnectionUiState.connected:
         statusIcon = Icons.watch_rounded;
         statusColor = AppColors.success;
-        statusText = 'Đồng hồ đang kết nối';
+        // Phase 3: prefer the actual device name (Redmi Watch 3, Mi Band 8...)
+        // so the dashboard never lies about which watch is feeding data.
+        // Falls back to the legacy generic copy when the user has not
+        // pinned a primary and DeviceProvider has not loaded yet.
+        statusText = (deviceName != null && deviceName!.trim().isNotEmpty)
+            ? deviceName!.trim()
+            : 'Đồng hồ đang kết nối';
         break;
       case DeviceConnectionUiState.offline:
         statusIcon = Icons.watch_off_rounded;
         statusColor = AppColors.textSecondary;
-        statusText = 'Đồng hồ offline';
+        statusText = (deviceName != null && deviceName!.trim().isNotEmpty)
+            ? '${deviceName!.trim()} · offline'
+            : 'Đồng hồ offline';
         break;
       case DeviceConnectionUiState.notPaired:
         statusIcon = Icons.phonelink_erase_rounded;

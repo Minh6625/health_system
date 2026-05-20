@@ -517,6 +517,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen>
           : 'Các chỉ số đang được đồng bộ...',
       deviceConnectionState: deviceConnectionState,
       batteryPercent: primaryDevice?.batteryLevel,
+      deviceName: primaryDevice?.deviceName,
       isOffline: deviceConnectionState == DeviceConnectionUiState.offline,
       hasWarningBanner:
           overallStatus == DashboardOverallStatus.warning ||
@@ -758,6 +759,7 @@ class _DashboardBody extends StatelessWidget {
                   deviceConnectionState: vm.deviceConnectionState,
                   batteryPercent: vm.batteryPercent,
                   lastUpdatedLabel: vm.latestUpdatedLabel,
+                  deviceName: vm.deviceName,
                   onTapDevice: () {
                     Navigator.pushReplacementNamed(context, '/device');
                   },
