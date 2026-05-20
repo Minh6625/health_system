@@ -292,4 +292,83 @@ class BleService {
       await FlutterBluePlus.stopScan();
     }
   }
+
+  /// Best-effort metadata fetch without OS-level bonding.
+  ///
+  /// Connects briefly, runs GATT discovery, reads the Device Information
+  /// service (0x180A) and the Battery Service (0x180F) when present, then
+  /// disconnects. We deliberately avoid `createBond()` because the Redmi
+  /// Watch 3 only exchanges meaningful data with Mi Fitness — forcing a
+  /// bond would either fail silently or leave a dead pairing in the OS
+  /// settings. Returning a partially-populated [BleConnectedDevice] is
+  /// fine: every field is nullable and the caller surfaces "—" for the
+  /// missing ones.
+  Future<BleConnectedDevice> peekMetadata(
+    String remoteId, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    final device = BluetoothDevice.fromId(remoteId);
+    String? firmware;
+    String? manufacturer;
+    String? modelNumber;
+    int? battery;
+
+    try {
+      await device.connect(timeout: timeout, autoConnect: false);
+      final services = await device.discoverServices();
+      for (final service in services) {
+        final uuid = service.uuid.str128.toLowerCase();
+        if (uuid.startsWith('0000180a')) {
+          // Device Information Service: read what is exposed; ignore
+          // characteristics the watch does not implement.
+          for (final char in service.characteristics) {
+            final cuid = char.uuid.str128.toLowerCase();
+            try {
+              if (cuid.startsWith('00002a26')) {
+                firmware = String.fromCharCodes(await char.read()).trim();
+              } else if (cuid.startsWith('00002a29')) {
+                manufacturer = String.fromCharCodes(await char.read()).trim();
+              } else if (cuid.startsWith('00002a24')) {
+                modelNumber = String.fromCharCodes(await char.read()).trim();
+              }
+            } catch (_) {
+              // Some characteristics require auth — skip silently.
+            }
+          }
+        } else if (uuid.startsWith('0000180f')) {
+          for (final char in service.characteristics) {
+            try {
+              final bytes = await char.read();
+              if (bytes.isNotEmpty) battery = bytes.first;
+            } catch (_) {
+              // Skip if not readable.
+            }
+          }
+        }
+      }
+    } on FlutterBluePlusException catch (e) {
+      // Connect/discover failed — return partial info so the caller can
+      // still register the MAC. The UI explains the limitation.
+      throw BleFailure(
+        BleFailureReason.connectFailed,
+        'Không đọc được thông tin chi tiết: ${e.description ?? e.toString()}',
+        cause: e,
+      );
+    } finally {
+      try {
+        await device.disconnect();
+      } catch (_) {
+        // Best-effort cleanup.
+      }
+    }
+
+    return BleConnectedDevice(
+      remoteId: remoteId,
+      name: device.platformName,
+      batteryLevel: battery,
+      firmwareRevision: firmware,
+      manufacturer: manufacturer,
+      modelNumber: modelNumber,
+    );
+  }
 }

@@ -221,22 +221,51 @@ class DeviceConnectProvider extends ChangeNotifier {
     _errorReason = null;
     _safeNotify();
 
+    // Discovery-only flow: peek standard GATT metadata (DIS, Battery)
+    // without bonding. The Redmi Watch 3 only exchanges meaningful data
+    // with Mi Fitness, so a forced bond would either fail or leave a
+    // dead pairing in the OS settings. We still record the MAC + best
+    // available metadata so the device shows up in the user's account.
+    String? model;
+    String? firmware;
+    if (picked.source == DeviceDiscoverySource.live) {
+      try {
+        final info = await _ble.peekMetadata(picked.id);
+        model = info.modelNumber;
+        firmware = info.firmwareRevision;
+      } on BleFailure catch (e) {
+        // Non-fatal: record the device with whatever we know, surface a
+        // soft note in the success copy via errorMessage when the peek
+        // partially failed.
+        debugPrint('peekMetadata failed: ${e.message}');
+      }
+    }
+
     try {
       await _repository.pairNewDevice(
         macAddress: picked.macAddress,
         deviceName: picked.name,
         deviceType: picked.deviceType,
-        model: null,
+        model: model,
       );
+      // TODO Phase 2: persist firmware via PATCH /devices/{id} once the
+      // active-device branch lands. For now firmware stays null because
+      // the existing /devices/scan/pair endpoint does not accept it.
+      _firmwareReadback = firmware;
       _state = DeviceConnectState.success;
     } catch (e) {
       _state = DeviceConnectState.error;
-      _errorMessage = 'Ghép nối thất bại: ${e.toString()}';
+      _errorMessage = 'Ghi nhận thiết bị thất bại: ${e.toString()}';
     } finally {
       _isPairing = false;
       _safeNotify();
     }
   }
+
+  /// Firmware string read from DIS during the peek. Exposed read-only so
+  /// the success card can render a "Firmware: 1.1.40" line when available.
+  String? _firmwareReadback;
+  String? get firmwareReadback => _firmwareReadback;
 
   // ── Internal: discovery branches ─────────────────────────────────────────
 
