@@ -18,6 +18,9 @@ from app.schemas.emergency import (
     FallDetectionXAI,
     TimelineEvent,
     ResolutionInfo,
+    RecentAlertItem,
+    RecentAlertDeepLink,
+    RecentAlertsResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -620,6 +623,105 @@ class EmergencyService:
         """Resolve SOS event (mark as safe/resolved)."""
         return EmergencyRepository.resolve_sos(
             db, sos_id, caregiver_user_id, resolution_status, notes
+        )
+
+    @staticmethod
+    def get_recent_alerts_for_patient(
+        db: Session,
+        *,
+        viewer_user_id: int,
+        patient_user_id: int,
+        days: int = 7,
+        limit: int = 10,
+    ) -> RecentAlertsResponse:
+        """Caregiver-facing feed of recent health alerts for a single patient.
+
+        Permission gate (raises HTTPException so the FastAPI route layer just
+        bubbles it up):
+          * Self-view (``viewer == patient``) — always allowed; the user is
+            looking at their own history.
+          * Caregiver of patient — must have an ``accepted`` relationship AND
+            ``can_receive_alerts = True``.
+          * Otherwise — 403. We deliberately collapse "no relationship" and
+            "relationship without alert permission" into the same status so
+            the API doesn't leak whether two users are linked.
+
+        Once authorised, the heavy lifting lives in
+        :meth:`EmergencyRepository.get_recent_alerts_for_patient`, which
+        applies the caregiver-feed alert_type whitelist + the time window.
+        """
+        is_self_view = int(viewer_user_id) == int(patient_user_id)
+
+        if not is_self_view:
+            permissions = EmergencyRepository.get_caregiver_view_permissions(
+                db,
+                patient_user_id=int(patient_user_id),
+                caregiver_user_id=int(viewer_user_id),
+            )
+            if permissions is None or not permissions[0]:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You do not have permission to view this patient's alerts",
+                )
+
+        alerts = EmergencyRepository.get_recent_alerts_for_patient(
+            db,
+            patient_user_id=int(patient_user_id),
+            days=days,
+            limit=limit,
+        )
+
+        items = [
+            EmergencyService._build_recent_alert_item(alert)
+            for alert in alerts
+        ]
+
+        return RecentAlertsResponse(
+            items=items,
+            permission_state="granted",
+            window_days=days,
+            total_in_window=len(items),
+        )
+
+    @staticmethod
+    def _build_recent_alert_item(alert: Alert) -> RecentAlertItem:
+        """Map a persisted :class:`Alert` row to the wire-format item.
+
+        Resolution semantics: an alert is "resolved" once it has been
+        ``acknowledged_at`` (caregiver tapped through) OR — for SOS-linked
+        alerts — once the parent SOS event itself is resolved. The latter
+        keeps the feed honest when an SOS gets cleared but the alert row's
+        ``acknowledged_at`` was never set (older fall paths).
+        """
+        is_resolved = alert.acknowledged_at is not None
+
+        deep_link: Optional[RecentAlertDeepLink] = None
+        if alert.sos_event_id is not None:
+            deep_link = RecentAlertDeepLink(
+                type="sos_event",
+                id=int(alert.sos_event_id),
+            )
+        elif alert.fall_event_id is not None:
+            deep_link = RecentAlertDeepLink(
+                type="fall_event",
+                id=int(alert.fall_event_id),
+            )
+        else:
+            # Generic alerts (vital_abnormal / risk_* / sleep_anomaly) deep-link
+            # to themselves; the mobile alert detail screen knows how to
+            # render arbitrary alert rows from their ``details`` payload.
+            deep_link = RecentAlertDeepLink(type="alert", id=int(alert.id))
+
+        return RecentAlertItem(
+            id=int(alert.id),
+            uuid=str(alert.uuid),
+            alert_type=str(alert.alert_type),
+            severity=str(alert.severity),
+            title=str(alert.title),
+            message=alert.message if alert.message else None,
+            occurred_at=alert.created_at,
+            is_resolved=is_resolved,
+            deep_link=deep_link,
         )
 
     @staticmethod

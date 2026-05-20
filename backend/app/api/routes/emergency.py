@@ -11,6 +11,7 @@ from app.schemas.emergency import (
     TriggerSOSRequest,
     SuccessResponse,
     TriggerSOSResponse,
+    RecentAlertsResponse,
 )
 from app.services.emergency_service import EmergencyService
 from app.services.push_notification_service import PushNotificationService
@@ -72,6 +73,38 @@ def get_sos_alerts(
     """
     return EmergencyService.get_sos_alerts_for_caregiver(
         db, current_user.id, status_filter
+    )
+
+
+@router.get(
+    "/caregiver/patients/{patient_user_id}/recent-alerts",
+    response_model=RecentAlertsResponse,
+)
+def get_patient_recent_alerts(
+    patient_user_id: int,
+    days: int = Query(7, ge=1, le=30),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RecentAlertsResponse:
+    """Recent health alerts about a single patient (caregiver feed).
+
+    Powers the "Cảnh báo gần đây" section on the mobile PersonDetailScreen.
+    Filters to the curated whitelist in
+    :data:`app.core.alert_constants.CAREGIVER_FEED_ALERT_TYPES` so device
+    status (offline / battery) and conversational events stay out of the
+    health timeline.
+
+    Authorization: caller must be the patient themselves OR an accepted
+    caregiver with ``can_receive_alerts = True``. The service layer raises
+    403 with no information leak about whether a relationship exists.
+    """
+    return EmergencyService.get_recent_alerts_for_patient(
+        db,
+        viewer_user_id=int(current_user.id),
+        patient_user_id=int(patient_user_id),
+        days=days,
+        limit=limit,
     )
 
 
