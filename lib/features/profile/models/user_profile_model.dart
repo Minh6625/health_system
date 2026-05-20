@@ -18,6 +18,10 @@ class UserProfileModel {
   final List<String> medications;
   final List<String> allergies;
   final List<String> medicalConditions;
+  /// Phase 3: pinned primary device id. Null when the user has not
+  /// chosen a primary source — the dashboard then falls back to the
+  /// legacy "latest-of-all" query on the backend.
+  final int? primaryDeviceId;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -38,6 +42,7 @@ class UserProfileModel {
     this.medications = const [],
     this.allergies = const [],
     this.medicalConditions = const [],
+    this.primaryDeviceId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -62,6 +67,7 @@ class UserProfileModel {
       medications: ((json['medications'] as List<dynamic>?) ?? []).map((e) => e.toString()).toList(),
       allergies: ((json['allergies'] as List<dynamic>?) ?? []).map((e) => e.toString()).toList(),
       medicalConditions: ((json['medical_conditions'] as List<dynamic>?) ?? []).map((e) => e.toString()).toList(),
+      primaryDeviceId: (json['primary_device_id'] as num?)?.toInt(),
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),
       updatedAt: DateTime.parse(json['updated_at'] as String).toLocal(),
     );

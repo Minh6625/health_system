@@ -117,5 +117,49 @@ class ProfileProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  /// Phase 3: pin a device as the user's primary data source. Pass
+  /// `null` to clear the pointer. Optimistically updates the local
+  /// profile so the UI feels instant while the request settles.
+  Future<bool> setPrimaryDevice(int? deviceId) async {
+    _errorMessage = null;
+    try {
+      await _apiClient.patch(
+        '${ApiEndpoints.profile}/primary-device',
+        body: {'device_id': deviceId},
+      );
+      // Mirror the change locally so callers don't need to refetch.
+      final current = _profile;
+      if (current != null) {
+        _profile = UserProfileModel(
+          userId: current.userId,
+          email: current.email,
+          fullName: current.fullName,
+          role: current.role,
+          phone: current.phone,
+          dateOfBirth: current.dateOfBirth,
+          isActive: current.isActive,
+          isVerified: current.isVerified,
+          avatarUrl: current.avatarUrl,
+          gender: current.gender,
+          bloodType: current.bloodType,
+          heightCm: current.heightCm,
+          weightKg: current.weightKg,
+          medications: current.medications,
+          allergies: current.allergies,
+          medicalConditions: current.medicalConditions,
+          primaryDeviceId: deviceId,
+          createdAt: current.createdAt,
+          updatedAt: DateTime.now(),
+        );
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Không thể đặt thiết bị chính: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
 }
 
