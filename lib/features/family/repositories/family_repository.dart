@@ -4,6 +4,7 @@ import '../models/user_search_model.dart';
 import '../models/family_profile_snapshot.dart';
 import '../models/linked_contact_medical_info_model.dart';
 import '../models/linked_contact_model.dart';
+import '../models/recent_alert_item.dart';
 import 'package:flutter/foundation.dart';
 
 /// P-4: thrown by ``FamilyRepository.getLinkedContactMedicalInfo`` when the
@@ -25,6 +26,20 @@ class MedicalInfoPermissionDeniedException implements Exception {
 /// permission-toggle hint.
 class MedicalInfoNotFoundException implements Exception {
   const MedicalInfoNotFoundException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// Thrown by [FamilyRepository.fetchRecentAlerts] when the caregiver doesn't
+/// have ``can_receive_alerts = true`` (or no accepted relationship at all).
+///
+/// Distinct from a generic ``Exception`` so the UI can switch into the
+/// "permission not granted" banner state instead of showing a red error.
+class RecentAlertsPermissionDeniedException implements Exception {
+  const RecentAlertsPermissionDeniedException(this.message);
 
   final String message;
 
@@ -99,6 +114,45 @@ class FamilyRepository {
       }
       debugPrint('Error getting linked contact medical info: $e');
       throw Exception('Không thể tải hồ sơ y tế của liên hệ.');
+    }
+  }
+
+  /// Fetch the caregiver-feed of recent alerts for a single patient.
+  ///
+  /// Drives the "Cảnh báo gần đây" section on PersonDetailScreen.
+  ///
+  /// 403 from the backend (no accepted relationship OR
+  /// ``can_receive_alerts = false``) is mapped to
+  /// [RecentAlertsPermissionDeniedException] so the UI can render the
+  /// dedicated banner instead of a red error. We match the English copy used
+  /// by ``EmergencyService.get_recent_alerts_for_patient`` (the same string
+  /// is asserted in the backend HTTP tests, so any drift fails there first).
+  ///
+  /// [days] / [limit] mirror the backend ``Query(ge=…, le=…)`` bounds.
+  Future<RecentAlertsResponse> fetchRecentAlerts(
+    int patientUserId, {
+    int days = 7,
+    int limit = 10,
+  }) async {
+    try {
+      final response = await _apiClient.get(
+        '/emergency/caregiver/patients/$patientUserId/recent-alerts'
+        '?days=$days&limit=$limit',
+      );
+      if (response is Map) {
+        return RecentAlertsResponse.fromJson(
+          Map<String, dynamic>.from(response),
+        );
+      }
+      throw Exception('Phản hồi không hợp lệ.');
+    } catch (e) {
+      final raw = e.toString();
+      if (raw.contains('do not have permission') ||
+          raw.contains('không có quyền')) {
+        throw RecentAlertsPermissionDeniedException(raw);
+      }
+      debugPrint('Error fetching recent alerts: $e');
+      throw Exception('Không thể tải cảnh báo gần đây.');
     }
   }
 
