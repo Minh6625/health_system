@@ -65,6 +65,13 @@ dependencies:
   audioplayers: ^6.1.0
   shared_preferences: ^2.3.0
 
+  # BLE stack for real Redmi Watch 3 (M2216W1) connect/scan.
+  # Pinned to a known-good range; do NOT bump without re-testing the
+  # `BleService.ensureReady()` permission flow on Android 12+ where the
+  # plugin gates `BLUETOOTH_SCAN`/`BLUETOOTH_CONNECT` differently.
+  flutter_blue_plus: ^1.32.12
+  permission_handler: ^11.3.1
+
   flutter_native_splash: any
 dev_dependencies:
   flutter_test:
