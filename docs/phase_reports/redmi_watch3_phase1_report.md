@@ -1,57 +1,53 @@
-# Phase 1 Report — Redmi Watch 3 BLE (real scan & pair)
+# Phase 1 Report — Redmi Watch 3 BLE (real scan, discovery-only)
 
 ## Summary
 
-Phase 1 of `plans/redmi_watch_3_ble_plan_*.md` is complete. The Flutter
-device-connect flow now drives a **real BLE scan/connect** against the
-Redmi Watch 3 (M2216W1) instead of the previous hard-coded mock list,
-while preserving the mock branch for emulator builds.
+Phase 1 of `plans/redmi_watch_3_ble_plan_*.md` is complete with **Option A
+scope** (Discovery + Identify only, no OS-level bond).
 
-What changed end-to-end:
+Why Option A: Redmi/Xiaomi watches require Mi Fitness to complete the
+proprietary auth handshake before exchanging health data. Forcing a
+generic OS bond from a third-party app would either fail at the link
+layer or leave a dead pairing in Android settings without unlocking
+data flow. Option A respects this vendor boundary: app scans BLE
+honestly, reads standard GATT metadata (Device Information Service,
+Battery Service) without bonding, and records the device against the
+user account. Vital-sign sync is delegated to the simulator pipeline
+until the Xiaomi protobuf path is implemented in a future phase.
 
-- Added `flutter_blue_plus` and `permission_handler` to `pubspec.yaml`,
-  with version pins documented in-line.
-- Declared the Android 12+ permission set (`BLUETOOTH_SCAN` with
-  `neverForLocation`, `BLUETOOTH_CONNECT`) plus legacy `BLUETOOTH` /
-  `BLUETOOTH_ADMIN` (capped at `maxSdkVersion=30`) in
-  `AndroidManifest.xml`. iOS Info.plist gained
-  `NSBluetoothAlwaysUsageDescription` /
-  `NSBluetoothPeripheralUsageDescription`.
-- Implemented `lib/core/services/ble_service.dart` exposing
-  `ensureReady()`, `startScan()`, `stopScan()`. Errors surface as a typed
-  `BleFailure` with discriminated `BleFailureReason` codes so the UI can
-  render contextual CTAs (turn on Bluetooth, open settings, scan
-  timeout, etc.).
-- Rewrote `DeviceConnectProvider` so `openQrScanner()` runs a live
-  `BleService` scan, deduplicates by `remoteId`, sorts by RSSI, and
-  picks up the existing `/devices/scan/pair` backend endpoint with a
-  real MAC address. `DeviceMockConfig.useMockData=true` keeps the
-  previous progressive-reveal mock alive for emulators.
-- Replaced the fake QR-finder UI in `device_qr_scan_step.dart` with a
-  live BLE list and a typed error view (`_ScanErrorView`) that maps each
-  `BleFailureReason` to user-actionable advice.
-- Updated `method_select_step.dart` copy from "Quét QR thiết bị" to
-  "Quét BLE quanh đây" so the entry CTA matches what the screen actually
-  does.
+End-to-end behaviour now:
 
-The legacy `confirmAndPair()` path is intentionally preserved: it still
-calls `DeviceRepository.pairNewDevice()` against `/devices/scan/pair`,
-which is already wired and validated by the backend. We did not touch
-the backend in this phase.
+- Real BLE scan replaces the mocked QR finder. Adverts filtered by
+  `kDefaultRedmiNamePrefixes` (Redmi Watch / Mi Watch / Mi Band /
+  Xiaomi). Mock fallback preserved under `DeviceMockConfig.useMockData`
+  so emulator demos still walk through the legacy progressive-reveal.
+- `BleService.peekMetadata(remoteId)` connects briefly, runs GATT
+  discovery, reads DIS (firmware/manufacturer/model number) and Battery
+  level when present, then disconnects. No `createBond()` call.
+- `DeviceConnectProvider.confirmAndPair()` calls `peekMetadata` first,
+  then POSTs `/devices/scan/pair` with the real MAC and best-available
+  `model`. Failures during peek are non-fatal: the MAC still gets
+  recorded so the user has a stable identifier in their account.
+- UI copy realigned: confirm-card button changed from
+  "Kết nối máy này (đang phát triển)" to "Ghi nhận thiết bị này", with
+  a hint pointing the user to Mi Fitness for data sync. Demo banner
+  rewritten to honestly describe the discovery-only scope.
 
-Out of scope (deferred per anh's instruction "Phase 1 only"):
+Out of scope (deferred):
 
-- `device_id` filter in `/metrics/vital-signs/latest` and friends.
-- Active-device persistence layer (`ActiveDeviceService`).
-- Vital card empty-state copy distinguishing connected/stale/offline.
+- `device_id` filter in `/metrics/vital-signs/latest`.
+- Active-device persistence layer.
+- Empty-state copy distinguishing connected/stale/offline.
+- Xiaomi protobuf data sync.
 
 ## Files Modified
 
 Created (1):
 
-- `lib/core/services/ble_service.dart`
+- `lib/core/services/ble_service.dart` — BleService with `ensureReady()`,
+  `startScan()`, `stopScan()`, `peekMetadata()`.
 
-Edited (5):
+Edited (7):
 
 - `pubspec.yaml` — added `flutter_blue_plus: ^1.32.12`,
   `permission_handler: ^11.3.1`.
@@ -61,11 +57,16 @@ Edited (5):
 - `ios/Runner/Info.plist` — Bluetooth usage descriptions.
 - `lib/features/device/providers/device_connect_provider.dart` —
   rewrite scan/select pipeline, introduce `DiscoveredDevice` value
-  object, keep mock fallback under `DeviceMockConfig.useMockData`.
+  object, peek GATT metadata before pair, keep mock fallback.
 - `lib/features/device/widgets/device_connect/device_qr_scan_step.dart`
-  — replaced QR placeholder with live BLE scan list + typed error view.
+  — replaced QR placeholder with live BLE list + typed error view.
 - `lib/features/device/widgets/device_connect/method_select_step.dart`
-  — updated CTA copy to reflect BLE-first behaviour.
+  — updated CTA copy to BLE-first.
+- `lib/features/device/widgets/device_connect/device_identity_confirm_card.dart`
+  — unlocked confirm action, label "Ghi nhận thiết bị này", hint Mi
+  Fitness for data sync.
+- `lib/features/device/widgets/device_connect/device_connect_demo_banner.dart`
+  — banner copy reflects discovery-only scope honestly.
 
 No files deleted.
 
