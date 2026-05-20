@@ -30,6 +30,36 @@ RISK_ALERT_TYPES: frozenset[str] = frozenset({
 
 
 # ---------------------------------------------------------------------------
+# Caregiver "Recent alerts" feed whitelist
+#
+# Controls which alert_type values are surfaced on the caregiver-facing
+# PersonDetailScreen "Cảnh báo gần đây" section. Intentionally narrower than
+# the full canonical alert_type vocabulary:
+#   * Health-relevant only — caregivers come here to assess the patient's
+#     condition, not to triage device issues.
+#   * Excludes ``device_offline`` / ``low_battery`` (device status belongs
+#     on the device screen and otherwise creates noise).
+#   * Excludes ``medication_reminder`` / ``manual_check_in`` / ``system`` /
+#     ``caregiver_message`` (not health events about the patient).
+# Adding/removing entries here is a product/UX decision; coordinate with the
+# frontend AlertHistorySection icon mapping before changing.
+# ---------------------------------------------------------------------------
+
+ALERT_TYPE_VITAL_ABNORMAL = "vital_abnormal"
+ALERT_TYPE_SOS_TRIGGERED = "sos_triggered"
+ALERT_TYPE_SLEEP_ANOMALY = "sleep_anomaly"
+
+CAREGIVER_FEED_ALERT_TYPES: frozenset[str] = frozenset({
+    ALERT_TYPE_SOS_TRIGGERED,
+    ALERT_TYPE_FALL_DETECTED,
+    ALERT_TYPE_RISK_CRITICAL,
+    ALERT_TYPE_RISK_HIGH,
+    ALERT_TYPE_VITAL_ABNORMAL,
+    ALERT_TYPE_SLEEP_ANOMALY,
+})
+
+
+# ---------------------------------------------------------------------------
 # Escalation dataclass
 # ---------------------------------------------------------------------------
 
@@ -110,9 +140,13 @@ the same device.  Prevents notification fatigue.  Default: 5 minutes."""
 __all__: Sequence[str] = [
     "ALERT_TYPE_FALL_DETECTED",
     "ALERT_TYPE_SOS",
+    "ALERT_TYPE_SOS_TRIGGERED",
     "ALERT_TYPE_RISK_HIGH",
     "ALERT_TYPE_RISK_CRITICAL",
+    "ALERT_TYPE_VITAL_ABNORMAL",
+    "ALERT_TYPE_SLEEP_ANOMALY",
     "RISK_ALERT_TYPES",
+    "CAREGIVER_FEED_ALERT_TYPES",
     "EscalationRule",
     "ESCALATION_MATRIX",
     "get_escalation_rule",
