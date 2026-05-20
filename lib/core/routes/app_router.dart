@@ -9,6 +9,7 @@ import 'package:healthguard/features/auth/screens/reset_password_screen.dart';
 import 'package:healthguard/features/auth/screens/email_verification_screen.dart';
 import 'package:healthguard/features/home/presentation/screens/home_dashboard_screen.dart';
 import 'package:healthguard/features/profile/screens/edit_profile_screen.dart';
+import 'package:healthguard/features/profile/screens/health_connect_settings_screen.dart';
 import 'package:healthguard/features/profile/screens/medical_info_screen.dart';
 import 'package:healthguard/features/profile/screens/delete_account_screen.dart';
 import 'package:healthguard/features/profile/screens/profile_settings_screen.dart';
@@ -79,6 +80,8 @@ class AppRouter {
   static const String riskReportDetail = '/risk-report-detail';
   static const String riskHistory = '/risk-history';
   static const String notifications = '/notifications';
+  // Phase 2 (Health Connect) — Mi Fitness bridge settings.
+  static const String healthConnectSettings = '/health-connect-settings';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     String routePath = settings.name ?? login;
@@ -355,6 +358,11 @@ class AppRouter {
         );
       case notifications:
         return MaterialPageRoute(builder: (_) => const NotificationsScreen());
+      case healthConnectSettings:
+        return MaterialPageRoute(
+          settings: const RouteSettings(name: healthConnectSettings),
+          builder: (_) => const HealthConnectSettingsScreen(),
+        );
       case start:
         return MaterialPageRoute(builder: (_) => const AuthPagesScreen());
       case login:
