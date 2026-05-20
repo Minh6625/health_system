@@ -28,28 +28,12 @@ from app.utils.rate_limiter import (
     change_password_rate_limiter,
     resend_verification_rate_limiter,
 )
+from app.utils.audit_helper import get_client_ip, get_user_agent
 from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 _EXPOSE_CODES_FOR_TESTING: bool = os.getenv("TESTING_EXPOSE_CODES", "").strip() == "1"
-
-
-def get_client_ip(request: Request) -> Optional[str]:
-    """Extract client IP address from request.
-
-    Returns None when no client info is available; AuditLogRepository will
-    store this as NULL (Postgres `inet` cannot accept "" or "unknown").
-    """
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else None
-
-
-def get_user_agent(request: Request) -> str:
-    """Extract user agent from request."""
-    return request.headers.get("User-Agent", "unknown")
 
 
 @router.post("/register", response_model=AuthResponse)
