@@ -179,6 +179,14 @@ def normalize_risk_score(
     if canonical_level is None:
         return clamp_risk_score(raw_score)
 
+    # Phase 8 (2026-05-20): defense-in-depth short-circuit cho path
+    # ``model_api_health``. Adapter ``from_response`` đã set score
+    # trực tiếp từ probability, nhưng nếu một caller khác sau này gọi
+    # qua hàm này với cùng backend, vẫn map liên tục thay vì quantize
+    # qua 3 band cứng (lý do xem ``ModelApiHealthAdapter.from_response``).
+    if backend == "model_api_health" and confidence is not None:
+        return clamp_risk_score(float(confidence) * 100.0)
+
     if backend in MODEL_INFERENCE_BACKENDS or raw_score is None:
         return _score_from_model_confidence(canonical_level, confidence or 0.0)
 

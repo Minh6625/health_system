@@ -3,10 +3,14 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import Integer, and_, case, func, select
 from sqlalchemy.orm import Session
 
-from app.core.alert_constants import RISK_ALERT_COOLDOWN_SECONDS, EscalationRule
+from app.core.alert_constants import (
+    RISK_ALERT_COOLDOWN_SECONDS,
+    RISK_ALERT_TYPES,
+    EscalationRule,
+)
 from app.models.notification_read_model import NotificationRead
 from app.models.push_token_model import UserPushToken
 from app.models.risk_alert_response_model import RiskAlertResponse
@@ -189,21 +193,29 @@ class NotificationService:
         device_id: int,
         alert_type: str,
     ) -> bool:
-        """Check whether a risk alert of *alert_type* for *device_id* was
-        created within the cooldown window AND has not yet been
-        acknowledged by the user.
+        """Check whether a risk alert family for *device_id* is in cooldown.
 
-        Uses ``RISK_ALERT_COOLDOWN_SECONDS`` from ``alert_constants``.
-        Returns ``True`` if a recent unacknowledged alert exists (i.e.
-        a fresh notification would be redundant).
+        Phase 8 (2026-05-20): cooldown gate now operates at the **risk
+        alert family** level (``RISK_ALERT_TYPES`` = {risk_high,
+        risk_critical}) instead of one window per ``alert_type``.
 
-        Issue 2b fix: when the patient clicks "Tôi ổn" on a risk alert,
-        the BE persists a ``RiskAlertResponse`` row with
-        ``response_action='safe'``.  That alert no longer represents
-        an open issue, so it must NOT count toward the cooldown — the
-        next event of the same type should fire a fresh push.  Without
-        this exclusion the user reports "click Tôi ổn once → no more
-        FCM for the next 5 minutes".
+        Trước fix: mỗi ``alert_type`` có cooldown 5 phút riêng. Khi vitals
+        dao động quanh ``health_thresholds.critical_at`` (0.65), một mẫu
+        nhảy qua nhảy lại giữa medium/critical → backend bắn push xen kẽ
+        2 type vì cooldown của type kia chưa active. Hệ quả: user nhận
+        FCM warning + critical liên tục cách nhau vài chục giây.
+
+        Quy tắc mới:
+        - Trong cửa sổ cooldown, **bất kỳ** risk_* alert chưa ack đều
+          coi là active.
+        - Cho phép escalate UP: lần trước là ``risk_high`` mà lần này
+          là ``risk_critical`` thì pass cooldown (escalation thực sự).
+        - Mọi trường hợp khác (cùng type, hoặc downgrade
+          ``risk_critical → risk_high``) đều bị block.
+
+        Issue 2b vẫn được giữ: alert đã ack ``response_action='safe'``
+        không tính vào cooldown. Phần B2 (group-ack) mở rộng quy tắc này
+        để 1 patient ack release cho cả nhóm caregiver.
         """
         cutoff = datetime.now(timezone.utc) - timedelta(
             seconds=RISK_ALERT_COOLDOWN_SECONDS,
@@ -215,31 +227,67 @@ class NotificationService:
         # being dedup-suppressed against an already-acknowledged
         # alert.  Using ``select(...)`` explicitly avoids the SQLA 2.x
         # deprecation warning around bare Subquery objects in ``in_()``.
-        acknowledged_alert_ids = select(RiskAlertResponse.notification_id).where(
+        #
+        # Phase 8 B2 (2026-05-20): nhóm Alert được tạo bởi
+        # ``create_risk_alerts`` chia sẻ chung ``risk_score_id`` (1 row
+        # per recipient: patient + N caregivers). Trước fix: patient ack
+        # chỉ release row của chính họ, các row caregiver vẫn block
+        # cooldown 5 phút → user báo "bấm Tôi ổn xong vẫn không nhận
+        # push mới". Quy tắc mới: bất kỳ alert nào trong nhóm có ack
+        # ``safe`` thì cả nhóm được coi là đã ack.
+        directly_acknowledged = select(RiskAlertResponse.notification_id).where(
             RiskAlertResponse.response_action == "safe"
         )
+        acknowledged_risk_score_ids = (
+            select(RiskAlertResponse.risk_score_id)
+            .where(
+                RiskAlertResponse.response_action == "safe",
+                RiskAlertResponse.risk_score_id.is_not(None),
+            )
+        )
+        sibling_acknowledged = (
+            select(Alert.id)
+            .where(
+                Alert.alert_type.in_(RISK_ALERT_TYPES),
+                Alert.details["risk_score_id"]
+                .as_integer()
+                .in_(acknowledged_risk_score_ids),
+            )
+        )
+        acknowledged_alert_ids = directly_acknowledged.union(sibling_acknowledged)
 
-        recent = (
-            db.query(Alert.id)
+        # Family gate: lấy alert_type của cảnh báo gần nhất trong cửa sổ
+        # cooldown thuộc cùng family (đã loại trừ alert đã ack).
+        recent_family = (
+            db.query(Alert.alert_type)
             .filter(
                 Alert.device_id == device_id,
-                Alert.alert_type == alert_type,
+                Alert.alert_type.in_(RISK_ALERT_TYPES),
                 Alert.created_at >= cutoff,
                 ~Alert.id.in_(acknowledged_alert_ids),
             )
+            .order_by(Alert.created_at.desc())
             .limit(1)
             .first()
         )
 
-        if recent is not None:
-            logger.info(
-                "Risk alert cooldown active: device=%d, type=%s, window=%ds",
-                device_id,
-                alert_type,
-                RISK_ALERT_COOLDOWN_SECONDS,
-            )
+        if recent_family is None:
+            return False
 
-        return recent is not None
+        last_type = recent_family[0]
+        # Escalate UP từ medium → critical luôn pass cooldown
+        # (đây là tình huống xấu đi cần thông báo lại ngay).
+        if last_type == "risk_high" and alert_type == "risk_critical":
+            return False
+
+        logger.info(
+            "Risk alert cooldown active: device=%d, type=%s, last_in_family=%s, window=%ds",
+            device_id,
+            alert_type,
+            last_type,
+            RISK_ALERT_COOLDOWN_SECONDS,
+        )
+        return True
 
     # -----------------------------------------------------------------
     # Risk alert creation  (A1 — GAP-6 fix)

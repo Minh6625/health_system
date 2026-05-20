@@ -353,19 +353,22 @@ class PushNotificationService:
                 "click_action": "FLUTTER_NOTIFICATION_CLICK",
             }
 
+            # Phase 8 B4 (2026-05-20): risk push CHUYEN sang DATA-ONLY de
+            # khu duplicate notification. Truoc fix: BE gui ca
+            # ``messaging.Notification(title, body)`` block lan ``data``
+            # block. Khi app foreground hoac vua tu background ve, OS
+            # tu render 1 banner tu ``notification`` block + Flutter
+            # ``_handleFcmForegroundMessage`` -> ``_processNotificationEvent``
+            # -> ``_emergencyAdapter.presentMissedAlert`` render banner thu
+            # 2 -> user thay 2 notification trung. Background path da co
+            # ``_showBackgroundCriticalRiskNotification`` tu render qua
+            # ``_backgroundNotifications.show`` cho cold-start, foreground
+            # path da co ``_processNotificationEvent`` xu ly. Bo
+            # ``notification`` block o BE de client la nguon duy nhat
+            # render UI - giong pattern fall takeover (line 533).
             android_config = messaging.AndroidConfig(priority="high")
             notification = None
-            if not is_critical_takeover:
-                notification = messaging.Notification(title=title, body=body)
-                android_config = messaging.AndroidConfig(
-                    priority="high",
-                    notification=messaging.AndroidNotification(
-                        channel_id=channel_id,
-                        click_action="FLUTTER_NOTIFICATION_CLICK",
-                        sound="default",
-                        priority="max",
-                    ),
-                )
+            data["channel_id"] = channel_id
 
             messages.append(
                 messaging.Message(
