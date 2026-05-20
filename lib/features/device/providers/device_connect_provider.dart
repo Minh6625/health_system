@@ -44,6 +44,13 @@ enum DeviceConnectState {
 /// mocked discovery list.
 enum DeviceDiscoverySource { live, mock, manual }
 
+/// Toggle between the curated Redmi/Mi name filter and an unfiltered scan
+/// that surfaces every BLE peripheral with a non-empty name. The "scan
+/// all" mode is a debug aid for cases where a watch advertises with an
+/// unexpected name (e.g. `XMSH_M2216W1`) and would otherwise never appear
+/// in the curated list.
+enum DiscoveryMode { redmiOnly, scanAll }
+
 /// UI-facing wrapper around [BleScanEntry] / [MockBleDevice]. Centralising
 /// the contract here means the connect widgets do not need to know which
 /// branch produced the entry.
@@ -112,6 +119,12 @@ class DeviceConnectProvider extends ChangeNotifier {
   DeviceConnectState _state = DeviceConnectState.intro;
   DeviceConnectState get state => _state;
 
+  /// Active discovery mode. Defaults to the curated Redmi/Mi filter; the
+  /// connect UI can flip this to [DiscoveryMode.scanAll] for debug
+  /// scenarios where the watch advertises an unexpected name.
+  DiscoveryMode _discoveryMode = DiscoveryMode.redmiOnly;
+  DiscoveryMode get discoveryMode => _discoveryMode;
+
   DiscoveredDevice? _identifiedDevice;
   DiscoveredDevice? get identifiedDevice => _identifiedDevice;
 
@@ -150,7 +163,11 @@ class DeviceConnectProvider extends ChangeNotifier {
   /// device_qr_scan_step) can call into it without churning navigation
   /// logic. The [forceMock] knob lets developer builds simulate the live
   /// flow on an emulator without flipping the global config.
-  Future<void> openQrScanner({bool forceMock = false}) async {
+  Future<void> openQrScanner({
+    bool forceMock = false,
+    DiscoveryMode? mode,
+  }) async {
+    if (mode != null) _discoveryMode = mode;
     final useMock = forceMock || DeviceMockConfig.useMockData;
     _resetScanState();
     _state = DeviceConnectState.scanning;
@@ -161,6 +178,19 @@ class DeviceConnectProvider extends ChangeNotifier {
       return;
     }
     await _runLiveDiscovery();
+  }
+
+  /// Switches discovery mode and immediately restarts the scan so the
+  /// user sees results from the new filter without an extra tap.
+  Future<void> setDiscoveryMode(DiscoveryMode mode) async {
+    if (_discoveryMode == mode) return;
+    _discoveryMode = mode;
+    if (_state == DeviceConnectState.scanning ||
+        _state == DeviceConnectState.error) {
+      await openQrScanner();
+    } else {
+      _safeNotify();
+    }
   }
 
   void backToIntro() {

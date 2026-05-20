@@ -198,6 +198,11 @@ class BleService {
   /// is cancelled by the caller, whichever comes first. We deliberately
   /// surface every advertisement (no de-duplication) so the UI layer can
   /// implement its own freshness/RSSI policy.
+  ///
+  /// Pass an empty [namePrefixes] set to disable name filtering — useful
+  /// for the debug "scan all" mode when the watch advertises with an
+  /// unexpected name (e.g. `XMSH_M2216W1`) and would otherwise be
+  /// filtered out by the default Redmi/Mi prefix list.
   Stream<BleScanEntry> startScan({
     Duration timeout = const Duration(seconds: 30),
     Set<String> namePrefixes = kDefaultRedmiNamePrefixes,
@@ -238,10 +243,12 @@ class BleService {
                 ? r.advertisementData.advName
                 : r.device.platformName;
             if (name.isEmpty) continue;
-            final lower = name.toLowerCase();
-            final match =
-                namePrefixes.any((prefix) => lower.startsWith(prefix));
-            if (!match) continue;
+            if (namePrefixes.isNotEmpty) {
+              final lower = name.toLowerCase();
+              final match =
+                  namePrefixes.any((prefix) => lower.startsWith(prefix));
+              if (!match) continue;
+            }
             controller.add(BleScanEntry(
               remoteId: r.device.remoteId.str,
               name: name,

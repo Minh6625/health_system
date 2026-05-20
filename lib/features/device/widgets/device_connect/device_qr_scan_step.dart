@@ -46,9 +46,77 @@ class DeviceQrScanStep extends StatelessWidget {
             style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
             textAlign: TextAlign.center,
           ),
+          if (!DeviceMockConfig.useMockData) ...[
+            SizedBox(height: AppSpacing.gapMd),
+            _DiscoveryModeToggle(provider: provider),
+          ],
           SizedBox(height: AppSpacing.sectionGapLg),
           Expanded(child: _ScanBody(provider: provider)),
         ],
+      ),
+    );
+  }
+}
+
+class _DiscoveryModeToggle extends StatelessWidget {
+  final DeviceConnectProvider provider;
+  const _DiscoveryModeToggle({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final mode = provider.discoveryMode;
+    return Container(
+      padding: EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.bgPrimary,
+        borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _segment(
+              label: 'Đồng hồ Xiaomi',
+              selected: mode == DiscoveryMode.redmiOnly,
+              onTap: () =>
+                  provider.setDiscoveryMode(DiscoveryMode.redmiOnly),
+            ),
+          ),
+          Expanded(
+            child: _segment(
+              label: 'Tất cả BLE (debug)',
+              selected: mode == DiscoveryMode.scanAll,
+              onTap: () => provider.setDiscoveryMode(DiscoveryMode.scanAll),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _segment({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadii.radiusSm),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.caption.copyWith(
+            color: selected
+                ? AppColors.brandPrimary
+                : AppColors.textSecondary,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
