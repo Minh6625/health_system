@@ -214,8 +214,14 @@ class DeviceConnectProvider extends ChangeNotifier {
   }
 
   /// Manual code entry path (kept for users who can't scan, e.g. watch
-  /// already paired with another phone). Behaviour preserved from the
-  /// legacy provider — mock-only for now.
+  /// already paired with another phone). Accepts either:
+  ///   - A canonical MAC address `AA:BB:CC:DD:EE:FF` (case-insensitive,
+  ///     also accepts `-` separators) — used when the watch is bonded
+  ///     to Mi Fitness and stops advertising publicly. The user copies
+  ///     the MAC from Android Settings -> Bluetooth -> bonded device.
+  ///   - Anything else falls back to the legacy mock flow so QA can
+  ///     still exercise the success path on an emulator without typing
+  ///     a real MAC.
   Future<void> verifyCode(String code) async {
     _state = DeviceConnectState.verifying;
     _errorMessage = null;
@@ -233,12 +239,38 @@ class DeviceConnectProvider extends ChangeNotifier {
       return;
     }
 
-    // For now the manual path still falls back to the first mock entry so
-    // QA engineers can exercise the success flow without a watch nearby.
-    final mock = MockBleDiscovery.nearbyDevices.first.device;
-    _identifiedDevice = DiscoveredDevice.fromMock(mock);
+    // Try to parse as a MAC address first. Real watches that have
+    // already bonded with Mi Fitness do not show up in our BLE scan,
+    // so accepting a MAC here is the escape hatch the user actually
+    // needs to register their hardware.
+    final mac = _normalizeMac(code);
+    if (mac != null) {
+      _identifiedDevice = DiscoveredDevice(
+        id: mac,
+        name: 'Redmi Watch 3',
+        macAddress: mac,
+        deviceType: 'smartwatch',
+        rssi: 0,
+        source: DeviceDiscoverySource.manual,
+      );
+      _state = DeviceConnectState.confirmIdentity;
+      _safeNotify();
+      return;
+    }
+
+    // Fallback: the legacy mock path so emulator demos keep working.
+    final mockDevice = MockBleDiscovery.nearbyDevices.first.device;
+    _identifiedDevice = DiscoveredDevice.fromMock(mockDevice);
     _state = DeviceConnectState.confirmIdentity;
     _safeNotify();
+  }
+
+  /// Returns the canonical `AA:BB:CC:DD:EE:FF` form when [raw] matches a
+  /// MAC address (with `:` or `-` separators, any case), otherwise null.
+  String? _normalizeMac(String raw) {
+    final cleaned = raw.replaceAll('-', ':').toUpperCase().trim();
+    final pattern = RegExp(r'^[0-9A-F]{2}(:[0-9A-F]{2}){5}$');
+    return pattern.hasMatch(cleaned) ? cleaned : null;
   }
 
   Future<void> confirmAndPair() async {
