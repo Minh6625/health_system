@@ -83,5 +83,9 @@
 		<string>Ứng dụng cần quyền vị trí để gửi tọa độ của bạn khi có trường hợp khẩn cấp (SOS).</string>
 		<key>NSLocationAlwaysUsageDescription</key>
 		<string>Ứng dụng cần quyền truy cập vị trí liên tục để giúp bảo vệ bạn.</string>
+		<key>NSBluetoothAlwaysUsageDescription</key>
+		<string>Ứng dụng cần quyền Bluetooth để kết nối với đồng hồ thông minh và đọc dữ liệu sức khỏe.</string>
+		<key>NSBluetoothPeripheralUsageDescription</key>
+		<string>Ứng dụng cần quyền Bluetooth để kết nối với đồng hồ thông minh và đọc dữ liệu sức khỏe.</string>
 	</dict>
 </plist>
