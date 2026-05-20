@@ -14,6 +14,83 @@ class VitalSignsResponse(BaseModel):
     is_stale: bool = False
 
 
+# ── Phase 2: Health Connect mobile ingest ──────────────────────────────
+# Mobile clients (Flutter app) push samples they read from Health Connect
+# straight into ``vitals`` via ``POST /metrics/vitals/ingest``. Schemas
+# stay strict: ``extra='forbid'`` blocks producers from smuggling unknown
+# fields, and tight value bounds match the DB CHECK constraints in
+# ``05_timeseries_vitals_motion_sleep.sql`` so a bad reading is rejected
+# at the boundary instead of failing the SQL INSERT later.
+from pydantic import ConfigDict, field_validator  # noqa: E402  (grouped with Phase 2 schemas)
+
+
+class MobileVitalSample(BaseModel):
+    """One reading harvested from Health Connect.
+
+    Source-attribution lives in [source]; the canonical value today is
+    ``"health_connect"`` for anything that came in via the Mi Fitness →
+    Health Connect bridge. Manual entries from the app's emergency form
+    use ``"manual"``. Unknown values are rejected so we don't silently
+    pollute risk-pipeline assumptions with vendor-specific labels.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    timestamp: datetime
+    heart_rate: float | None = Field(default=None, ge=20, le=260)
+    spo2: float | None = Field(default=None, ge=50, le=100)
+    temperature: float | None = Field(default=None, ge=30, le=45)
+    respiratory_rate: float | None = Field(default=None, ge=4, le=80)
+    blood_pressure_sys: int | None = Field(default=None, ge=40, le=260)
+    blood_pressure_dia: int | None = Field(default=None, ge=20, le=180)
+    source: str = Field(default="health_connect")
+
+    @field_validator("source")
+    @classmethod
+    def _validate_source(cls, value: str) -> str:
+        allowed = {"health_connect", "manual"}
+        if value not in allowed:
+            raise ValueError("source phai la 'health_connect' hoac 'manual'")
+        return value
+
+
+class MobileVitalsBatch(BaseModel):
+    """Batch wrapper for ``POST /metrics/vitals/ingest``.
+
+    The 1000-sample cap matches the IoT simulator contract in
+    ``vitals_ingest.md`` §1.3 so a buggy producer can't push a million
+    rows in a single call.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    device_id: int = Field(ge=1)
+    samples: list[MobileVitalSample] = Field(min_length=1, max_length=1000)
+
+
+class MobileVitalsIngestRejection(BaseModel):
+    """Per-item rejection record. Producers iterate the batch and decide
+    whether to retry just the rejected indices."""
+
+    index: int
+    timestamp: datetime
+    reason: str
+
+
+class MobileVitalsIngestResponse(BaseModel):
+    """Boundary response shape for ``POST /metrics/vitals/ingest``.
+
+    ``risk_evaluated_devices`` echoes the unique set of ``device_id`` for
+    which the AI risk pipeline ran after this ingest, so the mobile UI
+    can refresh the risk-history surface only when needed.
+    """
+
+    accepted: int
+    rejected: int
+    rejections: list[MobileVitalsIngestRejection] = Field(default_factory=list)
+    risk_evaluated_devices: list[int] = Field(default_factory=list)
+
+
 # F-12 (M-6): vitals time-series chart payload. The mobile
 # `vital_detail_screen.dart` previously promised a "Biến động 24h qua"
 # chart but `VitalSignsProvider.chartData` always returned `const []`
