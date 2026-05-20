@@ -202,12 +202,14 @@ class ModelApiHealthAdapter:
             else None
         )
 
-        risk_score = normalize_risk_score(
-            level=risk_level,
-            confidence=confidence_value,
-            raw_score=None,
-            backend=backend_label,
-        )
+        # Phase 8 (2026-05-20): map probability ∈ [0,1] thẳng sang
+        # risk_score ∈ [0,100]. Trước đây gọi ``normalize_risk_score`` quantize
+        # qua 3 band cứng [0,33]/[34,66]/[67,100] khiến elderly có
+        # ``probability ≈ 0`` luôn dồn về 33.0 (health_score 67) — score
+        # không phản ánh được biến động thực của vitals dù model đã trả
+        # tín hiệu liên tục. ``risk_level`` vẫn lấy từ ``health_thresholds``
+        # nên alert/escalation matrix giữ nguyên semantics.
+        risk_score = round(confidence_value * 100.0, 2)
         prediction_label = str(
             (response.get("prediction") or {}).get("prediction_label")
             or response.get("predicted_health_risk_label")
