@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, case, func, select
+from sqlalchemy import Integer, and_, case, func, select
 from sqlalchemy.orm import Session
 
 from app.core.alert_constants import (
@@ -227,9 +227,34 @@ class NotificationService:
         # being dedup-suppressed against an already-acknowledged
         # alert.  Using ``select(...)`` explicitly avoids the SQLA 2.x
         # deprecation warning around bare Subquery objects in ``in_()``.
-        acknowledged_alert_ids = select(RiskAlertResponse.notification_id).where(
+        #
+        # Phase 8 B2 (2026-05-20): nhóm Alert được tạo bởi
+        # ``create_risk_alerts`` chia sẻ chung ``risk_score_id`` (1 row
+        # per recipient: patient + N caregivers). Trước fix: patient ack
+        # chỉ release row của chính họ, các row caregiver vẫn block
+        # cooldown 5 phút → user báo "bấm Tôi ổn xong vẫn không nhận
+        # push mới". Quy tắc mới: bất kỳ alert nào trong nhóm có ack
+        # ``safe`` thì cả nhóm được coi là đã ack.
+        directly_acknowledged = select(RiskAlertResponse.notification_id).where(
             RiskAlertResponse.response_action == "safe"
         )
+        acknowledged_risk_score_ids = (
+            select(RiskAlertResponse.risk_score_id)
+            .where(
+                RiskAlertResponse.response_action == "safe",
+                RiskAlertResponse.risk_score_id.is_not(None),
+            )
+        )
+        sibling_acknowledged = (
+            select(Alert.id)
+            .where(
+                Alert.alert_type.in_(RISK_ALERT_TYPES),
+                Alert.details["risk_score_id"]
+                .as_integer()
+                .in_(acknowledged_risk_score_ids),
+            )
+        )
+        acknowledged_alert_ids = directly_acknowledged.union(sibling_acknowledged)
 
         # Family gate: lấy alert_type của cảnh báo gần nhất trong cửa sổ
         # cooldown thuộc cùng family (đã loại trừ alert đã ack).
