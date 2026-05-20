@@ -312,22 +312,76 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-class _AlertList extends StatelessWidget {
+class _AlertList extends StatefulWidget {
   const _AlertList({required this.items});
 
   final List<RecentAlertItem> items;
 
   @override
+  State<_AlertList> createState() => _AlertListState();
+}
+
+class _AlertListState extends State<_AlertList> {
+  /// How many cards to render before the "Xem thêm" CTA collapses the rest.
+  /// Three is a deliberate compromise: small enough that the section never
+  /// dominates the scroll view on a 6.1" phone, large enough that a quiet
+  /// week (1–2 incidents) still shows everything without an extra tap.
+  static const int _initialVisible = 3;
+
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final all = widget.items;
+    final hasOverflow = all.length > _initialVisible;
+    final visible = (_expanded || !hasOverflow)
+        ? all
+        : all.sublist(0, _initialVisible);
+    final hiddenCount = all.length - visible.length;
+
     return Column(
       children: [
-        for (final alert in items)
+        for (final alert in visible)
           AlertHistoryItem(
             key: ValueKey(alert.uuid),
             alert: alert,
             onTap: () => _onTap(context, alert),
           ),
+        if (hasOverflow) _buildToggle(hiddenCount),
       ],
+    );
+  }
+
+  Widget _buildToggle(int hiddenCount) {
+    final label = _expanded
+        ? 'Thu gọn'
+        : 'Xem thêm $hiddenCount cảnh báo';
+    final icon = _expanded
+        ? Icons.expand_less_rounded
+        : Icons.expand_more_rounded;
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: TextButton.icon(
+          onPressed: () => setState(() => _expanded = !_expanded),
+          icon: Icon(icon, size: 18, color: AppColors.brandPrimary),
+          label: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.brandPrimary,
+            ),
+          ),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadii.radiusMd),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -344,7 +398,7 @@ class _AlertList extends StatelessWidget {
     switch (link.type) {
       case RecentAlertDeepLinkType.sosEvent:
         Navigator.of(context).pushNamed(
-          AppRoutes.emergencySosDetail,
+          AppRouter.emergencySosDetail,
           arguments: link.id.toString(),
         );
         return;

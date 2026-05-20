@@ -828,20 +828,13 @@ class PersonDetailScreen extends StatelessWidget {
   Widget _buildAlertHistory(FamilyProfileSnapshot profile) {
     // Section "Cảnh báo gần đây": delegated to AlertHistorySection which
     // owns its own provider, repository call, and 4-state UI (loading /
-    // granted+empty / granted+items / permissionDenied / error). Anything
-    // older lived as a hard-coded mock here — see git history for context.
+    // granted+empty / granted+items / permissionDenied / error). Padding
+    // is owned by the section itself to stay consistent with the medical /
+    // sleep cards above it (each function returns a self-padded card).
     final firstName = profile.name.trim().split(' ').last;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.gapLg,
-        0,
-        AppSpacing.gapLg,
-        0,
-      ),
-      child: AlertHistorySection(
-        profileId: profile.id,
-        firstName: firstName.isEmpty ? profile.name : firstName,
-      ),
+    return AlertHistorySection(
+      profileId: profile.id,
+      firstName: firstName.isEmpty ? profile.name : firstName,
     );
   }
 }
