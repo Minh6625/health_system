@@ -35,6 +35,20 @@
         android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
 
+    <!--
+      Phase 2 (Health Connect): read-only access to Mi Fitness's
+      Redmi Watch 3 readings. Each permission is a runtime grant on
+      Android 14+; on older devices the Health Connect APK supplies
+      the permission flow via its own activity.
+    -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.READ_BODY_TEMPERATURE" />
+    <uses-permission android:name="android.permission.health.READ_BLOOD_PRESSURE" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
+
     <application
         android:label="Health Guard"
         android:name="${applicationName}"

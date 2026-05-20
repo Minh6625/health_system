@@ -72,6 +72,15 @@ dependencies:
   flutter_blue_plus: ^1.32.12
   permission_handler: ^11.3.1
 
+  # Phase 2 (Health Connect): Mi Fitness writes Redmi Watch 3 readings
+  # (HR, SpO2, Steps, Sleep) into Android Health Connect. The `health`
+  # package wraps the Health Connect Client API (and HealthKit on iOS)
+  # so the Flutter app can read those rows without bonding directly to
+  # the watch. Pin to the 13.x series so it lines up with the
+  # repository's `intl ^0.20.2` constraint (older 11.x lines depend on
+  # intl <0.20). Re-test the permission flow if you bump majors.
+  health: ^13.3.1
+
   flutter_native_splash: any
 dev_dependencies:
   flutter_test:
