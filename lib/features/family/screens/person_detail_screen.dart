@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:healthguard/core/routes/app_router.dart';
 import 'package:healthguard/features/family/providers/family_dashboard_provider.dart';
 import 'package:healthguard/features/family/models/family_profile_snapshot.dart';
+import 'package:healthguard/features/family/widgets/alert_history_section.dart';
 import 'package:healthguard/features/home/presentation/widgets/vital_metric_card.dart';
 import 'package:healthguard/shared/presentation/theme/app_colors.dart';
 import 'package:healthguard/shared/presentation/theme/app_radii.dart';
@@ -825,74 +826,15 @@ class PersonDetailScreen extends StatelessWidget {
   }
 
   Widget _buildAlertHistory(FamilyProfileSnapshot profile) {
-    // NOTE: Backend hiện chưa có endpoint trả về danh sách cảnh báo gần đây
-    // theo profileId. Trước đây chỗ này render hard-coded mock data ("Nhịp tim
-    // cao 112 bpm — Hôm nay 14:30", "Đã nhấn nút SOS — Hôm qua 09:15") cho mọi
-    // profile, gây hiểu lầm nguy hiểm cho caregiver. Khi có API thật, thay
-    // empty state bên dưới bằng list thực tế filtered theo profile.id.
-    final firstName = profile.name.split(' ').last;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.gapLg,
-        AppSpacing.gapLg,
-        AppSpacing.gapLg,
-        0,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Cảnh báo gần đây',
-            style: TextStyle(
-              fontSize: 19,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: AppSpacing.sectionGapSm),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(
-              horizontal: AppSpacing.gapLg,
-              vertical: AppSpacing.sectionGapXl,
-            ),
-            decoration: BoxDecoration(
-              color: AppColors.bgSurface,
-              borderRadius: BorderRadius.circular(AppRadii.radiusMd),
-              border: Border.all(color: AppColors.strokeSoft),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.notifications_none_rounded,
-                  color: AppColors.textSecondary,
-                  size: 36,
-                ),
-                SizedBox(height: AppSpacing.gapSm),
-                Text(
-                  'Chưa có cảnh báo gần đây',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                SizedBox(height: AppSpacing.gapXs),
-                Text(
-                  'Cảnh báo về $firstName sẽ hiển thị tại đây khi có.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.textSecondary,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-        ],
-      ),
+    // Section "Cảnh báo gần đây": delegated to AlertHistorySection which
+    // owns its own provider, repository call, and 4-state UI (loading /
+    // granted+empty / granted+items / permissionDenied / error). Padding
+    // is owned by the section itself to stay consistent with the medical /
+    // sleep cards above it (each function returns a self-padded card).
+    final firstName = profile.name.trim().split(' ').last;
+    return AlertHistorySection(
+      profileId: profile.id,
+      firstName: firstName.isEmpty ? profile.name : firstName,
     );
   }
 }

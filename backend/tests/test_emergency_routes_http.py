@@ -13,6 +13,9 @@ from app.db.database import get_db
 from app.schemas.emergency import (
     LocationInfo,
     PatientInfo,
+    RecentAlertDeepLink,
+    RecentAlertItem,
+    RecentAlertsResponse,
     ResolutionInfo,
     SOSEventResponse,
     SOSAlertsResponse,
@@ -280,3 +283,184 @@ def test_risk_response_route_surfaces_recipient_count_for_escalation(
         "sos_event_id": 12,
         "recipient_count": 2,
     }
+
+
+# ----------------------------------------------------------------------------
+# Recent alerts (caregiver feed) — GET /caregiver/patients/{id}/recent-alerts
+# ----------------------------------------------------------------------------
+
+
+def _build_recent_alerts(
+    *,
+    item_count: int = 2,
+    permission_state: str = "granted",
+    window_days: int = 7,
+) -> RecentAlertsResponse:
+    items = [
+        RecentAlertItem(
+            id=1000 + i,
+            uuid=f"00000000-0000-0000-0000-{i:012d}",
+            alert_type="risk_high" if i % 2 == 0 else "fall_detected",
+            severity="high" if i % 2 == 0 else "critical",
+            title="Cảnh báo sức khoẻ" if i % 2 == 0 else "Phát hiện té ngã",
+            message=f"Sample alert #{i}",
+            occurred_at=datetime(2026, 5, 19, 10, i, tzinfo=UTC),
+            is_resolved=False,
+            deep_link=RecentAlertDeepLink(
+                type="alert" if i % 2 == 0 else "fall_event",
+                id=2000 + i,
+            ),
+        )
+        for i in range(item_count)
+    ]
+    return RecentAlertsResponse(
+        items=items,
+        permission_state=permission_state,  # type: ignore[arg-type]
+        window_days=window_days,
+        total_in_window=len(items),
+    )
+
+
+def test_recent_alerts_route_passes_caller_and_default_query(monkeypatch) -> None:
+    """Happy path: caregiver hits the endpoint, service receives the
+    expected viewer/patient/days/limit, response shape matches schema."""
+    client = _build_test_client(user_id=11)
+    captured: dict[str, object] = {}
+
+    def _service(db, *, viewer_user_id, patient_user_id, days, limit):
+        captured.update(
+            {
+                "viewer_user_id": viewer_user_id,
+                "patient_user_id": patient_user_id,
+                "days": days,
+                "limit": limit,
+            }
+        )
+        return _build_recent_alerts(item_count=2)
+
+    monkeypatch.setattr(
+        EmergencyService,
+        "get_recent_alerts_for_patient",
+        staticmethod(_service),
+    )
+
+    response = client.get(
+        "/api/v1/mobile/emergency/caregiver/patients/42/recent-alerts"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["permission_state"] == "granted"
+    assert body["window_days"] == 7
+    assert len(body["items"]) == 2
+    # Defaults are explicit per the FastAPI route signature; assert both so a
+    # future drive-by edit to ``Query(...)`` defaults breaks the test.
+    assert captured == {
+        "viewer_user_id": 11,
+        "patient_user_id": 42,
+        "days": 7,
+        "limit": 10,
+    }
+
+
+def test_recent_alerts_route_forwards_custom_query_params(monkeypatch) -> None:
+    """Caregiver overrides ``days``/``limit`` — the route must pipe both
+    through verbatim (within the ``ge``/``le`` bounds enforced by Query)."""
+    client = _build_test_client(user_id=11)
+    captured: dict[str, object] = {}
+
+    def _service(db, *, viewer_user_id, patient_user_id, days, limit):
+        captured.update({"days": days, "limit": limit})
+        return _build_recent_alerts(item_count=0)
+
+    monkeypatch.setattr(
+        EmergencyService,
+        "get_recent_alerts_for_patient",
+        staticmethod(_service),
+    )
+
+    response = client.get(
+        "/api/v1/mobile/emergency/caregiver/patients/42/recent-alerts"
+        "?days=14&limit=25"
+    )
+
+    assert response.status_code == 200
+    assert captured == {"days": 14, "limit": 25}
+
+
+def test_recent_alerts_route_rejects_out_of_range_query(monkeypatch) -> None:
+    """``Query(ge/le)`` bounds must reject ``days=0`` and ``limit=99``
+    before the service is called — the service stub asserts on entry."""
+    client = _build_test_client(user_id=11)
+    monkeypatch.setattr(
+        EmergencyService,
+        "get_recent_alerts_for_patient",
+        staticmethod(
+            lambda *a, **kw: (_ for _ in ()).throw(
+                AssertionError("service must not be called")
+            )
+        ),
+    )
+
+    too_small = client.get(
+        "/api/v1/mobile/emergency/caregiver/patients/42/recent-alerts?days=0"
+    )
+    too_large = client.get(
+        "/api/v1/mobile/emergency/caregiver/patients/42/recent-alerts?limit=999"
+    )
+
+    assert too_small.status_code == 422
+    assert too_large.status_code == 422
+
+
+def test_recent_alerts_route_returns_empty_list_when_no_data(monkeypatch) -> None:
+    """Granted permission but no alerts in the window — still 200 with
+    ``permission_state=granted``. Mobile distinguishes empty from denied via
+    this field, not via HTTP status."""
+    client = _build_test_client(user_id=11)
+    monkeypatch.setattr(
+        EmergencyService,
+        "get_recent_alerts_for_patient",
+        staticmethod(
+            lambda db, **_: _build_recent_alerts(item_count=0),
+        ),
+    )
+
+    response = client.get(
+        "/api/v1/mobile/emergency/caregiver/patients/42/recent-alerts"
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"] == []
+    assert body["permission_state"] == "granted"
+    assert body["total_in_window"] == 0
+
+
+def test_recent_alerts_route_propagates_403_from_service(monkeypatch) -> None:
+    """When the service raises 403 (no relationship OR no
+    ``can_receive_alerts``), the route must surface it untouched. Mobile
+    relies on the status code to switch into the ``permissionDenied`` UI
+    state."""
+    from fastapi import HTTPException
+
+    client = _build_test_client(user_id=11)
+
+    def _denied(*_a, **_kw):
+        raise HTTPException(
+            status_code=403,
+            detail="You do not have permission to view this patient's alerts",
+        )
+
+    monkeypatch.setattr(
+        EmergencyService,
+        "get_recent_alerts_for_patient",
+        staticmethod(_denied),
+    )
+
+    response = client.get(
+        "/api/v1/mobile/emergency/caregiver/patients/42/recent-alerts"
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"].startswith("You do not have permission")

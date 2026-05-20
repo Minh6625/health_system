@@ -175,3 +175,53 @@ class TriggerSOSResponse(SuccessResponse):
 
     sos_id: int
     recipient_count: int
+
+
+# ============================================================================
+# Recent Alerts (caregiver feed for PersonDetailScreen)
+# ============================================================================
+
+
+class RecentAlertDeepLink(BaseModel):
+    """Hint to the mobile client about which detail screen to open on tap.
+
+    The backend never derives a route string — it only emits the *kind* of
+    target plus its primary key. Mobile owns the route table so that backend
+    changes can't break navigation.
+    """
+
+    type: Literal["sos_event", "risk_score", "fall_event", "alert"]
+    id: int
+
+
+class RecentAlertItem(BaseModel):
+    """A single alert as shown on the caregiver-facing feed."""
+
+    id: int
+    uuid: str
+    alert_type: str  # value from CAREGIVER_FEED_ALERT_TYPES
+    severity: str  # 'low' | 'medium' | 'high' | 'critical'
+    title: str
+    message: Optional[str] = None
+    occurred_at: datetime
+    is_resolved: bool = False
+    deep_link: Optional[RecentAlertDeepLink] = None
+
+    class Config:
+        from_attributes = True
+
+
+class RecentAlertsResponse(BaseModel):
+    """Response for ``GET /caregiver/patients/{id}/recent-alerts``.
+
+    ``permission_state`` lets the client tell apart *no rows* (granted but
+    quiet) from *no permission* (caregiver hasn't been allowed to receive
+    alerts) without parsing the HTTP status. The status itself stays 200 in
+    both granted cases; 403 only fires when the relationship is missing or
+    not accepted.
+    """
+
+    items: List[RecentAlertItem]
+    permission_state: Literal["granted"]
+    window_days: int
+    total_in_window: int
