@@ -907,16 +907,21 @@ class MonitoringService:
                 if result.rowcount and result.rowcount > 0:
                     accepted += 1
 
-            # Update device freshness so the mobile dashboard's
-            # last-sync indicator matches reality.
-            db.execute(
-                text(
-                    "UPDATE devices SET last_sync_at = :now, last_seen_at = :now "
-                    "WHERE id = :device_id"
-                ),
-                {"now": now_utc, "device_id": device_id},
-            )
-            db.commit()
+        # Phase 2 fix: bump device freshness on EVERY successful sync
+        # call, not just when new vitals were inserted. Health Connect
+        # sometimes returns 0 new samples (Mi Fitness has not pushed yet
+        # since the last poll) — that does not mean the device is dead,
+        # so we still update last_seen_at so the dashboard can flip the
+        # online badge instead of looking dead 60s after the user
+        # explicitly tapped "Đồng bộ ngay".
+        db.execute(
+            text(
+                "UPDATE devices SET last_sync_at = :now, last_seen_at = :now "
+                "WHERE id = :device_id"
+            ),
+            {"now": now_utc, "device_id": device_id},
+        )
+        db.commit()
 
         risk_evaluated: list[int] = []
         if accepted > 0:
