@@ -101,7 +101,11 @@ NotificationEvent? mapNotificationEventFromPushData(
   // separately to decide whether to deep-link to FallAlertScreen vs
   // SosDetailScreen.
   final fallEventId = data['fall_event_id']?.toString().trim();
-  final isFall = isFallAlertType(alertType);
+  // A real patient fall alert always carries fall_event_id.
+  // sos_alert with alert_type=fall_detected (fall-triggered SOS sent to
+  // caregivers) has no fall_event_id — treat it as SOS, not patient fall.
+  final isFall =
+      isFallAlertType(alertType) && (fallEventId?.isNotEmpty ?? false);
   final notificationId = (data['notification_id'] ?? data['id'])
       ?.toString()
       .trim();

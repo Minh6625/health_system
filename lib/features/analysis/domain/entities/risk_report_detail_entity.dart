@@ -75,15 +75,15 @@ class SnapshotMetrics {
 /// patient-mode detail loads.
 class ShapWaterfall {
   /// True when the upstream model produced a usable SHAP payload.
-  /// Some backend fallbacks (rule_based, ONNX) return
-  /// ``available=false`` because they don't compute real SHAP
-  /// values; the screen renders an explanatory empty state in that
-  /// case rather than fake bars.
   final bool available;
 
-  /// SHAP base value (the model's mean prediction). Bars on the
-  /// waterfall are anchored to this baseline.
+  /// SHAP base value (E[f(X)] — the model's mean prediction across
+  /// training data). Bars on the waterfall are anchored to this baseline.
   final double baseValue;
+
+  /// Final prediction value (base_value + sum of all contributions).
+  /// Null when the backend did not include it (older model versions).
+  final double? predictionValue;
 
   /// Per-feature contributions. Length is bounded by the model-api
   /// `top_n` config (typically <=20).
@@ -92,15 +92,20 @@ class ShapWaterfall {
   const ShapWaterfall({
     required this.available,
     required this.baseValue,
+    this.predictionValue,
     required this.values,
   });
 
   bool get hasValues => available && values.isNotEmpty;
 
-  /// Sum of all contributions on top of the base value. Equals the
-  /// final prediction (in raw SHAP space, not 0..100 risk score).
+  /// Sum of all contributions on top of the base value.
   double get totalContribution =>
       values.fold<double>(0, (acc, v) => acc + v.shapValue);
+
+  /// Final prediction: prefer the backend-supplied value, fall back to
+  /// base_value + totalContribution.
+  double get finalPrediction =>
+      predictionValue ?? (baseValue + totalContribution);
 
   static const ShapWaterfall empty = ShapWaterfall(
     available: false,
@@ -114,19 +119,22 @@ class ShapContribution {
   /// Backend feature name (snake_case, model-api domain).
   final String feature;
 
-  /// Raw SHAP value. Sign matters — positive pushes the prediction
-  /// up (toward higher risk), negative pulls it down (protective).
+  /// Raw SHAP value. Positive = pushes prediction up (higher risk),
+  /// negative = protective.
   final double shapValue;
 
-  /// Optional pre-computed magnitude (``abs(shap_value)``) the
-  /// backend ships for sorting. Falls back to ``shapValue.abs()``
-  /// when missing so consumers can sort uniformly.
+  /// Pre-computed magnitude (abs(shap_value)) for sorting.
   final double impact;
+
+  /// Actual measured value for this feature at prediction time
+  /// (e.g. spo2=92.5). May be null for derived/categorical features.
+  final double? featureValue;
 
   const ShapContribution({
     required this.feature,
     required this.shapValue,
     required this.impact,
+    this.featureValue,
   });
 
   bool get isProtective => shapValue < 0;

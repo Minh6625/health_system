@@ -32,6 +32,14 @@ class VitalDetailScreen extends StatefulWidget {
 
 class _VitalDetailScreenState extends State<VitalDetailScreen> {
   late final VitalSignsProvider _vitalsProvider;
+  String _selectedRange = '1h';
+
+  // 12 entries each — matches the 12 time-bucket points the backend returns.
+  // Empty strings skip labeling that position so only 4 ticks are visible.
+  static const Map<String, List<String>> _rangeLabels = {
+    '1h': ['60p', '', '', '', '40p', '', '', '', '20p', '', '', 'Bây giờ'],
+    '6h': ['6h',  '', '', '', '4h',  '', '', '', '2h',  '', '', 'Bây giờ'],
+  };
 
   @override
   void initState() {
@@ -158,11 +166,35 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                 // mini chart underneath already shows the 24h trend the
                 // section title promises, so we drop the dead CTA instead of
                 // hiding the lie behind a disabled state.
-                Text(
-                  'Biến động 24h qua',
-                  style: AppTextStyles.sectionTitle.copyWith(
-                    fontSize: 18,
-                  ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Biến động $_selectedRange qua',
+                      style: AppTextStyles.sectionTitle.copyWith(
+                        fontSize: 18,
+                      ),
+                    ),
+                    SegmentedButton<String>(
+                      segments: const [
+                        ButtonSegment(value: '1h', label: Text('1h')),
+                        ButtonSegment(value: '6h', label: Text('6h')),
+                      ],
+                      selected: {_selectedRange},
+                      onSelectionChanged: (selected) {
+                        final range = selected.first;
+                        setState(() => _selectedRange = range);
+                        _vitalsProvider.loadTimeseries(
+                          force: true,
+                          range: range,
+                        );
+                      },
+                      style: ButtonStyle(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
                 ),
                 SizedBox(height: AppSpacing.gapSm),
 
@@ -181,7 +213,8 @@ class _VitalDetailScreenState extends State<VitalDetailScreen> {
                       linesData: provider.chartData,
                       lineColors: provider.chartColors,
                       height: 140,
-                      xLabels: const ['6h', '9h', '12h', '15h', '18h', '21h', '0h', 'Bây giờ'],
+                      xLabels: _rangeLabels[_selectedRange] ??
+                          _rangeLabels['1h']!,
                     ),
                   ),
 

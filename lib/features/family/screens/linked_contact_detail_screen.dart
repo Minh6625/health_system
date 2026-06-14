@@ -164,7 +164,6 @@ class _LinkedContactDetailContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<LinkedContactDetailProvider>();
-
     return Scaffold(
       backgroundColor: AppColors.bgPrimary,
       appBar: AppBar(
@@ -196,7 +195,10 @@ class _LinkedContactDetailContent extends StatelessWidget {
       );
     }
 
-    if (provider.error != null) {
+    // Only replace the entire body with an error screen when the initial
+    // load failed (contact was never populated). Toggle failures are handled
+    // separately via SnackBar so the UI remains usable.
+    if (provider.error != null && provider.contact == null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -234,13 +236,27 @@ class _LinkedContactDetailContent extends StatelessWidget {
 
         Padding(
           padding: EdgeInsets.symmetric(horizontal: AppSpacing.gapLg),
-          child: Text(
-            'Quyền hạn của bạn trao',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textSecondary,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Quyền hạn của bạn trao',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              if (provider.hasUnsavedChanges)
+                Text(
+                  'Chưa lưu',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.brandPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+            ],
           ),
         ),
         SizedBox(height: AppSpacing.gapSm),
@@ -248,38 +264,36 @@ class _LinkedContactDetailContent extends StatelessWidget {
           title: 'Cho phép xem chỉ số sức khoẻ của tôi',
           description:
               'Người này sẽ xem được nhịp tim, SpO₂, huyết áp và các chỉ số liên quan của bạn.',
-          value: contact.permissions.contains('can_view_vitals'),
-          onChanged: (val) => provider.togglePermission('can_view_vitals', val),
+          value: provider.draftPermissions.contains('can_view_vitals'),
+          onChanged: (val) =>
+              provider.updateDraftPermission('can_view_vitals', val),
         ),
         PermissionToggleCard(
           title: 'Cho phép nhận cảnh báo SOS của tôi',
           description:
               'Người này sẽ nhận thông báo khi bạn phát tín hiệu khẩn cấp SOS.',
-          value: contact.permissions.contains('can_receive_alerts'),
+          value: provider.draftPermissions.contains('can_receive_alerts'),
           onChanged: (val) =>
-              provider.togglePermission('can_receive_alerts', val),
+              provider.updateDraftPermission('can_receive_alerts', val),
         ),
         PermissionToggleCard(
           title: 'Cho phép xem vị trí của tôi khi SOS',
           description:
               'Chỉ chia sẻ vị trí trong tình huống khẩn cấp để hỗ trợ tìm kiếm nhanh hơn.',
-          value: contact.permissions.contains('can_view_location'),
+          value: provider.draftPermissions.contains('can_view_location'),
           onChanged: (val) =>
-              provider.togglePermission('can_view_location', val),
+              provider.updateDraftPermission('can_view_location', val),
         ),
-        // P-4: opt-in sharing of self-filled medical profile (blood type,
-        // height/weight, medications, allergies, conditions). Defaults
-        // OFF; the patient must flip this for each linked contact who
-        // they want to share their medical info with (typically a
-        // doctor or primary caregiver).
         PermissionToggleCard(
           title: 'Cho phép xem hồ sơ y tế của tôi',
           description:
               'Người này sẽ xem được nhóm máu, chiều cao/cân nặng, thuốc đang dùng, dị ứng và tiền sử bệnh bạn đã khai báo.',
-          value: contact.permissions.contains('can_view_medical_info'),
+          value: provider.draftPermissions.contains('can_view_medical_info'),
           onChanged: (val) =>
-              provider.togglePermission('can_view_medical_info', val),
+              provider.updateDraftPermission('can_view_medical_info', val),
         ),
+        SizedBox(height: AppSpacing.gapSm),
+        _SavePermissionsButton(provider: provider),
 
         SizedBox(height: AppSpacing.gapLg),
         LabelManagementCard(
@@ -307,6 +321,90 @@ class _LinkedContactDetailContent extends StatelessWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Save Permissions Button
+// ---------------------------------------------------------------------------
+
+class _SavePermissionsButton extends StatelessWidget {
+  final LinkedContactDetailProvider provider;
+
+  const _SavePermissionsButton({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasChanges = provider.hasUnsavedChanges;
+    final isSaving = provider.isSavingPermissions;
+    final saveError = provider.savePermissionsError;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (saveError != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Lưu thất bại. Vui lòng kiểm tra kết nối và thử lại.',
+                style: TextStyle(fontSize: 13, color: AppColors.critical),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ElevatedButton(
+            onPressed: (hasChanges && !isSaving)
+                ? () async {
+                    final ok = await provider.savePermissions();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            ok
+                                ? 'Đã lưu quyền thành công.'
+                                : 'Lưu thất bại. Vui lòng thử lại.',
+                          ),
+                          backgroundColor:
+                              ok ? AppColors.brandPrimary : AppColors.critical,
+                          duration: const Duration(seconds: 2),
+                        ),
+                      );
+                    }
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.brandPrimary,
+              disabledBackgroundColor: AppColors.strokeSoft,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: isSaving
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Text(
+                    hasChanges ? 'Lưu thay đổi' : 'Đã lưu',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: hasChanges ? Colors.white : AppColors.textSecondary,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 class _TagPickerSheet extends StatefulWidget {
   final List<ContactTag> initialTags;

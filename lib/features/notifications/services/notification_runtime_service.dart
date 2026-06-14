@@ -35,7 +35,7 @@ const String _backgroundRiskCriticalChannelId = 'risk_critical_alerts_v3';
 const String _backgroundRiskCriticalChannelName = 'Risk Critical Alerts';
 const String _backgroundSosChannelId = 'sos_fullscreen_alerts_v3';
 const String _backgroundSosChannelName = 'SOS Fullscreen Alerts';
-const String _backgroundFallChannelId = 'fall_alerts_v1';
+const String _backgroundFallChannelId = 'fall_alerts_v2';
 const String _backgroundFallChannelName = 'Fall Alerts';
 
 // Legacy IDs kept for one-shot deletion on init so old installs don't
@@ -44,6 +44,7 @@ const String _legacyBackgroundRiskCriticalChannelId = 'risk_critical_alerts';
 const String _legacyBackgroundRiskCriticalChannelIdV2 = 'risk_critical_alerts_v2';
 const String _legacyBackgroundSosChannelId = 'sos_fullscreen_alerts';
 const String _legacyBackgroundSosChannelIdV2 = 'sos_fullscreen_alerts_v2';
+const String _legacyBackgroundFallChannelId = 'fall_alerts_v1';
 
 /// Per-type notification sounds — each maps to a file in android/app/src/main/res/raw/.
 const _emergencyAlertSound =
@@ -117,6 +118,9 @@ Future<void> _initializeBackgroundNotifications() async {
   );
   await androidPlugin?.deleteNotificationChannel(
     _legacyBackgroundSosChannelIdV2,
+  );
+  await androidPlugin?.deleteNotificationChannel(
+    _legacyBackgroundFallChannelId,
   );
 
   // Both channels register with the SAME loud vibration pattern + sound
@@ -361,7 +365,7 @@ class NotificationRuntimeService {
   // in Android Settings.  See top-level comment in this file.
   static const String _fullScreenChannelId = 'sos_fullscreen_alerts_v3';
   static const String _fullScreenChannelName = 'SOS Fullscreen Alerts';
-  static const String _fallChannelId = 'fall_alerts_v1';
+  static const String _fallChannelId = 'fall_alerts_v2';
   static const String _fallChannelName = 'Fall Alerts';
   static const String _legacyFullScreenChannelId = 'sos_fullscreen_alerts';
   static const String _legacyFullScreenChannelIdV2 = 'sos_fullscreen_alerts_v2';
@@ -464,6 +468,7 @@ class NotificationRuntimeService {
     await androidPlugin?.deleteNotificationChannel(_legacyFullScreenChannelIdV2);
     await androidPlugin?.deleteNotificationChannel(_legacyRiskCriticalChannelId);
     await androidPlugin?.deleteNotificationChannel(_legacyRiskCriticalChannelIdV2);
+    await androidPlugin?.deleteNotificationChannel('fall_alerts_v1');
 
     await androidPlugin?.createNotificationChannel(
       AndroidNotificationChannel(
@@ -1247,7 +1252,12 @@ class NotificationRuntimeService {
     // ADR-023 Phase 7 S13: caregiver fall path — show banner instead of
     // fullscreen. Patient fall flag absent or "true" continues the existing
     // fullscreen FallAlertScreen path.
-    final isFallAlert = isFallAlertType(alertType);
+    // A genuine patient fall alert has fall_event_id; sos_alert with
+    // alert_type=fall_detected (fall-triggered SOS to caregivers) has
+    // no fall_event_id and must NOT show FallAlertScreen.
+    final hasFallEventId =
+        _toMap(item['data'])['fall_event_id'] != null;
+    final isFallAlert = isFallAlertType(alertType) && hasFallEventId;
     final isCaregiver =
         isFallAlert &&
         _toMap(item['data'])['is_recipient_patient']?.toString() == 'false';

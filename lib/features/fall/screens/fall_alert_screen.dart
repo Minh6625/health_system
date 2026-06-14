@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:healthguard/core/services/sos_audio_service.dart';
 import 'package:healthguard/features/fall/models/fall_event.dart';
 import 'package:healthguard/features/fall/providers/fall_event_provider.dart';
+import 'package:healthguard/features/fall/repositories/fall_event_repository.dart';
 import 'package:healthguard/features/fall/screens/fall_stand_up_survey_screen.dart';
 import 'package:healthguard/features/emergency/screens/sos_confirm_screen.dart';
 import 'package:healthguard/features/fall/widgets/fall_countdown_ring.dart';
@@ -186,29 +187,67 @@ class _FallAlertScreenState extends State<FallAlertScreen> {
   ) async {
     final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
-    final ok = await provider.dismiss(widget.event.id, reason: 'Tôi ổn');
-    if (!ok && context.mounted) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Không thể bỏ qua — vui lòng thử lại'),
-        ),
-      );
-      return;
-    }
-    // Module FA-2 (Option 3-Lite): user just confirmed they're OK.
-    // Push the stand-up survey so caregiver gets a richer signal
-    // ("standing OK" / "needs help getting up" / "skipped").  We use
-    // ``pushReplacement`` so Android back-button won't return to the
-    // already-dismissed alert (which would be confusing UX).
+    final result = await provider.dismiss(widget.event.id, reason: 'Tôi ổn');
     if (!context.mounted) return;
-    unawaited(_audio.stop());
-    await navigator.pushReplacement(
-      MaterialPageRoute(
-        settings: const RouteSettings(name: FallStandUpSurveyScreen.routeName),
-        builder: (_) => FallStandUpSurveyScreen(event: widget.event),
-        fullscreenDialog: true,
-      ),
-    );
+
+    switch (result.outcome) {
+      case FallDismissOutcome.success:
+        // Module FA-2 (Option 3-Lite): user just confirmed they're OK.
+        // Surface a heads-up if auto-SOS already fired before the
+        // dismiss landed — the patient should know contacts are on
+        // their way even though they've cleared the alert locally.
+        // Then push the stand-up survey via `pushReplacement` so
+        // Android back-button won't return to the now-dismissed alert.
+        unawaited(_audio.stop());
+        final updated = result.event ?? widget.event;
+        if (updated.status == FallEventStatus.escalated) {
+          messenger.showSnackBar(
+            const SnackBar(
+              backgroundColor: Colors.orange,
+              content: Text(
+                'SOS đã được gửi đến người thân. Vui lòng giữ liên lạc nếu cần hỗ trợ.',
+              ),
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        await navigator.pushReplacement(
+          MaterialPageRoute(
+            settings: const RouteSettings(
+              name: FallStandUpSurveyScreen.routeName,
+            ),
+            builder: (_) => FallStandUpSurveyScreen(event: updated),
+            fullscreenDialog: true,
+          ),
+        );
+        return;
+
+      case FallDismissOutcome.notFoundOrForbidden:
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Cảnh báo đã hết hạn hoặc không khả dụng cho tài khoản này.',
+            ),
+          ),
+        );
+        return;
+
+      case FallDismissOutcome.serverError:
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Lỗi máy chủ — vui lòng thử lại sau vài giây.'),
+          ),
+        );
+        return;
+
+      case FallDismissOutcome.networkError:
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Mất kết nối — kiểm tra mạng rồi thử lại.'),
+          ),
+        );
+        return;
+    }
   }
 
   void _onConfirm(BuildContext context) {

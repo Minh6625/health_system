@@ -55,12 +55,11 @@ def get_vitals_timeseries(
     target_profile_id: int = Depends(get_target_profile_id),
     db: Session = Depends(get_db),
     range: str = Query(
-        default="24h",
+        default="1h",
         description=(
-            "Time window the chart should cover. Currently only ``24h`` is "
-            "wired into the mobile UI; ``7d`` and ``30d`` are reserved for "
-            "future range tabs and are silently coerced to ``24h`` until "
-            "those tabs ship."
+            "Time window for the chart. Supported: ``1h`` (12 × 5-min buckets), "
+            "``6h`` (12 × 30-min), ``24h`` (96 × 15-min). "
+            "Unknown values are coerced to ``1h``."
         ),
     ),
 ) -> VitalsTimeseriesResponse:

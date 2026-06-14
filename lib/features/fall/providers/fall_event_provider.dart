@@ -81,14 +81,13 @@ class FallEventProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Dismiss one event. Returns ``true`` when the dismiss succeeded.
+  /// Dismiss one event. Returns a [FallDismissResult] so the caller
+  /// can branch UX per outcome (success vs 404 vs 5xx vs network).
   ///
-  /// Optimistically updates the local state on success so the UI
-  /// reflects the new ``dismissed`` status without waiting for a list
-  /// refresh. On 404 (event not found / not yours) returns ``false``
-  /// without throwing — the caller usually shows a "đã hết hạn"
-  /// banner.
-  Future<bool> dismiss(
+  /// On success the local list is patched optimistically with the
+  /// updated event so the UI reflects the new status without waiting
+  /// for a list refresh. Non-success outcomes leave the list intact.
+  Future<FallDismissResult> dismiss(
     int eventId, {
     String? reason,
     String? patientId,
@@ -97,27 +96,34 @@ class FallEventProvider extends ChangeNotifier {
     _dismissErrorMessage = null;
     notifyListeners();
 
-    bool ok = false;
+    FallDismissResult result = const FallDismissResult(
+      outcome: FallDismissOutcome.serverError,
+    );
     try {
-      final updated = await _repository.dismiss(
+      result = await _repository.dismiss(
         eventId,
         reason: reason,
         patientId: patientId,
       );
-      if (updated != null) {
+      final updated = result.event;
+      if (result.isSuccess && updated != null) {
         _events = [
           for (final event in _events)
             if (event.id == updated.id) updated else event,
         ];
-        ok = true;
+      } else if (!result.isSuccess) {
+        _dismissErrorMessage = result.outcome.toString();
       }
     } catch (e) {
       _dismissErrorMessage = e.toString();
+      result = const FallDismissResult(
+        outcome: FallDismissOutcome.serverError,
+      );
     } finally {
       _dismissInFlight = false;
       notifyListeners();
     }
-    return ok;
+    return result;
   }
 
   /// Fetch one event detail. Bypasses the list cache so caregiver

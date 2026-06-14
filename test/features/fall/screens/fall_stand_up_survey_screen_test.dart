@@ -37,7 +37,12 @@ class _CapturingRepository implements FallEventRepository {
   Future<FallEvent?> getEvent(int id, {String? patientId}) async => null;
 
   @override
-  Future<FallEvent?> dismiss(int id, {String? reason, String? patientId}) async => null;
+  Future<FallDismissResult> dismiss(
+    int id, {
+    String? reason,
+    String? patientId,
+  }) async =>
+      const FallDismissResult(outcome: FallDismissOutcome.notFoundOrForbidden);
 
   @override
   Future<FallEvent?> submitSurvey(

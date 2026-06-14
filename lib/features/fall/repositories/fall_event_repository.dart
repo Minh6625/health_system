@@ -27,12 +27,20 @@ abstract class FallEventRepository {
 
   /// Mark a fall event as user-cancelled.
   ///
-  /// Idempotent on the server — re-dismissing refreshes the response
-  /// timestamp and overwrites the reason. Returns the updated event
-  /// so the caller can swap it into local state without a follow-up
-  /// GET. Returns ``null`` when the event is not found / not owned
-  /// (HTTP 404).
-  Future<FallEvent?> dismiss(int id, {String? reason, String? patientId});
+  /// Returns a [FallDismissResult] that distinguishes:
+  /// * [FallDismissOutcome.success] with the updated event (status
+  ///   may be `dismissed` or `escalated` if auto-SOS already fired —
+  ///   caller decides UX).
+  /// * [FallDismissOutcome.notFoundOrForbidden] — backend answered 404
+  ///   (event missing or caller is not the owner / linked caregiver).
+  /// * [FallDismissOutcome.serverError] — backend answered 5xx.
+  /// * [FallDismissOutcome.networkError] — timeout / no connection /
+  ///   transport-level failure.
+  Future<FallDismissResult> dismiss(
+    int id, {
+    String? reason,
+    String? patientId,
+  });
 
   /// Module FA-2 (Option 3-Lite): submit the post-dismiss stand-up
   /// survey answer.  Called from [FallStandUpSurveyScreen] after the
@@ -53,6 +61,36 @@ abstract class FallEventRepository {
     required bool skipped,
     String? patientId,
   });
+}
+
+/// Outcome of a dismiss call. Lets the UI surface a distinct message
+/// per failure mode instead of the same generic "Không thể bỏ qua"
+/// snackbar for every error.
+enum FallDismissOutcome {
+  /// Backend returned 200 with a valid event payload. The event field
+  /// is non-null; its `status` may be `dismissed` (clean cancel) or
+  /// `escalated` (dismiss arrived after auto-SOS already fired).
+  success,
+
+  /// Backend answered 404 — event doesn't exist OR the caller has no
+  /// ownership / accepted-caregiver link to it.
+  notFoundOrForbidden,
+
+  /// Backend answered 5xx.
+  serverError,
+
+  /// Transport-level failure (timeout, socket, host lookup).
+  networkError,
+}
+
+/// Outcome + (optional) updated event for a dismiss call.
+class FallDismissResult {
+  const FallDismissResult({required this.outcome, this.event});
+
+  final FallDismissOutcome outcome;
+  final FallEvent? event;
+
+  bool get isSuccess => outcome == FallDismissOutcome.success;
 }
 
 class FallEventRepositoryImpl implements FallEventRepository {
@@ -92,7 +130,7 @@ class FallEventRepositoryImpl implements FallEventRepository {
       }
       return FallEvent.fromJson(response);
     } catch (e) {
-      if (_is404(e)) {
+      if (_classify(e) == FallDismissOutcome.notFoundOrForbidden) {
         return null;
       }
       rethrow;
@@ -100,7 +138,7 @@ class FallEventRepositoryImpl implements FallEventRepository {
   }
 
   @override
-  Future<FallEvent?> dismiss(
+  Future<FallDismissResult> dismiss(
     int id, {
     String? reason,
     String? patientId,
@@ -116,18 +154,19 @@ class FallEventRepositoryImpl implements FallEventRepository {
         targetProfileId: _parseTargetProfileId(patientId),
       );
       if (response is! Map<String, dynamic>) {
-        return null;
+        return const FallDismissResult(outcome: FallDismissOutcome.serverError);
       }
       final inner = response['fall_event'];
       if (inner is! Map<String, dynamic>) {
-        return null;
+        return const FallDismissResult(outcome: FallDismissOutcome.serverError);
       }
-      return FallEvent.fromJson(inner);
+      return FallDismissResult(
+        outcome: FallDismissOutcome.success,
+        event: FallEvent.fromJson(inner),
+      );
     } catch (e) {
-      if (_is404(e)) {
-        return null;
-      }
-      rethrow;
+      if (e is SessionExpiredException) rethrow;
+      return FallDismissResult(outcome: _classify(e));
     }
   }
 
@@ -157,16 +196,44 @@ class FallEventRepositoryImpl implements FallEventRepository {
       }
       return FallEvent.fromJson(inner);
     } catch (e) {
-      if (_is404(e)) {
+      if (_classify(e) == FallDismissOutcome.notFoundOrForbidden) {
         return null;
       }
       rethrow;
     }
   }
 
-  bool _is404(Object e) {
+  /// Map a thrown error from [ApiClient] to a [FallDismissOutcome].
+  ///
+  /// [ApiClient._mapException] re-wraps as plain `Exception(message)`,
+  /// so we string-match. Backend HTTPException(404) detail is in
+  /// Vietnamese ("Không tìm thấy sự kiện ngã"); _getErrorMessage falls
+  /// back to "Not found" only when the body is unparseable. Match both.
+  FallDismissOutcome _classify(Object e) {
     final msg = e.toString();
-    return msg.contains('Not found') || msg.contains('404');
+    if (msg.contains('Network error') ||
+        msg.contains('SocketException') ||
+        msg.contains('TimeoutException') ||
+        msg.contains('Failed host lookup') ||
+        msg.contains('Connection refused')) {
+      return FallDismissOutcome.networkError;
+    }
+    if (msg.contains('404') ||
+        msg.contains('Not found') ||
+        msg.contains('Không tìm thấy')) {
+      return FallDismissOutcome.notFoundOrForbidden;
+    }
+    if (msg.contains('500') ||
+        msg.contains('502') ||
+        msg.contains('503') ||
+        msg.contains('Lỗi server') ||
+        msg.contains('Service unavailable')) {
+      return FallDismissOutcome.serverError;
+    }
+    // Default: unknown server-side message — treat as server error so
+    // the user sees "thử lại sau" rather than "mất kết nối" (which
+    // would be wrong if the request actually reached the server).
+    return FallDismissOutcome.serverError;
   }
 
   int? _parseTargetProfileId(String? patientId) {

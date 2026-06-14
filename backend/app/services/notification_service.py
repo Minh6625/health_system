@@ -183,6 +183,42 @@ class NotificationService:
         return existing.read_at
 
     # -----------------------------------------------------------------
+    # Fall alert cooldown  (Lane A)
+    # -----------------------------------------------------------------
+
+    @staticmethod
+    def is_fall_alert_in_cooldown(
+        db: Session,
+        *,
+        device_id: int,
+        window_seconds: int = 60,
+    ) -> bool:
+        """True when a fall alert was already sent for this device within
+        *window_seconds*. Prevents duplicate fall push when the IoT
+        simulator re-injects the same fall event (e.g. after a retry or
+        a rapid second trigger within the countdown window).
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
+        recent = (
+            db.query(Alert.id)
+            .filter(
+                Alert.device_id == device_id,
+                Alert.alert_type.in_(["fall_detection", "fall_detected"]),
+                Alert.created_at >= cutoff,
+            )
+            .limit(1)
+            .first()
+        )
+        if recent is not None:
+            logger.info(
+                "Fall alert cooldown active: device=%s window=%ss",
+                device_id,
+                window_seconds,
+            )
+            return True
+        return False
+
+    # -----------------------------------------------------------------
     # Risk alert cooldown check  (A5 — GAP-5 fix)
     # -----------------------------------------------------------------
 
@@ -192,6 +228,7 @@ class NotificationService:
         *,
         device_id: int,
         alert_type: str,
+        age_years: float | None = None,
     ) -> bool:
         """Check whether a risk alert family for *device_id* is in cooldown.
 
@@ -217,8 +254,19 @@ class NotificationService:
         không tính vào cooldown. Phần B2 (group-ack) mở rộng quy tắc này
         để 1 patient ack release cho cả nhóm caregiver.
         """
+        # Age-aware cooldown: elderly users (≥70) have higher HR/vital
+        # baselines that oscillate near alert thresholds more easily.
+        # Extend the cooldown window so we don't spam with risk_high alerts
+        # while still allowing risk_critical to escalate normally.
+        effective_window = RISK_ALERT_COOLDOWN_SECONDS
+        if age_years is not None and alert_type == "risk_high":
+            if age_years >= 80:
+                effective_window = max(effective_window, 600)   # 10 min
+            elif age_years >= 70:
+                effective_window = max(effective_window, 480)   # 8 min
+
         cutoff = datetime.now(timezone.utc) - timedelta(
-            seconds=RISK_ALERT_COOLDOWN_SECONDS,
+            seconds=effective_window,
         )
 
         # Select alert ids that the user already marked safe — these
@@ -396,7 +444,7 @@ class NotificationService:
                     platform=platform,
                     device_id=device_id,
                     is_active=True,
-                    last_seen_at=get_current_time(),
+                    last_sync_at=get_current_time(),
                 )
             )
             logger.info(
@@ -411,7 +459,7 @@ class NotificationService:
             existing.platform = platform
             existing.device_id = device_id
             existing.is_active = True
-            existing.last_seen_at = get_current_time()
+            existing.last_sync_at = get_current_time()
             logger.info(
                 "Push token registered: user=%s platform=%s device_id=%s token_prefix=%s status=updated",
                 user_id,
@@ -438,7 +486,7 @@ class NotificationService:
             .update(
                 {
                     "is_active": False,
-                    "last_seen_at": get_current_time(),
+                    "last_sync_at": get_current_time(),
                 },
                 synchronize_session=False,
             )
@@ -462,7 +510,7 @@ class NotificationService:
             .update(
                 {
                     "is_active": False,
-                    "last_seen_at": get_current_time(),
+                    "last_sync_at": get_current_time(),
                 },
                 synchronize_session=False,
             )

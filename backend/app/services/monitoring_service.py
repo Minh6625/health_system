@@ -951,9 +951,11 @@ class MonitoringService:
     # enough to show diurnal variation, small enough to keep the JSON
     # payload under ~10 KB and the fl_chart line smooth on a phone.
     _VITALS_TIMESERIES_RANGES: dict[str, tuple[int, int]] = {
-        "24h": (24, 15),  # 96 buckets
-        "7d": (24 * 7, 60),  # 168 buckets — reserved for future range tab
-        "30d": (24 * 30, 6 * 60),  # 120 buckets — reserved for future range tab
+        "1h": (1, 5),       # 12 buckets × 5 min
+        "6h": (6, 30),      # 12 buckets × 30 min
+        "24h": (24, 15),    # 96 buckets × 15 min
+        "7d": (24 * 7, 60),        # reserved
+        "30d": (24 * 30, 6 * 60),  # reserved
     }
 
     @staticmethod
@@ -986,7 +988,7 @@ class MonitoringService:
         normalized_range = (
             range_key
             if range_key in MonitoringService._VITALS_TIMESERIES_RANGES
-            else "24h"
+            else "1h"
         )
         window_hours, bucket_minutes = MonitoringService._VITALS_TIMESERIES_RANGES[
             normalized_range

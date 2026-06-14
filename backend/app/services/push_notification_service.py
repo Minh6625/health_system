@@ -16,6 +16,7 @@ except ModuleNotFoundError:
     credentials = None  # type: ignore[assignment]
     messaging = None  # type: ignore[assignment]
     _sdk_available = False
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models.push_token_model import UserPushToken
@@ -326,6 +327,48 @@ class PushNotificationService:
             or risk_level.strip().lower() == "critical"
         )
 
+        # B-Lane: attach latest known location for the device so caregivers
+        # can see where the patient is when the risk alert arrives.
+        # Falls back to None if no location has ever been recorded.
+        location_lat: str = ""
+        location_lng: str = ""
+        location_address: str = ""
+        if device_id is not None:
+            try:
+                loc_row = db.execute(
+                    text(
+                        """
+                        SELECT latitude, longitude, address
+                        FROM (
+                            SELECT latitude, longitude, address, detected_at AS ts
+                            FROM fall_events
+                            WHERE device_id = :did AND latitude IS NOT NULL
+                            UNION ALL
+                            SELECT se.latitude, se.longitude, se.address,
+                                   se.triggered_at AS ts
+                            FROM sos_events se
+                            JOIN devices d ON d.id = :did
+                            WHERE se.user_id = d.user_id AND se.latitude IS NOT NULL
+                        ) loc
+                        ORDER BY ts DESC
+                        LIMIT 1
+                        """
+                    ),
+                    {"did": int(device_id)},
+                ).mappings().first()
+                if loc_row is not None:
+                    location_lat = str(float(loc_row["latitude"]))
+                    location_lng = str(float(loc_row["longitude"]))
+                    location_address = loc_row["address"] or ""
+            except Exception:
+                logger.debug(
+                    "Could not query last known location for device=%s (non-fatal)",
+                    device_id,
+                )
+
+        # recipient_count = number of unique users receiving this push.
+        unique_recipient_count = len(set(int(r.user_id) for r in rows))
+
         logger.info(
             "Preparing FCM risk push: recipients=%s active_tokens=%s alert_type=%s level=%s device=%s channel=%s",
             list(recipient_user_ids),
@@ -351,7 +394,13 @@ class PushNotificationService:
                 "title": title,
                 "body": body,
                 "click_action": "FLUTTER_NOTIFICATION_CLICK",
+                "recipient_count": str(unique_recipient_count),
             }
+            if location_lat:
+                data["latitude"] = location_lat
+                data["longitude"] = location_lng
+            if location_address:
+                data["location_address"] = location_address
 
             # Phase 8 B4 (2026-05-20): risk push CHUYEN sang DATA-ONLY de
             # khu duplicate notification. Truoc fix: BE gui ca

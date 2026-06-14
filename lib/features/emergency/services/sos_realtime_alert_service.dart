@@ -215,27 +215,27 @@ class SOSRealtimeAlertService implements NotificationEmergencyAdapter {
     // notification on top would cause duplicate sounds in foreground.
     if (isFallAlertType(alertType)) {
       final dataMap = _toMap(item['data']);
+      // Do NOT fall back to subjectId: sos_alert with alert_type=fall_detected
+      // has no fall_event_id and subjectId would be a sos_event_id — wrong type.
       final fallEventIdRaw =
-          (dataMap['fall_event_id'] ??
-                  item['fall_event_id'] ??
-                  subjectId)
-              ?.toString();
+          (dataMap['fall_event_id'] ?? item['fall_event_id'])?.toString();
       final fallEventId = int.tryParse(fallEventIdRaw ?? '');
-      if (fallEventId == null) {
+      if (fallEventId != null) {
+        final fallEventUuid =
+            (dataMap['fall_event_uuid'] ?? item['fall_event_uuid'])
+                ?.toString();
+        final confidence = double.tryParse(
+          (dataMap['confidence'] ?? item['confidence'] ?? '').toString(),
+        ) ?? 0.0;
+        await presentFallAlert(
+          fallEventId: fallEventId,
+          fallEventUuid: fallEventUuid,
+          confidence: confidence,
+        );
         return;
       }
-      final fallEventUuid =
-          (dataMap['fall_event_uuid'] ?? item['fall_event_uuid'])
-              ?.toString();
-      final confidence = double.tryParse(
-        (dataMap['confidence'] ?? item['confidence'] ?? '').toString(),
-      ) ?? 0.0;
-      await presentFallAlert(
-        fallEventId: fallEventId,
-        fallEventUuid: fallEventUuid,
-        confidence: confidence,
-      );
-      return;
+      // fallEventId == null: fall-triggered SOS (no fall_event_id) →
+      // fall through to SOS path so caregiver sees SOS UI, not FallAlertScreen.
     }
 
     await _showFullScreenAlert(item, sosId: subjectId);
@@ -890,7 +890,7 @@ class SOSRealtimeAlertService implements NotificationEmergencyAdapter {
       notifSound =
           const RawResourceAndroidNotificationSound('health_emergency');
     } else if (isFall) {
-      channelId = 'fall_alerts_v1';
+      channelId = 'fall_alerts_v2';
       channelName = 'Fall Alerts';
       channelDesc = 'Cảnh báo phát hiện té ngã';
       notifSound = const RawResourceAndroidNotificationSound('fall_alert');
@@ -954,11 +954,38 @@ class SOSRealtimeAlertService implements NotificationEmergencyAdapter {
     final title =
         (item['title'] as String?) ??
         (isRisk ? 'Cảnh báo sức khỏe bỏ lỡ' : 'Cảnh báo SOS bỏ lỡ');
-    final body =
+
+    // Base body from server or fallback.
+    var body =
         (item['message'] as String?) ??
         (isRisk
             ? 'Bạn có cảnh báo sức khỏe khi chưa hoạt động trong ứng dụng.'
             : 'Bạn có một cảnh báo SOS khi chưa hoạt động trong ứng dụng.');
+
+    // B-Lane: append recipient_count + location from FCM data when available.
+    final dataMap = _toMap(item['data']);
+    final recipientCountRaw = dataMap['recipient_count']?.toString().trim();
+    final recipientCount = int.tryParse(recipientCountRaw ?? '');
+    final lat = dataMap['latitude']?.toString().trim();
+    final lng = dataMap['longitude']?.toString().trim();
+    final addr = dataMap['location_address']?.toString().trim();
+
+    final locationPart = (addr != null && addr.isNotEmpty)
+        ? addr
+        : (lat != null && lat.isNotEmpty && lng != null && lng.isNotEmpty)
+            ? '$lat, $lng'
+            : null;
+
+    final extras = <String>[];
+    if (recipientCount != null && recipientCount > 0) {
+      extras.add('Đã gửi cho $recipientCount người thân');
+    }
+    if (locationPart != null) {
+      extras.add('📍 $locationPart');
+    }
+    if (extras.isNotEmpty) {
+      body = '$body\n${extras.join(' · ')}';
+    }
 
     final payload = jsonEncode({
       'type': isRisk ? 'risk' : 'sos',

@@ -102,6 +102,31 @@ const Map<String, String> _actionRewrites = {
   'tiep tuc theo doi xu huong': 'Tiếp tục theo dõi xu hướng',
 };
 
+/// Returns the Vietnamese display label for a raw snake_case feature key.
+///
+/// Falls back to a Title Case conversion for unknown keys so we never
+/// show raw underscored names in the UI. The optional [includeUnit]
+/// flag appends the unit in parentheses when true (default false).
+String humanizeFeatureName(String featureKey, {bool includeUnit = false}) {
+  final mapped = _factorLabels[featureKey.toLowerCase()];
+  if (mapped != null) {
+    if (includeUnit && mapped.unit.isNotEmpty) {
+      return '${mapped.label} (${mapped.unit})';
+    }
+    return mapped.label;
+  }
+  return featureKey
+      .split('_')
+      .where((p) => p.isNotEmpty)
+      .map((p) => p[0].toUpperCase() + p.substring(1))
+      .join(' ');
+}
+
+/// Returns only the unit string for a raw feature key (empty string if unknown).
+String featureUnit(String featureKey) {
+  return _factorLabels[featureKey.toLowerCase()]?.unit ?? '';
+}
+
 /// Replaces every `feature_key=value` occurrence in [reason] with the
 /// Vietnamese label + value + unit looked up in `_factorLabels`.
 ///

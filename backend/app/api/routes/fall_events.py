@@ -133,12 +133,33 @@ def dismiss_fall_event(
     otherwise HTTP 404.
     """
     reason = payload.reason if payload is not None else None
+    # Two-step probe so dismiss works in both the patient flow AND the
+    # caregiver flow (family tab active, X-Target-Profile-Id set to the
+    # patient). Service-layer ownership check now accepts either:
+    #
+    # 1. current_user owns the device that produced the event
+    #    (patient dismissing own alert), OR
+    # 2. current_user is an accepted caregiver of the device owner
+    #    (caregiver acknowledging on the patient's behalf, e.g. when
+    #    they're physically with the patient and tap "Tôi ổn").
+    #
+    # We probe with current_user.id first because that's the common
+    # patient path; the target_profile_id fallback covers the case
+    # where the patient context was switched in the UI before the
+    # alert fired (older bug returned 404 there — see Phase 4B notes).
     result = FallEventService.dismiss(
-        user_id=int(target_profile_id),
+        user_id=int(current_user.id),
         fall_event_id=int(fall_event_id),
         reason=reason,
         db=db,
     )
+    if result is None and int(target_profile_id) != int(current_user.id):
+        result = FallEventService.dismiss(
+            user_id=int(target_profile_id),
+            fall_event_id=int(fall_event_id),
+            reason=reason,
+            db=db,
+        )
     if result is None:
         # 404 enumeration-resistant — skip audit.
         raise HTTPException(
@@ -198,8 +219,10 @@ def submit_fall_survey(
     Returns HTTP 404 when the event doesn't belong to the target user
     (same enumeration-resistant pattern as ``GET`` / ``dismiss``).
     """
+    # Same fix as dismiss: survey is submitted by the patient for their
+    # own event — use current_user.id, not target_profile_id.
     result = FallEventService.submit_survey(
-        user_id=int(target_profile_id),
+        user_id=int(current_user.id),
         fall_event_id=int(fall_event_id),
         can_stand=payload.can_stand,
         skipped=bool(payload.skipped),

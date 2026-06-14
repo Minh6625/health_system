@@ -27,6 +27,7 @@ from app.schemas.fall_telemetry import ImuWindowRequest, ImuWindowResponse
 from app.schemas.sleep_telemetry import SleepRiskRequest, SleepRiskResponse
 from app.services.emergency_service import EmergencyService
 from app.services.model_api_client import get_model_api_client
+from app.services.notification_service import NotificationService
 from app.services.push_notification_service import PushNotificationService
 from app.services.risk_alert_service import calculate_device_risk, dispatch_risk_alerts
 from app.services.settings_service import SettingsService
@@ -284,6 +285,67 @@ def _pick_bool(payload: dict[str, Any], *keys: str) -> bool | None:
     if value is None:
         return None
     return bool(value)
+
+
+def _resolve_device_location(
+    db: Session,
+    device_id: int,
+    metadata: dict[str, Any],
+) -> tuple[float | None, float | None, str | None]:
+    """Return (lat, lon, address) for a fall/SOS event.
+
+    Priority:
+    1. Values from the ingest payload metadata (simulator / real device).
+    2. Most-recent FallEvent with GPS for this device (last known position).
+    3. Most-recent SOSEvent with GPS for this device.
+    4. None, None, None — caller handles missing location gracefully.
+    """
+    lat = _pick_float(metadata, "latitude")
+    lon = _pick_float(metadata, "longitude")
+    addr = _pick_value(metadata, "address")
+    if lat is not None and lon is not None:
+        return lat, lon, addr
+
+    # Fallback: last known GPS from fall_events
+    last_fall = (
+        db.query(FallEvent.latitude, FallEvent.longitude, FallEvent.address)
+        .filter(
+            FallEvent.device_id == device_id,
+            FallEvent.latitude.is_not(None),
+            FallEvent.longitude.is_not(None),
+        )
+        .order_by(FallEvent.detected_at.desc())
+        .limit(1)
+        .first()
+    )
+    if last_fall is not None:
+        logger.info(
+            "Fall/SOS location fallback: using last known GPS from fall_events for device=%s",
+            device_id,
+        )
+        return float(last_fall.latitude), float(last_fall.longitude), last_fall.address
+
+    # Fallback: last known GPS from sos_events
+    from app.models.sos_event_model import SOSEvent  # local import to avoid circular
+    last_sos = (
+        db.query(SOSEvent.latitude, SOSEvent.longitude)
+        .filter(
+            SOSEvent.device_id == device_id,
+            SOSEvent.latitude.is_not(None),
+            SOSEvent.longitude.is_not(None),
+        )
+        .order_by(SOSEvent.triggered_at.desc())
+        .limit(1)
+        .first()
+    )
+    if last_sos is not None:
+        logger.info(
+            "Fall/SOS location fallback: using last known GPS from sos_events for device=%s",
+            device_id,
+        )
+        return float(last_sos.latitude), float(last_sos.longitude), None
+
+    return None, None, None
 
 
 def _resolve_alert_user_id(
@@ -623,15 +685,18 @@ def ingest_alert(
                     )
 
             if fall_event is None:
+                _fe_lat, _fe_lon, _fe_addr = _resolve_device_location(
+                    db, int(payload.db_device_id), metadata or {}
+                )
                 fall_event = FallEvent(
                     device_id=payload.db_device_id,
                     detected_at=payload.timestamp,
                     confidence=confidence_value,
                     model_version=_pick_value(metadata, "model_version"),
-                    latitude=_pick_float(metadata, "latitude"),
-                    longitude=_pick_float(metadata, "longitude"),
+                    latitude=_fe_lat,
+                    longitude=_fe_lon,
                     location_accuracy=_pick_float(metadata, "location_accuracy", "accuracy"),
-                    address=_pick_value(metadata, "address"),
+                    address=_fe_addr,
                     features=metadata or None,
                 )
                 db.add(fall_event)
@@ -642,8 +707,9 @@ def ingest_alert(
                 # without overwriting the original detection timestamp.
                 if confidence_value:
                     fall_event.confidence = confidence_value
-                lat = _pick_float(metadata, "latitude")
-                lon = _pick_float(metadata, "longitude")
+                lat, lon, addr = _resolve_device_location(
+                    db, int(payload.db_device_id), metadata or {}
+                )
                 if lat is not None:
                     fall_event.latitude = lat
                 if lon is not None:
@@ -651,7 +717,6 @@ def ingest_alert(
                 accuracy = _pick_float(metadata, "location_accuracy", "accuracy")
                 if accuracy is not None:
                     fall_event.location_accuracy = accuracy
-                addr = _pick_value(metadata, "address")
                 if addr is not None:
                     fall_event.address = addr
                 if metadata:
@@ -702,9 +767,9 @@ def ingest_alert(
                     db=db,
                     user_id=resolved_user_id,
                     trigger_type="auto",
-                    latitude=_pick_float(metadata, "latitude"),
-                    longitude=_pick_float(metadata, "longitude"),
-                    address=_pick_value(metadata, "address"),
+                    latitude=float(fall_event.latitude) if fall_event.latitude is not None else None,
+                    longitude=float(fall_event.longitude) if fall_event.longitude is not None else None,
+                    address=fall_event.address,
                     fall_event_id=fall_event_id,
                     send_push=True,
                 )
@@ -763,24 +828,40 @@ def ingest_alert(
                     )
                     _caregiver_ids = []
                 _all_recipients = [_patient_id] + _caregiver_ids
-                background_tasks.add_task(
-                    PushNotificationService.send_fall_critical_alert,
+                # A-Lane: cooldown gate — suppress duplicate fall push
+                # if the same device already sent one within 60s.
+                # SOS escalation (trigger_sos above) has its own 60s
+                # dedup; this gate specifically protects the fall FCM
+                # fan-out from a rapid second inject or IoT retry.
+                if NotificationService.is_fall_alert_in_cooldown(
                     db,
-                    recipient_user_ids=_all_recipients,
-                    patient_user_id=_patient_id,
-                    fall_event_id=int(fall_event_id),
-                    fall_event_uuid=str(fall_event.uuid),
-                    title="Phát hiện té ngã",
-                    body=(
-                        "Hệ thống phát hiện bạn có thể đã té ngã. "
-                        "Nhấn 'Tôi ổn' nếu bạn vẫn ổn."
-                    ),
-                    confidence=float(confidence_value),
-                )
-                logger.info(
-                    "Fall fanout queued: patient=%s caregivers=%s fall_event_id=%s",
-                    _patient_id, _caregiver_ids, fall_event_id,
-                )
+                    device_id=int(payload.db_device_id),
+                    window_seconds=60,
+                ):
+                    logger.info(
+                        "Fall push suppressed by cooldown: device=%s fall_event_id=%s",
+                        payload.db_device_id,
+                        fall_event_id,
+                    )
+                else:
+                    background_tasks.add_task(
+                        PushNotificationService.send_fall_critical_alert,
+                        db,
+                        recipient_user_ids=_all_recipients,
+                        patient_user_id=_patient_id,
+                        fall_event_id=int(fall_event_id),
+                        fall_event_uuid=str(fall_event.uuid),
+                        title="Phát hiện té ngã",
+                        body=(
+                            "Hệ thống phát hiện bạn có thể đã té ngã. "
+                            "Nhấn 'Tôi ổn' nếu bạn vẫn ổn."
+                        ),
+                        confidence=float(confidence_value),
+                    )
+                    logger.info(
+                        "Fall fanout queued: patient=%s caregivers=%s fall_event_id=%s",
+                        _patient_id, _caregiver_ids, fall_event_id,
+                    )
 
                 ingested += 1
                 return IngestResponse(ingested=ingested, errors=errors)

@@ -288,6 +288,7 @@ def dispatch_risk_alerts(
     score: float,
     risk_score_id: int | None = None,
     post_fall: bool = False,
+    age_years: float | None = None,
 ) -> bool:
     """Escalation -> cooldown check -> create alerts -> send push notifications."""
     rule = get_escalation_rule(risk_level)
@@ -302,6 +303,7 @@ def dispatch_risk_alerts(
         db,
         device_id=device_id,
         alert_type=rule.alert_type,
+        age_years=age_years,
     ):
         logger.warning(
             "Risk alert suppressed by cooldown: device=%s type=%s level=%s window=%ss",
@@ -350,6 +352,7 @@ def dispatch_risk_alerts(
         db,
         device_id=device_id,
         alert_type=rule.alert_type,
+        age_years=age_years,
     ):
         logger.warning(
             "Risk alert suppressed by cooldown after lock: device=%s type=%s",
@@ -513,6 +516,7 @@ def calculate_device_risk(
     )
 
     if dispatch_alerts:
+        user_age = _derive_age(context.get("date_of_birth"))
         dispatch_risk_alerts(
             db,
             device_id=int(device_id),
@@ -520,6 +524,7 @@ def calculate_device_risk(
             risk_level=inference.risk_level,
             score=result.score,
             risk_score_id=risk_score_row.id,
+            age_years=user_age,
         )
 
     return result

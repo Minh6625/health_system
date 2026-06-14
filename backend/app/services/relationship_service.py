@@ -287,10 +287,12 @@ class RelationshipService:
         rel.can_receive_alerts = True
         RelationshipRepository.update(db, rel)
         
-        # Check if inverse relationship already exists
+        # Check if inverse relationship already exists (exclude soft-deleted rows
+        # so a deleted inverse doesn't block creating a fresh one).
         existing_inverse_rel = db.query(UserRelationship).filter(
             UserRelationship.patient_id == rel.caregiver_id,
-            UserRelationship.caregiver_id == rel.patient_id
+            UserRelationship.caregiver_id == rel.patient_id,
+            UserRelationship.deleted_at.is_(None),
         ).first()
 
         # If it doesn't exist, create it (Patient views Caregiver)
@@ -332,6 +334,16 @@ class RelationshipService:
         if inverse_rel:
             RelationshipRepository.delete(db, inverse_rel)
 
+    # Permission columns that must always live on the patient-side row
+    # (the row where patient_id == current_user.id), because they represent
+    # "what I (the data-owner / patient) grant to my caregiver".
+    _PERMISSION_KEYS: frozenset = frozenset({
+        'can_view_vitals',
+        'can_receive_alerts',
+        'can_view_location',
+        'can_view_medical_info',
+    })
+
     @staticmethod
     def update_relationship(db: Session, current_user: User, relationship_id: int, payload: Any) -> UserRelationship:
         rel = RelationshipRepository.get_by_id(db, relationship_id)
@@ -348,13 +360,6 @@ class RelationshipService:
         # must therefore live on the row where the current user is the
         # caregiver (``caregiver_id == current_user.id``), regardless of
         # which side of the pair ``relationship_id`` happens to point at.
-        # Before this fix the label landed on whatever row was passed in,
-        # which for the dashboard PUT was the patient-side row, and
-        # ``format_relationships`` then surfaced the partner's label as the
-        # current user's own. Net effect: A's relabel of B showed up only on
-        # B's dashboard ("nó bị ngược"). We pop the label from the generic
-        # update payload and route it to the correct row; permissions and
-        # other fields keep their existing per-row semantics.
         label_value = update_data.pop("primary_relationship_label", None)
         if label_value is not None:
             partner_id = (
@@ -373,21 +378,80 @@ class RelationshipService:
             target_for_label = caregiver_side_rel or rel
             target_for_label.primary_relationship_label = label_value
             if target_for_label is not rel:
-                # Persist the label change in the same transaction as the
-                # generic field updates below so a single PUT either applies
-                # both halves or neither.
                 db.flush()
 
-        for key, value in update_data.items():
+        # --- Permission routing fix ---
+        # Permissions MUST land on the patient-side row (patient_id ==
+        # current_user.id), because ``get_linked_contact_detail`` reads them
+        # from exactly that row.  When the admin panel creates a relationship
+        # it only inserts ONE row (the caregiver-side: patient=B, caregiver=A),
+        # so the inverse row (patient=A, caregiver=B) may not yet exist.
+        # If the given ``relationship_id`` is the caregiver-side row we must
+        # find (or create) the patient-side row before writing permissions.
+        permission_data = {k: v for k, v in update_data.items()
+                          if k in RelationshipService._PERMISSION_KEYS}
+        other_data = {k: v for k, v in update_data.items()
+                      if k not in RelationshipService._PERMISSION_KEYS}
+
+        if permission_data:
+            if rel.patient_id == current_user.id:
+                # rel is already the patient-side row — update in-place.
+                permission_rel = rel
+            else:
+                # rel is the caregiver-side row; current user is the caregiver.
+                # The partner (the patient of rel) needs to be the caregiver of
+                # the patient-side row.
+                partner_id = rel.patient_id
+                permission_rel = (
+                    db.query(UserRelationship)
+                    .filter(
+                        UserRelationship.patient_id == current_user.id,
+                        UserRelationship.caregiver_id == partner_id,
+                        UserRelationship.deleted_at.is_(None),
+                    )
+                    .first()
+                )
+                if permission_rel is None:
+                    # Inverse row missing (admin-created relationship).
+                    # Create it so permissions have a stable home.
+                    permission_rel = UserRelationship(
+                        patient_id=current_user.id,
+                        caregiver_id=partner_id,
+                        relationship_type=rel.relationship_type,
+                        status='accepted',
+                        can_view_vitals=False,
+                        can_receive_alerts=False,
+                        can_view_location=False,
+                        can_view_medical_info=False,
+                    )
+                    db.add(permission_rel)
+                    db.flush()  # populate permission_rel.id without committing yet
+
+            for key, value in permission_data.items():
+                setattr(permission_rel, key, value)
+
+            if permission_rel is not rel:
+                # Flush permission changes to DB before committing the whole tx.
+                db.flush()
+                # Return the patient-side row so format_relationships picks the
+                # right ID when matching r["id"] == rel.id.
+                rel = permission_rel
+
+        # Non-permission fields (tags, relationship_type) stay on the original row.
+        for key, value in other_data.items():
             setattr(rel, key, value)
 
         return RelationshipRepository.update(db, rel)
 
     @staticmethod
     def format_relationships(db: Session, user_id: int) -> List[Dict[str, Any]]:
+        # Filter soft-deleted rows so format_relationships never returns a
+        # deleted row as primary_rel (which would cause permission writes to
+        # land on the wrong row and reads to always return []).
         rels = db.query(UserRelationship).filter(
-            (UserRelationship.patient_id == user_id) | 
-            (UserRelationship.caregiver_id == user_id)
+            (UserRelationship.patient_id == user_id) |
+            (UserRelationship.caregiver_id == user_id),
+            UserRelationship.deleted_at.is_(None),
         ).all()
         
         # Group by partner_id

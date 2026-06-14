@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../domain/entities/risk_report_detail_entity.dart';
+import '../../utils/factor_reason_prettifier.dart';
 
 /// Phase 8 slice 4b — clinician-only SHAP waterfall screen.
 ///
@@ -142,28 +143,61 @@ class _Header extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
+          // Waterfall equation: base_value + Σcontributions = prediction
           Row(
             children: [
               Expanded(
                 child: _Metric(
-                  label: 'Base value',
+                  label: 'Baseline (E[f(X)])',
                   value: shap.baseValue.toStringAsFixed(3),
                   theme: theme,
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  ' + ',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
               Expanded(
                 child: _Metric(
-                  label: 'Tổng đóng góp',
+                  label: 'Σ đóng góp',
                   value: (shap.totalContribution >= 0 ? '+' : '') +
                       shap.totalContribution.toStringAsFixed(3),
                   theme: theme,
                 ),
               ),
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  ' = ',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
               Expanded(
                 child: _Metric(
-                  label: 'Số đặc trưng',
-                  value: shap.values.length.toString(),
+                  label: 'Dự đoán cuối',
+                  value: shap.finalPrediction.toStringAsFixed(3),
                   theme: theme,
+                  highlight: true,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Spacer(),
+              Text(
+                '${shap.values.length} đặc trưng',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ],
@@ -178,10 +212,12 @@ class _Metric extends StatelessWidget {
   final String label;
   final String value;
   final ThemeData theme;
+  final bool highlight;
   const _Metric({
     required this.label,
     required this.value,
     required this.theme,
+    this.highlight = false,
   });
 
   @override
@@ -194,12 +230,16 @@ class _Metric extends StatelessWidget {
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 2),
         Text(
           value,
           style: theme.textTheme.titleSmall?.copyWith(
             fontFeatures: const [FontFeature.tabularFigures()],
+            color: highlight ? theme.colorScheme.primary : null,
+            fontWeight: highlight ? FontWeight.w700 : null,
           ),
         ),
       ],
@@ -224,40 +264,113 @@ class _ShapBar extends StatelessWidget {
         ? theme.colorScheme.tertiary
         : theme.colorScheme.error;
     final sign = contribution.shapValue >= 0 ? '+' : '';
+
+    // Human-readable feature name + optional measured value
+    final humanName = humanizeFeatureName(contribution.feature);
+    final unit = featureUnit(contribution.feature);
+    final featureVal = contribution.featureValue;
+    final featureValStr = featureVal != null
+        ? ' = ${featureVal % 1 == 0 ? featureVal.toInt() : featureVal.toStringAsFixed(1)}${unit.isNotEmpty ? " $unit" : ""}'
+        : '';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
+            // Feature name (Vietnamese) + measured value
             Expanded(
-              child: Text(
-                contribution.feature,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
+              child: RichText(
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                text: TextSpan(
+                  children: [
+                    TextSpan(
+                      text: humanName,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (featureValStr.isNotEmpty)
+                      TextSpan(
+                        text: featureValStr,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-            Text(
-              '$sign${contribution.shapValue.toStringAsFixed(3)}',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: colour,
-                fontWeight: FontWeight.w600,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
+            const SizedBox(width: 8),
+            // SHAP contribution value with direction icon
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  contribution.isProtective
+                      ? Icons.arrow_downward_rounded
+                      : Icons.arrow_upward_rounded,
+                  size: 14,
+                  color: colour,
+                ),
+                const SizedBox(width: 2),
+                Text(
+                  '$sign${contribution.shapValue.toStringAsFixed(3)}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colour,
+                    fontWeight: FontWeight.w600,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
         const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(
-            value: fraction.clamp(0.0, 1.0),
-            backgroundColor: colour.withValues(alpha: 0.12),
-            color: colour,
-            minHeight: 8,
-          ),
+        // Waterfall-style bar: positive bars extend right from center,
+        // protective bars extend left from center — center line is the
+        // 50% mark representing zero contribution.
+        LayoutBuilder(
+          builder: (_, constraints) {
+            final total = constraints.maxWidth;
+            final half = total / 2;
+            final barW = (fraction * half).clamp(0.0, half);
+            return Stack(
+              children: [
+                // Track
+                Container(
+                  height: 8,
+                  width: total,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                // Center divider
+                Positioned(
+                  left: half - 0.5,
+                  child: Container(
+                    width: 1,
+                    height: 8,
+                    color: theme.colorScheme.outline.withValues(alpha: 0.4),
+                  ),
+                ),
+                // Bar: risk_up → right of center, protective → left of center
+                Positioned(
+                  left: contribution.isProtective ? half - barW : half,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: Container(
+                      height: 8,
+                      width: barW,
+                      color: colour,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );

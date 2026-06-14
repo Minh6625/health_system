@@ -223,14 +223,25 @@ class FallEventService:
         )
         if row is None:
             return None
-        # Authorisation: re-check ownership inside the transaction.
-        owner_check = (
+        # Authorisation: dismiss is allowed for the device owner OR for
+        # an accepted caregiver of that owner. Caregiver path matters
+        # when the patient hands the watch to a family member who taps
+        # the alert on their own phone from the family tab.
+        ownership = (
             db.execute(
                 text(
                     """
                     SELECT 1
                     FROM devices d
                     WHERE d.id = :device_id AND d.user_id = :user_id
+                    UNION
+                    SELECT 1
+                    FROM devices d
+                    JOIN user_relationships r ON r.patient_id = d.user_id
+                    WHERE d.id = :device_id
+                      AND r.caregiver_id = :user_id
+                      AND r.status = 'accepted'
+                      AND r.deleted_at IS NULL
                     LIMIT 1
                     """
                 ),
@@ -239,7 +250,7 @@ class FallEventService:
             .mappings()
             .first()
         )
-        if owner_check is None:
+        if ownership is None:
             return None
 
         try:

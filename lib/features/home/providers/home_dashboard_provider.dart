@@ -64,6 +64,12 @@ class HomeDashboardProvider extends ChangeNotifier {
   double? get riskConfidence => _riskConfidence;
   bool get reportStale => _reportStale;
   Map<String, dynamic>? get sleepData => _sleepData;
+  // Show section errors only after this many consecutive silent-refresh
+  // failures. A single transient network blip during 5s polling must not
+  // flash the error banner to the user.
+  static const int _silentFailureThreshold = 3;
+  int _consecutiveSilentFailures = 0;
+
   bool get hasSectionErrors => _sectionErrors.isNotEmpty;
   Map<HomeDashboardSection, String> get sectionErrors =>
       Map.unmodifiable(_sectionErrors);
@@ -119,17 +125,39 @@ class HomeDashboardProvider extends ChangeNotifier {
     if (!silent) {
       _isLoading = true;
       _error = null;
+      _sectionErrors.clear();
+      _consecutiveSilentFailures = 0;
       notifyListeners();
     }
 
-    _sectionErrors.clear();
+    // For silent polling: collect errors into a scratch map, only promote
+    // them to the visible map after _silentFailureThreshold consecutive runs.
+    final scratchErrors = silent
+        ? <HomeDashboardSection, String>{}
+        : _sectionErrors;
+
+    if (silent) {
+      _sectionErrors.clear();
+    }
 
     try {
       await Future.wait([
-        _fetchLatestVitals(),
-        _fetchHealthReport(),
-        _fetchLatestSleep(),
+        _fetchLatestVitals(errorTarget: scratchErrors),
+        _fetchHealthReport(errorTarget: scratchErrors),
+        _fetchLatestSleep(errorTarget: scratchErrors),
       ], eagerError: false);
+
+      if (silent) {
+        if (scratchErrors.isEmpty) {
+          _consecutiveSilentFailures = 0;
+        } else {
+          _consecutiveSilentFailures++;
+          if (_consecutiveSilentFailures >= _silentFailureThreshold) {
+            _sectionErrors.addAll(scratchErrors);
+          }
+        }
+      }
+
       _error = _sectionErrors.length == HomeDashboardSection.values.length
           ? sectionErrorMessage
           : null;
@@ -143,7 +171,9 @@ class HomeDashboardProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _fetchLatestVitals() async {
+  Future<void> _fetchLatestVitals({
+    Map<HomeDashboardSection, String>? errorTarget,
+  }) async {
     try {
       final vitals = await _repository.getLatestVitalSigns(
         profileId: _profileId,
@@ -157,11 +187,15 @@ class HomeDashboardProvider extends ChangeNotifier {
       _vitalsTimestamp = vitals.timestamp;
       _vitalsStale = vitals.isStale;
     } catch (error) {
-      _recordSectionError(HomeDashboardSection.vitals, error);
+      _recordSectionError(
+        HomeDashboardSection.vitals, error, target: errorTarget,
+      );
     }
   }
 
-  Future<void> _fetchHealthReport() async {
+  Future<void> _fetchHealthReport({
+    Map<HomeDashboardSection, String>? errorTarget,
+  }) async {
     try {
       final report = await _repository.getHealthReport(profileId: _profileId);
       final latestRiskScore = report.latestRiskScore;
@@ -179,22 +213,32 @@ class HomeDashboardProvider extends ChangeNotifier {
       _riskConfidence = report.confidence;
       _reportStale = report.isStale;
     } catch (error) {
-      _recordSectionError(HomeDashboardSection.healthReport, error);
+      _recordSectionError(
+        HomeDashboardSection.healthReport, error, target: errorTarget,
+      );
     }
   }
 
-  Future<void> _fetchLatestSleep() async {
+  Future<void> _fetchLatestSleep({
+    Map<HomeDashboardSection, String>? errorTarget,
+  }) async {
     try {
       _sleepData = await _repository.getLatestSleepSession(
         profileId: _profileId,
       );
     } catch (error) {
-      _recordSectionError(HomeDashboardSection.sleep, error);
+      _recordSectionError(
+        HomeDashboardSection.sleep, error, target: errorTarget,
+      );
     }
   }
 
-  void _recordSectionError(HomeDashboardSection section, Object error) {
-    _sectionErrors[section] = error.toString();
+  void _recordSectionError(
+    HomeDashboardSection section,
+    Object error, {
+    Map<HomeDashboardSection, String>? target,
+  }) {
+    (target ?? _sectionErrors)[section] = error.toString();
   }
 
   Future<void> refreshDashboard() async {

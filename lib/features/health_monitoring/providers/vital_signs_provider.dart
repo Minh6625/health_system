@@ -238,25 +238,33 @@ class VitalSignsProvider extends ChangeNotifier {
   /// secondary surface (the live tile still renders), and 500-ing the
   /// whole screen because the chart endpoint hiccuped would be a worse
   /// UX than just showing the placeholder.
-  Future<void> loadTimeseries({bool force = false}) async {
+  String _timeseriesRange = '1h';
+  String get timeseriesRange => _timeseriesRange;
+
+  Future<void> loadTimeseries({bool force = false, String? range}) async {
     if (_disposed) return;
     if (_isLoadingTimeseries) return;
-    if (_hasLoadedTimeseries && !force) return;
 
+    final newRange = range ?? _timeseriesRange;
+    final rangeChanged = newRange != _timeseriesRange;
+    if (_hasLoadedTimeseries && !force && !rangeChanged) return;
+
+    _timeseriesRange = newRange;
     _isLoadingTimeseries = true;
     if (!_disposed) notifyListeners();
 
     try {
-      final result = await _repo.getVitalsTimeseries(profileId: _profileId);
+      final result = await _repo.getVitalsTimeseries(
+        profileId: _profileId,
+        range: _timeseriesRange,
+      );
       if (_disposed) return;
       _timeseries = result;
       _hasLoadedTimeseries = true;
     } catch (_) {
       if (_disposed) return;
       // Keep _hasLoadedTimeseries=false so a later startPolling()/refresh
-      // can retry. We deliberately do not surface a separate chart
-      // error UI: the placeholder already covers the empty case and the
-      // live tile is the primary signal on this screen.
+      // can retry. The placeholder covers the empty case.
       _timeseries = VitalsTimeseries.empty;
     } finally {
       _isLoadingTimeseries = false;

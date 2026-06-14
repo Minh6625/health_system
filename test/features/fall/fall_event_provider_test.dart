@@ -15,7 +15,7 @@ class _FakeRepository implements FallEventRepository {
   Future<FallEventList> Function({int limit, int offset, String? patientId})?
       listFn;
   Future<FallEvent?> Function(int id, {String? patientId})? getFn;
-  Future<FallEvent?> Function(int id, {String? reason, String? patientId})?
+  Future<FallDismissResult> Function(int id, {String? reason, String? patientId})?
       dismissFn;
   Future<FallEvent?> Function(int id,
       {required bool? canStand, required bool skipped, String? patientId})?
@@ -49,11 +49,17 @@ class _FakeRepository implements FallEventRepository {
   }
 
   @override
-  Future<FallEvent?> dismiss(int id, {String? reason, String? patientId}) {
+  Future<FallDismissResult> dismiss(
+    int id, {
+    String? reason,
+    String? patientId,
+  }) {
     dismissCalls++;
     final fn = dismissFn;
     if (fn != null) return fn(id, reason: reason, patientId: patientId);
-    return Future.value(null);
+    return Future.value(
+      const FallDismissResult(outcome: FallDismissOutcome.notFoundOrForbidden),
+    );
   }
 
   @override
@@ -154,24 +160,27 @@ void main() {
   });
 
   group('FallEventProvider.dismiss', () {
-    test('returns true and updates the event in place on success',
-        () async {
+    test('returns success and updates the event in place', () async {
       final repo = _FakeRepository(
         dismissFn: (id, {reason, patientId}) async {
-          return _stub(
-            id: id,
-            status: FallEventStatus.dismissed,
-            userCancelled: true,
-            cancelReason: reason,
+          return FallDismissResult(
+            outcome: FallDismissOutcome.success,
+            event: _stub(
+              id: id,
+              status: FallEventStatus.dismissed,
+              userCancelled: true,
+              cancelReason: reason,
+            ),
           );
         },
       );
       final provider = FallEventProvider(repository: repo)
         ..debugSetEvents([_stub(id: 17), _stub(id: 18)]);
 
-      final ok = await provider.dismiss(17, reason: 'Tôi ổn');
+      final result = await provider.dismiss(17, reason: 'Tôi ổn');
 
-      expect(ok, isTrue);
+      expect(result.outcome, FallDismissOutcome.success);
+      expect(result.isSuccess, isTrue);
       expect(repo.dismissCalls, 1);
       expect(provider.isDismissing, isFalse);
       // Event 17 is updated, 18 untouched.
@@ -181,18 +190,22 @@ void main() {
       expect(updated.cancelReason, 'Tôi ổn');
     });
 
-    test('returns false on 404 (server returns null)', () async {
+    test('returns notFoundOrForbidden on 404 from server', () async {
       final repo = _FakeRepository(
-        dismissFn: (id, {reason, patientId}) async => null,
+        dismissFn: (id, {reason, patientId}) async =>
+            const FallDismissResult(
+              outcome: FallDismissOutcome.notFoundOrForbidden,
+            ),
       );
       final provider = FallEventProvider(repository: repo);
 
-      final ok = await provider.dismiss(9999);
+      final result = await provider.dismiss(9999);
 
-      expect(ok, isFalse);
+      expect(result.outcome, FallDismissOutcome.notFoundOrForbidden);
+      expect(result.isSuccess, isFalse);
     });
 
-    test('exception sets dismissErrorMessage and returns false', () async {
+    test('exception is caught and surfaced as serverError', () async {
       final repo = _FakeRepository(
         dismissFn: (id, {reason, patientId}) async {
           throw Exception('500 server error');
@@ -200,19 +213,21 @@ void main() {
       );
       final provider = FallEventProvider(repository: repo);
 
-      final ok = await provider.dismiss(17);
+      final result = await provider.dismiss(17);
 
-      expect(ok, isFalse);
+      expect(result.outcome, FallDismissOutcome.serverError);
       expect(provider.dismissErrorMessage, contains('500 server error'));
       expect(provider.isDismissing, isFalse);
     });
 
     test('isDismissing is true while in flight, false after', () async {
-      // Manual completer to control the in-flight window.
       final repo = _FakeRepository(
         dismissFn: (id, {reason, patientId}) async {
           await Future<void>.delayed(const Duration(milliseconds: 1));
-          return _stub(id: id, status: FallEventStatus.dismissed);
+          return FallDismissResult(
+            outcome: FallDismissOutcome.success,
+            event: _stub(id: id, status: FallEventStatus.dismissed),
+          );
         },
       );
       final provider = FallEventProvider(repository: repo)

@@ -279,6 +279,9 @@ class RiskAnalysisRepository {
     final map = Map<String, dynamic>.from(raw);
     final available = map['available'] as bool? ?? false;
     final baseValue = _parseDouble(map['base_value']);
+    final predictionValue = map['prediction_value'] != null
+        ? _parseDouble(map['prediction_value'])
+        : null;
     final rawValues = map['values'];
     final contributions = <ShapContribution>[];
     if (rawValues is List) {
@@ -288,15 +291,18 @@ class RiskAnalysisRepository {
         final feature = entry['feature'] as String? ?? '';
         if (feature.isEmpty) continue;
         final shapValue = _parseDouble(entry['shap_value']);
-        // Backend ships ``impact`` as ``abs(shap_value)`` for
-        // pre-sorted bars; fall back to ``abs(shapValue)`` if missing
-        // so a future schema simplification doesn't break the screen.
         final impact = entry['impact'] != null
             ? _parseDouble(entry['impact'])
             : shapValue.abs();
+        final featureValue = entry['feature_value'] != null
+            ? double.tryParse(entry['feature_value'].toString())
+            : null;
         contributions.add(
           ShapContribution(
-            feature: feature, shapValue: shapValue, impact: impact,
+            feature: feature,
+            shapValue: shapValue,
+            impact: impact,
+            featureValue: featureValue,
           ),
         );
       }
@@ -304,6 +310,7 @@ class RiskAnalysisRepository {
     return ShapWaterfall(
       available: available,
       baseValue: baseValue,
+      predictionValue: predictionValue,
       values: contributions,
     );
   }

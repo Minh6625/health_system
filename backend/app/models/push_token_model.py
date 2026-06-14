@@ -33,7 +33,7 @@ class UserPushToken(Base):
         default=get_current_time,
         onupdate=get_current_time,
     )
-    last_seen_at: Mapped[datetime] = mapped_column(
+    last_sync_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=get_current_time,
     )
